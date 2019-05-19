@@ -1,0 +1,132 @@
+//
+// Copyright (C) 2017-2018 Niel Clausen. All rights reserved.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program. If not, see <https://www.gnu.org/licenses/>.
+//
+#pragma once
+
+// C++ includes
+#include <functional>
+#include <list>
+
+
+
+/*-----------------------------------------------------------------------
+ * Initialisation / Shutdown
+ -----------------------------------------------------------------------*/
+
+// instances of OnEvent must be declared statically
+
+class OnEvent
+{
+public:
+	using function_t = std::function<void( void )>;
+
+	enum class EventType
+	{
+		Startup,
+		Shutdown,
+		_NumTypes
+	};
+
+private:
+	// stored lists (of all) event callbacks
+	static constexpr size_t c_NumEvents{ static_cast<size_t>(EventType::_NumTypes) };
+	using EventList = std::list<OnEvent*>;
+	static EventList m_EventHandlers[ c_NumEvents ];
+
+	static EventList & GetEventList( EventType type ) {
+		return m_EventHandlers[ static_cast<size_t>(type) ];
+	};
+
+	// callback for *this* event
+	function_t m_Function;
+
+public:
+	static void RunEvents( EventType type );
+	OnEvent( EventType type, function_t func );
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * ChangeTracker
+ -----------------------------------------------------------------------*/
+
+// simple way to recall and check for the validity of an item
+class ChangeTracker
+{
+private:
+	mutable size_t m_Count{ 0 };
+
+public:
+	ChangeTracker( bool initialise = false )
+		: m_Count{ initialise ? 1U : 0U } {}
+
+	void RecordEvent( void ) {
+		m_Count += 1;
+	}
+
+	// return true where the states are different
+	bool CompareTo( const ChangeTracker & source ) const {
+		if( source.m_Count == 0 )
+			throw std::domain_error{ "Nlog: Uninitialised ChangeCounter" };
+
+		if( m_Count != source.m_Count )
+		{
+			m_Count = source.m_Count;
+			return true;
+		}
+		else
+			return false;
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * CacheStatistics
+ -----------------------------------------------------------------------*/
+
+ // instances of this class should be static
+class CacheStatistics
+{
+public:
+	CacheStatistics( const char * name )
+		: m_Name{ name }
+	{
+		m_Next = m_First;
+		m_First = this;
+	}
+
+	static void ReportAll( void );
+
+	void Lookup( void ) {
+		m_Lookups += 1;
+	}
+
+	void Miss( void ) {
+		m_Misses += 1;
+	}
+
+private:
+	void Report( void );
+
+	uint64_t m_Lookups{ 0 }, m_Misses{ 0 };
+	const char * m_Name;
+	CacheStatistics * m_Next;
+
+private:
+	static CacheStatistics * m_First;
+};
