@@ -131,6 +131,13 @@ counter=ver.txt
 ver=`cat $counter`
 echo -n $(($ver + 1)) > $counter
 
+# create the Python setup files
+sed -e "s/__VER__/$ver/" < Application/Template/nlv-setup.py > Application/nlv-setup.py
+sed -e "s/__VER__/$ver/" < Plugin/Template/nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py 
+
+# make the application version available to the Python code
+sed -e "s/__DEV__/$ver/" < Application/Template/Version.py > Application/Nlv/Version.py
+
 #directory structure
 blddir=`pwd`
 wrkdir="$blddir/_Work"
