@@ -1,0 +1,293 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+
+<!--
+ 
+Copyright (c) Microsoft Corporation. All rights reserved.
+THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
+ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
+IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
+PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
+
+-->
+
+
+<!--
+This is the file that defines the actual layout and type of the commands. 
+It is divided in different sections (e.g. command definition, command 
+placement, ...), with each defining a specific set of properties. 
+-->
+<CommandTable xmlns="http://schemas.microsoft.com/VisualStudio/2005-10-18/CommandTable" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <!--This defines the IDs for all the commands exposed by VisualStudio. -->
+  <Extern href="stdidcmd.h" />
+
+  <!--This header contains the command ids for the menus provided by the shell. -->
+  <Extern href="vsshlids.h" />
+  <Include href="KnownImageIds.vsct"/>
+
+
+  <!--
+  Inside the commands section we can have different sub-sections: one for
+  the menus, another for the menu groups, one for the buttons (the actual
+  commands), one for the combos and the last one for the bitmaps used. Each
+  element is identified by a command id that is a unique pair of guid and
+  numeric identifier; the guid part of the identifier is usually called
+  "command set" and is used to group different command inside a logically
+  related group; your package should define its own command set in order
+  to avoid collisions with command ids defined by other packages.
+  -->
+  <Commands package="guidClientPkg">
+
+
+    <!--
+    In this section you can define new menus. A menu in VS is the generic
+    way of refering to both menus (all types, including context menus and
+    MenuControllers) and toolbars (both toolwindow and top-level). A menu
+    is a container for groups.
+    -->
+    <Menus>
+    
+      <!--
+      A toolbar is a menu with itself as the "Relative to Group" and a
+      "Type" of "ToolWindowToolbar"
+      -->
+      <Menu guid="guidClientCmdSet" id="MyToolbar" priority="0x0000" type="ToolWindowToolbar">
+        <Parent guid="guidClientCmdSet" id="MyToolbar" />
+        <Strings>
+          <ButtonText>Window ToolBar</ButtonText>
+        </Strings>
+      </Menu>
+
+    </Menus>
+
+
+    <!--
+    In this section you can define new groups. A group is a container for
+    menus  or buttons (commands); from a visual point of view you can see
+    the group as the part of a menu or toolbar contained between seperators.
+    The parent of a group must be a menu.
+    -->
+    <Groups>
+
+      <!-- On the toolbar (menu) we can have 1 or more group that will contain the buttons -->
+      <Group guid="guidClientCmdSet" id="MyToolbarGroup" priority="0x0500">
+        <Parent guid="guidClientCmdSet" id="MyToolbar" />
+      </Group>
+
+    </Groups>
+
+    
+    <!--
+    Buttons (commands) defined by the package. This section defines the elements
+    the user can interact with, like a menu command or a button or combo box
+    in a toolbar.
+    -->
+    <Buttons>
+      
+      <!--
+      An element inside this section is defined by its ID and must specify a
+      parent group, a display priority, an image, a type, some visibility flags
+      (optional) and a default text.
+      -->
+
+      <!--
+      The menu items will be placed in one of the first group of the
+      View->Other Windows menu. To find IDG_VS_WNDO_OTRWNDWS1 (which is the group
+      ID), we searched ShellCmdPlace.ctc for Other Windows from which we got
+      the IDM_VS_CSCD_WINDOWS menu, and searching for that showed us which groups
+      were already part of that menu. Of those we picked IDG_VS_WNDO_OTRWNDWS1.
+      -->
+      <Button guid="guidClientCmdSet" id="cmdidToolWindowShow" priority="0x100" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Icon guid="ImageCatalogGuid" id="GoToSourceCode" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Strings>
+          <ButtonText>&amp;NLV Listener</ButtonText>
+        </Strings>
+      </Button>
+
+      
+      <!--
+      The following command will appear on the tool window toolbar
+      -->
+      <Button guid="guidClientCmdSet" id="cmdidLogListClear" priority="0x100" type="Button">
+        <Parent guid="guidClientCmdSet" id="MyToolbarGroup" />
+        <Icon guid="ImageCatalogGuid" id="ClearWindowContent" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Strings>
+          <ButtonText>Clear List</ButtonText>
+        </Strings>
+      </Button>
+
+      
+      <Button guid="guidClientCmdSet" id="cmdidLogListPrev" priority="0x101" type="Button">
+        <Parent guid="guidClientCmdSet" id="MyToolbarGroup" />
+        <Icon guid="ImageCatalogGuid" id="GoToPreviousInList" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Strings>
+          <ButtonText>Go to Previous Log Line</ButtonText>
+        </Strings>
+      </Button>
+
+      
+      <Button guid="guidClientCmdSet" id="cmdidLogListNext" priority="0x102" type="Button">
+        <Parent guid="guidClientCmdSet" id="MyToolbarGroup" />
+        <Icon guid="ImageCatalogGuid" id="GoToNextInList" />
+        <CommandFlag>IconIsMoniker</CommandFlag>
+        <Strings>
+          <ButtonText>Go to Next Log Line</ButtonText>
+        </Strings>
+      </Button>
+      
+    </Buttons>
+
+
+    <Combos>
+      <!--
+      NOTE: An important thing to know about combos is that if they are placed
+      on a toolbar that is visible, and they are not marked with the CommandFlag
+      DefaultDisabled the shell will load your package in order to determine the
+      item to display in the display area (this is because it is done via
+      IOleCommandTarget::Exec, and there is no special case logic to realize the
+      Exec request is really a 'query' in disguise. This sample has all combos
+      as being enabled out of the box; if the ComboBox toolbar is set as visible,
+      your package will be force loaded next time you start Visual Studio. But
+      in general practice you need to consider if you want your combos to be
+      enabled (which is the default) and if so if you are fine with your package 
+      being loaded almost immediately on rendering of the UI.
+      
+      The following types of combo boxes are supported: 
+
+      DropDownCombo 
+        a DropDownCombo does not let the user type into the combo box; they can
+        only pick from the list of items in the drop down. The string value of
+        the element selected is given as a parameter when the command is executed
+        (which happens automatically when the user chooses an item). This type of
+        combo could be used for something like the "Solution Configurations" combo
+        on the "Standard" toolbar. 
+
+      IndexCombo 
+        An IndexCombo is the same as a DropDownCombo in that it is a "pick from
+        the list" only combo. The difference is an IndexCombo returns the selected
+        value as an index into the list (0 based). 
+        
+      ...
+       
+      The following flags can be applied to Combo boxes: 
+        NoKeyCustomize      (rarely used) 
+        NoButtonCustomize   (rarely used) 
+        NoCustomize         (rarely used) 
+        DefaultInvisible    (often used: Exec is used to fetch info about combos,
+                              calling Exec on an unloaded package causes that package
+                              to load. If you place a combo on a visible toolbar
+                              without setting DefaultInvisible, you will force load
+                              your package upon IDE startup) 
+        DefaultDisabled     (often used) 
+        DynamicVisibility   (often used) 
+        CommandWellOnly     (used for commands that may have placements on the main
+                              menu for purposes of canonnical name generation but
+                              should not be actually created on main menu visually.) 
+        IconAndText         (sometimes used) 
+        FilterKeys          (rarely used ** used to hook window messages on commandbar
+                              controls) 
+        StretchHorizontally (only used with combos on Toolwindow toolbars. This tells
+                              the shell, when laying out the toolbar, to stretch the
+                              combo to fill all horizontal space not taken by other
+                              controls. This is only honored for the first combo on
+                              the toolbar with this flag. An example of a toolbar that
+                              uses this is the Task List Window's toolbar.) 
+
+      The following strings can be supplied with a command: 
+        Button Text (required) ** displayed as label of the command on a toolbar if
+          IconAndText flag is specified.
+          
+      If any of the following optional strings are missing then Button Text is
+      used for their values. 
+      
+        Menu Text (optional) ** displayed as label of the command on a menu if
+        IconAndText flag is specified. 
+        Tooltip Text (optional) ** displayed when mouse hovers on command.
+        Command Well Name (optional) ** displayed as name of command in the
+          Add Command dialog.
+        Canonical Name (optional) ** English programmatic name of command used
+          in Command Window and DTE.ExecuteCommand. This name is used in place
+          of the ButtonText for purposes of canonical name formation. The value
+          of this tag is appended to the value of the CanonicalName of the root
+          of your placement. So if your command specifies a CanonicalName of 
+          Foo and is placed anywhere (at any nesting level) under the File menu,
+          its runtime canonical name would be File.Foo. In localized command/menu
+          (CTO) resources, always provide the English canonical name in this tag
+          so macros can be language independent. 
+        Localized Canonical Name (optional) ** Localized programmatic name of
+          command used in Command Window, DTE.ExecuteCommand, and Tools.Options
+          "Environment/Keyboard" page. If you provide a CanonicalName you should
+          *always* also provide a LocalizedCanonicalName tag, even if they are
+          identical text (as they would be in English since the value of the
+          CanonicalName tag should always be in English). Otherwise, for
+          LocalizedCanonicalName the shell will use your ButtonText, if that
+          is different than your CanonicalName it means that on non-English
+          versions of Visual Studio your programmatic access name will be
+          different than it would be on the English version.
+          -->
+      <Combo guid="guidClientCmdSet" id="cmdidCombo" priority="0x0010" type="IndexCombo" defaultWidth="120" idCommandList="cmdidComboGetList">
+        <Parent guid="guidClientCmdSet" id="MyToolbarGroup"/>
+        <CommandFlag>IconAndText</CommandFlag>
+        <Strings>
+          <MenuText>Notifier Channel:</MenuText>
+          <ButtonText>Notifier Channel:</ButtonText>
+          <ToolTipText>Select required notifier channel</ToolTipText>
+          <CanonicalName>Channel Combo</CanonicalName>
+          <LocCanonicalName>Channel Combo</LocCanonicalName>
+          <CommandName>Channel Combo</CommandName>
+        </Strings>
+      </Combo>
+  
+    </Combos>
+  
+  </Commands>
+
+  
+  <Symbols>
+    <!--
+    The definition of symbols in a VSCT file derives from the way the IDs of
+    the elements are defined by the command table. We have seen that the ID
+    is a GUID/Number pair, where the GUID is also called Command Set and it
+    provides the context in which the numeric ID is evaluated. It makes then
+    sense for the VSCT schema to define the GuidSymbl tag as top level element
+    containig the definiton of the numeric IDs.
+    -->
+
+    
+    <!--
+    The first GUID defined here is the one for the package. It does not
+    contain numeric IDs.
+    -->
+    <GuidSymbol name="guidClientPkg" value="{D36AA01F-2FB4-4A38-B527-8411E9CE0226}" />
+
+    
+    <!--
+    The GUID for the command set is the one that contains the numeric IDs
+    used in this sample with the only exception of the one used for the
+    bitmap.
+    -->
+    <GuidSymbol name="guidClientCmdSet" value="{759C8B4E-B5E9-4167-B55F-3751402C2402}">
+      <!--Menus-->
+      <IDSymbol name="MyToolbar" value="0x101" />
+
+      <!--Groups-->
+      <IDSymbol name="MyToolbarGroup" value="0x1001" />
+
+      <!--Commands-->
+      <IDSymbol name="cmdidToolWindowShow" value="0x2001" />
+      <IDSymbol name="cmdidLogListClear" value="0x2003" />
+      <IDSymbol name="cmdidLogListPrev" value="0x2004" />
+      <IDSymbol name="cmdidLogListNext" value="0x2005" />
+
+      <!--Combos-->
+      <IDSymbol name="cmdidCombo" value="0x2006"/>
+      <IDSymbol name="cmdidComboGetList" value="0x2007"/>      
+    </GuidSymbol>
+
+  </Symbols>
+
+</CommandTable>
