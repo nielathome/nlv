@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+
+<!--
+
+Copyright (C) 2018 Niel Clausen. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+
+
+<root>
+
+  <theme name="MythTV Standard View" guid="19ADE7AD-34CC-4407-8FB8-E24766EDFB37" read_only="1">
+
+    <!-- Search -->
+    <item field_id="3FF4F681-A223-46A8-B782-FD7CDA4A233C"></item>
+    <item field_id="1B6B3AF1-2797-4A69-B8CC-5834C4213774">True</item>
+    <item field_id="F94D8434-A398-4A0E-A91C-C7428C4E0808">Literal</item>
+    
+    <item field_id="42CE40E8-9644-4A1C-9801-227A3E0C2501"></item>
+    <item field_id="EEBB45C4-FA2B-46AA-AE65-77AAE1E522C8">True</item>
+    <item field_id="E02D0DFE-095B-44C7-889C-5452D1679C8F">Literal</item>
+    
+    <item field_id="F0F99C37-7596-4444-AE2B-13522B63143C"></item>
+    <item field_id="750C61A7-075F-4ADB-83EC-BC743B1AE988">True</item>
+    <item field_id="1137630B-16A4-474D-B8B0-B5C3164864C5">Literal</item>
+    
+    <item field_id="AC26C8BC-C4CA-464E-A8FE-6516CF25C7C0"></item>
+    <item field_id="1056BACC-57A4-4E72-9CDF-6DA8A1CE611B">True</item>
+    <item field_id="F4534EEE-3C74-468D-82FE-FA9B5A8E5052">Literal</item>
+    
+    <item field_id="FD527655-8A7F-4B20-9A19-0A3045BE1958"></item>
+    <item field_id="39E3FD7B-ECDB-444F-9FF3-129766E82906">True</item>
+    <item field_id="30F5B8DB-C3BC-40ED-A10E-E47D3A204F57">Literal</item>
+    
+    <item field_id="08EB858A-CF15-43F5-A684-27FDC5ECF168"></item>
+    <item field_id="C02A14B9-28A6-4370-A449-79D3F064BD65">True</item>
+    <item field_id="3D9EE26B-FA05-4D5E-8E18-0E122B2A9D3E">Literal</item>
+
+    <!-- Filter -->
+    <item field_id="B9F3D339-8AF1-4FAD-A0B2-836FC6EF4330"></item>
+    <item field_id="D98B4FB2-EB73-43AF-9057-EF301C33FDFE">True</item>
+    <item field_id="B9ACE89C-3EA0-473A-A36F-D37EAB21D384">Literal</item>
+
+    <!-- Tracker -->
+    <item field_id="E02F4755-BABB-47B5-B2AC-4DE6975646D0">True</item>
+    <item field_id="535DC6CE-90B2-4492-B902-C21027E6DD50">0</item>
+    <item field_id="D68B6A18-4AA4-43E4-9E62-728EA3F5DB4E">1</item>
+
+    <!-- Field visibility -->
+    <item field_id="A661E23B-882D-4B2B-8C24-5DA99F66BF24">DARK GOLDENROD;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;TAN;SADDLE BROWN;DARK GOLDENROD;LIGHT STEEL BLUE;TAN;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE</item>
+    <item field_id="1DCC3CEA-5915-4D7D-A142-23DA290CEF5C">True;False;False;False;True;True;True;False;True;False;False;False;False;False;False;False;False;False;False;False</item>
+
+  </theme>
+  
+</root>

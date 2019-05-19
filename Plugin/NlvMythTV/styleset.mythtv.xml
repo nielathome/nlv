@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+
+<!--
+
+Copyright (C) 2018 Niel Clausen. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+
+
+<root>
+
+  <!--
+  Example style set - for MythTV
+  The style file can contain any number of "style" elements, guids must be unique.
+  -->
+
+  <styleset name="MythTV" guid="C8B802B0-FE05-4F38-A20D-E9E3573B8BDD">
+
+    <!--
+    A styleset is a collection of named styles
+    Each style determines a set of character properties: bold, italic, underline, foreground colour.
+    The default is plain black text.
+    -->
+
+    <style name="fieldtext">
+      <italic>1</italic>
+    </style>
+
+    <style name="value">
+      <bold>1</bold>
+    </style>
+
+    <style name="dimmed">
+      <bold>1</bold>
+      <fore>PLUM</fore>
+    </style>
+
+    <style name="strongvalue">
+      <bold>1</bold>
+      <fore>TOMATO</fore>
+    </style>
+
+  </styleset>
+  
+</root>

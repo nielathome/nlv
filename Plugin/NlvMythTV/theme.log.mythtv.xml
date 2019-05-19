@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+
+<!--
+
+Copyright (C) 2018 Niel Clausen. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+
+
+<root>
+
+  <theme name="MythTV Log" guid="116C22A2-3699-47B6-B8B7-4FC7C0A19F91" read_only="1">
+
+    <!-- Markers -->
+
+    <item field_id="D2A56B54-4BC9-4BD2-AA61-B6F81AB10EDD">EIT</item>
+    <item field_id="AEE7FEF2-10BA-4080-979E-EABDA691FF16">True</item>
+    <item field_id="F85C04D2-713E-4C4C-9B09-3F19C4F11B1B">Literal</item>
+
+    <item field_id="5FC297E7-3185-4571-A0BB-5DA7A064E8D2"></item>
+    <item field_id="9C3C3A4A-4194-4B54-B81C-0966C297645A">True</item>
+    <item field_id="BE1B5604-5A2D-4005-8059-5BB6D09DB200">Literal</item>
+    
+    <item field_id="49DAE2A2-2A0E-4ED7-B371-5CACAA56BD41"></item>
+    <item field_id="AABA97F7-B537-4A88-A394-1D3301817F62">True</item>
+    <item field_id="A942B7ED-F85B-483D-A7B9-360DCC1039DB">Literal</item>
+  </theme>
+
+</root>
