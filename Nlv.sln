@@ -1,0 +1,111 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application", "Application", "{E6FC98CA-2142-491A-8CE3-73056F7E4507}"EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "Nlv", "Application\Nlv\Nlv.pyproj", "{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}"EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogDll", "Log\Dll\NlogDll.vcxproj", "{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}"EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogLib", "Log\Lib\NlogLib.vcxproj", "{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}"EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogTests", "Log\Tests\NlogTests.vcxproj", "{58360E66-6F3A-4DF5-B0EE-C6B00254271F}"EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvMythTV", "Plugin\NlvMythTV\NlvMythTV.pyproj", "{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}"EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "wxWidgets", "wxWidgets", "{BAF54AF1-2719-4931-9B4F-BEBB4F02B6BF}"EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "stc", "..\..\GitHub\Phoenix\ext\wxWidgets\build\msw\wx_vc12_stc.vcxproj", "{23E1C437-A951-5943-8639-A17F3CF2E606}"EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "wxscintilla", "..\..\GitHub\Phoenix\ext\wxWidgets\build\msw\wx_vc12_wxscintilla.vcxproj", "{74827EBD-93DC-5110-BA95-3F2AB029B6B0}"EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{2A5E6D2B-7364-4F8B-A93C-DB0962B7ECB8}"EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sphinx", "Sphinx", "{6CFDE18D-34FA-4EC4-88A1-FBEA3472BA20}"
+	ProjectSection(SolutionItems) = preProject
+		Sphinx\building.rst = Sphinx\building.rst
+		Sphinx\conf.py = Sphinx\conf.py
+		Sphinx\events.rst = Sphinx\events.rst
+		Sphinx\index.rst = Sphinx\index.rst
+		Sphinx\issues.rst = Sphinx\issues.rst
+		Sphinx\keyboard.rst = Sphinx\keyboard.rst
+		Sphinx\licenses.rst = Sphinx\licenses.rst
+		Sphinx\logfile.rst = Sphinx\logfile.rst
+		Sphinx\make.bat = Sphinx\make.bat
+		Sphinx\overview.rst = Sphinx\overview.rst
+		Sphinx\references.rst = Sphinx\references.rst
+		Sphinx\schema.rst = Sphinx\schema.rst
+		Sphinx\searching.rst = Sphinx\searching.rst
+		Sphinx\session.rst = Sphinx\session.rst
+		Sphinx\views.rst = Sphinx\views.rst
+		Sphinx\vsnlv.rst = Sphinx\vsnlv.rst
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}.Release|x64.ActiveCfg = Release|Any CPU
+		{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}.Release|x86.ActiveCfg = Release|Any CPU
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Debug|x64.ActiveCfg = Debug|x64
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Debug|x64.Build.0 = Debug|x64
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Debug|x86.ActiveCfg = Debug|x64
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Release|Any CPU.ActiveCfg = Release|x64
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Release|x64.ActiveCfg = Release|x64
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Release|x64.Build.0 = Release|x64
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}.Release|x86.ActiveCfg = Release|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Debug|x64.ActiveCfg = Debug|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Debug|x64.Build.0 = Debug|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Debug|x86.ActiveCfg = Debug|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Release|Any CPU.ActiveCfg = Release|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Release|x64.ActiveCfg = Release|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Release|x64.Build.0 = Release|x64
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}.Release|x86.ActiveCfg = Release|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Debug|x64.ActiveCfg = Debug|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Debug|x64.Build.0 = Debug|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Debug|x86.ActiveCfg = Debug|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Release|Any CPU.ActiveCfg = Release|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Release|x64.ActiveCfg = Release|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Release|x64.Build.0 = Release|x64
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F}.Release|x86.ActiveCfg = Release|x64
+		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Release|x64.ActiveCfg = Release|Any CPU
+		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Release|x86.ActiveCfg = Release|Any CPU
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Debug|x64.ActiveCfg = Debug|x64
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Debug|x64.Build.0 = Debug|x64
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Debug|x86.ActiveCfg = Debug|Win32
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Release|Any CPU.ActiveCfg = Release|Win32
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Release|x64.ActiveCfg = Release|x64
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Release|x64.Build.0 = Release|x64
+		{23E1C437-A951-5943-8639-A17F3CF2E606}.Release|x86.ActiveCfg = Release|Win32
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Debug|x64.ActiveCfg = Debug|x64
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Debug|x64.Build.0 = Debug|x64
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Debug|x86.ActiveCfg = Debug|x64
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Release|Any CPU.ActiveCfg = Release|Win32
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Release|x64.ActiveCfg = Release|x64
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Release|x64.Build.0 = Release|x64
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0}.Release|x86.ActiveCfg = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{5272B2AB-2437-43F5-A93C-C1190A6DFBF0} = {E6FC98CA-2142-491A-8CE3-73056F7E4507}
+		{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF} = {E6FC98CA-2142-491A-8CE3-73056F7E4507}
+		{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4} = {E6FC98CA-2142-491A-8CE3-73056F7E4507}
+		{58360E66-6F3A-4DF5-B0EE-C6B00254271F} = {E6FC98CA-2142-491A-8CE3-73056F7E4507}
+		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF} = {E6FC98CA-2142-491A-8CE3-73056F7E4507}
+		{23E1C437-A951-5943-8639-A17F3CF2E606} = {BAF54AF1-2719-4931-9B4F-BEBB4F02B6BF}
+		{74827EBD-93DC-5110-BA95-3F2AB029B6B0} = {BAF54AF1-2719-4931-9B4F-BEBB4F02B6BF}
+		{6CFDE18D-34FA-4EC4-88A1-FBEA3472BA20} = {2A5E6D2B-7364-4F8B-A93C-DB0962B7ECB8}
+	EndGlobalSection
+EndGlobal
