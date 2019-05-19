@@ -1,0 +1,7 @@
+[submodule "Deps/Modules/GoogleTest"]
+	path = Deps/Modules/GoogleTest
+	url = https://github.com/google/googletest.git
+[submodule "Deps/Modules/Phoenix"]
+	path = Deps/Modules/Phoenix
+	url = https://github.com/nielathome/Phoenix.git
+	branch = wxPy-4.0.x
