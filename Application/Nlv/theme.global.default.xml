@@ -1,0 +1,98 @@
+<?xml version="1.0"?>
+
+<!--
+
+Copyright (C) 2018 Niel Clausen. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+
+
+<root>
+
+  <theme name="Default" guid="15D7907F-D322-46F8-996F-9D62E26489A5">
+
+    <!-- Trackers (display panel) -->
+
+    <item field_id="8624E2E8-F16C-4EEA-B691-5B60D30CECCD">0</item>
+    <item field_id="4AE3E30A-75FE-4B6E-8899-8D879FCE1E78">0</item>
+    <item field_id="C3370CA3-9498-4509-8C8F-70CE8BE6D34C">0;1;2;3</item>
+    <item field_id="274AD7AA-EA90-4C50-9BDF-08C7B05162CE">0</item>
+
+    <!-- Markers (margin icon) -->
+
+    <item field_id="DF9575F1-F170-43EC-97C7-54241902E009">TOMATO</item>
+    <item field_id="A44E341B-385F-481F-B478-93B65404D9EC">Left Rectangle</item>
+    
+    <item field_id="F3CEC7A7-D3F0-44BA-8D4B-3229EEF53D32">ORCHID</item>
+    <item field_id="45B00DD6-4876-4A9E-BAF6-916BB35E69C2">Left Rectangle</item>
+    
+    <item field_id="7EBCCC9B-50AB-4044-B66A-0926DF42F332">GOLD</item>
+    <item field_id="9AACBC89-0192-4BB8-84F9-F120FA2FE1ED">Left Rectangle</item>
+    
+    <item field_id="18F9A63D-AF17-4AA9-8045-26A8D90024EC">STEEL BLUE</item>
+    <item field_id="5A0E35C8-A509-460C-8D13-04B6EE1FA4AD">Small Rectangle</item>
+
+    <!-- Trackers (margin icon) -->
+
+    <item field_id="41893E7A-2825-4F2B-83FC-4EDB428096E0">STEEL BLUE</item>
+    <item field_id="D12C570B-C117-4414-8FDC-BD5170FD9E74">Arrow Head</item>
+
+    <item field_id="0876A2C6-AA80-4F37-A593-BB9790CC7427">STEEL BLUE</item>
+    <item field_id="AF229A09-AEE4-424E-B441-D2B7CFB90313">Chevron (>>>)</item>
+    
+    <item field_id="11244707-D321-4BF7-87B1-EF9A1A3FF1B3">STEEL BLUE</item>
+    <item field_id="FF5348C8-866D-4434-88C4-9D83B4A3F015">Ellipses (...)</item>
+    
+    <item field_id="05D5D5C0-B334-4F28-860F-F41E30A0147B">STEEL BLUE</item>
+    <item field_id="CD8F8F60-653A-454A-BE1B-FE4B55349143">Arrow</item>
+    
+    <item field_id="1BB20755-656C-4811-8DC1-DBC0E79D1299">STEEL BLUE</item>
+    <item field_id="6F68402C-87F5-45FF-86C9-F64AEA9C0016">Arrow Down</item>
+
+    <!-- View Hiliters -->
+
+    <item field_id="3EAE7A55-9AB8-4043-9096-338A53187D2A">STEEL BLUE</item>
+    <item field_id="6CC5704C-068F-4341-B53B-FE9F5DF35AAC">Box</item>
+
+    <item field_id="99BDE677-A1BE-483E-B2E6-8BE04965C767">FIREBRICK</item>
+    <item field_id="20C07618-B254-4AC0-A400-0CA07A1B3427">Box</item>
+
+    <item field_id="10734B34-6B19-4981-ADA6-B61CB89547A7">ORCHID</item>
+    <item field_id="AD465A0C-A443-412B-A326-B19490C42D0A">Box</item>
+    
+    <item field_id="74A2F935-563F-48A2-9FE8-9C00C264FA00">GOLD</item>
+    <item field_id="59F921B5-EC0B-4888-BD17-63AAA71BE27C">Box</item>
+    
+    <item field_id="9866A201-C8BA-453E-91D2-FE8E950531D1">YELLOW GREEN</item>
+    <item field_id="43C96478-0EC0-4497-9A44-C287DC35221B">Box</item>
+    
+    <item field_id="620526B3-9445-4C0D-8A9C-7B9D3034E280">FIREBRICK</item>
+    <item field_id="9C8DEE25-E84A-4F86-9636-E8C741A555EA">Squiggle</item>
+    
+    <item field_id="F770D255-E7C3-4376-BC79-40DD6EE67EC5">FOREST GREEN</item>
+    <item field_id="32CDDF0D-CEE4-4E89-A27B-A2AD3B02F6BC">Diagonal</item>
+
+
+    <!-- Event Hiliters -->
+
+    <item field_id="193032BE-30F7-40F0-80E7-0C75F1946F0A">CORAL</item>
+    <item field_id="7E9B028B-64C6-41E1-936D-AFB1D38C31BE">PLUM</item>
+    <item field_id="C24DAF4F-DB94-4D8A-BEDC-C9EED8F5C1C3">LIGHT GOLDENROD</item>
+
+  </theme>
+
+</root>
+

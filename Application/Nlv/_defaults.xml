@@ -1,0 +1,399 @@
+<?xml version="1.0"?>
+
+<!--
+
+Copyright (C) 2017-2018 Niel Clausen. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+
+
+<root>
+
+  <!-- Parent Session node -->
+  <node factory="54509DB4-0B33-4C2E-AC17-B027581823E5" name="Session">
+
+    <!-- Identify the node defining the current global theme -->
+    <field name="ThemeNode" type="Str" theme_cls="global">2EF2160F-7BE1-4194-8C4A-D5415AD1985E</field>
+
+    <!-- Session manager node-->
+    <node factory="FE21291F-572A-483B-8CF3-48D8B90F0173" name="Session"/>
+    
+    <!-- Open log file node-->
+    <node factory="48A56F4F-CD92-4302-A33E-90222A30F994" name="Open Log">
+      <field name="SchemaGuid" type="Str">None</field>
+    </node>
+
+    <!-- Tracker options node-->
+    <node factory="AD2DCFB5-0433-44DB-9942-CC0CB5F89984" name="Trackers">
+      <field name="LocalTrackerFormatIdx" type="Int" field_id="8624E2E8-F16C-4EEA-B691-5B60D30CECCD" theme_cls="global" override="0">0</field>
+      <field name="GlobalTrackerFormatIdx" type="Int" field_id="4AE3E30A-75FE-4B6E-8899-8D879FCE1E78" theme_cls="global" override="0">0</field>
+      <field name="DeltaDisplaysIdx" type="IntArray" field_id="C3370CA3-9498-4509-8C8F-70CE8BE6D34C" theme_cls="global" override="0">0;1;2;3</field>
+      <field name="PrecisionIdx" type="Int" field_id="274AD7AA-EA90-4C50-9BDF-08C7B05162CE" theme_cls="global" override="0">0</field>
+    </node>
+
+    <!-- Global Theme Gallery node -->
+    <node factory="2EF2160F-7BE1-4194-8C4A-D5415AD1985E" name="Themes">
+      <field name="CurrentThemeId" type="Str">15D7907F-D322-46F8-996F-9D62E26489A5</field>
+    </node>
+
+    <!-- Global Annotation node-->
+    <node factory="795850FA-628A-47CC-8EDB-B7340CBC7573" name="Annotate">
+      <field name="StyleName" type="Str">Note</field>
+    </node>
+
+  </node>
+
+
+  <!-- Logfile node -->
+  <node factory="27813739-0E75-4140-B34B-97EE2BE003EE" name="Logfile">
+
+    <field name="ViewCounter" type="Int">0</field>
+    <field name="LogFileState" type="Str"/>
+
+    <!-- Identify the node defining the current log local theme -->
+    <field name="ThemeNode" type="Str" theme_cls="log">50DF4F78-2819-4B02-BE9F-0C423812FB64</field>
+
+    <!-- View Manager -->
+    <node factory="CF97CE28-0773-431D-960D-E249B818C636" name="New"/>
+
+    <!-- Marker container and defined markers -->
+    <node factory="2057A308-7C8C-4208-852E-0F598BF748F0" name="Markers">
+      <node factory="9BB5F8EC-41E4-4C43-8B3F-0A48EDCF7350" name="Bad">
+        <field name="ColourName" type="Str" field_id="DF9575F1-F170-43EC-97C7-54241902E009" theme_cls="global" override="0">TOMATO</field>
+        <field name="StyleName" type="Str" field_id="A44E341B-385F-481F-B478-93B65404D9EC" theme_cls="global" override="0">Left Rectangle</field>
+        <field name="MatchText" type="Str" field_id="D2A56B54-4BC9-4BD2-AA61-B6F81AB10EDD" theme_cls="log" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="AEE7FEF2-10BA-4080-979E-EABDA691FF16" theme_cls="log" override="0">True"</field>
+        <field name="MatchType" type="Str" field_id="F85C04D2-713E-4C4C-9B09-3F19C4F11B1B" theme_cls="log" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="9BB5F8EC-41E4-4C43-8B3F-0A48EDCF7350" name="Unsure">
+        <field name="ColourName" type="Str" field_id="F3CEC7A7-D3F0-44BA-8D4B-3229EEF53D32" theme_cls="global" override="0">ORCHID</field>
+        <field name="StyleName" type="Str" field_id="45B00DD6-4876-4A9E-BAF6-916BB35E69C2" theme_cls="global" override="0">Left Rectangle</field>
+        <field name="MatchText" type="Str" field_id="5FC297E7-3185-4571-A0BB-5DA7A064E8D2" theme_cls="log" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="9C3C3A4A-4194-4B54-B81C-0966C297645A" theme_cls="log" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="BE1B5604-5A2D-4005-8059-5BB6D09DB200" theme_cls="log" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="9BB5F8EC-41E4-4C43-8B3F-0A48EDCF7350" name="Check">
+        <field name="ColourName" type="Str" field_id="7EBCCC9B-50AB-4044-B66A-0926DF42F332" theme_cls="global" override="0">GOLD</field>
+        <field name="StyleName" type="Str" field_id="9AACBC89-0192-4BB8-84F9-F120FA2FE1ED" theme_cls="global" override="0">Left Rectangle</field>
+        <field name="MatchText" type="Str" field_id="49DAE2A2-2A0E-4ED7-B371-5CACAA56BD41" theme_cls="log" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="AABA97F7-B537-4A88-A394-1D3301817F62" theme_cls="log" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="A942B7ED-F85B-483D-A7B9-360DCC1039DB" theme_cls="log" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="9BB5F8EC-41E4-4C43-8B3F-0A48EDCF7350" name="(B) User">
+        <field name="ColourName" type="Str" field_id="18F9A63D-AF17-4AA9-8045-26A8D90024EC" theme_cls="global" override="0">STEEL BLUE</field>
+        <field name="StyleName" type="Str" field_id="5A0E35C8-A509-460C-8D13-04B6EE1FA4AD" theme_cls="global" override="0">Bookmark</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">False</field>
+      </node>
+    </node>
+
+    <!-- Tracker container and defined trackers -->
+    <node factory="5D604D98-10F8-4877-8A0B-F8BDBAFDE982" name="Trackers">
+      <!-- The first tracker is treated as the local tracker -->
+      <node factory="90495B34-5BDB-45AF-93B7-2BF104B6B953" name="(L) Local">
+        <field name="ColourName" type="Str" field_id="41893E7A-2825-4F2B-83FC-4EDB428096E0" theme_cls="global" override="0">STEEL BLUE</field>
+        <field name="StyleName" type="Str" field_id="D12C570B-C117-4414-8FDC-BD5170FD9E74" theme_cls="global" override="0">Arrow Head</field>
+      </node>
+
+      <!-- The rest are global trackers -->
+      <node factory="90495B34-5BDB-45AF-93B7-2BF104B6B953" name="(G) Global/1">
+        <field name="ColourName" type="Str" field_id="0876A2C6-AA80-4F37-A593-BB9790CC7427" theme_cls="global" override="0">STEEL BLUE</field>
+        <field name="StyleName" type="Str" field_id="AF229A09-AEE4-424E-B441-D2B7CFB90313" theme_cls="global" override="0">Chevron (>>>)</field>
+      </node>
+      <node factory="90495B34-5BDB-45AF-93B7-2BF104B6B953" name="(H) Global/2">
+        <field name="ColourName" type="Str" field_id="11244707-D321-4BF7-87B1-EF9A1A3FF1B3" theme_cls="global" override="0">STEEL BLUE</field>
+        <field name="StyleName" type="Str" field_id="FF5348C8-866D-4434-88C4-9D83B4A3F015" theme_cls="global" override="0">Ellipses (...)</field>
+      </node>
+      <node factory="90495B34-5BDB-45AF-93B7-2BF104B6B953" name="(J) Global/3">
+        <field name="ColourName" type="Str" field_id="05D5D5C0-B334-4F28-860F-F41E30A0147B" theme_cls="global" override="0">STEEL BLUE</field>
+        <field name="StyleName" type="Str" field_id="CD8F8F60-653A-454A-BE1B-FE4B55349143" theme_cls="global" override="0">Arrow</field>
+      </node>
+      <node factory="90495B34-5BDB-45AF-93B7-2BF104B6B953" name="(K) Global/4">
+        <field name="ColourName" type="Str" field_id="1BB20755-656C-4811-8DC1-DBC0E79D1299" theme_cls="global" override="0">STEEL BLUE</field>
+        <field name="StyleName" type="Str" field_id="6F68402C-87F5-45FF-86C9-F64AEA9C0016" theme_cls="global" override="0">Arrow Down</field>
+      </node>
+    </node>
+
+    <!-- Logfile info node -->
+    <node factory="680427E7-93EE-4B23-9157-289E87F14B4D" name="Info"/>
+
+    <!-- Logfile theme control (container)-->
+    <node factory="87C9B29A-DF06-4EC1-8966-45D51D827AAD" name="Theme">
+      <!-- Logfile pattern gallery-->
+      <node factory="50DF4F78-2819-4B02-BE9F-0C423812FB64" name="'Log' theme gallery">
+        <field name="CurrentThemeId" type="Str">B7168283-DCBB-4E3B-B67F-52B44C218AC9</field>
+      </node>
+      
+      <!-- Logfile global theme overrides -->
+      <node factory="E918B7F2-DF2A-4C55-AD84-BE96B29CF6D5" name="Changes to 'navigation' theme"/>
+
+      <!-- Logfile local pattern overrides-->
+      <node factory="F35A20DF-F009-4EE2-8207-532F65F712CA" name="Changes to 'log' theme"/>
+    </node>
+
+  </node>
+
+
+  <!-- View node -->
+  <node factory="B6903A1F-2DE6-436C-BC35-B2B03AF78203" name="View-0">
+
+    <!-- Identify the node defining the current view local theme -->
+    <field name="ThemeNode" type="Str" theme_cls="view">6494365B-350F-4718-87AC-7DEB80F34340</field>
+
+    <!-- Hiliter container and defined hiliters -->
+    <node factory="17D31FC0-7E8F-42A3-BF5E-532831C50832" name="Search">
+      <node factory="0465EF17-347D-4719-91C4-F8494B9C7DE6" name="Selection">
+        <field name="ColourName" type="Str" field_id="3EAE7A55-9AB8-4043-9096-338A53187D2A" theme_cls="global" override="0">STEEL BLUE</field>
+        <field name="StyleName" type="Str" field_id="6CC5704C-068F-4341-B53B-FE9F5DF35AAC" theme_cls="global" override="0">Box</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">False</field>
+      </node>
+      <node factory="0465EF17-347D-4719-91C4-F8494B9C7DE6" name="(1) Bad">
+        <field name="ColourName" type="Str" field_id="99BDE677-A1BE-483E-B2E6-8BE04965C767" theme_cls="global" override="0">TOMATO</field>
+        <field name="StyleName" type="Str" field_id="20C07618-B254-4AC0-A400-0CA07A1B3427" theme_cls="global" override="0">Box</field>
+        <field name="MatchText" type="Str" field_id="3FF4F681-A223-46A8-B782-FD7CDA4A233C" theme_cls="view" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="1B6B3AF1-2797-4A69-B8CC-5834C4213774" theme_cls="view" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="F94D8434-A398-4A0E-A91C-C7428C4E0808" theme_cls="view" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="0465EF17-347D-4719-91C4-F8494B9C7DE6" name="(2) Unsure">
+        <field name="ColourName" type="Str" field_id="10734B34-6B19-4981-ADA6-B61CB89547A7" theme_cls="global" override="0">ORCHID</field>
+        <field name="StyleName" type="Str" field_id="AD465A0C-A443-412B-A326-B19490C42D0A" theme_cls="global" override="0">Box</field>
+        <field name="MatchText" type="Str" field_id="42CE40E8-9644-4A1C-9801-227A3E0C2501" theme_cls="view" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="EEBB45C4-FA2B-46AA-AE65-77AAE1E522C8" theme_cls="view" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="E02D0DFE-095B-44C7-889C-5452D1679C8F" theme_cls="view" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="0465EF17-347D-4719-91C4-F8494B9C7DE6" name="(3) Check">
+        <field name="ColourName" type="Str" field_id="74A2F935-563F-48A2-9FE8-9C00C264FA00" theme_cls="global" override="0">GOLD</field>
+        <field name="StyleName" type="Str" field_id="59F921B5-EC0B-4888-BD17-63AAA71BE27C" theme_cls="global" override="0">Box</field>
+        <field name="MatchText" type="Str" field_id="F0F99C37-7596-4444-AE2B-13522B63143C" theme_cls="view" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="750C61A7-075F-4ADB-83EC-BC743B1AE988" theme_cls="view" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="1137630B-16A4-474D-B8B0-B5C3164864C5" theme_cls="view" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="0465EF17-347D-4719-91C4-F8494B9C7DE6" name="(4) Good">
+        <field name="ColourName" type="Str" field_id="9866A201-C8BA-453E-91D2-FE8E950531D1" theme_cls="global" override="0">YELLOW GREEN</field>
+        <field name="StyleName" type="Str" field_id="43C96478-0EC0-4497-9A44-C287DC35221B" theme_cls="global" override="0">Box</field>
+        <field name="MatchText" type="Str" field_id="AC26C8BC-C4CA-464E-A8FE-6516CF25C7C0" theme_cls="view" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="1056BACC-57A4-4E72-9CDF-6DA8A1CE611B" theme_cls="view" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="F4534EEE-3C74-468D-82FE-FA9B5A8E5052" theme_cls="view" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="0465EF17-347D-4719-91C4-F8494B9C7DE6" name="(5) Probably bad">
+        <field name="ColourName" type="Str" field_id="620526B3-9445-4C0D-8A9C-7B9D3034E280" theme_cls="global" override="0">FIREBRICK</field>
+        <field name="StyleName" type="Str" field_id="9C8DEE25-E84A-4F86-9636-E8C741A555EA" theme_cls="global" override="0">Squiggle</field>
+        <field name="MatchText" type="Str" field_id="FD527655-8A7F-4B20-9A19-0A3045BE1958" theme_cls="view" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="39E3FD7B-ECDB-444F-9FF3-129766E82906" theme_cls="view" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="30F5B8DB-C3BC-40ED-A10E-E47D3A204F57" theme_cls="view" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="0465EF17-347D-4719-91C4-F8494B9C7DE6" name="(6) Probably good">
+        <field name="ColourName" type="Str" field_id="F770D255-E7C3-4376-BC79-40DD6EE67EC5" theme_cls="global" override="0">FOREST GREEN</field>
+        <field name="StyleName" type="Str" field_id="32CDDF0D-CEE4-4E89-A27B-A2AD3B02F6BC" theme_cls="global" override="0">Diagonal</field>
+        <field name="MatchText" type="Str" field_id="08EB858A-CF15-43F5-A684-27FDC5ECF168" theme_cls="view" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="C02A14B9-28A6-4370-A449-79D3F064BD65" theme_cls="view" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="3D9EE26B-FA05-4D5E-8E18-0E122B2A9D3E" theme_cls="view" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+    </node>
+
+    <!-- Filter node-->
+    <node factory="6968149A-D9DA-47AF-A742-2C75A1D16720" name="Filter">
+      <field name="MatchText" type="Str" field_id="B9F3D339-8AF1-4FAD-A0B2-836FC6EF4330" theme_cls="view" override="0"/>
+      <field name="MatchCase" type="Bool" field_id="D98B4FB2-EB73-43AF-9057-EF301C33FDFE" theme_cls="view" override="0">True</field>
+      <field name="MatchType" type="Str" field_id="B9ACE89C-3EA0-473A-A36F-D37EAB21D384" theme_cls="view" override="0">Literal</field>
+      <field name="MatchEdit" type="Bool">True</field>
+    </node>
+
+    <!-- View tracking node -->
+    <node factory="8481271C-B31B-4C29-AEE5-2AED0905DFF5" name="Track">
+      <object name="TrackInfo">
+        <field name="bUpdateLocal" type="Bool" field_id="E02F4755-BABB-47B5-B2AC-4DE6975646D0" theme_cls="view" override="0">True</field>
+        <field name="idxUpdateGlobal" type="Int" field_id="535DC6CE-90B2-4492-B902-C21027E6DD50" theme_cls="view" override="0">0</field>
+        <field name="idxSyncSource" type="Int" field_id="D68B6A18-4AA4-43E4-9E62-728EA3F5DB4E" theme_cls="view" override="0">0</field>
+      </object>
+    </node>
+
+    <!-- Field node-->
+    <node factory="6F3C11E5-3148-41C0-83C8-329BB94C6C0F" name="Fields">
+      <field name="ColourNames" type="StrArray" field_id="A661E23B-882D-4B2B-8C24-5DA99F66BF24" theme_cls="view" override="0">LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE</field>
+      <field name="Visibility" type="BoolArray" field_id="1DCC3CEA-5915-4D7D-A142-23DA290CEF5C" theme_cls="view" override="0">True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True</field>
+    </node>
+
+    <!-- View theme control (container)-->
+    <node factory="06BD4FE4-F2C9-47A4-8329-EE0604B9CD8B" name="Theme">
+      <!-- View pattern gallery-->
+      <node factory="6494365B-350F-4718-87AC-7DEB80F34340" name="'View' theme gallery">
+        <field name="CurrentThemeId" type="Str">A46B3D18-0876-4E6F-9BF4-62A6FAF76D2D</field>
+      </node>
+      
+      <!-- View overrides of the global theme-->
+      <node factory="B6326018-3AF5-4E41-9BE3-1193811AF439" name="Changes to 'navigation' theme"/>
+
+      <!-- View local pattern overrides-->
+      <node factory="9DD0FF9F-7BC5-4DD7-BAA4-4E9F76682795" name="Changes to 'view' theme"/>
+    </node>
+
+  </node>
+
+
+  <!-- Log analysis node -->
+  <node factory="BED0DF17-1A62-4123-8097-0A41E9E23D1C" name="Analyse-0">
+
+    <!-- Identify the node defining the current event local theme -->
+    <field name="ThemeNode" type="Str" theme_cls="event">DE983334-8D66-42E8-917E-05D5C464DFB4</field>
+
+    <!-- Node name (as displayed in the tree control) -->
+    <field name="DefaultNodeName" type="Str" field_id="DD9B316C-4F9E-4DF3-9970-0781D56980B0" theme_cls="event" override="0"/>
+
+    <!-- Analyser Script node-->
+    <node factory="F418311C-9449-46DB-A8C5-B6B4F324D3F0" name="Script">
+      <field name="Description" type="Str" field_id="91F38F0D-3375-4005-935E-0CC7A738F74C" theme_cls="event" override="0"/>
+      <field name="ReferenceScript" type="Str" field_id="910F22BD-73A0-4C4A-B9C4-05EE5465C901" theme_cls="event" override="0"/>
+      <field name="EditedScript" type="Str" field_id="F1DF7FB1-9C9F-45B1-BD6A-DEDAED883E34" theme_cls="event" override="0"/>
+    </node>
+
+    <!-- Event analyser node-->
+    <node factory="4AAD05E5-493C-45D9-AD2D-D96D9324E4B5" name="Analyse">
+    </node>
+
+    <!-- Log analysis theme control (container)-->
+    <node factory="AD58B879-F278-476E-9C52-DA886DB2415B" name="Theme">
+      <!-- Log analysis pattern gallery-->
+      <node factory="DE983334-8D66-42E8-917E-05D5C464DFB4" name="'Events' theme gallery">
+        <field name="CurrentThemeId" type="Str">CF6B1C12-5BCA-41AA-A723-941455575B07</field>
+      </node>
+
+      <!-- Log analysis local pattern overrides-->
+      <node factory="C0F7D466-B02C-4F85-92E1-DA5E7F77CAFE" name="Changes to 'events' theme"/>
+    </node>
+
+  </node>
+
+  
+  <!-- Event Projector (table) node -->
+  <node factory="90FCCB21-8484-451A-8EB5-DBED816DFE17" name="Events">
+
+    <!-- Hiliter container and defined hiliters -->
+    <node factory="187B89FD-8E79-4F6C-B513-2211B82B6029" name="Search">
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(1) Bad">
+        <field name="ColourName" type="Str" field_id="193032BE-30F7-40F0-80E7-0C75F1946F0A" theme_cls="global" override="0">TOMATO</field>
+        <field name="MatchText" type="Str" field_id="C32B2009-A78F-43FB-A7BF-21AA90687F04" theme_cls="event" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="05569C3E-86CA-43FC-81AE-52503818EE20" theme_cls="event" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="7236C2F9-CC3C-465E-86D1-E92E68584CE0" theme_cls="event" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(2) Unsure">
+        <field name="ColourName" type="Str" field_id="7E9B028B-64C6-41E1-936D-AFB1D38C31BE" theme_cls="global" override="0">ORCHID</field>
+        <field name="MatchText" type="Str" field_id="EF072092-A595-44EF-98F1-97889BC577B6" theme_cls="event" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="F89733BD-50F0-44E8-9921-6AA7F3AD1C00" theme_cls="event" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="26FB9648-2207-4840-8406-AF6C03738588" theme_cls="event" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(3) Check">
+        <field name="ColourName" type="Str" field_id="C24DAF4F-DB94-4D8A-BEDC-C9EED8F5C1C3" theme_cls="global" override="0">GOLD</field>
+        <field name="MatchText" type="Str" field_id="B8821C72-A6B9-44FE-AC8B-E954AC3BA7F1" theme_cls="event" override="0"/>
+        <field name="MatchCase" type="Bool" field_id="CE7AE3C1-9509-4FBA-B119-F6611857FEAE" theme_cls="event" override="0">True</field>
+        <field name="MatchType" type="Str" field_id="D0D7849D-64AD-4444-A3B9-81E01BFB92B9" theme_cls="event" override="0">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+    </node>
+    
+    <!-- Filter node-->
+    <node factory="9913F5A0-C726-4A4C-974A-B5A92E71ECEB" name="Filter">
+      <field name="MatchText" type="Str" field_id="684AC3BE-7E57-4AF7-B429-3D097C8834E2" theme_cls="event" override="0"/>
+      <field name="MatchCase" type="Bool" field_id="9EE092BD-BC19-4E94-9302-3FE0CC3466DC" theme_cls="event" override="0">True</field>
+      <field name="MatchType" type="Str" field_id="15AFAC90-1EC0-4F4E-9E08-EF60E97B57B6" theme_cls="event" override="0">Literal</field>
+      <field name="MatchEdit" type="Bool">True</field>
+    </node>
+
+    <!-- Event tracking node -->
+    <node factory="53AD7641-989C-4561-8F56-401DC378BAB6" name="Track">
+      <object name="TrackInfo">
+        <field name="idxUpdateMarker" type="Int" field_id="491AB385-20EF-42AD-96D1-855444D66D7B" theme_cls="event" override="0">0</field>
+        <field name="idxUpdateGlobal" type="Int" field_id="16AEEF65-AF10-4231-BBE4-F6FAB8AAE70B" theme_cls="event" override="0">0</field>
+      </object>
+    </node>
+
+    <!-- Field node-->
+    <node factory="3DDAF4B3-8B58-496B-888A-855CB78C59ED" name="Fields">
+      <field name="ColourNames" type="StrArray" field_id="EF11514A-E147-4E6A-B2EC-FB8FEBC88E0C" theme_cls="event" override="0">BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK</field>
+      <field name="Visibility" type="BoolArray" field_id="02A7CEC6-AE38-4632-9C19-6361D0109A8B" theme_cls="event" override="0">True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True</field>
+    </node>
+
+    <!-- Options node-->
+    <node factory="85615529-637B-4AD3-BE6D-FDA3C5E6B9DC" name="Setup">
+      <field name="DisplayNesting" type="Bool" field_id="EE35CE97-8ECC-448C-82E0-374007BEE21E" theme_cls="event" override="0"/>
+    </node>
+
+  </node>
+
+
+  <!-- Event Metrics (table & chart) node -->
+  <node factory="F1BA137E-41B1-4066-95FE-AA5689310209" name="Metrics">
+
+    <!-- Hiliter container and defined hiliters -->
+    <node factory="187B89FD-8E79-4F6C-B513-2211B82B6029" name="Search">
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(1) Bad">
+        <field name="ColourName" type="Str">LIGHT SALMON</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(2) Unsure">
+        <field name="ColourName" type="Str">THISTLE</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(3) Check">
+        <field name="ColourName" type="Str">PALE GOLDENROD</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+    </node>
+
+    <!-- Filter node-->
+    <node factory="9913F5A0-C726-4A4C-974A-B5A92E71ECEB" name="Filter">
+      <field name="MatchText" type="Str"/>
+      <field name="MatchCase" type="Bool">True</field>
+      <field name="MatchType" type="Str">Literal</field>
+      <field name="MatchEdit" type="Bool">True</field>
+    </node>
+
+    <!-- Options node-->
+    <node factory="7F164B4B-7276-4F52-89A3-6D90A6C2557E" name="Setup">
+      <field name="idxSelectChart" type="Int">0</field>
+      <field name="ParameterValues" type="Str"/>
+    </node>
+    -->
+    
+  </node>
+
+
+</root>

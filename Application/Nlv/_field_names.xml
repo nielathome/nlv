@@ -1,0 +1,128 @@
+<?xml version="1.0"?>
+
+<!--
+
+Copyright (C) 2018 Niel Clausen. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+-->
+
+
+<root>
+
+  <!-- Map of global theme field_id GUIDs to friendly names-->
+
+  <name field_id="8624E2E8-F16C-4EEA-B691-5B60D30CECCD">Local tracker.Format</name>
+  <name field_id="4AE3E30A-75FE-4B6E-8899-8D879FCE1E78">Global tracker.Format</name>
+  <name field_id="C3370CA3-9498-4509-8C8F-70CE8BE6D34C">Time delta.Selection</name>
+  <name field_id="274AD7AA-EA90-4C50-9BDF-08C7B05162CE">Time display.Precision</name>
+
+  <name field_id="DF9575F1-F170-43EC-97C7-54241902E009">Marker 1.Colour</name>
+  <name field_id="A44E341B-385F-481F-B478-93B65404D9EC">Marker 1.Style</name>
+  <name field_id="F3CEC7A7-D3F0-44BA-8D4B-3229EEF53D32">Marker 2.Colour</name>
+  <name field_id="45B00DD6-4876-4A9E-BAF6-916BB35E69C2">Marker 2.Style</name>
+  <name field_id="7EBCCC9B-50AB-4044-B66A-0926DF42F332">Marker 3.Colour</name>
+  <name field_id="9AACBC89-0192-4BB8-84F9-F120FA2FE1ED">Marker 3.Style</name>
+  <name field_id="18F9A63D-AF17-4AA9-8045-26A8D90024EC">Marker 4.Colour</name>
+  <name field_id="5A0E35C8-A509-460C-8D13-04B6EE1FA4AD">Marker 4.Style</name>
+  <name field_id="41893E7A-2825-4F2B-83FC-4EDB428096E0">Local tracker.Colour</name>
+  <name field_id="D12C570B-C117-4414-8FDC-BD5170FD9E74">Local tracker.Style</name>
+  <name field_id="0876A2C6-AA80-4F37-A593-BB9790CC7427">Global tracker 1.Colour</name>
+  <name field_id="AF229A09-AEE4-424E-B441-D2B7CFB90313">Global tracker 1.Style</name>
+  <name field_id="11244707-D321-4BF7-87B1-EF9A1A3FF1B3">Global tracker 2.Colour</name>
+  <name field_id="FF5348C8-866D-4434-88C4-9D83B4A3F015">Global tracker 2.Style</name>
+  <name field_id="05D5D5C0-B334-4F28-860F-F41E30A0147B">Global tracker 3.Colour</name>
+  <name field_id="CD8F8F60-653A-454A-BE1B-FE4B55349143">Global tracker 3.Style</name>
+  <name field_id="1BB20755-656C-4811-8DC1-DBC0E79D1299">Global tracker 4.Colour</name>
+  <name field_id="6F68402C-87F5-45FF-86C9-F64AEA9C0016">Global tracker 4.Style</name>
+  <name field_id="3EAE7A55-9AB8-4043-9096-338A53187D2A">View selection.Colour</name>
+  <name field_id="6CC5704C-068F-4341-B53B-FE9F5DF35AAC">View selection.Style</name>
+  <name field_id="99BDE677-A1BE-483E-B2E6-8BE04965C767">View search 1.Colour</name>
+  <name field_id="20C07618-B254-4AC0-A400-0CA07A1B3427">View search 1.Style</name>
+  <name field_id="10734B34-6B19-4981-ADA6-B61CB89547A7">View search 2.Colour</name>
+  <name field_id="AD465A0C-A443-412B-A326-B19490C42D0A">View search 2.Style</name>
+  <name field_id="74A2F935-563F-48A2-9FE8-9C00C264FA00">View search 3.Colour</name>
+  <name field_id="59F921B5-EC0B-4888-BD17-63AAA71BE27C">View search 3.Style</name>
+  <name field_id="9866A201-C8BA-453E-91D2-FE8E950531D1">View search 4.Colour</name>
+  <name field_id="43C96478-0EC0-4497-9A44-C287DC35221B">View search 4.Style</name>
+  <name field_id="620526B3-9445-4C0D-8A9C-7B9D3034E280">View search 5.Colour</name>
+  <name field_id="9C8DEE25-E84A-4F86-9636-E8C741A555EA">View search 5.Style</name>
+  <name field_id="F770D255-E7C3-4376-BC79-40DD6EE67EC5">View search 6.Colour</name>
+  <name field_id="32CDDF0D-CEE4-4E89-A27B-A2AD3B02F6BC">View search 6.Style</name>
+  <name field_id="193032BE-30F7-40F0-80E7-0C75F1946F0A">Event search 1.Colour</name>
+  <name field_id="7E9B028B-64C6-41E1-936D-AFB1D38C31BE">Event search 1.Colour</name>
+  <name field_id="C24DAF4F-DB94-4D8A-BEDC-C9EED8F5C1C3">Event search 1.Colour</name>
+
+  <!-- Map of log theme field_id GUIDs to friendly names-->
+  <name field_id="D2A56B54-4BC9-4BD2-AA61-B6F81AB10EDD">Marker 1.Text</name>
+  <name field_id="AEE7FEF2-10BA-4080-979E-EABDA691FF16">Marker 1.Case</name>
+  <name field_id="F85C04D2-713E-4C4C-9B09-3F19C4F11B1B">Marker 1.Type</name>
+  <name field_id="5FC297E7-3185-4571-A0BB-5DA7A064E8D2">Marker 2.Text</name>
+  <name field_id="9C3C3A4A-4194-4B54-B81C-0966C297645A">Marker 2.Case</name>
+  <name field_id="BE1B5604-5A2D-4005-8059-5BB6D09DB200">Marker 2.Type</name>
+  <name field_id="49DAE2A2-2A0E-4ED7-B371-5CACAA56BD41">Marker 3.Text</name>
+  <name field_id="AABA97F7-B537-4A88-A394-1D3301817F62">Marker 3.Case</name>
+  <name field_id="A942B7ED-F85B-483D-A7B9-360DCC1039DB">Marker 3.Type</name>
+
+  <!-- Map of view theme field_id GUIDs to friendly names-->
+  <name field_id="3FF4F681-A223-46A8-B782-FD7CDA4A233C">View search 1.Text</name>
+  <name field_id="1B6B3AF1-2797-4A69-B8CC-5834C4213774">View search 1.Case</name>
+  <name field_id="F94D8434-A398-4A0E-A91C-C7428C4E0808">View search 1.Type</name>
+  <name field_id="42CE40E8-9644-4A1C-9801-227A3E0C2501">View search 2.Text</name>
+  <name field_id="EEBB45C4-FA2B-46AA-AE65-77AAE1E522C8">View search 2.Case</name>
+  <name field_id="E02D0DFE-095B-44C7-889C-5452D1679C8F">View search 2.Type</name>
+  <name field_id="F0F99C37-7596-4444-AE2B-13522B63143C">View search 3.Text</name>
+  <name field_id="750C61A7-075F-4ADB-83EC-BC743B1AE988">View search 3.Case</name>
+  <name field_id="1137630B-16A4-474D-B8B0-B5C3164864C5">View search 3.Type</name>
+  <name field_id="AC26C8BC-C4CA-464E-A8FE-6516CF25C7C0">View search 4.Text</name>
+  <name field_id="1056BACC-57A4-4E72-9CDF-6DA8A1CE611B">View search 4.Case</name>
+  <name field_id="F4534EEE-3C74-468D-82FE-FA9B5A8E5052">View search 4.Type</name>
+  <name field_id="FD527655-8A7F-4B20-9A19-0A3045BE1958">View search 5.Text</name>
+  <name field_id="39E3FD7B-ECDB-444F-9FF3-129766E82906">View search 5.Case</name>
+  <name field_id="30F5B8DB-C3BC-40ED-A10E-E47D3A204F57">View search 5.Type</name>
+  <name field_id="08EB858A-CF15-43F5-A684-27FDC5ECF168">View search 6.Text</name>
+  <name field_id="C02A14B9-28A6-4370-A449-79D3F064BD65">View search 6.Case</name>
+  <name field_id="3D9EE26B-FA05-4D5E-8E18-0E122B2A9D3E">View search 6.Type</name>
+  <name field_id="E02F4755-BABB-47B5-B2AC-4DE6975646D0">Tracker.Update Local</name>
+  <name field_id="535DC6CE-90B2-4492-B902-C21027E6DD50">Tracker.Update Global</name>
+  <name field_id="D68B6A18-4AA4-43E4-9E62-728EA3F5DB4E">Tracker.Synchronise With</name>
+  <name field_id="B9F3D339-8AF1-4FAD-A0B2-836FC6EF4330">Filter.Text</name>
+  <name field_id="D98B4FB2-EB73-43AF-9057-EF301C33FDFE">Filter.Case</name>
+  <name field_id="B9ACE89C-3EA0-473A-A36F-D37EAB21D384">Filter.Type</name>
+  <name field_id="A661E23B-882D-4B2B-8C24-5DA99F66BF24">Field.Colours</name>
+  <name field_id="1DCC3CEA-5915-4D7D-A142-23DA290CEF5C">Field.Visibility</name>
+
+  <!-- Map of event theme field_id GUIDs to friendly names-->
+  <name field_id="91F38F0D-3375-4005-935E-0CC7A738F74C">Event analyser.Description</name>
+  <name field_id="F1DF7FB1-9C9F-45B1-BD6A-DEDAED883E34">Event analyser.Python Source</name>
+  <name field_id="EE35CE97-8ECC-448C-82E0-374007BEE21E">Event analyser.Display Nesting</name>
+  <name field_id="C32B2009-A78F-43FB-A7BF-21AA90687F04">Event search 1.Text</name>
+  <name field_id="05569C3E-86CA-43FC-81AE-52503818EE20">Event search 1.Case</name>
+  <name field_id="7236C2F9-CC3C-465E-86D1-E92E68584CE0">Event search 1.Type</name>
+  <name field_id="EF072092-A595-44EF-98F1-97889BC577B6">Event search 2.Text</name>
+  <name field_id="F89733BD-50F0-44E8-9921-6AA7F3AD1C00">Event search 2.Case</name>
+  <name field_id="26FB9648-2207-4840-8406-AF6C03738588">Event search 2.Type</name>
+  <name field_id="B8821C72-A6B9-44FE-AC8B-E954AC3BA7F1">Event search 3.Text</name>
+  <name field_id="CE7AE3C1-9509-4FBA-B119-F6611857FEAE">Event search 3.Case</name>
+  <name field_id="D0D7849D-64AD-4444-A3B9-81E01BFB92B9">Event search 3.Type</name>
+  <name field_id="684AC3BE-7E57-4AF7-B429-3D097C8834E2">Event filter.Text</name>
+  <name field_id="9EE092BD-BC19-4E94-9302-3FE0CC3466DC">Event filter.Case</name>
+  <name field_id="15AFAC90-1EC0-4F4E-9E08-EF60E97B57B6">Event filter.Type</name>
+  <name field_id="491AB385-20EF-42AD-96D1-855444D66D7B">Tracker.Update Marker</name>
+  <name field_id="16AEEF65-AF10-4231-BBE4-F6FAB8AAE70B">Tracker.Update Global</name>
+  <name field_id="EF11514A-E147-4E6A-B2EC-FB8FEBC88E0C">Field.Colours</name>
+  <name field_id="02A7CEC6-AE38-4632-9C19-6361D0109A8B">Field.Visibility</name>
+
+</root>
