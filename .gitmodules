@@ -5,3 +5,6 @@
 	path = Deps/Modules/Phoenix
 	url = https://github.com/nielathome/Phoenix.git
 	branch = wxPy-4.0.x
+[submodule "Deps/Modules/Json"]
+	path = Deps/Modules/Json
+	url = https://github.com/nlohmann/json.git
