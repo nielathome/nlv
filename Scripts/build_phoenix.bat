@@ -16,7 +16,7 @@ rem You should have received a copy of the GNU General Public License
 rem along with this program. If not, see <https://www.gnu.org/licenses/>.
 rem
 
-call _Results\env.bat
+call _Work\env.bat
 
 echo.
 echo ==== wxPython - setup build environment

@@ -29,14 +29,15 @@ help()
   echo "--verbose | -v - increase detail in output"
 }
 
-clean=""
-verbose=""
+cfg_clean=""
+cfg_verbose=""
+cfg_skip_phoenix=""
 for arg in $*; do
 
   case "$arg" in
 
     "--clean")
-      clean=1
+      cfg_clean=1
       ;;
         
     "--help"|"-h"|"/?")
@@ -44,8 +45,12 @@ for arg in $*; do
       exit 0
       ;;
 
+    "--skip-phoenix")
+      cfg_skip_phoenix=1
+      ;;
+      
     "--verbose"|"-v")
-      verbose=1
+      cfg_verbose=1
       ;;
                   
     *)
@@ -64,14 +69,14 @@ msbuild_target="/target:Build"
 pip_args="--quiet"
 wget_args="--no-verbose"
 
-if [ -n "$verbose" ]; then
+if [ -n "$cfg_verbose" ]; then
   b2_args=""
   msbuild_args=""
   pip_args=""
   wget_args=""
 fi
 
-if [ -n "$clean" ]; then
+if [ -n "$cfg_clean" ]; then
   b2_args="--clean"
   msbuild_target="/target:Clean"
 fi
@@ -154,8 +159,10 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>" > $envprops
 echo "<Project xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">" >> $envprops
 echo "  <PropertyGroup>" >> $envprops
 
+addenv GTEST "Deps/Modules/GoogleTest"
+addenv JSON "Deps/Modules/Json"
 addenv PHOENIX "Deps/Modules/Phoenix"
-addenv GOOGLETEST "Deps/Modules/GoogleTest"
+addenv WXWIDGETS "Deps/Modules/Phoenix/ext/wxWidgets"
 
 
 
@@ -232,6 +239,7 @@ echo "SET NUGET=`cygpath -w $nuget`" >> $envbat
 python=`which -a python | fgrep 36`
 checkf "$python" "Unable to locate Python 36"
 addenvvar PYTHON "$python"
+addenvprops PYTHON "`dirname $python`"
 
 cyg_vs2015env='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat'
 checkf "$cyg_vs2015env" "Unable to locate VisualStudio 2015"
@@ -291,7 +299,7 @@ fi
 addenv BOOST "${boost_dir}"
 echo -n ";`cygpath -w ${boost_pkg}/stage/x64/lib`" >> $pathvar 
 
-if [ -n "$clean" ]; then
+if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning BOOST ${boost_name}"
   rm -f "${boost_build}" 
   runbat Scripts/build_boost.bat 2>&1 | tee "${boost_clean}"
@@ -327,7 +335,7 @@ fi
 addenv TBB "${tbb_dir}"
 echo -n ";`cygpath -w ${tbb_pkg}/build/vs2013/x64/Debug`" >> $pathvar 
 
-if [ -n "$clean" ]; then
+if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning TBB ${tbb_name}"
   rm -f "${tbb_build}" 
   runbat Scripts/build_tbb.bat 2>&1 | tee "${tbb_clean}"
@@ -343,11 +351,26 @@ fi
 # Phoenix
 ###############################################################################
 
-if [ -n "$clean" ]; then
-  msg_header "Cleaning Phoenix"
-  runbat Scripts/clean_phoenix.bat 2>&1 | tee "${logdir}/phoenix.clean.log"
+if [ -z "$cfg_skip_phoenix" ]; then
 
-else
-  msg_header "Building Phoenix"
-  time runbat Scripts/build_phoenix.bat 2>&1 | tee "${logdir}/phoenix.build.log"
+  if [ -n "$cfg_clean" ]; then
+    msg_header "Cleaning Phoenix"
+    runbat Scripts/clean_phoenix.bat 2>&1 | tee "${logdir}/phoenix.clean.log"
+  
+  else
+    msg_header "Building Phoenix"
+    time runbat Scripts/build_phoenix.bat 2>&1 | tee "${logdir}/phoenix.build.log"
+  fi
+
 fi
+
+
+
+###############################################################################
+# Finish
+###############################################################################
+
+echo "  </PropertyGroup>" >> $envprops
+echo "</Project>" >> $envprops
+
+msg_line "Build finished"

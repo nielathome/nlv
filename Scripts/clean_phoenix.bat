@@ -16,7 +16,7 @@ rem You should have received a copy of the GNU General Public License
 rem along with this program. If not, see <https://www.gnu.org/licenses/>.
 rem
 
-call _Results\env.bat
+call _Work\env.bat
 
 rem Build wxPython within the defined Python build virtual environment
 call %PYENVBLD%\Scripts\Activate.bat
