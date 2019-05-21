@@ -132,13 +132,13 @@ ver=`cat $counter`
 echo -n $(($ver + 1)) > $counter
 
 # create the Python setup files
-sed -e "s/__VER__/$ver/" < Application/Template/nlv-setup.py > Application/nlv-setup.py
-sed -e "s/__VER__/$ver/" < Plugin/Template/nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py 
+sed -e "s/__VER__/$ver/" < Application/Template/tpl-nlv-setup.py > Application/nlv-setup.py
+sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py 
 
 # make the application version available to the Python code
-sed -e "s/__DEV__/$ver/" < Application/Template/Version.py > Application/Nlv/Version.py
+sed -e "s/__DEV__/$ver/" < Application/Template/tpl-Version.py > Application/Nlv/Version.py
 
-#directory structure
+# directory structure
 blddir=`pwd`
 wrkdir="$blddir/_Work"
 pkgdir="$blddir/Deps/Packages"
@@ -146,7 +146,7 @@ instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
 mkdir -p "$logdir" "$pkgdir" "$instdir" 
 
-# initialise DLL path
+# initialise debug time DLL path
 pathvar=$wrkdir/path.txt
 echo -n `cygpath -w -p "$PATH"` > $pathvar
 
@@ -304,7 +304,7 @@ if [ ! -d "$boost_dir" ]; then
 fi
 
 addenv BOOST "${boost_dir}"
-echo -n ";`cygpath -w ${boost_pkg}/stage/x64/lib`" >> $pathvar 
+echo -n ";`cygpath -w ${boost_dir}/stage/x64/lib`" >> $pathvar 
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning BOOST ${boost_name}"
@@ -340,7 +340,7 @@ if [ ! -d "$tbb_dir" ]; then
 fi
 
 addenv TBB "${tbb_dir}"
-echo -n ";`cygpath -w ${tbb_pkg}/build/vs2013/x64/Debug`" >> $pathvar 
+echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Debug`" >> $pathvar 
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning TBB ${tbb_name}"
@@ -390,5 +390,19 @@ fi
 
 echo "  </PropertyGroup>" >> $envprops
 echo "</Project>" >> $envprops
+
+# as a convenience, customise the Visual Studio Python project file to allow
+# debugging to work
+projfile="Application/Nlv/Nlv.pyproj"
+tplfile="Application/Template/tpl-Nlv.pyproj"
+
+if [ -n "$cfg_clean" ]; then
+  rm $projfile
+  
+elif [ ! -f "$projfile" ]; then 
+  subst=`cat $pathvar | sed -e 's|\\\\|\\\\\\\\|'g`
+  sed -e "s/__ENVIRONMENT__/PATH=$subst/" < $tplfile > $projfile 
+
+fi
 
 msg_line "Build finished"

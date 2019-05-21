@@ -5,8 +5,16 @@
 
 # NLV files
 _Work/
+
+# Python integration
 Nlv.egg-info/
 NlvMythTV.egg-info/
+
+# Templated files
+Nlv.pyproj
+nlv-setup.py
+Version.py
+nlv.mythtv-setup.py
 
 # User-specific files
 *.suo
