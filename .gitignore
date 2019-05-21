@@ -5,6 +5,8 @@
 
 # NLV files
 _Work/
+Nlv.egg-info/
+NlvMythTV.egg-info/
 
 # User-specific files
 *.suo
