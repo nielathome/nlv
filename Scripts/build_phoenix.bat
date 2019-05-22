@@ -52,4 +52,4 @@ echo ==== wxPython - package
 python build.py bdist_wheel > wxbld.log
 
 rem Copy installer to install directory
-xcopy /q /y dist\*.* %INSTDIR%
+xcopy /q /y dist\*.* %INSTDIR% >NUL

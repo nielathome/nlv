@@ -1613,7 +1613,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         # allow documentation to live in a couple of "well known" places
         file_path = Path( __file__ ).parent.joinpath("Sphinx", "html")
         if not file_path.exists():
-            file_path = Path( __file__ ).parent.parent.parent.joinpath("_Bld", "Sphinx", "html")
+            file_path = Path( __file__ ).parent.parent.parent.joinpath("_Work", "Bld", "Sphinx", "html")
         if not file_path.exists():
             file_path = Path("missing_doc")
 
