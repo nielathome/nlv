@@ -1,0 +1,19 @@
+Metadata-Version: 1.1
+Name: NlvMythTV
+Version: 410
+Summary: MythTV extension for NLV
+Home-page: http://tbd/
+Author: Niel Clausen
+Author-email: Niel Clausen <niel@home>
+License: GPL V3.0
+Download-URL: http://tbd/
+Description: Add support for MythTV logfiles to NLV
+Keywords: GUI,nlv
+Platform: WIN64
+Classifier: Development Status :: 3 - Alpha
+Classifier: Environment :: Win32 (MS Windows)
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved
+Classifier: Operating System :: Microsoft :: Windows :: Windows 10
+Classifier: Programming Language :: Python :: 3.5
+Classifier: Topic :: Software Development :: User Interfaces

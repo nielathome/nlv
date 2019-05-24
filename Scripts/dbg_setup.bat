@@ -19,10 +19,13 @@ rem
 
 rem
 rem Setup the debug Python virtual environment so that VisualStudio picks
-rem up the debug versions of teh supporting DLLs.
+rem up the debug versions of the supporting DLLs.
 rem
 
 call _Work\env.bat
+set HOME=%CD%
+set SITEDIR=%PYENVDBG%\Lib\site-packages
+
 
 
 echo.
@@ -33,47 +36,53 @@ python -m pip install %PIP_ARGS% --upgrade pip
 python -m pip %PIP_ARGS% install --upgrade pip pywin32 matplotlib
 
 
-rem
-rem setup nlog.dll; short-circuit if NLOG already setup
-rem
-set HOME=%CD%
-set SITEDIR=%VIRTUAL_ENV%\Lib\site-packages
-set NLOG_EGG=%SITEDIR%\nlog.egg-link
-set NLOG_PTH=%SITEDIR%\nlog.pth
-set NLOG_DIR=%HOME%\_Work\Bld\NlogDll\Bin\Debug
-
-if exist %NLOG_PTH% (
-  goto FINISH
-)
- 
-rem sys.path extension
-echo # NLV developer paths > %NLOG_PTH%
-echo %NLOG_DIR% >> %NLOG_PTH%
-
-rem Nlog Egg
-echo %NLOG_DIR% > %NLOG_EGG%   
-echo . >> %NLOG_EGG%
-
 
 echo.
 echo ==== Add Phoenix to debug environment
 
 cd %PHOENIX%
-python setup.py develop
+python setup.py %PIP_ARGS% develop
+
 
 
 echo.
 echo ==== Add NLV to debug environment
 
-cd %HOME%\Application
-python nlv-setup.py develop
-rmdir /s /q build
+set NLV_PTH=%SITEDIR%\nlv.pth
+set NLV_EGG_LINK=%SITEDIR%\nlv.egg-link
+set NLOG_EGG_LINK=%SITEDIR%\nlog.egg-link
+
+set NLV_DIR=%HOME%\Application
+set NLOG_DIR=%HOME%\_Work\Bld\NlogDll\Bin\Debug
+
+rem sys.path extension
+echo # NLV developer paths > %NLV_PTH%
+echo %NLV_DIR% >> %NLV_PTH%
+echo %NLOG_DIR% >> %NLV_PTH%
+
+rem Nlv Egg link
+echo %NLV_DIR% > %NLV_EGG_LINK%   
+echo . >> %NLV_EGG_LINK%
+
+rem Nlog Egg link
+echo %NLOG_DIR% > %NLOG_EGG_LINK%   
+echo . >> %NLOG_EGG_LINK%
+
+
 
 echo.
 echo ==== Add MythTV to debug environment
 
-cd %HOME%\Plugin
-python nlv.mythtv-setup.py develop
+set MYTHTV_DIR=%HOME%\Plugin
+set MYTHTV_EGG_LINK=%SITEDIR%\NlvMythTV.egg-link
+
+rem sys.path extension
+echo %MYTHTV_DIR% >> %NLV_PTH%
+
+rem Nlv Egg link
+echo %MYTHTV_DIR% > %MYTHTV_EGG_LINK%   
+echo . >> %MYTHTV_EGG_LINK%
+
 
 
 echo.
@@ -86,16 +95,4 @@ echo   Solution Explorer ] Nlv ] Python Environments ] Add Existing Virtual Envi
 echo   Solution Explorer ] Nlv ] Python Environments ] Dbg (Python 36) ] Activate Environment      
 echo.
 
-cd %HOME%
-call %PYENVDBG%\Scripts\Deactivate.bat
-
-rem
-rem Post install fix-up: the installer leaves a packaged version of the Nlog DLL in
-rem the Application directory. VisualStudio picks this up instead of the one it
-rem compiles, causing confusion. So delete the unwanted DLL
-rem
-del /q Application\*.pyd
- 
 :FINISH
-
-

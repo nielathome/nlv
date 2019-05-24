@@ -37,32 +37,32 @@ cd %HOME%
 echo.
 echo ==== NLV
 
-rem Clear out any previous distributions
-set PYBLD=%HOME%\_Work\Bld\Python
-rem if exist %PYBLD% (
-rem   rmdir /s /q %PYBLD%
-rem )
-
+set PYBLD=%HOME%\_Work\Bld\Python\
+set PYNLV=%PYBLD%\Nlv
+cd %HOME%\Application
 
 rem Build the distributable wheel
-cd Application
-set PYNLV=%PYBLD%\Nlv
-python nlv-setup.py %PIP_ARGS% build --build-base=%PYNLV% --parallel 4 egg_info --egg-base %PYNLV% bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
+python nlv-setup.py %PIP_ARGS% ^
+  build --build-base=%PYNLV% --parallel 4 ^
+  egg_info --egg-base %PYNLV% ^
+  bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
 
 rem Copy the program icon(s) to the install directory
 xcopy /q /y nlv\*.ico %INSTDIR% >NUL
-
-cd %HOME%
 
 
 
 echo.
 echo ==== MythTV
 
-rem Build the distributable wheel
-cd Plugin
 set PYMYTHTV=%PYBLD%\MythTV
-python nlv.mythtv-setup.py %PIP_ARGS% build --build-base=%PYMYTHTV% egg_info --egg-base %PYMYTHTV% bdist_wheel --bdist-dir=%PYMYTHTV%\bdist.win-amd64 --dist-dir=%INSTDIR%
+cd %HOME%\Plugin
+
+rem Build the distributable wheel
+python nlv.mythtv-setup.py %PIP_ARGS% ^
+  build --build-base=%PYMYTHTV% ^
+  egg_info --egg-base %PYMYTHTV% ^
+  bdist_wheel --bdist-dir=%PYMYTHTV%\bdist.win-amd64 --dist-dir=%INSTDIR%
 
 rem Deactivate the Python virtual environment
 call %PYENVBLD%\Scripts\Deactivate.bat

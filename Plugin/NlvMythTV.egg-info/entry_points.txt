@@ -1,0 +1,3 @@
+[nlv.extensions]
+MythTV = NlvMythTV.Main:MakeExtension
+

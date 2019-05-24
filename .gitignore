@@ -6,10 +6,6 @@
 # NLV files
 _Work/
 
-# Python integration
-Nlv.egg-info/
-NlvMythTV.egg-info/
-
 # Templated files
 Nlv.pyproj
 nlv-setup.py
