@@ -382,6 +382,19 @@ if [ -z "$cfg_clean" ]; then
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/nlv.build.log"
 fi
 
+vsnlv_build="${logdir}/vsnlv.build.log"
+vsnlv_clean="${logdir}/vsnlv.clean.log"
+
+if [ -n "$cfg_clean" ]; then
+  msg_header "Cleaning vsNLV"
+  runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_clean}"
+
+else
+  msg_header "Building vsNLV"
+  time runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_build}"
+fi
+
+
 
 ###############################################################################
 # Developer support
