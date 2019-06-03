@@ -129,6 +129,7 @@ class G_Const:
     ID_LOGFILE_NEW_EVENTS = wx.ID_HIGHEST + 11
 
     ID_NODE_DELETE = wx.ID_HIGHEST + 20
+    ID_NODE_SHOWHIDE = wx.ID_HIGHEST + 21
 
     ID_SESSION_SAVE = wx.ID_HIGHEST + 30
     ID_SESSION_SAVE_AS = wx.ID_HIGHEST + 31
@@ -370,8 +371,14 @@ class G_Node:
 
     def PostInitLoad(self):
         """
-        Final initialisation; project tree is now setup and document
+        Fourth stage initialisation; project tree is now setup and document
         data is available. All nodes have been created.
+        """
+        pass
+
+    def PostInitLayout(self):
+        """
+        All node displays have been created and the AUI perspective activated.
         """
         pass
 
@@ -663,27 +670,33 @@ class G_Node:
 
 
     #-------------------------------------------------------
-    def GetParentNode(self, factory_id = None):
+    def GetParentNode(self, factory_id_or_class = None):
         """
-        Fetch our parent node. If factory_id is provided, then
-        recurse until the correct parent/grandparent is found.
+        Fetch our parent node. If factory_id_or_class is provided,
+        then recurse until the identified parent/grandparent is found.
         """
 
         # implement as recursive algorithm, in case GetParentNode
         # is ever over-ridden
         parent = _Item2Node(self.GetHrItem().GetParent())
-        if factory_id is None or parent.GetFactoryID() == factory_id:
+        if parent is None or factory_id_or_class is None:
             return parent
         else:
-            return parent.GetParentNode(factory_id)
+            if isinstance(factory_id_or_class, str):
+                # -> factory_id
+                if parent.GetFactoryID() == factory_id_or_class:
+                    return parent
+
+            elif isinstance(parent, factory_id_or_class):
+                # -> _or_class
+                return parent
+
+            # no takers, recurse
+            return parent.GetParentNode(factory_id_or_class)
 
 
     #-------------------------------------------------------
-    def HandlePopupCommand(self, id):
-        """Respond to a command from a popup menu. Return True if processed"""
-        pass
-
-    def CreatePopupMenu(self):
+    def CreatePopupMenu(self, handlers):
         """The tree node has been clicked, create a popup menu"""
         return None
 
@@ -799,6 +812,17 @@ class G_TreeNode(G_Node):
 
 
     #-------------------------------------------------------
+    def EnableTree(self, enable):
+        self.GetTree().EnableItem(self.GetTrItem(), enable)
+
+    def ExpandTree(self):
+        self.GetTree().Expand(self.GetTrItem())
+
+    def CollapseTree(self):
+        self.GetTree().Collapse(self.GetTrItem())
+
+
+    #-------------------------------------------------------
     def GetTreeLabel(self):
         return self.GetTree().GetItemText(self.GetTrItem())
 
@@ -830,15 +854,12 @@ class G_DeletableTreeNode(G_TreeNode):
 
 
     #-------------------------------------------------------
-    def AppendPopupDeleteNode(self, menu, separator = True):
+    def AppendPopupDeleteNode(self, menu, handlers, separator = False):
         if separator:
             menu.AppendSeparator()
-        menu.Append(G_Const.ID_NODE_DELETE, "Remove '{}'".format(self.GetNodeName()))
-        return menu
 
-    def HandlePopupDeleteCommand(self, id):
-        if id == G_Const.ID_NODE_DELETE:
-            self.OnCmdDelete()
+        menu.Append(G_Const.ID_NODE_DELETE, "Remove '{}'".format(self.GetNodeName()))
+        handlers[G_Const.ID_NODE_DELETE] = self.OnCmdDelete
 
 
     #-------------------------------------------------------
@@ -866,6 +887,120 @@ class G_DeletableTreeNode(G_TreeNode):
 
     def OnCmdDelete(self, event = None):
         self._DeleteNode()
+
+
+
+## G_HideableTreeNode ######################################
+
+class G_HideableTreeNode():
+    """Extend standard tree node with ability to hide its display(s)"""
+
+    #-------------------------------------------------------
+    def PostInitHideableTreeNode(self):
+        self._Field.Add(True, "ShowThisNodeDisplay", replace_existing = False)
+        self.UpdateNodeDisplay()
+        self.UpdateTreeDisplay()
+
+
+    #-------------------------------------------------------
+    def AppendPopupShowHide(self, menu, handlers, separator = False):
+        if separator:
+            menu.AppendSeparator()
+
+        action = "Show"
+        if self._Field.ShowThisNodeDisplay.Value:
+            action = "Hide"
+
+        menu.Append(G_Const.ID_NODE_SHOWHIDE, "{} '{}'".format(action, self.GetNodeName()))
+        handlers[G_Const.ID_NODE_SHOWHIDE] = self.OnShowHideCommand
+
+
+    def OnShowHideCommand(self):
+        show = not self._Field.ShowThisNodeDisplay.Value
+
+        # show/hide the display tab for this node
+        self.SetThisNodeDisplay(show)
+
+        # show/hide the display tab for all child nodes
+        for node in self.ListSubNodes(recursive = True, include_self = False):
+            if isinstance(node, G_HideableTreeNode):
+                node.SetParentNodeDisplay(show)
+            elif isinstance(node, G_HideableTreeChildNode):
+                node.UpdateTreeDisplay()
+
+        # show/hide the panel controls
+        self.ShowHideChildNodes(show)
+
+        return True
+
+
+    #-------------------------------------------------------
+    def UpdateNodeDisplay(self):
+        pass
+
+
+    def UpdateTreeDisplay(self):
+        enabled = self.IsParentNodeDisplayed()
+
+        # determine whether the node responds in the UI
+        self.EnableTree(enabled)
+
+        # expand/collapse our children
+        if enabled:
+            self.ExpandTree()
+        else:
+            self.CollapseTree()
+
+
+    #-------------------------------------------------------
+    def IsNodeDisplayed(self):
+        return self._Field.ShowThisNodeDisplay.Value and self.IsParentNodeDisplayed()
+
+    def IsParentNodeDisplayed(self):
+        parent = self.GetParentNode(G_HideableTreeNode)
+        if parent is None:
+            return True
+        else:
+            return parent._Field.ShowThisNodeDisplay.Value
+
+    def SetThisNodeDisplay(self, show):
+        self._Field.ShowThisNodeDisplay.Value = show
+        self.UpdateNodeDisplay()
+        self.UpdateTreeDisplay()
+
+    def SetParentNodeDisplay(self, show):
+        self.UpdateNodeDisplay()
+        self.UpdateTreeDisplay()
+
+
+
+## G_HideableTreeChildNode #################################
+
+class G_HideableTreeChildNode():
+    """Default behaviour for child nodes of a G_HideableTreeNode"""
+
+    #-------------------------------------------------------
+    def IsNodeDisplayed(self):
+        return self.GetParentNode(G_HideableTreeNode).IsNodeDisplayed()
+
+
+    #-------------------------------------------------------
+    def PostInitHideableTreeNode(self):
+        self.UpdateTreeDisplay()
+
+
+    #-------------------------------------------------------
+    def UpdateTreeDisplay(self):
+        enabled = self.IsNodeDisplayed()
+
+        # determine whether the node responds in the UI
+        self.EnableTree(enabled)
+
+        # expand/collapse our children
+        if enabled:
+            self.ExpandTree()
+        else:
+            self.CollapseTree()
 
 
 
@@ -996,9 +1131,11 @@ class G_ContainerMenu:
     Common popup menu behaviour for windows which contain nodes
     """
 
+    #-------------------------------------------------------
     def OnDisplayPopupMenu(self, window, node):
         """Show, and act on, a right-click 'context sensitive', popup menu"""
-        menu = node.CreatePopupMenu()
+        handlers = dict()
+        menu = node.CreatePopupMenu(handlers)
         if menu is None:
             return
 
@@ -1006,7 +1143,9 @@ class G_ContainerMenu:
         id = window.GetPopupMenuSelectionFromUser(menu)
 
         # perform the request
-        node.HandlePopupCommand(id)
+        handler = handlers.get(id)
+        if handler is not None:
+            handler()
 
 
 
@@ -1059,18 +1198,19 @@ class G_ContainerNode(G_ContainerMenu):
 
     #-------------------------------------------------------
     def SwitchSubpage(self, new_idx, page):
-        self._CurSelectionIdx = new_idx
-
         page_window = page.GetWindow()
         page_sizer = page.GetSizer()
         page_window.Freeze()
 
-        new_node = self.GetChildNode(new_idx)
         node_sizer = None
-        if new_node:
-            node_sizer = new_node.GetSizer()
-            page_sizer.Show(node_sizer, True)
-            new_node.Activate()
+        if new_idx >= 0:
+            self._CurSelectionIdx = new_idx
+
+            new_node = self.GetChildNode(new_idx)
+            if new_node:
+                node_sizer = new_node.GetSizer()
+                page_sizer.Show(node_sizer, True)
+                new_node.Activate()
 
         # it seems that since the sub-page sizers are specified with "EXPAND" that
         # whenever one of them is hidden, the others are expanded to fill the void;
@@ -1078,7 +1218,7 @@ class G_ContainerNode(G_ContainerMenu):
         # sub-page sizer is known to be visible
         for sizer_item in page_sizer.GetChildren():
             child_sizer = sizer_item.GetSizer()
-            if child_sizer and not child_sizer is node_sizer:
+            if child_sizer and child_sizer is not node_sizer:
                 page_sizer.Show(child_sizer, False)
 
         page_sizer.Layout()
@@ -1135,6 +1275,12 @@ class G_TabContainerNode(G_ContainerNode, G_DeletableTreeNode):
 
 
     #-------------------------------------------------------
+    def IsNodeDisplayed(self):
+        return True
+
+    def IsParentNodeDisplayed(self):
+        return True
+
     def ActivateContainer(self):
         gui = self._SubpageSelector
         gui.Unbind(wx.EVT_TOOL_RANGE)
@@ -1143,25 +1289,35 @@ class G_TabContainerNode(G_ContainerNode, G_DeletableTreeNode):
         # add children as toolbar buttons on the toolbar
         gui.ClearTools()
 
-        id = 0
-        for node in self.ListSubNodes():
-            if isinstance(node, G_ContainedNode):
-                art_id = node.GetArtID()
-                bitmap =  wx.ArtProvider.GetBitmap(art_id, wx.ART_TOOLBAR, self._ButtonSize)
-                gui.AddTool(id, node.GetNodeName(), bitmap, kind = wx.ITEM_RADIO)
-                id = id + 1
+        if self.IsNodeDisplayed():
+            id = 0
+            for node in self.ListSubNodes():
+                if isinstance(node, G_ContainedNode):
+                    art_id = node.GetArtID()
+                    bitmap =  wx.ArtProvider.GetBitmap(art_id, wx.ART_TOOLBAR, self._ButtonSize)
+                    gui.AddTool(id, node.GetNodeName(), bitmap, kind = wx.ITEM_RADIO)
+                    id = id + 1
 
-        gui.Realize()
-        gui.Bind(wx.EVT_TOOL_RANGE, self.OnSubpageSelect, id = 0, id2 = id - 1)
-        gui.Bind(wx.EVT_TOOL_RCLICKED_RANGE, self.OnSelectorRightClick, id = 0, id2 = id - 1)
+            gui.Realize()
+            gui.Bind(wx.EVT_TOOL_RANGE, self.OnSubpageSelect, id = 0, id2 = id - 1)
+            gui.Bind(wx.EVT_TOOL_RCLICKED_RANGE, self.OnSelectorRightClick, id = 0, id2 = id - 1)
 
-        self._SubpageSelector.ToggleTool(self._CurSelectionIdx, True)
-        self.SwitchSubpage(self._CurSelectionIdx, self._Page)
+            self._SubpageSelector.ToggleTool(self._CurSelectionIdx, True)
+            self.SwitchSubpage(self._CurSelectionIdx, self._Page)
+
+        else:
+            gui.Realize()
+            self.SwitchSubpage(-1, self._Page)
 
 
     #-------------------------------------------------------
     def OnSubpageSelect(self, event):
         self.SwitchSubpage(event.GetId(), self._Page)
+
+
+    #-------------------------------------------------------
+    def ShowHideChildNodes(self, show):
+        self.ActivateContainer()
 
 
 
@@ -1613,7 +1769,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         # allow documentation to live in a couple of "well known" places
         file_path = Path( __file__ ).parent.joinpath("Sphinx", "html")
         if not file_path.exists():
-            file_path = Path( __file__ ).parent.parent.parent.joinpath("_Work", "Bld", "Sphinx", "html")
+            file_path = Path( __file__ ).parent.parent.parent.joinpath("_Bld", "Sphinx", "html")
         if not file_path.exists():
             file_path = Path("missing_doc")
 

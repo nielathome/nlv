@@ -32,8 +32,7 @@ from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_ListContainedNode
 from .Project import G_ListContainerNode
-from .Project import G_DeletableTreeNode
-from .Project import G_TreeNode
+from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
 from .Session import G_SessionChildNode
@@ -197,8 +196,9 @@ class G_DisplayNode(G_LogChildNode):
 
 
         # skip if activation is a side effect of a display control getting
-        # input focus
-        self.WithFocusLock(Work)
+        # input focus, or if it is hidden
+        if self.IsNodeDisplayed():
+            self.WithFocusLock(Work)
 
 
     def OnDisplaySetFocus(self, event):
@@ -298,7 +298,8 @@ class G_DisplayNode(G_LogChildNode):
             self._DelayedFocusWindow.Unbind(wx.EVT_IDLE)
 
             # move the focus and drop the reference to the window
-            self._DelayedFocusWindow.SetFocus()
+            if self.IsNodeDisplayed():
+                self._DelayedFocusWindow.SetFocus()
             self._DelayedFocusWindow = None
 
         # don't interfere with any use the editor has for idle events
@@ -324,6 +325,14 @@ class G_DisplayNode(G_LogChildNode):
     def SetLastChild(self, child):
         # strictly, 'child' can be any node in the project tree
         self._WLastChild = MakeWeakRef(child)
+
+
+    #-------------------------------------------------------
+    def UpdateNodeDisplay(self):
+        show = self.IsNodeDisplayed()
+        notebook = self.GetNotebook()
+        tab_index = notebook.GetPageIndex(self._DisplayCtrl)
+        notebook.HidePage(tab_index, not show)
 
 
     #-------------------------------------------------------
@@ -392,7 +401,7 @@ class G_DisplayChildNode(G_LogChildNode):
         return False
 
 
-#-------------------------------------------------------
+    #-------------------------------------------------------
     def SendFocusToDisplayCtrl(self, refocus = True):
         if refocus:
             self.GetDisplayNode().SendFocusToDisplayCtrl()
@@ -901,7 +910,7 @@ class G_LogThemeContainerNode(G_LogChildNode, G_ListContainerNode):
 
 ## G_LogNode ##############################################
 
-class G_LogNode(G_SessionChildNode, G_TabContainerNode):
+class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     """
     Class that implements a logfile.
     Instances are attached to the logfile nodes in the project tree.
@@ -931,7 +940,6 @@ class G_LogNode(G_SessionChildNode, G_TabContainerNode):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
 
-        # ensure non-template fields exist and are initialised: if needed,
         # capture the current schema GUID
         if self._InitSchemaGuid is not None:
             self._Field.Add(self._InitSchemaGuid, "SchemaGuid", replace_existing = False)
@@ -972,25 +980,28 @@ class G_LogNode(G_SessionChildNode, G_TabContainerNode):
                 self.AppendNode(factory_guid, view_theme_id)
 
 
+    def PostInitLayout(self):
+        self.PostInitHideableTreeNode()
+
+
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateContainer()
 
 
     #-------------------------------------------------------
-    def CreatePopupMenu(self):
+    def CreatePopupMenu(self, handlers):
         menu = wx.Menu("Log file")
-        menu.Append(G_Const.ID_LOGFILE_NEW_VIEW, "New view")
-        menu.Append(G_Const.ID_LOGFILE_NEW_EVENTS, "New events table")
-        return self.AppendPopupDeleteNode(menu)
 
-    def HandlePopupCommand(self, id):
-        if id == G_Const.ID_LOGFILE_NEW_VIEW:
-            self.OnNewView()
-        elif id == G_Const.ID_LOGFILE_NEW_EVENTS:
-            self.OnNewEvents()
-        else:
-            self.HandlePopupDeleteCommand(id)
+        menu.Append(G_Const.ID_LOGFILE_NEW_VIEW, "New view")
+        handlers[G_Const.ID_LOGFILE_NEW_VIEW] = self.OnNewView
+
+        menu.Append(G_Const.ID_LOGFILE_NEW_EVENTS, "New events table")
+        handlers[G_Const.ID_LOGFILE_NEW_EVENTS] = self.OnNewEvents
+
+        self.AppendPopupShowHide(menu, handlers, True)
+        self.AppendPopupDeleteNode(menu, handlers, True)
+        return menu
 
 
     #-------------------------------------------------------

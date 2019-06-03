@@ -30,8 +30,7 @@ from .Project import G_TabContainedNode
 from .Project import G_TabContainerNode
 from .Project import G_ListContainedNode
 from .Project import G_ListContainerNode
-from .Project import G_DeletableTreeNode
-from .Project import G_TreeNode
+from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
 from .StyleNode import G_ColourNode
@@ -584,7 +583,7 @@ class G_ViewThemeContainerNode(G_ViewChildNode, G_ListContainerNode):
 
 ## G_ViewNode ##############################################
 
-class G_ViewNode(G_DisplayNode, G_TabContainerNode):
+class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     """Class that implements a view onto a logfile"""
 
     # global tracker key binding map to tracker index
@@ -700,18 +699,25 @@ class G_ViewNode(G_DisplayNode, G_TabContainerNode):
         self.SetScreenState( (self._Field.FirstVisibleLine.Value, self._Field.CursorLine.Value) )
 
 
+    def PostInitLayout(self):
+        self.PostInitHideableTreeNode()
+
+
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateContainer()
 
 
     #-------------------------------------------------------
-    def CreatePopupMenu(self):
-        menu = wx.Menu("View")
-        return self.AppendPopupDeleteNode(menu, False)
+    def CreatePopupMenu(self, handlers):
+        menu = None
 
-    def HandlePopupCommand(self, id):
-        self.HandlePopupDeleteCommand(id)
+        if self.IsParentNodeDisplayed():
+            menu = wx.Menu("View")
+            self.AppendPopupShowHide(menu, handlers)
+            self.AppendPopupDeleteNode(menu, handlers, True)
+
+        return menu
 
 
     #-------------------------------------------------------

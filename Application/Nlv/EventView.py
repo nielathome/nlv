@@ -61,6 +61,8 @@ from .Project import G_TabContainedNode
 from .Project import G_TabContainerNode
 from .Project import G_ListContainedNode
 from .Project import G_ListContainerNode
+from .Project import G_HideableTreeNode
+from .Project import G_HideableTreeChildNode
 from .Project import G_WindowInfo
 from .Project import G_NodeFactory
 from .Project import G_Project
@@ -459,7 +461,7 @@ class G_LogAnalysisLocalThemeOverridesNode(G_LogAnalysisChildNode, G_ThemeOverri
 
 ## G_LogAnalysisNode #######################################
 
-class G_LogAnalysisNode(G_DisplayNode, G_TabContainerNode):
+class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     """Master node for all logfile analysis and results viewing"""
 
     #-------------------------------------------------------
@@ -539,6 +541,10 @@ class G_LogAnalysisNode(G_DisplayNode, G_TabContainerNode):
         self.UnlockCharts()
 
 
+    def PostInitLayout(self):
+        self.PostInitHideableTreeNode()
+
+
     #-------------------------------------------------------
     def MakeTemporaryFilename(self, ext = ".csv"):
         cachedir = (self.GetLogNode().GetLogfilePath().parent) / ".nlvc"
@@ -554,12 +560,15 @@ class G_LogAnalysisNode(G_DisplayNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def CreatePopupMenu(self):
-        menu = wx.Menu("Event")
-        return self.AppendPopupDeleteNode(menu, False)
+    def CreatePopupMenu(self, handlers):
+        menu = None
 
-    def HandlePopupCommand(self, id):
-        self.HandlePopupDeleteCommand(id)
+        if self.IsParentNodeDisplayed():
+            menu = wx.Menu("Event")
+            self.AppendPopupShowHide(menu, handlers)
+            self.AppendPopupDeleteNode(menu, handlers, True)
+
+        return menu
 
 
     #-------------------------------------------------------
@@ -1160,7 +1169,7 @@ class G_EventProjectorOptionsNode(G_ProjectorChildNode, G_ThemeNode, G_TabContai
 
 ## G_LogAnalysisChildProjectorNode #########################
 
-class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode):
+class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeChildNode):
     """
     Mixin class to extend child *projector* nodes of an analysis node
     with common behaviour (i.e. G_EventProjectorNode and G_MetricsProjectorNode.
@@ -1169,6 +1178,11 @@ class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode):
     #-------------------------------------------------------
     def __init__(self):
         G_DisplayNode.__init__(self)
+
+
+    #-------------------------------------------------------
+    def PostInitLayout(self):
+        self.PostInitHideableTreeNode()
 
 
     #-------------------------------------------------------

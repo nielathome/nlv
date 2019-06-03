@@ -32,7 +32,6 @@ from .Logmeta import GetLogSchema, GetLogSchemataNames
 from .Project import G_Const
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
-from .Project import G_DeletableTreeNode
 from .Project import G_TreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
@@ -532,7 +531,7 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
         self.Rebind(self._BtnOpenLogfile, wx.EVT_BUTTON, self.OnCmdOpenLogfile)
 
         guid = self._Field.SchemaGuid.Value
-        if guid == "None":
+        if guid == "None" and len(self._SchemataNames) != 0:
             guid = self._Field.SchemaGuid.Value = self._SchemataNames[0][1]
 
         idx = 0
@@ -1249,6 +1248,9 @@ class G_SessionNode(G_TabContainerNode):
         else:
             self.GetProject().LoadPerspective(layout)
 
+        for node in self.ListSubNodes(recursive = True, include_self = True):
+            node.PostInitLayout()
+    
 
     #-------------------------------------------------------
     def AppendLog(self, relative_path, schema_guid, builder_guid):
@@ -1261,21 +1263,17 @@ class G_SessionNode(G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def CreatePopupMenu(self):
+    def CreatePopupMenu(self, handlers):
+        manager = GetSessionManager()
         menu = wx.Menu("Session")
 
         menu.Append(G_Const.ID_SESSION_SAVE, "Save")
+        handlers[G_Const.ID_SESSION_SAVE] = manager.OnCmdSessionSave
+
         menu.Append(G_Const.ID_SESSION_SAVE_AS, "Save As ...")
+        handlers[G_Const.ID_SESSION_SAVE_AS] = manager.OnCmdSessionSaveAs
 
         return menu
-
-
-    def HandlePopupCommand(self, id):
-        manager = GetSessionManager()
-        if id == G_Const.ID_SESSION_SAVE:
-            manager.OnCmdSessionSave()
-        elif id == G_Const.ID_SESSION_SAVE_AS:
-            manager.OnCmdSessionSaveAs()
 
 
     #-------------------------------------------------------
