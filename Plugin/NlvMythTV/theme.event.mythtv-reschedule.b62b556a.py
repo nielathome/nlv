@@ -18,38 +18,68 @@ import re
 
 
 
-## SimpleFormatter #############################################
+## Analyser ####################################################
 
-def SimpleFormatter(value, attr):
-    """
-    Formatters are executed at event display time.
-
-    :param `value`: the field value to be displayed.
-
-    :param `attr`: an attributes object. Controls the formatting
-     of the displayed field value.  Supported methods on the
-     attributes object are:
-        . SetBold(set)
-        . SetItalic(set)
-        . SetFgColour(colour_name_or_rgb)
-        . SetBgColour(colour_name_or_rgb)
-    """
-
-    if value > 1:
-        attr.SetBold(True)
-
-
-
-## LogfileAnalyser #############################################
-
-class LogfileAnalyser:
+class Analyser:
 
     """
-    A class which identifies events in a logfile.
+    A class which identifies events in a logfile. The results of
+    an analysis are written to the corresponding events table.
     """
 
-    ## DefineFilter ############################################
+    #-----------------------------------------------------------
+    class MatchEventFinish:
+        """
+        Callable object. Called during event analysis to identify
+        the finish of an event.
+        """
 
+        #-------------------------------------------------------
+        _RegexPlace = re.compile("([\d.]+)\splace")
+
+
+        #-------------------------------------------------------
+        def __call__(self, line, collector):
+            """
+            Called to determine whether a log line (candidate) marks
+            the finish of the event of interest. Only lines matching
+            the finish filter (see DefineFilter) will be passed to
+            this method.
+
+            :param `line`: provides access to the log line under
+            consideration. It provides the following methods:
+
+                . GetFieldText( field_name ) - fetches a field's value as text
+                . GetFieldValueUnsigned( field_name ) - fetches an unsigned field's value
+                . GetFieldValueSigned( field_name ) - fetches an integer field's value
+                . GetFieldValueFloat( field_name ) - fetches a float field's value
+                . GetNonFieldText() - fetches the non-field part of the log line
+
+            where the field_name is the log file's field name as defined
+            by its schema.
+        
+            :param `collector`: results accessor. The collector provides
+            two methods:
+
+                . AddEvent( recogniser_values )
+                . CancelEvent()
+
+            where:
+                * `recogniser_values` is a list of event field values.
+                  The length and types of the list members must match
+                  the descriptions provided by the analysers `DefineSchema`.
+            """
+
+            f_place = 0.0
+            match = re.search(self._RegexPlace, line.GetNonFieldText())
+            if match and match.lastindex == 1:
+                f_place = float(match[1])
+            f_bool = f_place > 0.16
+
+            collector.AddEvent([f_place, f_bool])
+
+
+    #-----------------------------------------------------------
     @staticmethod
     def DefineFilter():
         """
@@ -62,20 +92,73 @@ class LogfileAnalyser:
         two strings:
 
         1. The filter type. Must be one of 'Literal, 'Regular Expression'
-           or  'LogView Filter'
+           or 'LogView Filter'
         2. The filter's match text.
         """
 
         return [
-            ('LogView Filter',  'function = "HandleReschedule" and log ~= "Reschedule"'),
-            ('LogView Filter',  'function = "HandleReschedule" and log ~= "Scheduled"')
+            ('LogView Filter', 'function = "HandleReschedule" and log ~= "Reschedule"'),
+            ('LogView Filter', 'function = "HandleReschedule" and log ~= "Scheduled"')
         ]
 
 
-    ## DefineSchema ############################################
-
+    #-----------------------------------------------------------
     @staticmethod
     def DefineSchema(schema):
+        schema.AddField("place", "float32")
+        schema.AddField("abool", "bool")
+
+
+    #-----------------------------------------------------------
+    @classmethod
+    def MatchEventStart(cls, line):
+        """
+        Called to determine whether a log line (candidate) marks
+        the start of an event of interest. Only lines matching
+        the start filter (see DefineFilter) will be passed.
+
+        If the log line matches the start of an event, then return
+        a callable object which adhers to the MatchEventFinish
+        concept.
+        """
+        return cls.MatchEventFinish()
+
+
+
+## Projector ###################################################
+
+class Projector:
+
+    """
+    A class which maps one or more raw analysed event tables ready
+    to be displayed in the UI.
+    """
+
+    #-----------------------------------------------------------
+    @staticmethod
+    def SimpleFormatter(value, attr):
+        """
+        Formatters are executed in the UI when the projected table
+        is displayed.
+
+        :param `value`: the field value to be displayed.
+
+        :param `attr`: an attributes object. Controls the formatting
+         of the displayed field value.  Supported methods on the
+         attributes object are:
+            . SetBold(set)
+            . SetItalic(set)
+            . SetFgColour(colour_name_or_rgb)
+            . SetBgColour(colour_name_or_rgb)
+        """
+
+        if value > 1:
+            attr.SetBold(True)
+
+
+    #-----------------------------------------------------------
+    @classmethod
+    def DefineSchema(cls, schema):
         """
         Called to define the schema of the resulting event list.
         Optionally call InitStart to customise the start date/time
@@ -143,83 +226,26 @@ class LogfileAnalyser:
         """
 
         schema.InitStart("Start", width = 100)
-        schema.AddDuration("Duration (s)", scale = "s", width = 60, formatter = SimpleFormatter)
+        schema.AddDuration("Duration", scale = "s", width = 60, formatter = cls.SimpleFormatter)
         schema.AddField("Place", "float32", 60)
         schema.AddField("Abool", "bool", 60)
 
 
-    ## MatchEventFinish ########################################
 
-    class MatchEventFinish:
-        """
-        Callable object. Called during event analysis to identify
-        the finish of an event.
-        """
-
-        _RegexPlace = re.compile("([\d.]+)\splace")
-
-
-        #-------------------------------------------------------
-        def __call__(self, line, collector):
-            """
-            Called to determine whether a log line (candidate) marks
-            the finish of the event of interest. Only lines matching
-            the finish filter (see DefineFilter) will be passed.
-
-            :param `line`: provides access to the log line under
-            consideration. It provides the following methods:
-
-                . GetFieldText( field_name ) - fetches a field's value as text
-                . GetFieldValueUnsigned( field_name ) - fetches an unsigned field's value
-                . GetFieldValueSigned( field_name ) - fetches an integer field's value
-                . GetFieldValueFloat( field_name ) - fetches a float field's value
-                . GetNonFieldText() - fetches the non-field part of the log line
-
-            where the field_name is the log file's field name as defined
-            by its schema.
-        
-            :param `collector`: results accessor. The collector provides
-            two methods:
-
-                . AddEvent( recogniser_values, cookie )
-                . CancelEvent()
-
-            where:
-                * `cookie` is a value that can be passed to the IsContained
-                  function.
-
-                * `recogniser_values` is a list of event fields. The length
-                  and types of the list members must match the descriptions
-                  provided by `DefineSchema`.
-            """
-
-            f_place = 0.0
-            match = re.search(self._RegexPlace, line.GetNonFieldText())
-            if match and match.lastindex == 1:
-                f_place = float(match[1])
-            f_bool = f_place > 0.16
-
-            collector.AddEvent(self, [f_place, f_bool])
-
-
-    ## MatchEventStart #########################################
-
+    #-----------------------------------------------------------
     @staticmethod
-    def MatchEventStart(line):
-        """
-        Called to determine whether a log line (candidate) marks
-        the start of an event of interest. Only lines matching
-        the start filter (see DefineFilter) will be passed.
-
-        If the log line matches the start of an event, then return
-        a callable object which adhers to the MatchEventFinish
-        concept.
-        """
-        return __class__.MatchEventFinish()
+    def Select(dbinfo):
+        table_name = dbinfo.GetTableName("reschedule")
+        return "SELECT place, abool FROM {}".format(table_name)
 
 
-    ## IsContained #############################################
+    #-----------------------------------------------------------
+    @staticmethod
+    def Project(event, collector):
+        collector.AddEvent([event.place, event.abool])
 
+
+    #-----------------------------------------------------------
     @staticmethod
     def IsContained(parent, child):
         """
@@ -227,8 +253,8 @@ class LogfileAnalyser:
         considered subordinate-to, or contained-within, the `parent`
         event.
 
-        Both `parent` and `child` are objects previously returned
-        by self.MatchEventStart. The function should return True
+        Both `parent` and `child` are objects returned via the
+        select query. The function should return True
         if the child event is to be considered "contained by"
         (or "subordinate to") the parent event, and False otherwise.
         Contained events mey be displayed nested in the UI.
@@ -249,4 +275,13 @@ where:
     * `log_analyser` is an object, behaving as per `LogfileAnalyser`
 """
 
-Register(LogfileAnalyser())
+#Register(LogfileAnalyser())
+
+
+
+
+
+
+
+RegisterAnalyser("reschedule", Analyser())
+RegisterProjector("Reschedule", Projector())

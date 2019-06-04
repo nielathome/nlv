@@ -18,7 +18,9 @@
 # Python imports
 import logging
 from pathlib import Path
+import sqlite3
 import time
+from uuid import uuid4
 from weakref import ref as MakeWeakRef
 import xml.etree.ElementTree as et
 
@@ -1206,6 +1208,7 @@ class G_SessionNode(G_TabContainerNode):
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         super().__init__(factory, wproject, witem)
+        self._Database = None
 
         # allow perspective saviong to be disabled; AUI notebooks can
         # and do become corrupted
@@ -1215,6 +1218,7 @@ class G_SessionNode(G_TabContainerNode):
     def PostInitNode(self):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
+        self._Field.Add(str(uuid4()), "Guid", replace_existing = False)
 
     def PostInitLoad(self):
         # control/restore window layout; this should be last, as the
@@ -1274,6 +1278,13 @@ class G_SessionNode(G_TabContainerNode):
         handlers[G_Const.ID_SESSION_SAVE_AS] = manager.OnCmdSessionSaveAs
 
         return menu
+
+
+    #-------------------------------------------------------
+    def GetDatabase(self):
+        if self._Database is None:
+            self._Database = sqlite3.connect("{}.db".format(self._Field.Guid.Value))
+        return self._Database
 
 
     #-------------------------------------------------------

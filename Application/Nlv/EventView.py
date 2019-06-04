@@ -47,10 +47,11 @@ import wx
 
 # Application imports 
 from .Document import D_Document
-from .EventData import G_Analyser
-from .EventData import G_MetricsViewCtrl
-from .EventData import G_ScriptGuard
-from .EventData import G_TableViewCtrl
+from .EventData import G_Analyser2
+from .EventProjector import G_Analyser
+from .EventProjector import G_MetricsViewCtrl
+from .EventProjector import G_ScriptGuard
+from .EventProjector import G_TableViewCtrl
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
 from .MatchNode import G_MatchItem
@@ -546,12 +547,15 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    def MakeTemporaryName(self):
+        return self._Field.Guid.Value
+
     def MakeTemporaryFilename(self, ext = ".csv"):
         cachedir = (self.GetLogNode().GetLogfilePath().parent) / ".nlvc"
         if not cachedir.exists():
             cachedir.mkdir()
 
-        return str((cachedir / self._Field.Guid.Value).with_suffix(ext))
+        return str((cachedir / self.MakeTemporaryName()).with_suffix(ext))
 
 
     #-------------------------------------------------------
@@ -625,10 +629,16 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def RunAnalyser(self, code, log_schema, meta_only):
         self.SetErrorText("Analysing ...\n")
-        analyser = G_Analyser(meta_only, self.MakeTemporaryFilename(), log_schema, None, self.GetLogfile())
+        analyser = G_Analyser(meta_only, self.MakeTemporaryFilename(),
+            log_schema, None, self.GetLogfile()
+        )
+
+        analyser2 = G_Analyser2(self.GetSessionNode().GetDatabase(), self.MakeTemporaryName(),
+            log_schema, self.GetLogfile()
+        )
 
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
-            globals = dict(Register = analyser.Register)
+            globals = dict(Register = analyser.Register, RegisterAnalyser = analyser2.RegisterAnalyser)
             exec(code, globals)
             self.SetErrorText("Analysed OK\n")
             self._Field.AnalysisIsValid.Value = True
