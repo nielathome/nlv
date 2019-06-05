@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -61,7 +61,7 @@ class G_ScriptGuard:
     """
     All use of the user supplied recogniser script, and any
     objects functions returned from the script, should be
-    protected within a try block, and any exceptions reported
+    protected within a 'with' block, and any exceptions reported
     back to the UI
     """
     #-------------------------------------------------------
@@ -297,14 +297,14 @@ class G_ProjectionSchema(G_FieldSchemata):
 
 
 
-## G_CoreSchemaCollector ###################################
+## G_CoreProjectionSchemaCollector #########################
 
-class G_CoreSchemaCollector:
+class G_CoreProjectionSchemaCollector:
     """Collect schema data for a projector's table"""
 
     #-------------------------------------------------------
     def __init__(self):
-        self._TableSchema = G_ProjectionSchema("14C89CE3-E8A4-4F28-99EB-3EF5D5FD3B13")
+        self._ProjectionSchema = G_ProjectionSchema("14C89CE3-E8A4-4F28-99EB-3EF5D5FD3B13")
 
 
     #-------------------------------------------------------
@@ -335,19 +335,19 @@ class G_CoreSchemaCollector:
     #-------------------------------------------------------
     def AddField(self, name, type, width = 30, align = "centre", formatter = None):
         field_schema = self.MakeFieldSchema(name, type, width, align, formatter)
-        self._TableSchema.Append(field_schema)
+        self._ProjectionSchema.Append(field_schema)
 
 
     #-------------------------------------------------------
     def Close(self):
-        self._TableSchema[-1].SetAsLastField()
-        return self._TableSchema
+        self._ProjectionSchema[-1].SetAsLastField()
+        return self._ProjectionSchema
 
 
 
 ## G_ProjectionSchemaCollector #############################
 
-class G_ProjectionSchemaCollector(G_CoreSchemaCollector):
+class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
     
     #-------------------------------------------------------
     def __init__(self, date_fieldtype):
@@ -355,10 +355,10 @@ class G_ProjectionSchemaCollector(G_CoreSchemaCollector):
 
         # ColParentId
         self._DateFieldType = date_fieldtype
-        self._TableSchema.Append(G_ProjectionFieldSchema("ParentId", "int32", False))
+        self._ProjectionSchema.Append(G_ProjectionFieldSchema("ParentId", "int32", False))
 
         # ColStart
-        self._TableSchema.Append(G_ProjectionFieldSchema("Start", self._DateFieldType, True))
+        self._ProjectionSchema.Append(G_ProjectionFieldSchema("Start", self._DateFieldType, True))
 
 
     #-------------------------------------------------------
@@ -379,20 +379,20 @@ class G_ProjectionSchemaCollector(G_CoreSchemaCollector):
     #-------------------------------------------------------
     def InitStart(self, name = "", width = 0, align = None, formatter = None):
         al = self._CalcAlign(align, True)
-        self._TableSchema.InitStart(name, width, al, formatter)
+        self._ProjectionSchema.InitStart(name, width, al, formatter)
 
 
     #-------------------------------------------------------
     def AddFinish(self, name, width = 30, align = "centre", formatter = None):
         field_schema = self.MakeFieldSchema(name, self._DateFieldType, width, align, formatter)
-        self._TableSchema.AppendFinish(field_schema)
+        self._ProjectionSchema.AppendFinish(field_schema)
 
 
     #-------------------------------------------------------
     def AddDuration(self, name, scale = "us", width = 30, align = "centre", formatter = None):
         scale_factor = self._CalcScale(scale)
         field_schema = self.MakeFieldSchema(name, "int64", width, align, formatter)
-        self._TableSchema.AppendDuration(scale_factor, field_schema)
+        self._ProjectionSchema.AppendDuration(scale_factor, field_schema)
 
         
 
@@ -434,11 +434,6 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def SetEvent(self, event):
-        self._Event = event
-
-
-    #-------------------------------------------------------
     def StackBack(self):
         return self._Stack[len(self._Stack) - 1]
 
@@ -459,8 +454,10 @@ class G_ProjectionCollector:
  
  
     def CalcParentId(self, cookie):
-        # note: relies on the fact that events are discovered in order of their
- 
+        if cookie is None:
+            return -1
+
+        # note: relies on the fact that events are discovered in start order
         cur = self.UpdateStack(cookie)
         for idx in range(len(self._Stack) - 2, 0, -1):
             prev = self._Stack[idx]
@@ -472,14 +469,14 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def AddEvent(self, cookie, recogniser_values):
-        values = [self.CalcParentId(cookie), self._StartDatetext]
+    def AddEvent(self, cookie, event, recogniser_values):
+        values = [self.CalcParentId(cookie), event["start_text"]]
 
         if self._ProjectionSchema.ColFinish is not None:
-            values.append(self._FinishDatetext)
+            values.append(event["finish_text"])
 
         if self._ProjectionSchema.ColDuration is not None:
-            ns_duration = self._FinishTimecode.GetOffsetNs() - self._StartTimecode.GetOffsetNs()
+            ns_duration = event["duration_ns"]
             duration = int(ns_duration / self._ProjectionSchema.DurationScale)
             values.append(duration)
 
@@ -507,13 +504,14 @@ class G_Projector:
     """Project event analyses, creates an event table (CSV)"""
 
     #-------------------------------------------------------
-    def __init__(self, meta_only, filename, log_schema, logfile):
+    def __init__(self, database, meta_only, filename, log_schema, logfile):
+        self._Database = database
         self._MetaOnly = meta_only
         self._Filename = filename
         self._ProjectionSchema = G_ProjectionSchema()
         self._EventMetrics = None
 
-        date_field_id = self._LogFile.GetTimecodeBase().GetFieldId() - 1
+        date_field_id = logfile.GetTimecodeBase().GetFieldId() - 1
         self._DateFieldType = log_schema[date_field_id].Type
 
 
@@ -530,47 +528,10 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def CollectEvents(self, event_collector, start_view, finish_view, user_projector):
-        # observation: this could be made multithreaded
-
-        field_ids = self._LogFieldIds
-
-        start_accessor = G_LineAccessor(field_ids, start_view)
-        start_line_count = start_view.GetNumLines()
-
-        finish_accessor = G_LineAccessor(field_ids, finish_view)
-        finish_line_count = finish_view.GetNumLines()
-
-        for start_lineno in range(start_line_count):
-            start_accessor.SetLineNo(start_lineno)
-            match_finish_func = user_projector.MatchEventStart(start_accessor)
-
-            if match_finish_func is None:
-                continue
-
-            # convert the index (into the lineset) to the actual logfile line number
-            start_log_lineno = start_view.ViewLineToLogLine(start_lineno)
-            event_collector.SetStartTimeCode(start_log_lineno, start_accessor)
-
-            # hence find the lineno to the first-event finish candidate in the finish
-            # view; negative means "not found"
-            first_finish_lineno = finish_view.LogLineToViewLine(start_log_lineno)
-            if first_finish_lineno < 0:
-                continue
-
-            # now find the event finish line, and, hence, create the event
-            for finish_lineno in range(first_finish_lineno, finish_line_count):
-                finish_accessor.SetLineNo(finish_lineno)
-                finish_log_lineno = finish_view.ViewLineToLogLine(finish_lineno)
-                event_collector.SetFinishTimeCode(finish_log_lineno, finish_accessor)
-
-                match_finish_func(finish_accessor, event_collector)
-                if event_collector.WasEventIdentified():
-                    break
-
-            if not event_collector.WasEventIdentified():
-                logging.info("Event close not found (performance warning)")
-
+    def CollectEvents(self, event_collector, user_projector):
+        events = user_projector.Select(self._Database)
+        for event in events:
+            user_projector.Project(event, event_collector)
 
     #-------------------------------------------------------
     def GetMeta(self):
@@ -578,18 +539,13 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def Register(self, user_projector, user_metrics = None):
+    def RegisterProjector(self, name, user_projector):
         self._ProjectionSchema = self.CollectProjectionSchema(user_projector)
-        self._EventMetrics = self.CollectEventMetrics(user_metrics)
 
-        if self._MetaOnly:
-            return
-
-        (start_view, finish_view) = self.BuildLineSets(user_projector)
-
-        event_collector = G_ProjectionCollector(self._Filename, self._ProjectionSchema, user_projector, self.GetDateFieldId())
-        self.CollectEvents(event_collector, start_view, finish_view, user_projector)
-        event_collector.Close()
+        if not self._MetaOnly:
+            event_collector = G_ProjectionCollector(self._Filename, self._ProjectionSchema, user_projector, self._DateFieldType)
+            self.CollectEvents(event_collector, user_projector)
+            event_collector.Close()
 
 
 
@@ -1574,7 +1530,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
         with G_ScriptGuard("Assemble", self._ErrorReporter):
             self._Quantifier = analysis_props.GetQuantifier(self._QuantifierName)
 
-            schema_collector = G_CoreSchemaCollector()
+            schema_collector = G_CoreProjectionSchemaCollector()
             self._Quantifier.DefineSchema(schema_collector)
             self._TableSchema = schema_collector.Close()
 

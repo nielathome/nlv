@@ -47,6 +47,46 @@ from .Theme import GetThemeGallery
 import Nlog
 
 
+## G_DatabaseManager #######################################
+
+class G_DatabaseManager:
+    """
+    Manage the SQLlite database used by the event recogniser
+    system
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, guid):
+        self._Connection = sqlite3.connect("{}.db".format(guid))
+        self._Connection.row_factory = sqlite3.Row
+
+
+    #-------------------------------------------------------
+    def GetLocalTableName(self, table_name):
+        return "t_{}_{}".format(table_name, self._LocalId)
+
+    def SetContext(self, local_id):
+        self._LocalId = local_id.replace("-", "_")
+
+
+    #-------------------------------------------------------
+    def MakeTable(self, table_name, sql_columns):
+        cursor = self.cursor()
+        cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
+        cursor.execute("CREATE TABLE {} ({})".format(table_name, ", ".join(sql_columns)))
+
+        self.commit()
+        return cursor
+
+
+    #-------------------------------------------------------
+    def cursor(self):
+        return self._Connection.cursor()
+            
+    def commit(self):
+        return self._Connection.commit()
+
+        
 
 ## G_SessionManager ########################################
 
@@ -1208,9 +1248,9 @@ class G_SessionNode(G_TabContainerNode):
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         super().__init__(factory, wproject, witem)
-        self._Database = None
+        self._DatabaseManager = None
 
-        # allow perspective saviong to be disabled; AUI notebooks can
+        # allow perspective saving to be disabled; AUI notebooks can
         # and do become corrupted
         self._StoreManagerPerspective = True
         self._StoreNotebookPerspective = True
@@ -1252,9 +1292,6 @@ class G_SessionNode(G_TabContainerNode):
         else:
             self.GetProject().LoadPerspective(layout)
 
-        for node in self.ListSubNodes(recursive = True, include_self = True):
-            node.PostInitLayout()
-    
 
     #-------------------------------------------------------
     def AppendLog(self, relative_path, schema_guid, builder_guid):
@@ -1281,10 +1318,12 @@ class G_SessionNode(G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def GetDatabase(self):
-        if self._Database is None:
-            self._Database = sqlite3.connect("{}.db".format(self._Field.Guid.Value))
-        return self._Database
+    def GetDatabaseManager(self, local_id):
+        if self._DatabaseManager is None:
+            self._DatabaseManager = G_DatabaseManager(self._Field.Guid.Value)
+
+        self._DatabaseManager.SetContext(local_id)
+        return self._DatabaseManager
 
 
     #-------------------------------------------------------

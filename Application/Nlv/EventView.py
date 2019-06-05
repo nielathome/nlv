@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -47,8 +47,8 @@ import wx
 
 # Application imports 
 from .Document import D_Document
-from .EventData import G_Analyser2
-from .EventProjector import G_Analyser
+from .EventData import G_Analyser
+from .EventProjector import G_Projector
 from .EventProjector import G_MetricsViewCtrl
 from .EventProjector import G_ScriptGuard
 from .EventProjector import G_TableViewCtrl
@@ -522,6 +522,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         def Work():
             self.GetNotebook().AddPage(self._Notebook, node_name, True)
             if self._InitAnalysis:
+                # make sure hideable is setup before child is made
+                self.PostInitHideableTreeNode()
                 self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, "Events")
                 self.AnalyseForAll()
 
@@ -627,22 +629,33 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    @staticmethod
+    def NullAnalyser(name, analyser):
+        pass
+
     def RunAnalyser(self, code, log_schema, meta_only):
         self.SetErrorText("Analysing ...\n")
-        analyser = G_Analyser(meta_only, self.MakeTemporaryFilename(),
-            log_schema, None, self.GetLogfile()
-        )
-
-        analyser2 = G_Analyser2(self.GetSessionNode().GetDatabase(), self.MakeTemporaryName(),
-            log_schema, self.GetLogfile()
-        )
-
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
-            globals = dict(Register = analyser.Register, RegisterAnalyser = analyser2.RegisterAnalyser)
+            local_id = self.MakeTemporaryName()
+            database = self.GetSessionNode().GetDatabaseManager(local_id)
+            globals = dict()
+
+            register_analyser = self.NullAnalyser
+            if not meta_only:
+                analyser = G_Analyser(database, log_schema, self.GetLogfile())
+                register_analyser = analyser.RegisterAnalyser
+
+            globals.update(RegisterAnalyser = register_analyser)
+
+            projector = G_Projector(database, meta_only, self.MakeTemporaryFilename(),
+                log_schema, self.GetLogfile()
+            )
+            globals.update(RegisterProjector = projector.RegisterProjector)
+
             exec(code, globals)
             self.SetErrorText("Analysed OK\n")
             self._Field.AnalysisIsValid.Value = True
-            return analyser.GetMeta()
+            return projector.GetMeta()
 
 
     #-------------------------------------------------------
@@ -1379,7 +1392,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 ## G_ParameterValues #######################################
 
 class G_ParameterValues:
-    """Accessor for the paramater values dictionary"""
+    """Accessor for the parameter values dictionary"""
 
     #-------------------------------------------------------
     def __init__(self, param_values_str):

@@ -551,16 +551,20 @@ class G_Node:
 
     def DoBuildNode(self, document, copy_defaults, name, **kwargs ):
         """Common node building implementation; GUI is frozen"""
-        node = self.BuildChildNode(document, copy_defaults, name, **kwargs)
+        new_node = self.BuildChildNode(document, copy_defaults, name, **kwargs)
 
-        # final offer of initialisation to document nodes; the
+        # final offers of initialisation to document nodes; the
         # whole tree is now built
-        if node is not None:
-            for n in node.ListSubNodes(recursive = True, include_self = True):
-                n.PostInitLoad()
-                n._Initialising = False
+        if new_node is not None:
+            for node in new_node.ListSubNodes(recursive = True, include_self = True):
+                node.PostInitLoad()
+                node._Initialising = False
 
-        return node
+            # again, but parents are called before their children (breadth-first)
+            for node in new_node.ListSubNodes(recursive = True, depth_first = False, include_self = True):
+                node.PostInitLayout()
+
+        return new_node
 
     def BuildNode(self, document, copy_defaults, name, **kwargs ):
         """Common node building implementation"""
@@ -588,41 +592,64 @@ class G_Node:
 
 
     #-------------------------------------------------------
-    def VisitSubNodes(self, call_back, factory_id = None, recursive = False, include_self = False):
+    def VisitSubNodes(self, call_back, factory_id = None, recursive = False, depth_first = True, include_self = False):
         """
         Call the callback for each child node.
 
         :param function `call_back`: function to be called. The argument
-        passed to this function is the child node.
+            passed to this function is the child node.
 
         :param `factory_id`: only matched children are considered. Set to
-        None (default) to match & call all children
+            None (default) to match & call all children
 
-        :param `recursive`: depth first recursion through the child/grandchild tree.
+        :param `recursive`: Recurse through the child/grandchild tree. Set
+            to False to consider direct children only.
+
+        :param `depth_first`: Recursion is depth-first; children are
+            processed before their parents. Set to False for breadth-first;
+            parents are processed before their children.
 
         :param `include_self`: include this node in the walk.
         """
 
-        for child_item in self.GetHrItem().GetChildren():
-            child_node = _Item2Node(child_item)
-            if child_node is None:
-                return
+        if depth_first:
+            for child_item in self.GetHrItem().GetChildren():
+                child_node = _Item2Node(child_item)
+                if child_node is None:
+                    return
     
-            # depth first - descend into grand-children first
-            if recursive:
-                child_node.VisitSubNodes(call_back, factory_id, recursive)
+                # depth first - descend into grand-children first
+                if recursive:
+                    child_node.VisitSubNodes(call_back, factory_id, recursive, depth_first)
 
-            # then action the child
-            if factory_id is None or child_node.GetFactoryID() == factory_id:
-                call_back(child_node)
+                # then action the child
+                if factory_id is None or child_node.GetFactoryID() == factory_id:
+                    call_back(child_node)
 
-        # and finally, this node
-        if include_self:
-            call_back(self)
+            # and finally, this node
+            if include_self:
+                call_back(self)
+
+        else:
+            if include_self:
+                call_back(self)
+
+            for child_item in self.GetHrItem().GetChildren():
+                child_node = _Item2Node(child_item)
+                if child_node is None:
+                    return
+    
+                # action the child first
+                if factory_id is None or child_node.GetFactoryID() == factory_id:
+                    call_back(child_node)
+
+                # breadth first - descend into grand-children last
+                if recursive:
+                    child_node.VisitSubNodes(call_back, factory_id, recursive, depth_first)
 
 
     #-------------------------------------------------------
-    def ListSubNodes(self, factory_id = None, recursive = False, include_self = False):
+    def ListSubNodes(self, factory_id = None, recursive = False, depth_first = True, include_self = False):
         """
         Return a list of child nodes.
 
@@ -638,7 +665,7 @@ class G_Node:
 
         def Work(node):
             ret.append(node)
-        self.VisitSubNodes(Work, factory_id, recursive, include_self)
+        self.VisitSubNodes(Work, factory_id, recursive, depth_first, include_self)
 
         return ret
 
@@ -1769,7 +1796,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         # allow documentation to live in a couple of "well known" places
         file_path = Path( __file__ ).parent.joinpath("Sphinx", "html")
         if not file_path.exists():
-            file_path = Path( __file__ ).parent.parent.parent.joinpath("_Bld", "Sphinx", "html")
+            file_path = Path( __file__ ).parent.parent.parent.joinpath("_Work", "Bld", "Sphinx", "html")
         if not file_path.exists():
             file_path = Path("missing_doc")
 

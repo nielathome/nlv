@@ -82,9 +82,9 @@ class G_EventSchema(G_FieldSchemata):
 
 
 
-## G_CoreSchemaCollector ###################################
+## G_CoreEventSchemaCollector ##############################
 
-class G_CoreSchemaCollector:
+class G_CoreEventSchemaCollector:
     """Collect schema data for a SQL table"""
 
     #-------------------------------------------------------
@@ -112,10 +112,10 @@ class G_CoreSchemaCollector:
 
 ## G_EventSchemaCollector ##################################
 
-class G_EventSchemaCollector(G_CoreSchemaCollector):
+class G_EventSchemaCollector(G_CoreEventSchemaCollector):
     
     #-------------------------------------------------------
-    def __init__(self, date_fieldtype):
+    def __init__(self):
         super().__init__()
 
         self.AddField("start_text", "text")
@@ -167,16 +167,12 @@ class G_EventCollector:
 
         self._FieldCount = len(event_schema)
 
-        # initialise SQL table
-        self._Cursor = cursor = database.cursor()
-        cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
-
+        full_table_name = database.GetLocalTableName(table_name)
         sql_columns = ["{} {}".format(field_schema.Name, field_schema.Type) for field_schema in event_schema]
-        cursor.execute("CREATE TABLE {} ({})".format(table_name, ", ".join(sql_columns)))
-        database.commit()
+        self._Cursor = database.MakeTable(full_table_name, sql_columns)
 
         placeholders = ", ".join(["?" for i in range(self._FieldCount)])
-        self._InsertCmd = "INSERT INTO {} VALUES ({})".format(table_name, placeholders)
+        self._InsertCmd = "INSERT INTO {} VALUES ({})".format(full_table_name, placeholders)
 
 
     #-------------------------------------------------------
@@ -279,10 +275,8 @@ class G_Analyser:
     """Analyse a log, creates an event table"""
 
     #-------------------------------------------------------
-    def __init__(self, database, instance_guid, log_schema, logfile):
+    def __init__(self, database, log_schema, logfile):
         self._Database = database
-        self._Guid = instance_guid.replace("-", "_")
-        self._LogSchema = log_schema
         self._LogFile = logfile
 
         field_ids = dict()
@@ -347,14 +341,13 @@ class G_Analyser:
 
     #-------------------------------------------------------
     def CollectEventSchema(self, user_analyser):
-        date_fieldtype = self._LogSchema[self.GetDateFieldId()].Type
-        schema_collector = G_EventSchemaCollector(date_fieldtype)
+        schema_collector = G_EventSchemaCollector()
         user_analyser.DefineSchema(schema_collector)
         return schema_collector.Close()
 
 
     #-------------------------------------------------------
-    def CollectEvents(self, user_analyser, full_table_name):
+    def CollectEvents(self, user_analyser, table_name):
         # observation: this could be made multithreaded
 
         field_ids = self._LogFieldIds
@@ -367,7 +360,7 @@ class G_Analyser:
         finish_accessor = G_LineAccessor(field_ids, finish_view)
         finish_line_count = finish_view.GetNumLines()
 
-        event_collector = G_EventCollector(self._Database, full_table_name, self._EventSchema, self.GetDateFieldId(), start_accessor, finish_accessor)
+        event_collector = G_EventCollector(self._Database, table_name, self._EventSchema, self.GetDateFieldId(), start_accessor, finish_accessor)
 
         for start_lineno in range(start_line_count):
             start_accessor.SetLineNo(start_lineno)
@@ -404,6 +397,5 @@ class G_Analyser:
 
     #-------------------------------------------------------
     def RegisterAnalyser(self, table_name, user_analyser):
-        full_table_name = "t_{}_{}".format(table_name, self._Guid)
-        self._EventSchema = self.CollectEventSchema(user_analyser, full_table_name)
-        self.CollectEvents(user_analyser)
+        self._EventSchema = self.CollectEventSchema(user_analyser)
+        self.CollectEvents(user_analyser, table_name)

@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -234,15 +234,17 @@ class Projector:
 
     #-----------------------------------------------------------
     @staticmethod
-    def Select(dbinfo):
-        table_name = dbinfo.GetTableName("reschedule")
-        return "SELECT place, abool FROM {}".format(table_name)
+    def Select(db):
+        table_name = db.GetLocalTableName("reschedule")
+        cursor = db.cursor()
+        cursor.execute("SELECT start_text, duration_ns, place, abool FROM {}".format(table_name))
+        return cursor
 
 
     #-----------------------------------------------------------
     @staticmethod
     def Project(event, collector):
-        collector.AddEvent([event.place, event.abool])
+        collector.AddEvent(None, event, [event["place"], event["abool"]])
 
 
     #-----------------------------------------------------------
