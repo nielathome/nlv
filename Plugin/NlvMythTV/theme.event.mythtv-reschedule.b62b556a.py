@@ -118,7 +118,7 @@ class Analyser:
         the start filter (see DefineFilter) will be passed.
 
         If the log line matches the start of an event, then return
-        a callable object which adhers to the MatchEventFinish
+        a callable object which adheres to the MatchEventFinish
         concept.
         """
         return cls.MatchEventFinish()
@@ -171,8 +171,12 @@ class Projector:
         Then call AddField to define each further field (column)
         that will be populated for an event. 
 
-        Available schema methods are:
-            InitStart(self, name = "", width = 0, align = None,
+        Available schema methods are shown below. They must be
+        called in the order shown. Only AddField can be called
+        more than once.
+            AddNesting(self)
+
+            AddStart(self, name, width = 30, align = None,
              formatter = None)
 
             AddFinish(self, name, width = 30, align = "centre",
@@ -225,7 +229,7 @@ class Projector:
         can then always correctly locate the end of the event.
         """
 
-        schema.InitStart("Start", width = 100)
+        schema.AddStart("Start", width = 100)
         schema.AddDuration("Duration", scale = "s", width = 60, formatter = cls.SimpleFormatter)
         schema.AddField("Place", "float32", 60)
         schema.AddField("Abool", "bool", 60)
@@ -244,7 +248,7 @@ class Projector:
     #-----------------------------------------------------------
     @staticmethod
     def Project(event, collector):
-        collector.AddEvent(None, event, [event["place"], event["abool"]])
+        collector.AddEvent(event, [event["place"], event["abool"]])
 
 
     #-----------------------------------------------------------
@@ -260,6 +264,9 @@ class Projector:
         if the child event is to be considered "contained by"
         (or "subordinate to") the parent event, and False otherwise.
         Contained events mey be displayed nested in the UI.
+
+        This routine is only called where schema.AddNesting()
+        was called in the DefineSchema() method.
         """
         return False
 
@@ -276,14 +283,6 @@ follows:
 where:
     * `log_analyser` is an object, behaving as per `LogfileAnalyser`
 """
-
-#Register(LogfileAnalyser())
-
-
-
-
-
-
 
 RegisterAnalyser("reschedule", Analyser())
 RegisterProjector("Reschedule", Projector())

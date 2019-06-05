@@ -21,34 +21,11 @@ import numpy as np
 import re
 
 
-## LogfileAnalyser #############################################
+## Analyser ####################################################
 
-class LogfileAnalyser:
+class Analyser:
 
-    ## DefineFilter ############################################
-
-    @staticmethod
-    def DefineFilter():
-        return [
-            ('LogView Filter',  '(function = "HandleReschedule" and log ~= "Reschedule") or (function = "CalcParams")'),
-            ('LogView Filter',  '(function = "HandleReschedule" and log ~= "Scheduled") or (function = "HandleAnnounce" and log ~= "adding")')
-        ]
-
-
-
-    ## DefineSchema ############################################
-
-    @staticmethod
-    def DefineSchema(schema):
-        schema.InitStart("Start", width = 100)
-        schema.AddFinish("Finish", 100)
-        schema.AddDuration("Duration (s)", scale = "s", width = 60)
-        schema.AddField("Event Summary", "text", 150, "left")
-
-
-
-    ## MatchEventFinish ########################################
-
+    #-----------------------------------------------------------
     class MatchEventFinish:
 
         #-------------------------------------------------------
@@ -58,12 +35,10 @@ class LogfileAnalyser:
 
         #-------------------------------------------------------
         def AddEvent(self, line, collector, summary):
-            collector.AddEvent(self, [summary])
+            collector.AddEvent([self.Process, summary])
 
 
-
-    ## MatchRescheduleEventFinish ##############################
-
+    #-----------------------------------------------------------
     class MatchRescheduleEventFinish(MatchEventFinish):
         _RegexPlace = re.compile("([\d.]+)\splace")
 
@@ -83,9 +58,7 @@ class LogfileAnalyser:
                 self.AddEvent(line, collector, "reschedule: place:'{}'".format(place))
 
 
-
-    ## MatchExpireEventFinish ##################################
-
+    #-----------------------------------------------------------
     class MatchExpireEventFinish(MatchEventFinish):
 
         #-------------------------------------------------------
@@ -99,23 +72,65 @@ class LogfileAnalyser:
                 self.AddEvent(line, collector, "expire")
 
 
-
-    ## MatchEventStart #########################################
-
+    #-----------------------------------------------------------
     @staticmethod
-    def MatchEventStart(line):
+    def DefineFilter():
+        return [
+            ('LogView Filter',  '(function = "HandleReschedule" and log ~= "Reschedule") or (function = "CalcParams")'),
+            ('LogView Filter',  '(function = "HandleReschedule" and log ~= "Scheduled") or (function = "HandleAnnounce" and log ~= "adding")')
+        ]
+
+
+    #-----------------------------------------------------------
+    @staticmethod
+    def DefineSchema(schema):
+        schema.AddField("process", "uint32")
+        schema.AddField("summary", "text")
+
+
+    #-----------------------------------------------------------
+    @classmethod
+    def MatchEventStart(cls, line):
         if line.GetFieldText("Function") == "HandleReschedule":
-            return __class__.MatchRescheduleEventFinish(line)
+            return cls.MatchRescheduleEventFinish(line)
         else:
-            return __class__.MatchExpireEventFinish(line)
+            return cls.MatchExpireEventFinish(line)
 
 
 
-    ## IsContained #############################################
+## Projector ###################################################
 
+class Projector:
+
+    #-----------------------------------------------------------
+    @staticmethod
+    def DefineSchema(schema):
+        schema.AddNesting()
+        schema.AddStart("Start", width = 100)
+        schema.AddFinish("Finish", 100)
+        schema.AddDuration("Duration", scale = "s", width = 60)
+        schema.AddField("Event Summary", "text", 150, "left")
+
+
+    #-----------------------------------------------------------
+    @staticmethod
+    def Select(db):
+        table_name = db.GetLocalTableName("summary")
+        cursor = db.cursor()
+        cursor.execute("SELECT start_line_no, finish_line_no, start_text, finish_text, duration_ns, process, summary FROM {}".format(table_name))
+        return cursor
+
+
+    #-----------------------------------------------------------
+    @staticmethod
+    def Project(event, collector):
+        collector.AddEvent(event, [event["summary"]])
+
+
+    #-----------------------------------------------------------
     @staticmethod
     def IsContained(parent, child):
-        return parent.Process == child.Process
+        return parent["process"] == child["process"]
 
 
 
@@ -402,4 +417,6 @@ class EventMetrics:
 
 ## GLOBAL ######################################################
 
-Register(LogfileAnalyser(), EventMetrics())
+RegisterAnalyser("summary", Analyser())
+RegisterProjector("Summary", Projector(), EventMetrics())
+

@@ -1329,6 +1329,8 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
         # convert range to timecodes
         (start_timecode, finish_timecode) = self.GetTableViewCtrl().GetEventRange(item)
+        if start_timecode is None:
+            return
 
         if update_marker:
             # convert range to LFV compatible dates

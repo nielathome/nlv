@@ -114,7 +114,9 @@ class G_FieldSchemata:
 
     #-------------------------------------------------------
     def Append(self, field_schema):
+        idx = len(self._FieldSchemata)
         self._FieldSchemata.append(field_schema)
+        return idx
 
 
     #-------------------------------------------------------

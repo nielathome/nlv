@@ -276,24 +276,25 @@ class G_ProjectionSchema(G_FieldSchemata):
         super().__init__(guid)
         self._SetTextOffsetSize(16)
         self.DurationScale = 1
-        self.ColParentId = 0
-        self.ColStart = 1
+        self.ColParentId = None
+        self.ColStart = None
         self.ColFinish = None
         self.ColDuration = None
 
 
     #-------------------------------------------------------
-    def InitStart(self, name, width, align, formatter):
-        self[self.ColStart].Update(name, width, align, formatter)
+    def AddNesting(self, field_schema):
+        self.ColParentId = self.Append(field_schema)
 
-    def AppendFinish(self, field_schema):
-        self.ColFinish = len(self._FieldSchemata)
-        self.Append(field_schema)
+    def AddStart(self, field_schema):
+        self.ColStart = self.Append(field_schema)
 
-    def AppendDuration(self, scale, field_schema):
-        self.ColDuration = len(self._FieldSchemata)
+    def AddFinish(self, field_schema):
+        self.ColFinish = self.Append(field_schema)
+
+    def AddDuration(self, scale, field_schema):
+        self.ColDuration = self.Append(field_schema)
         self.DurationScale = scale
-        self.Append(field_schema)
 
 
 
@@ -352,13 +353,7 @@ class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
     #-------------------------------------------------------
     def __init__(self, date_fieldtype):
         super().__init__()
-
-        # ColParentId
         self._DateFieldType = date_fieldtype
-        self._ProjectionSchema.Append(G_ProjectionFieldSchema("ParentId", "int32", False))
-
-        # ColStart
-        self._ProjectionSchema.Append(G_ProjectionFieldSchema("Start", self._DateFieldType, True))
 
 
     #-------------------------------------------------------
@@ -377,22 +372,29 @@ class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
 
 
     #-------------------------------------------------------
-    def InitStart(self, name = "", width = 0, align = None, formatter = None):
-        al = self._CalcAlign(align, True)
-        self._ProjectionSchema.InitStart(name, width, al, formatter)
+    def AddNesting(self):
+        field_schema = G_ProjectionFieldSchema("ParentId", "int32", False)
+        self._ProjectionSchema.AddNesting(field_schema)
+
+
+    #-------------------------------------------------------
+    def AddStart(self, name, width = 30, align = "centre", formatter = None):
+        field_schema = self.MakeFieldSchema(name, self._DateFieldType, width, align, formatter)
+        self._ProjectionSchema.AddStart(field_schema)
 
 
     #-------------------------------------------------------
     def AddFinish(self, name, width = 30, align = "centre", formatter = None):
         field_schema = self.MakeFieldSchema(name, self._DateFieldType, width, align, formatter)
-        self._ProjectionSchema.AppendFinish(field_schema)
+        self._ProjectionSchema.AddFinish(field_schema)
 
 
     #-------------------------------------------------------
     def AddDuration(self, name, scale = "us", width = 30, align = "centre", formatter = None):
+        name = "{} ({})".format(name, scale)
         scale_factor = self._CalcScale(scale)
         field_schema = self.MakeFieldSchema(name, "int64", width, align, formatter)
-        self._ProjectionSchema.AppendDuration(scale_factor, field_schema)
+        self._ProjectionSchema.AddDuration(scale_factor, field_schema)
 
         
 
@@ -401,9 +403,17 @@ class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
 class G_ProjectionItem:
 
     #-------------------------------------------------------
-    def __init__(self, log_start_line, log_finish_line, event_number, event):
-        self.LogStartLine = log_start_line
-        self.LogFinishLine = log_finish_line
+    def __init__(self, event_number = -1, event = None):
+        if event is None:
+            # note, somewhat arbitrary limit (32-bit signed-int-max)
+            max = 2147483647
+            self.LogStartLine = 0
+            self.LogFinishLine = max
+
+        else:
+            self.LogStartLine = event["start_line_no"]
+            self.LogFinishLine = event["finish_line_no"]
+
         self.EventNumber = event_number
         self.Event = event
 
@@ -426,7 +436,7 @@ class G_ProjectionCollector:
 
         # note, somewhat arbitrary limit (32-bit signed-int-max)
         max = 2147483647
-        self._Stack = [G_ProjectionItem(0, max, -1, None)]
+        self._Stack = [G_ProjectionItem()]
 
         # row headers
         headers = [field_schema.Name for field_schema in projection_schema]
@@ -438,8 +448,8 @@ class G_ProjectionCollector:
         return self._Stack[len(self._Stack) - 1]
 
 
-    def UpdateStack(self, cookie):
-        cur = G_ProjectionItem(self._StartLogLineno, self._FinishLogLineno, self._EventNo, cookie)
+    def UpdateStack(self, event):
+        cur = G_ProjectionItem(self._EventNo, event)
  
         # remove any entries that finish before 'cur' starts
         while cur.LogStartLine > self.StackBack().LogFinishLine:
@@ -453,15 +463,12 @@ class G_ProjectionCollector:
         return cur
  
  
-    def CalcParentId(self, cookie):
-        if cookie is None:
-            return -1
-
+    def CalcParentId(self, event):
         # note: relies on the fact that events are discovered in start order
-        cur = self.UpdateStack(cookie)
+        cur = self.UpdateStack(event)
         for idx in range(len(self._Stack) - 2, 0, -1):
             prev = self._Stack[idx]
-            if prev.Event is not None and prev.LogFinishLine > cur.LogFinishLine:
+            if prev.Event is not None and prev.LogFinishLine >= cur.LogFinishLine:
                 if self._UserProjector.IsContained(prev.Event, cur.Event):
                     return prev.EventNumber
  
@@ -469,15 +476,22 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def AddEvent(self, cookie, event, recogniser_values):
-        values = [self.CalcParentId(cookie), event["start_text"]]
+    def AddEvent(self, event, recogniser_values):
+        schema = self._ProjectionSchema
+        values = []
 
-        if self._ProjectionSchema.ColFinish is not None:
+        if schema.ColParentId is not None:
+            values.append(self.CalcParentId(event))
+
+        if schema.ColStart is not None:
+            values.append(event["start_text"])
+
+        if schema.ColFinish is not None:
             values.append(event["finish_text"])
 
-        if self._ProjectionSchema.ColDuration is not None:
+        if schema.ColDuration is not None:
             ns_duration = event["duration_ns"]
-            duration = int(ns_duration / self._ProjectionSchema.DurationScale)
+            duration = int(ns_duration / schema.DurationScale)
             values.append(duration)
 
         values.extend(recogniser_values)
@@ -486,7 +500,7 @@ class G_ProjectionCollector:
             raise RuntimeError("Incorrect number of field values (including hidden): got:{} exp:{}".format(len(values), self._FieldCount))
 
         self._EventNo += 1
-        self._EventIdentified = True
+        self._EventIdentified = True # TODO redundant
 
         text_values = [str(v).replace(',', '_').replace('"', "'").rstrip() for v in values]
         self._CsvWriter.writerow(text_values)
@@ -523,11 +537,6 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def CollectEventMetrics(self, event_metrics):
-        return event_metrics
-
-
-    #-------------------------------------------------------
     def CollectEvents(self, event_collector, user_projector):
         events = user_projector.Select(self._Database)
         for event in events:
@@ -539,8 +548,9 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def RegisterProjector(self, name, user_projector):
+    def RegisterProjector(self, name, user_projector, user_metrics = None):
         self._ProjectionSchema = self.CollectProjectionSchema(user_projector)
+        self._EventMetrics = user_metrics
 
         if not self._MetaOnly:
             event_collector = G_ProjectionCollector(self._Filename, self._ProjectionSchema, user_projector, self._DateFieldType)
@@ -693,7 +703,10 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
     #-------------------------------------------------------
     def GetItemKeyParentKey(self, item_key):
-        parent_id = self.GetFieldValue(item_key, self._TableSchema.ColParentId)
+        parent_id = -1
+        if self._TableSchema.ColParentId is not None:
+            parent_id = self.GetFieldValue(item_key, self._TableSchema.ColParentId)
+
         if parent_id < 0:
             return parent_id
 
@@ -712,6 +725,9 @@ class G_TableDataModel(wx.dataview.DataViewModel):
     #-------------------------------------------------------
     def GetEventRange(self, item):
         table_schema = self._TableSchema
+        if table_schema.ColStart is None:
+            return (None, None)
+
         item_key = self.ItemToKey(item)
         start_offset = finish_offset = self.GetFieldValue(item_key, table_schema.ColStart)
 
