@@ -18,9 +18,9 @@
 
 // Application includes
 #include "LogIndexWriter.h"
+#include "Nmisc.h"
 
 // C++ includes
-#include <chrono>
 #include <fstream>
 #include <map>
 #include <set>
@@ -1156,7 +1156,7 @@ Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, Pr
 Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME modified_time, const std::string & guid, ProgressMeter * progress, size_t skip_lines )
 {
 	// detect and ignore empty logfiles
-	const std::chrono::system_clock::time_point start{ std::chrono::system_clock::now() };
+	PerfTimer timer;
 	if( m_Log.GetSize() == 0 )
 		return TraceError( e_Empty, "'%S'", index_path.c_str() );
 
@@ -1210,10 +1210,7 @@ Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME 
 		return TraceError( e_Stream, "unable to create index: '%S'", index_path.c_str() );
 
 	// write out performance data
-	const std::chrono::system_clock::time_point finish{ std::chrono::system_clock::now() };
-	std::chrono::duration<double> dur_all_s{ finish - start };
-	std::chrono::duration<double, std::micro> dur_line_us{ dur_all_s / num_lines };
-	TraceDebug( "time:%.2fs per_line:%.3fus path:'%S'", dur_all_s.count(), dur_line_us.count(), index_path.c_str() );
+	TraceDebug( "time:%.2fs per_line:%.3fus path:'%S'", timer.Overall(), timer.PerItem( num_lines ), index_path.c_str() );
 	
 	return res;
 }

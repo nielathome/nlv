@@ -130,3 +130,27 @@ private:
 private:
 	static CacheStatistics * m_First;
 };
+
+
+
+/*-----------------------------------------------------------------------
+ * Performance Timer
+ -----------------------------------------------------------------------*/
+
+class PerfTimer
+{
+private:
+	const std::chrono::system_clock::time_point m_Start;
+	std::chrono::duration<double> m_DurationAll_S;
+
+	bool m_Closed{ false };
+	void Close( void );
+
+public:
+	PerfTimer( void );
+	double Overall( void );
+	double PerItem( size_t item_count = 0 );
+};
+
+
+

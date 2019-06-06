@@ -28,49 +28,6 @@
 
 
 /*-----------------------------------------------------------------------
- * Performance Measure
- -----------------------------------------------------------------------*/
-
-class SLineTimer
-{
-private:
-	const std::chrono::system_clock::time_point m_Start{ std::chrono::system_clock::now() };
-	const nlineno_t m_NumLines;
-
-	std::chrono::duration<double> m_DurationAll_S;
-	std::chrono::duration<double, std::micro> m_DurationLine_us;
-
-	bool m_Closed{ false };
-
-	void Close( void ) {
-		if( m_Closed )
-			return;
-
-		const std::chrono::system_clock::time_point finish{ std::chrono::system_clock::now() };
-		m_DurationAll_S = finish - m_Start;
-		m_DurationLine_us = m_DurationAll_S / m_NumLines;
-
-		m_Closed = true;
-	}
-
-public:
-	SLineTimer( nlineno_t num_lines )
-		: m_NumLines{ num_lines } {}
-
-	double Overall( void ) {
-		Close();
-		return m_DurationAll_S.count();
-	}
-
-	double PerLine( void ) {
-		Close();
-		return m_DurationLine_us.count();
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
  * SViewCellBuffer - New
  -----------------------------------------------------------------------*/
 
@@ -284,7 +241,7 @@ struct FilterVisitor : public LineVisitor::Visitor
 
 void SViewCellBuffer::Filter( Selector * selector, bool add_irregular )
 {
-	SLineTimer timer{ m_LogAccessor->GetNumLines() };
+	PerfTimer timer;
 	FilterVisitor visitor{ selector, m_LineAdornmentsProvider, m_LogAccessor->GetNumLines(), add_irregular };
 	m_LogAccessor->VisitLines( visitor, m_FieldViewMask, false );
 	visitor.Finish();
@@ -304,7 +261,7 @@ void SViewCellBuffer::Filter( Selector * selector, bool add_irregular )
 	m_Tracker.RecordEvent();
 
 	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerLine() );
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_LogAccessor->GetNumLines() ) );
 }
 
 
@@ -316,7 +273,7 @@ void SViewCellBuffer::SetFieldMask( uint64_t field_mask )
 
 	if( !m_IsEmpty )
 	{
-		SLineTimer timer{ m_NumLinesOrOne };
+		PerfTimer timer;
 
 		// TODO: parallelise
 		vint_t pos{ 0 };
@@ -329,7 +286,7 @@ void SViewCellBuffer::SetFieldMask( uint64_t field_mask )
 		m_TextLen = m_Lines[ m_NumLinesOrOne ] = pos;
 
 		// write out performance data
-		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerLine() );
+		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
 	}
 }
 
@@ -404,9 +361,9 @@ std::vector<nlineno_t> SViewCellBuffer::Search( Selector * selector ) const
 
 	if( !m_IsEmpty )
 	{
-		SLineTimer timer{ m_NumLinesOrOne };
+		PerfTimer timer;
 		m_LogAccessor->VisitLines( visitor, m_FieldViewMask, true, m_NumLinesOrOne );
-		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerLine() );
+		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
 	}
 
 	return visitor.f_Map;

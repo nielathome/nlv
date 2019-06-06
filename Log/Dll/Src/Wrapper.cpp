@@ -254,6 +254,11 @@ BOOST_PYTHON_MODULE( Nlog )
 	// although boost::noncopyable is specified here, Boost still attempts
 	// to make use of a copy constructor, so the kludged default constructors
 	// are needed for the time being
+	class_<PerfTimer, boost::noncopyable>( "PerfTimer" )
+		.def( "Overall", &PerfTimer::Overall )
+		.def( "PerItem", &PerfTimer::PerItem )
+		;
+
 	class_<NHiliter, hiliter_ptr_t, boost::noncopyable>( "Hiliter" )
 		.def( "Search", &NHiliter::Search )
 		.def( "Hit", &NHiliter::Hit )

@@ -80,6 +80,51 @@ void CacheStatistics::ReportAll( void )
 }
 
 
+
+/*-----------------------------------------------------------------------
+ * Performance Timer
+ -----------------------------------------------------------------------*/
+
+PerfTimer::PerfTimer( void )
+	:
+	m_Start{ std::chrono::system_clock::now() }
+{
+}
+
+
+void PerfTimer::Close( void )
+{
+	if( m_Closed )
+		return;
+
+	const std::chrono::system_clock::time_point finish{ std::chrono::system_clock::now() };
+	m_DurationAll_S = finish - m_Start;
+
+	m_Closed = true;
+}
+
+
+double PerfTimer::Overall( void )
+{
+	Close();
+	return m_DurationAll_S.count();
+}
+
+
+double PerfTimer::PerItem( size_t item_count )
+{
+	Close();
+
+	std::chrono::duration<double, std::micro> duration_us{ 0 };
+
+	if( item_count != 0 )
+		duration_us = m_DurationAll_S / item_count;
+
+	return duration_us.count();
+}
+
+
+
 /*-----------------------------------------------------------------------
  * FieldValue
  -----------------------------------------------------------------------*/
