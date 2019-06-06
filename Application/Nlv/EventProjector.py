@@ -33,6 +33,7 @@ from .Logmeta import G_FieldSchemata
 # may not be needed
 from .MatchNode import G_MatchItem
 from .Project import G_Global
+from .Project import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
 
 # wxWidgets imports
@@ -444,6 +445,11 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
+    def Count(self):
+        return self._EventNo
+
+
+    #-------------------------------------------------------
     def StackBack(self):
         return self._Stack[len(self._Stack) - 1]
 
@@ -537,10 +543,17 @@ class G_Projector:
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
+    def _Select(self, user_projector):
+        return user_projector.Select(self._Database)
+
     def CollectEvents(self, event_collector, user_projector):
-        events = user_projector.Select(self._Database)
-        for event in events:
-            user_projector.Project(event, event_collector)
+        events = self._Select(user_projector)
+        with G_PerfTimerScope("G_Projector._Project") as timer:
+            for event in events:
+                user_projector.Project(event, event_collector)
+            timer.SetItemCount(event_collector.Count())
+
 
     #-------------------------------------------------------
     def GetMeta(self):
@@ -1415,6 +1428,7 @@ class G_ChartViewCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def Realise(self):
         """Redraw the chart if needed"""
         with G_ScriptGuard("Realise", self._ErrorReporter):

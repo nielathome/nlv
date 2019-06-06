@@ -66,7 +66,121 @@ def _Item2Node(item):
     return node
 
 
+
+## G_PerfTimer #############################################
            
+class G_PerfTimer:
+    """Support performance timing of call hierarchies"""
+
+    _Last = None
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def GetCurrent(cls):
+        return cls._Last
+
+
+    #-------------------------------------------------------
+    def __init__(self, description = "", item_count = 0):
+        self._Description = description
+        self._Arguments = []
+        self._ItemCount = item_count
+        self._Timer = Nlog.PerfTimer()
+        self._Parent = __class__._Last
+        self._Children = []
+        self._Closed = False
+
+        if self._Parent is not None:
+            self._Parent._AddChild(self)
+
+        __class__._Last = self
+
+
+    #-------------------------------------------------------
+    def _AddChild(self, child):
+        self._Children.append(child)
+
+
+    #-------------------------------------------------------
+    def _Report(self, indent = 0):
+        if not self._Closed:
+            raise RuntimeError("TimeFunction failed")
+
+        inclusive = self._Elapsed
+        exclusive = inclusive - sum([timer._Elapsed for timer in self._Children])
+
+        per_item_text = ""
+        if self._PerItem != 0:
+            per_item_text = "per_item:{:.3f}us ".format(self._PerItem)
+
+        if exclusive != inclusive:
+            dur_text = "elapsed(inclusive):{:.2f}s elapsed(exclusive):{:.2f}s".format(inclusive, exclusive)
+        else:
+            dur_text = "elapsed:{:.2f}s".format(inclusive)
+
+        args = ", ".join(self._Arguments)
+        logging.debug("G_PerfTimer: {}{}({}): {}{}".format("|--" * indent, self._Description, args, dur_text, per_item_text))
+
+        for child in self._Children:
+            child._Report(indent + 1)
+
+
+    #-------------------------------------------------------
+    def SetItemCount(self, item_count):
+        self._ItemCount = item_count
+
+
+    #-------------------------------------------------------
+    def AddArgument(self, arg):
+        self._Arguments.append(arg)
+
+
+    #-------------------------------------------------------
+    def Close(self, item_count = 0):
+        if not self._Closed:
+            self._Closed = True
+
+            if item_count == 0:
+                item_count = self._ItemCount
+
+            self._Elapsed = self._Timer.Overall()
+            self._PerItem = self._Timer.PerItem(item_count)
+            __class__._Last = self._Parent
+
+            if self._Parent is None:
+                self._Report()
+
+
+
+## G_PerfTimerScope ########################################
+
+class G_PerfTimerScope:
+    """Time the execution of something"""
+
+    #-------------------------------------------------------
+    def __init__(self, name, item_count = 0):
+        self._Name = name
+        self._ItemCount = item_count
+
+
+    #-------------------------------------------------------
+    def __enter__(self):
+        self._Timer = G_PerfTimer(self._Name)
+        return self
+
+
+    #-------------------------------------------------------
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._Timer.Close(self._ItemCount)
+
+
+    #-------------------------------------------------------
+    def SetItemCount(self, item_count):
+        self._ItemCount = item_count
+
+
+
 ## G_Const #################################################
 
 class G_Const:
@@ -182,6 +296,18 @@ class G_Global:
 
     def FormatLastTraceback():
         return __class__.FormatTraceback(*sys.exc_info())
+
+
+    #-------------------------------------------------------
+    def GetCurrentTimer():
+        return G_PerfTimer.GetCurrent()
+
+    def TimeFunction(func):
+        def TimeFunctionWrapper(*args, **kwargs):
+            with G_PerfTimerScope(func.__qualname__):
+                return func(*args, **kwargs)
+
+        return TimeFunctionWrapper
 
 
 
@@ -549,6 +675,7 @@ class G_Node:
 
         return node
 
+    @G_Global.TimeFunction
     def DoBuildNode(self, document, copy_defaults, name, **kwargs ):
         """Common node building implementation; GUI is frozen"""
         new_node = self.BuildChildNode(document, copy_defaults, name, **kwargs)

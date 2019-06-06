@@ -512,16 +512,18 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         self.SetDisplayCtrl(panel_notebook, script_ctrl, display_ctrl_is_subtab = True)
 
-
+    @G_Global.TimeFunction
     def PostInitChildren(self):
         # apply the themed default node name to the tree
         node_name = self._Field.DefaultNodeName.Value
         self.PostInitDisplay(node_name)
+        G_Global.GetCurrentTimer().AddArgument(node_name)
 
         # and add the viewer to the main notebook, without altering focus
         def Work():
             self.GetNotebook().AddPage(self._Notebook, node_name, True)
             if self._InitAnalysis:
+
                 # make sure hideable is setup before child is made
                 self.PostInitHideableTreeNode()
                 self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, "Events")
@@ -603,6 +605,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def CompileAnalyser(self, src):
         self.SetErrorText("Compiling ...\n")
 
@@ -633,6 +636,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def NullAnalyser(name, analyser):
         pass
 
+    @G_Global.TimeFunction
     def RunAnalyser(self, code, log_schema, meta_only):
         self.SetErrorText("Analysing ...\n")
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
@@ -659,6 +663,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def Analyse(self, source, meta_only = False):
         self._EventMeta = None
         self._AnalysisRun = True
@@ -717,6 +722,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._ForallProjectors(Work, event = False)
 
 
+    @G_Global.TimeFunction
     def UpdateContent(self, event = True, metrics = True, unlock_charts = True):
         analysis_props = self.GetAnalysisProperties()
         if analysis_props is None:
@@ -737,6 +743,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def UpdateAnalysis(self):
         """Analysis requested by user"""
         self.AnalyseForAll()
