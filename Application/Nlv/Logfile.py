@@ -28,6 +28,7 @@ from .Logmeta import GetLogSchema
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_Const
+from .Project import G_Global
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_ListContainedNode
@@ -131,16 +132,6 @@ class G_DisplayNode(G_LogChildNode):
         #  processing tree view selection change events
         self._CanManageFocus = True
 
-    def PostInitDisplay(self, force_name = None):
-        initial_name = self.GetTreeLabel()
-        self._Field.Add(initial_name, "NodeName", replace_existing = False)
-
-        node_name = self._Field.NodeName.Value
-        if force_name is not None:
-            node_name = force_name
-
-        self.SetTreeLabel(node_name)
-
 
     #-------------------------------------------------------
     def GetDisplayCtrl(self):
@@ -148,6 +139,14 @@ class G_DisplayNode(G_LogChildNode):
 
     def GetDisplayNode(self):
         return self
+
+    def GetNodeLabel(self):
+        self._Field.Add("", "NodeUserLabel", replace_existing = False)
+        label = self._Field.NodeUserLabel.Value
+        if label != "":
+            return label
+        else:
+            return self.GetDefaultNodeLabel()
 
 
     #-------------------------------------------------------
@@ -278,7 +277,7 @@ class G_DisplayNode(G_LogChildNode):
             notebook = self.GetNotebook()
             tab_index = notebook.GetPageIndex(self._DisplayCtrl)
             notebook.SetPageText(tab_index, label)
-            self._Field.NodeName.Value = label
+            self._Field.NodeUserLabel.Value = label
 
         return True
 
@@ -921,7 +920,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         super().__init__(factory, wproject, witem)
         self._ViewCount = 0
         self._N_Logfile = None
-        self._LogfileName = name
+        self._OrigLogfileName = name
 
         self._InitSchemaGuid = None 
         if "schema_guid" in kwargs:
@@ -945,7 +944,10 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
             self._Field.Add(self._InitSchemaGuid, "SchemaGuid", replace_existing = False)
 
         # and the current relative logfile path
-        self._Field.Add(self._LogfileName, "RelativeLogfilePath", replace_existing = False)
+        self._Field.Add(self._OrigLogfileName, "RelativeLogfilePath", replace_existing = False)
+
+        # set node title to current relative path
+        self.SetTreeLabel(self.GetNodeLabel())
 
         # when debugging C++ code directly, attempts to call-back into Python to upate
         # the progress dialog trigger a crash; workaround here by setting want_progress
@@ -953,7 +955,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         want_progress = True
         progress_dlg = None
         if want_progress:
-            progress_dlg = G_ProgressMeter("NLV Indexing File", self._LogfileName)
+            progress_dlg = G_ProgressMeter("NLV Indexing File", self.GetNodeLabel())
 
         # open the logfile
         self._FullPath = fullpath = Path().cwd().joinpath(self._Field.RelativeLogfilePath.Value)
@@ -1020,7 +1022,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         """A save has been requested; lookup and record the log file state"""
         self._Field.LogFileState.Value = self._N_Logfile.GetState()
 
-        relpath = self._FullPath.relative_to(Path().cwd())
+        relpath = G_Global.RelPath(self._FullPath)
         self._Field.RelativeLogfilePath.Value = str(relpath)
 
 
@@ -1049,6 +1051,10 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     def GetLogfilePath(self):
         """Fetch absolute path"""
         return self._FullPath
+
+    def GetNodeLabel(self):
+        """The default logfile name is the current relative path"""
+        return str(Path(self._Field.RelativeLogfilePath.Value).as_posix())
 
     def GetLogSchema(self):
         return GetLogSchema(self._Field.SchemaGuid.Value)
@@ -1087,7 +1093,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         """Append a new view to this logfile"""
 
         count = self._Field.ViewCounter.Value = self._Field.ViewCounter.Value + 1
-        name = "{}/{}".format(self._LogfileName, count)
+        name = str(count)
         self.BuildNodeFromDefaults(guid, name, theme_id = theme_id, do_analysis = do_analysis)
 
 

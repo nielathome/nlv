@@ -601,14 +601,15 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         G_TabContainerNode.__init__(self, factory, wproject, witem)
         self._CursorLine = -1
         self._AutoHiliteText = ""
+        self._OrigNameId = name.split("/")[-1]
 
 
     def PostInitNode(self):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
 
-        # apply any user override to the node's name
-        self.PostInitDisplay()
+        # apply any user override to the node's label
+        self.SetTreeLabel(self.GetNodeLabel())
 
         # ensure non-template fields exist and are initialised
         self._Field.Add(0, "FirstVisibleLine", replace_existing = False)
@@ -683,7 +684,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         # and add the Scintilla editor to the main notebook, without altering focus
         def Work():
-            notebook.AddPage(editor, self._Field.NodeName.Value, True)
+            notebook.AddPage(editor, self.GetNodeLabel(), True)
         self.WithFocusLock(Work)
 
         # ensure markers are set correctly
@@ -759,6 +760,9 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
     def GetView(self):
         return self._N_View
+
+    def GetDefaultNodeLabel(self):
+        return "{}/{}".format(self.GetLogNode().GetNodeLabel(), self._OrigNameId)
 
 
     #-------------------------------------------------------

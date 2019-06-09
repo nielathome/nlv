@@ -18,6 +18,7 @@
 # Python imports
 import glob
 import logging
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -156,7 +157,10 @@ class G_PerfTimer:
 ## G_PerfTimerScope ########################################
 
 class G_PerfTimerScope:
-    """Time the execution of something"""
+    """
+    Context manager (use with "with").
+    Time the execution of something
+    """
 
     #-------------------------------------------------------
     def __init__(self, name, item_count = 0):
@@ -303,11 +307,22 @@ class G_Global:
         return G_PerfTimer.GetCurrent()
 
     def TimeFunction(func):
+        """
+        Decorator to allow function/method execution times to
+        be recorded and logged.
+        """
         def TimeFunctionWrapper(*args, **kwargs):
             with G_PerfTimerScope(func.__qualname__):
                 return func(*args, **kwargs)
 
         return TimeFunctionWrapper
+
+
+    #-------------------------------------------------------
+    def RelPath(path, start = os.curdir):
+        # pathlib.relative_to is surprisingly limited; this
+        # workaround taken from https://stackoverflow.com/questions/38083555/using-pathlibs-relative-to-for-directories-on-the-same-level
+        return Path(os.path.relpath(path, start))
 
 
 
@@ -1111,11 +1126,18 @@ class G_HideableTreeNode():
         return self._Field.ShowThisNodeDisplay.Value and self.IsParentNodeDisplayed()
 
     def IsParentNodeDisplayed(self):
-        parent = self.GetParentNode(G_HideableTreeNode)
-        if parent is None:
+        # parent's aren't guaranteed to be fully initialised when
+        # creating new nodes; so safe to assume the parent node is
+        # visible in such cases
+        try:
+            parent = self.GetParentNode(G_HideableTreeNode)
+            if parent is None:
+                return True
+            else:
+                return parent._Field.ShowThisNodeDisplay.Value
+
+        except:
             return True
-        else:
-            return parent._Field.ShowThisNodeDisplay.Value
 
     def SetThisNodeDisplay(self, show):
         self._Field.ShowThisNodeDisplay.Value = show

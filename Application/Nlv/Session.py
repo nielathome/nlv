@@ -32,6 +32,7 @@ from .Document import D_Document
 from .Extension import GetExtensionNames
 from .Logmeta import GetLogSchema, GetLogSchemataNames
 from .Project import G_Const
+from .Project import G_Global
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_TreeNode
@@ -176,11 +177,6 @@ class G_SessionManager:
             return str(Path(path).name)
 
     def IsValid(self):
-        # Currently, log file paths are stored relative to the session file, and are hard to
-        # change. This limits valid operations; in particular, it is not possible to open a log
-        # file while the session "datum" directory is unknown. Although not ideal, it is easier
-        # to limit app functionality than to change the XML structure to cope with a change of
-        # session directory after log files have been opened (least worse of two evils)
         return self._CurrentPath is not None
 
 
@@ -319,7 +315,7 @@ class G_SessionManager:
 
                 p = Path(path)
                 if p.is_absolute():
-                    p = p.relative_to(base_path).as_posix()
+                    p = G_Global.RelPath(p, base_path).as_posix()
 
                 self.GetSessionNode().AppendLog(str(p), builder_guid)
 
@@ -352,7 +348,6 @@ class G_SessionManager:
         if dlg.ShowModal() == wx.ID_OK:
             path = dlg.GetPath()
 
-        # close dialog and change directory
         dlg.Destroy()
 
         if path is not None:
@@ -403,23 +398,11 @@ class G_SessionManager:
 
         dlg.Destroy()
 
-        if new_path is None:
-            return
+        if new_path is not None:
+            self.SessionSaveAs(new_path)
 
-        # tedious
-        new_dir = Path(new_path).parent
-        for lognode in self.GetRootNode().ListSubNodes(G_Project.NodeID_Log, recursive = True):
-            try:
-                rel_path = lognode.GetLogfilePath().relative_to(new_dir)
-            except ValueError:
-                err_str = "Unable to save.\nA PathLib constraint requires all logfiles to be in, or under, the document directory ('{}')."
-                self.AppError(err_str.format(str(new_dir)))
-                return
-
-        self.SessionSaveAs(new_path)
-
-        # flush any new name into the GUI
-        self.GetSessionNode().SetTreeLabel(str(Path(new_path).name))
+            # flush any new name into the GUI
+            self.GetSessionNode().SetTreeLabel(str(Path(new_path).name))
 
 
     #-------------------------------------------------------
@@ -605,11 +588,10 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
         ext = schema.GetExtension()
         wildcard = "{} log files (*.{})|*.{}|All files (*.*)|*.*".format(schema_name, ext, ext)
 
-        base_path = Path.cwd()
         dlg = wx.FileDialog(
             self.GetProject().GetFrame(),
             message = "Select {} log file(s)".format(schema_name),
-            defaultDir = str(base_path),
+            defaultDir = str(Path.cwd()),
             wildcard = wildcard,
             style = wx.FD_OPEN | wx.FD_MULTIPLE | wx.FD_FILE_MUST_EXIST
         )
@@ -623,18 +605,13 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
         dlg.Destroy()
 
         for path in paths:
-            try:
-                builder_guid = None
-                if len(self._BuilderNames) != 0:
-                    builder_guid = self._BuilderNames[self._ChoiceLogBuilder.GetSelection()][1]
+            builder_guid = None
+            if len(self._BuilderNames) != 0:
+                builder_guid = self._BuilderNames[self._ChoiceLogBuilder.GetSelection()][1]
 
-                relative_path = str(Path(path).relative_to(base_path).as_posix())
-                self.GetSessionNode().AppendLog(relative_path, self.GetLogSchemaGuid(), builder_guid)
+            relative_path = str(G_Global.RelPath(path).as_posix())
+            self.GetSessionNode().AppendLog(relative_path, self.GetLogSchemaGuid(), builder_guid)
 
-            except ValueError:
-                # the relative_to implementation is a bit weak
-                err_str = "Unable to open '{}'.\nA PathLib constraint requires the log file to be in, or under, the document directory ('{}')."
-                self.AppError(err_str.format(path, str(base_path)))
 
 
     #-------------------------------------------------------

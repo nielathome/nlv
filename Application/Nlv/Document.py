@@ -391,6 +391,8 @@ class D_Object(D_Base):
     def __getattr__(self, name):
         """Fetch object's field by name"""
         element = self._Element.find("./*[@name='{}']".format(name))
+        if element is None:
+            raise RuntimeError("Unable to find document field '{}'".format(name))
         return D_Document(element, self._WNode())
 
 

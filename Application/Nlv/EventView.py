@@ -516,7 +516,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def PostInitChildren(self):
         # apply the themed default node name to the tree
         node_name = self._Field.DefaultNodeName.Value
-        self.PostInitDisplay(node_name)
+        self.SetTreeLabel(node_name)
         G_Global.GetCurrentTimer().AddArgument(node_name)
 
         # and add the viewer to the main notebook, without altering focus
