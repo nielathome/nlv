@@ -555,10 +555,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         return self._Field.Guid.Value
 
     def MakeTemporaryFilename(self, ext = ".csv"):
-        cachedir = (self.GetLogNode().GetLogfilePath().parent) / ".nlvc"
-        if not cachedir.exists():
-            cachedir.mkdir()
-
+        cachedir = G_Global.MakeCacheDir(self.GetLogNode().GetLogfilePath().parent)
         return str((cachedir / self.MakeTemporaryName()).with_suffix(ext))
 
 

@@ -269,6 +269,21 @@ class G_Global:
 
 
     #-------------------------------------------------------
+    def MakeCacheDir(base_path, subdir = None):
+        if not isinstance(base_path, Path):
+            base_path = Path(base_path)
+
+        cachedir = base_path / ".nlvc"
+        if subdir is not None:
+            cachedir = cachedir / subdir
+
+        if not cachedir.exists():
+            cachedir.mkdir(parents = True)
+
+        return cachedir
+
+
+    #-------------------------------------------------------
     # hack to stamp strings with metadata
     _MarkMagic = "#<->#"
     _MarkNoDisplay = "nodisplay"

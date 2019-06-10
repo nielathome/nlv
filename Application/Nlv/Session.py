@@ -181,6 +181,28 @@ class G_SessionManager:
 
 
     #-------------------------------------------------------
+    def MakeSessionDir(self):
+        guid = self.GetSessionNode().GetSessionGuid()
+        return G_Global.MakeCacheDir(Path(self._CurrentPath).parent, guid)
+
+    def CheckGuidCollision(self):
+        # no sentinel file implies no collision; claim
+        # Guid for this document and finish
+        sentinel_filename = "sentinel.txt"
+        file = self.MakeSessionDir() / sentinel_filename
+        if not file.exists():
+            file.write_text(self._CurrentPath)
+            return
+
+        # if Guid taken by another document; create new Guid
+        # and claim it
+        owning_path = file.read_text()
+        if owning_path != self._CurrentPath:
+            self.GetSessionNode().NewSessionGuid()
+            (self.MakeSessionDir() / sentinel_filename).write_text(self._CurrentPath)
+
+
+    #-------------------------------------------------------
     def SetSessionFilename(self, doc_path = None):
         """Set the current working directory to match the session file location"""
 
@@ -245,6 +267,7 @@ class G_SessionManager:
 
         if touch:
             self._ListTouch(self._CurrentPath)
+
 
         self.GetRootNode().SaveNode(self._CurrentPath)
 
@@ -1269,6 +1292,16 @@ class G_SessionNode(G_TabContainerNode):
         else:
             self.GetProject().LoadPerspective(layout)
 
+        self.CheckGuidCollision()
+
+
+    #-------------------------------------------------------
+    def GetSessionGuid(self):
+        return self._Field.Guid.Value
+
+    def NewSessionGuid(self):
+        self._Field.Guid.Value = str(uuid4())
+
 
     #-------------------------------------------------------
     def AppendLog(self, relative_path, schema_guid, builder_guid):
@@ -1306,6 +1339,8 @@ class G_SessionNode(G_TabContainerNode):
     #-------------------------------------------------------
     def NotifyPreSave(self):
         """A save has been requested; perform any tasks that must be completed before the save takes place"""
+        self.CheckGuidCollision()
+
         layout = ""
         if self._StoreManagerPerspective:
             layout = self.GetAuiManager().SavePerspective()
@@ -1320,6 +1355,9 @@ class G_SessionNode(G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    def CheckGuidCollision(self):
+        GetSessionManager().CheckGuidCollision()
+
     def IsValid(self):
         return GetSessionManager().IsValid()
 
