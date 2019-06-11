@@ -37,6 +37,7 @@ import json
 import logging
 from pathlib import Path
 import pywintypes
+import sqlite3
 import time
 from uuid import uuid4
 import win32com.client as com
@@ -77,6 +78,45 @@ from .Theme import GetThemeSupportFile
 
 # Content provider interface
 import Nlog
+
+
+# temporary?
+class G_DatabaseManager:
+    """
+    Manage the SQLlite database used by the event recogniser
+    system
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, filepath):
+        self._Connection = sqlite3.connect(filepath)
+        self._Connection.row_factory = sqlite3.Row
+
+
+    #-------------------------------------------------------
+    def GetLocalTableName(self, table_name):
+        return table_name
+
+
+    #-------------------------------------------------------
+    def MakeTable(self, table_name, sql_columns):
+        cursor = self.cursor()
+        cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
+        cursor.execute("CREATE TABLE {} ({})".format(table_name, ", ".join(sql_columns)))
+
+        self.commit()
+        return cursor
+
+
+    #-------------------------------------------------------
+    def cursor(self):
+        return self._Connection.cursor()
+            
+    def commit(self):
+        return self._Connection.commit()
+
+    def close(self):
+        self._Connection.close()
 
 
 
@@ -551,12 +591,9 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def MakeTemporaryName(self):
-        return self._Field.Guid.Value
-
     def MakeTemporaryFilename(self, ext = ".csv"):
-        cachedir = G_Global.MakeCacheDir(self.GetLogNode().GetLogfilePath().parent)
-        return str((cachedir / self.MakeTemporaryName()).with_suffix(ext))
+        cachedir = self.GetLogNode().MakeSessionDir()
+        return str((cachedir / self._Field.Guid.Value).with_suffix(ext))
 
 
     #-------------------------------------------------------
@@ -637,8 +674,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def RunAnalyser(self, code, log_schema, meta_only):
         self.SetErrorText("Analysing ...\n")
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
-            local_id = self.MakeTemporaryName()
-            database = self.GetSessionNode().GetDatabaseManager(local_id)
+            database = G_DatabaseManager(self.MakeTemporaryFilename(".db"))
             globals = dict()
 
             register_analyser = self.NullAnalyser
@@ -654,8 +690,11 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             globals.update(RegisterProjector = projector.RegisterProjector)
 
             exec(code, globals)
+
             self.SetErrorText("Analysed OK\n")
             self._Field.AnalysisIsValid.Value = True
+            database.close()
+
             return projector.GetMeta()
 
 

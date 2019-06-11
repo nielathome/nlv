@@ -273,6 +273,9 @@ class G_Global:
         if not isinstance(base_path, Path):
             base_path = Path(base_path)
 
+        if not base_path.is_dir():
+            base_path = base_path.parent
+
         cachedir = base_path / ".nlvc"
         if subdir is not None:
             cachedir = cachedir / subdir

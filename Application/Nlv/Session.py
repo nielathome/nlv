@@ -18,7 +18,6 @@
 # Python imports
 import logging
 from pathlib import Path
-import sqlite3
 import time
 from uuid import uuid4
 from weakref import ref as MakeWeakRef
@@ -47,47 +46,6 @@ from .Theme import GetThemeGallery
 # Content provider interface
 import Nlog
 
-
-## G_DatabaseManager #######################################
-
-class G_DatabaseManager:
-    """
-    Manage the SQLlite database used by the event recogniser
-    system
-    """
-
-    #-------------------------------------------------------
-    def __init__(self, guid):
-        self._Connection = sqlite3.connect("{}.db".format(guid))
-        self._Connection.row_factory = sqlite3.Row
-
-
-    #-------------------------------------------------------
-    def GetLocalTableName(self, table_name):
-        return "t_{}_{}".format(table_name, self._LocalId)
-
-    def SetContext(self, local_id):
-        self._LocalId = local_id.replace("-", "_")
-
-
-    #-------------------------------------------------------
-    def MakeTable(self, table_name, sql_columns):
-        cursor = self.cursor()
-        cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
-        cursor.execute("CREATE TABLE {} ({})".format(table_name, ", ".join(sql_columns)))
-
-        self.commit()
-        return cursor
-
-
-    #-------------------------------------------------------
-    def cursor(self):
-        return self._Connection.cursor()
-            
-    def commit(self):
-        return self._Connection.commit()
-
-        
 
 ## G_SessionManager ########################################
 
@@ -183,7 +141,7 @@ class G_SessionManager:
     #-------------------------------------------------------
     def MakeSessionDir(self):
         guid = self.GetSessionNode().GetSessionGuid()
-        return G_Global.MakeCacheDir(Path(self._CurrentPath).parent, guid)
+        return G_Global.MakeCacheDir(self._CurrentPath, guid)
 
     def CheckGuidCollision(self):
         # no sentinel file implies no collision; claim
@@ -1325,15 +1283,6 @@ class G_SessionNode(G_TabContainerNode):
         handlers[G_Const.ID_SESSION_SAVE_AS] = manager.OnCmdSessionSaveAs
 
         return menu
-
-
-    #-------------------------------------------------------
-    def GetDatabaseManager(self, local_id):
-        if self._DatabaseManager is None:
-            self._DatabaseManager = G_DatabaseManager(self._Field.Guid.Value)
-
-        self._DatabaseManager.SetContext(local_id)
-        return self._DatabaseManager
 
 
     #-------------------------------------------------------

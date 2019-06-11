@@ -1048,16 +1048,16 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     def GetLogfile(self):
         return self._N_Logfile
 
-    def GetLogfilePath(self):
-        """Fetch absolute path"""
-        return self._FullPath
-
     def GetNodeLabel(self):
         """The default logfile name is the current relative path"""
         return str(Path(self._Field.RelativeLogfilePath.Value).as_posix())
 
     def GetLogSchema(self):
         return GetLogSchema(self._Field.SchemaGuid.Value)
+
+    def MakeSessionDir(self):
+        session_guid = self.GetSessionNode().GetSessionGuid()
+        return G_Global.MakeCacheDir(self._FullPath, session_guid)
 
 
     #-------------------------------------------------------

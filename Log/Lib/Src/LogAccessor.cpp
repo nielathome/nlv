@@ -327,21 +327,22 @@ std::filesystem::path MLogAccessor::CalcIndexPath( const std::filesystem::path &
 {
 	using namespace std::filesystem;
 
-	path old_index_path{ file_path };
-	old_index_path += L".nlx";
-
 	const path cache_subdir{ L".nlvc" };
 	const path file_dir{ file_path.parent_path() };
-	const path cache_dir{ file_dir.filename() == cache_subdir ? file_dir : file_dir / cache_subdir };
+
+	bool in_cache_dir{ false };
+	for(const path & elem : file_dir )
+		if( elem == cache_subdir )
+		{
+			in_cache_dir = true;
+			break;
+		}
+
+	const path cache_dir{ in_cache_dir ? file_dir : file_dir / cache_subdir };
 	if( !exists( cache_dir ) )
 		create_directory( cache_dir );
 
-	const path new_index_path{ (cache_dir / file_path.filename()).concat( L".idx" ) };
-
-	if( exists( old_index_path ) && !exists( new_index_path ) )
-		rename( old_index_path, new_index_path );
-
-	return new_index_path;
+	return (cache_dir / file_path.filename()).concat( L".idx" );
 }
 
 
