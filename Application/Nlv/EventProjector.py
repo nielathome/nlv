@@ -524,8 +524,8 @@ class G_Projector:
     """Project event analyses, creates an event table (CSV)"""
 
     #-------------------------------------------------------
-    def __init__(self, database, meta_only, filename, log_schema, logfile):
-        self._Database = database
+    def __init__(self, connection, meta_only, filename, log_schema, logfile):
+        self._Connection = connection
         self._MetaOnly = meta_only
         self._Filename = filename
         self._ProjectionSchema = G_ProjectionSchema()
@@ -545,7 +545,7 @@ class G_Projector:
     #-------------------------------------------------------
     @G_Global.TimeFunction
     def _Select(self, user_projector):
-        return user_projector.Select(self._Database)
+        return user_projector.Select(self._Connection)
 
     def CollectEvents(self, event_collector, user_projector):
         events = self._Select(user_projector)

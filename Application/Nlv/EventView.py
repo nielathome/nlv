@@ -80,45 +80,6 @@ from .Theme import GetThemeSupportFile
 import Nlog
 
 
-# temporary?
-class G_DatabaseManager:
-    """
-    Manage the SQLlite database used by the event recogniser
-    system
-    """
-
-    #-------------------------------------------------------
-    def __init__(self, filepath):
-        self._Connection = sqlite3.connect(filepath)
-        self._Connection.row_factory = sqlite3.Row
-
-
-    #-------------------------------------------------------
-    def GetLocalTableName(self, table_name):
-        return table_name
-
-
-    #-------------------------------------------------------
-    def MakeTable(self, table_name, sql_columns):
-        cursor = self.cursor()
-        cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
-        cursor.execute("CREATE TABLE {} ({})".format(table_name, ", ".join(sql_columns)))
-
-        self.commit()
-        return cursor
-
-
-    #-------------------------------------------------------
-    def cursor(self):
-        return self._Connection.cursor()
-            
-    def commit(self):
-        return self._Connection.commit()
-
-    def close(self):
-        self._Connection.close()
-
-
 
 ## G_LogAnalysisChildNode ##################################
 
@@ -667,24 +628,26 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     @staticmethod
-    def NullAnalyser(name, analyser):
+    def NullAnalyser(analyser):
         pass
 
     @G_Global.TimeFunction
     def RunAnalyser(self, code, log_schema, meta_only):
         self.SetErrorText("Analysing ...\n")
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
-            database = G_DatabaseManager(self.MakeTemporaryFilename(".db"))
+            connection = sqlite3.connect(self.MakeTemporaryFilename(".db"))
+            connection.row_factory = sqlite3.Row
+
             globals = dict()
 
             register_analyser = self.NullAnalyser
             if not meta_only:
-                analyser = G_Analyser(database, log_schema, self.GetLogfile())
+                analyser = G_Analyser(connection, log_schema, self.GetLogfile())
                 register_analyser = analyser.RegisterAnalyser
 
             globals.update(RegisterAnalyser = register_analyser)
 
-            projector = G_Projector(database, meta_only, self.MakeTemporaryFilename(),
+            projector = G_Projector(connection, meta_only, self.MakeTemporaryFilename(),
                 log_schema, self.GetLogfile()
             )
             globals.update(RegisterProjector = projector.RegisterProjector)
@@ -693,7 +656,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
             self.SetErrorText("Analysed OK\n")
             self._Field.AnalysisIsValid.Value = True
-            database.close()
+            connection.close()
 
             return projector.GetMeta()
 

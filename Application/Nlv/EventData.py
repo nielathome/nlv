@@ -25,197 +25,6 @@ import Nlog
 
 
 
-## G_EventTypeManager ######################################
-
-class G_EventTypeManager:
-    """Type management and value conversion services for SQL"""
-
-    _FieldTypes = dict(
-        bool = "integer",
-        uint08 = "integer",
-        uint16 = "integer",
-        uint32 = "integer",
-        uint64 = "integer",
-        int08 = "integer",
-        int16 = "integer",
-        int32 = "integer",
-        int64 = "integer",
-        float32 = "real",
-        float64 = "real",
-        enum08 = "integer",
-        enum16 = "integer",
-        text = "text"
-    )
-
-
-    #-------------------------------------------------------
-    def ValidateType(type):
-        me = __class__
-
-        if not type in me._FieldTypes:
-            raise RuntimeError("Invalid field type: {}".format(type))
-
-        return me._FieldTypes[type]
-
-
-
-## G_EventFieldSchema ######################################
-
-class G_EventFieldSchema:
-    """Describe a single event field (database 'colummn')"""
-
-    #-------------------------------------------------------
-    def __init__(self, name, type):
-        self.Name = name
-        self.Type = type
-
-
-
-## G_EventSchema ###########################################
-
-class G_EventSchema(G_FieldSchemata):
-    """Describe all the fields of a table (database 'row')"""
-
-    #-------------------------------------------------------
-    def __init__(self, guid = ""):
-        super().__init__(guid)
-
-
-
-## G_CoreEventSchemaCollector ##############################
-
-class G_CoreEventSchemaCollector:
-    """Collect schema data for a SQL table"""
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self._Schema = G_EventSchema("B2ADC6BF-AEBC-452B-B604-4EDCCCE2CBCD")
-
-
-    #-------------------------------------------------------
-    @staticmethod
-    def MakeFieldSchema(name, type):
-        return G_EventFieldSchema(name, G_EventTypeManager.ValidateType(type))
-
-
-    #-------------------------------------------------------
-    def AddField(self, name, type):
-        field_schema = self.MakeFieldSchema(name, type)
-        self._Schema.Append(field_schema)
-
-
-    #-------------------------------------------------------
-    def Close(self):
-        return self._Schema
-
-
-
-## G_EventSchemaCollector ##################################
-
-class G_EventSchemaCollector(G_CoreEventSchemaCollector):
-    
-    #-------------------------------------------------------
-    def __init__(self):
-        super().__init__()
-
-        self.AddField("start_text", "text")
-        self.AddField("start_line_no", "uint32")
-        self.AddField("start_utc", "uint64")
-        self.AddField("start_offset_ns", "uint64")
-
-        self.AddField("finish_text", "text")
-        self.AddField("finish_line_no", "uint32")
-        self.AddField("finish_utc", "uint64")
-        self.AddField("finish_offset_ns", "uint64")
-
-        self.AddField("duration_ns", "uint64")
-
-
-
-## G_EventDateTime ###########################################==
-
-class G_EventDateTime:
-
-    #-------------------------------------------------------
-    def __init__(self, log_line_no, accessor, date_field_id):
-        self.LogLineNumber = log_line_no
-
-        self.Text = accessor.GetFieldText(date_field_id)
-
-        timecode = accessor.GetUtcTimecode()
-        timecode.Normalise()
-        self.Timecode = timecode
-
-
-    #-------------------------------------------------------
-    def AsFields(self):
-        return [self.Text, self.LogLineNumber, self.Timecode.GetUtcDatum(), self.Timecode.GetOffsetNs()]
-
-
-
-## G_EventCollector ########################################
-
-class G_EventCollector:
-    """Collect and save event data from an event analyser"""
-
-    #-------------------------------------------------------
-    def __init__(self, database, table_name, event_schema, date_fieldid, start_accessor, finish_accessor):
-        self._Database = database
-        self._DateFieldId = date_fieldid
-        self._StartAccessor = start_accessor
-        self._FinishAccessor = finish_accessor
-
-        self._FieldCount = len(event_schema)
-
-        full_table_name = database.GetLocalTableName(table_name)
-        sql_columns = ["{} {}".format(field_schema.Name, field_schema.Type) for field_schema in event_schema]
-        self._Cursor = database.MakeTable(full_table_name, sql_columns)
-
-        placeholders = ", ".join(["?" for i in range(self._FieldCount)])
-        self._InsertCmd = "INSERT INTO {} VALUES ({})".format(full_table_name, placeholders)
-
-
-    #-------------------------------------------------------
-    def SetStartLine(self, log_lineno):
-        self._StartLine = log_lineno
-
-    def SetFinishLine(self, log_lineno):
-        self._FinishLine = log_lineno
-
-
-    #-------------------------------------------------------
-    def AddEvent(self, recogniser_values):
-        start_date = G_EventDateTime(self._StartLine, self._StartAccessor, self._DateFieldId)
-        finish_date = G_EventDateTime(self._FinishLine, self._FinishAccessor, self._DateFieldId)
-
-        duration = finish_date.Timecode.Subtract(start_date.Timecode)
-
-        values = start_date.AsFields()
-        values.extend(finish_date.AsFields())
-        values.append(duration)
-        values.extend(recogniser_values)
-
-        if len(values) != self._FieldCount:
-            raise RuntimeError("Incorrect number of field values: got:{} exp:{}".format(len(values), self._FieldCount))
-
-        self._Cursor.execute(self._InsertCmd, values)
-        self._EventIdentified = True
-
-
-    def CancelEvent(self):
-        self._EventIdentified = True
-
-
-    def WasEventIdentified(self):
-        return self._EventIdentified
-
-
-    #-------------------------------------------------------
-    def Close(self):
-        self._Database.commit()
-
-
-
 ## G_LineAccessor ##########################################
 
 class G_LineAccessor:
@@ -272,20 +81,54 @@ class G_LineAccessor:
 ## G_Analyser ##############################################
 
 class G_Analyser:
-    """Analyse a log, creates an event table"""
+    """Analyse a log, creates any number of event/feature tables"""
 
     #-------------------------------------------------------
-    def __init__(self, database, log_schema, logfile):
-        self._Database = database
+    _EventColumnNames = [
+        "start_text",
+        "start_line_no",
+        "start_utc",
+        "start_offset_ns",
+        "finish_text",
+        "finish_line_no",
+        "finish_utc",
+        "finish_offset_ns",
+        "duration_ns"
+    ]
+
+    _EventColumnTypes = [
+        "TEXT",
+        "INT",
+        "INT",
+        "INT",
+        "TEXT",
+        "INT",
+        "INT",
+        "INT",
+        "INT"
+    ]
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def GetCreateTableColumnsText(cls):
+        cols = ["{} {}".format(n, t) for n, t in zip(cls._EventColumnNames, cls._EventColumnTypes)]
+        return ", ".join(cols)
+
+    def GetInsertColumnsText(cls):
+        return ", ".join(["?" for i in range(len(cls._EventColumnNames))])
+
+
+    #-------------------------------------------------------
+    def __init__(self, connection, log_schema, logfile):
+        self.Connection = connection
         self._LogFile = logfile
+        self._DateFieldId = logfile.GetTimecodeBase().GetFieldId() - 1
 
         field_ids = dict()
         for (idx, name) in enumerate(log_schema.GetFieldNames()):
             field_ids.update([[name, idx]])
         self._LogFieldIds = field_ids
-
-    def GetDateFieldId(self):
-        return self._LogFile.GetTimecodeBase().GetFieldId() - 1
 
 
     #-------------------------------------------------------
@@ -340,38 +183,56 @@ class G_Analyser:
 
 
     #-------------------------------------------------------
-    def CollectEventSchema(self, user_analyser):
-        schema_collector = G_EventSchemaCollector()
-        user_analyser.DefineSchema(schema_collector)
-        return schema_collector.Close()
+    def GetInsertValues(self):
+        start_timecode = self._StartAccessor.GetUtcTimecode()
+        start_timecode.Normalise()
+
+        finish_timecode = self._FinishAccessor.GetUtcTimecode()
+        finish_timecode.Normalise()
+
+        return [
+            # event start details
+            self._StartAccessor.GetFieldText(self._DateFieldId),
+            self._StartLine,
+            start_timecode.GetUtcDatum(),
+            start_timecode.GetOffsetNs(),
+
+            # event finish details
+            self._FinishAccessor.GetFieldText(self._DateFieldId),
+            self._FinishLine,
+            finish_timecode.GetUtcDatum(),
+            finish_timecode.GetOffsetNs(),
+
+            # other (duration)
+            finish_timecode.Subtract(start_timecode)
+        ]
 
 
     #-------------------------------------------------------
-    def CollectEvents(self, user_analyser, table_name):
+    def RegisterAnalyser(self, user_analyser):
         # observation: this could be made multithreaded
 
         field_ids = self._LogFieldIds
 
         (start_view, finish_view) = self.BuildLineSets(user_analyser)
 
-        start_accessor = G_LineAccessor(field_ids, start_view)
+        self._StartAccessor = start_accessor = G_LineAccessor(field_ids, start_view)
         start_line_count = start_view.GetNumLines()
 
-        finish_accessor = G_LineAccessor(field_ids, finish_view)
+        self._FinishAccessor = finish_accessor = G_LineAccessor(field_ids, finish_view)
         finish_line_count = finish_view.GetNumLines()
 
-        event_collector = G_EventCollector(self._Database, table_name, self._EventSchema, self.GetDateFieldId(), start_accessor, finish_accessor)
+        user_analyser.Begin(self)
 
         for start_lineno in range(start_line_count):
             start_accessor.SetLineNo(start_lineno)
-            match_finish_func = user_analyser.MatchEventStart(start_accessor)
+            match_finish_func = user_analyser.MatchEventStart(self, start_accessor)
 
             if match_finish_func is None:
                 continue
 
             # convert the index (into the lineset) to the actual logfile line number
-            start_log_lineno = start_view.ViewLineToLogLine(start_lineno)
-            event_collector.SetStartLine(start_log_lineno)
+            self._StartLine = start_log_lineno = start_view.ViewLineToLogLine(start_lineno)
 
             # hence find the lineno to the first-event finish candidate in the finish
             # view; negative means "not found"
@@ -380,22 +241,19 @@ class G_Analyser:
                 continue
 
             # now find the event finish line, and, hence, create the event
+            got_finish = False
             for finish_lineno in range(first_finish_lineno, finish_line_count):
                 finish_accessor.SetLineNo(finish_lineno)
-                finish_log_lineno = finish_view.ViewLineToLogLine(finish_lineno)
-                event_collector.SetFinishLine(finish_log_lineno)
+                self._FinishLine = finish_log_lineno = finish_view.ViewLineToLogLine(finish_lineno)
 
-                match_finish_func(finish_accessor, event_collector)
-                if event_collector.WasEventIdentified():
+                if match_finish_func(self, finish_accessor):
+                    got_finish = True
                     break
 
-            if not event_collector.WasEventIdentified():
+            if not got_finish:
                 logging.info("Event close not found (performance warning)")
 
-        event_collector.Close()
+        user_analyser.End(self)
+        user_analyser = None
 
-
-    #-------------------------------------------------------
-    def RegisterAnalyser(self, table_name, user_analyser):
-        self._EventSchema = self.CollectEventSchema(user_analyser)
-        self.CollectEvents(user_analyser, table_name)
+        self.Connection.commit()

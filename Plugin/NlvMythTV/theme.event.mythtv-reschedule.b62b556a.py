@@ -39,7 +39,12 @@ class Analyser:
 
 
         #-------------------------------------------------------
-        def __call__(self, line, collector):
+        def __init__(self, analyser):
+            self.Analyser = analyser
+
+
+        #-------------------------------------------------------
+        def __call__(self, context, line):
             """
             Called to determine whether a log line (candidate) marks
             the finish of the event of interest. Only lines matching
@@ -76,7 +81,13 @@ class Analyser:
                 f_place = float(match[1])
             f_bool = f_place > 0.16
 
-            collector.AddEvent([f_place, f_bool])
+            values = context.GetInsertValues()
+            values.extend([f_place, f_bool])
+
+            analyser = self.Analyser
+            analyser.Cursor.execute(analyser.InsertCmd, values)
+
+            return True
 
 
     #-----------------------------------------------------------
@@ -103,15 +114,15 @@ class Analyser:
 
 
     #-----------------------------------------------------------
-    @staticmethod
-    def DefineSchema(schema):
-        schema.AddField("place", "float32")
-        schema.AddField("abool", "bool")
+    def Begin(self, context):
+        self.Cursor = cursor = context.Connection.cursor()
+        self.InsertCmd = "INSERT INTO reschedule VALUES ({}, ?, ?)".format(context.GetInsertColumnsText())
+        cursor.execute("DROP TABLE IF EXISTS reschedule")
+        cursor.execute("CREATE TABLE reschedule ({}, place REAL, abool INT)".format(context.GetCreateTableColumnsText()))
 
 
     #-----------------------------------------------------------
-    @classmethod
-    def MatchEventStart(cls, line):
+    def MatchEventStart(self, context, line):
         """
         Called to determine whether a log line (candidate) marks
         the start of an event of interest. Only lines matching
@@ -121,7 +132,12 @@ class Analyser:
         a callable object which adheres to the MatchEventFinish
         concept.
         """
-        return cls.MatchEventFinish()
+        return self.MatchEventFinish(self)
+
+
+    #-----------------------------------------------------------
+    def End(self, context):
+        self.Cursor.close()
 
 
 
@@ -238,10 +254,9 @@ class Projector:
 
     #-----------------------------------------------------------
     @staticmethod
-    def Select(db):
-        table_name = db.GetLocalTableName("reschedule")
-        cursor = db.cursor()
-        cursor.execute("SELECT start_text, duration_ns, place, abool FROM {}".format(table_name))
+    def Select(connection):
+        cursor = connection.cursor()
+        cursor.execute("SELECT start_text, duration_ns, place, abool FROM reschedule")
         return cursor
 
 
@@ -284,5 +299,5 @@ where:
     * `log_analyser` is an object, behaving as per `LogfileAnalyser`
 """
 
-RegisterAnalyser("reschedule", Analyser())
+RegisterAnalyser(Analyser())
 RegisterProjector("Reschedule", Projector())
