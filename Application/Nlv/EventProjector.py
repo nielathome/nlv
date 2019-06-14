@@ -404,19 +404,19 @@ class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
 class G_ProjectionItem:
 
     #-------------------------------------------------------
-    def __init__(self, event_number = -1, event = None):
-        if event is None:
+    def __init__(self, event_number = -1, start_line_no = None, finish_line_no = None, event_data = None):
+        if event_data is None:
             # note, somewhat arbitrary limit (32-bit signed-int-max)
             max = 2147483647
             self.LogStartLine = 0
             self.LogFinishLine = max
 
         else:
-            self.LogStartLine = event["start_line_no"]
-            self.LogFinishLine = event["finish_line_no"]
+            self.LogStartLine = start_line_no
+            self.LogFinishLine = finish_line_no
 
         self.EventNumber = event_number
-        self.Event = event
+        self.EventData = event_data
 
 
 
@@ -426,12 +426,11 @@ class G_ProjectionCollector:
     """Collect and save event data from any number of event analyses"""
 
     #-------------------------------------------------------
-    def __init__(self, filename, projection_schema, user_projector, date_fieldid):
+    def __init__(self, filename, projection_schema, date_fieldid):
         self._CsvFile = open(filename, "w", newline = "")
         self._CsvWriter = csv.writer(self._CsvFile)
         self._EventNo = 0
         self._FieldCount = len(projection_schema)
-        self._UserProjector = user_projector
         self._ProjectionSchema = projection_schema
         self._DateFieldId = date_fieldid
 
@@ -450,15 +449,15 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def StackBack(self):
+    def _StackBack(self):
         return self._Stack[len(self._Stack) - 1]
 
 
-    def UpdateStack(self, event):
-        cur = G_ProjectionItem(self._EventNo, event)
+    def _UpdateStack(self, start_line_no, finish_line_no, event_data):
+        cur = G_ProjectionItem(self._EventNo, start_line_no, finish_line_no, event_data)
  
         # remove any entries that finish before 'cur' starts
-        while cur.LogStartLine > self.StackBack().LogFinishLine:
+        while cur.LogStartLine > self._StackBack().LogFinishLine:
             self._Stack.pop()
  
         # since events are published in start order, we know that
@@ -469,44 +468,29 @@ class G_ProjectionCollector:
         return cur
  
  
-    def CalcParentId(self, event):
+    def CalcParentId(self, start_line_no, finish_line_no, event_data, containment_test):
         # note: relies on the fact that events are discovered in start order
-        cur = self.UpdateStack(event)
+        cur = self._UpdateStack(start_line_no, finish_line_no, event_data)
         for idx in range(len(self._Stack) - 2, 0, -1):
             prev = self._Stack[idx]
-            if prev.Event is not None and prev.LogFinishLine >= cur.LogFinishLine:
-                if self._UserProjector.IsContained(prev.Event, cur.Event):
+            if prev.EventData is not None and prev.LogFinishLine >= cur.LogFinishLine:
+                if containment_test(prev.EventData, cur.EventData):
                     return prev.EventNumber
  
         return -1
 
 
     #-------------------------------------------------------
-    def AddEvent(self, event, recogniser_values):
-        schema = self._ProjectionSchema
-        values = []
+    def CalcDuration(self, duration):
+        return int(duration / self._ProjectionSchema.DurationScale)
 
-        if schema.ColParentId is not None:
-            values.append(self.CalcParentId(event))
 
-        if schema.ColStart is not None:
-            values.append(event["start_text"])
-
-        if schema.ColFinish is not None:
-            values.append(event["finish_text"])
-
-        if schema.ColDuration is not None:
-            ns_duration = event["duration_ns"]
-            duration = int(ns_duration / schema.DurationScale)
-            values.append(duration)
-
-        values.extend(recogniser_values)
-
+    #-------------------------------------------------------
+    def AddEvent(self, values):
         if len(values) != self._FieldCount:
             raise RuntimeError("Incorrect number of field values (including hidden): got:{} exp:{}".format(len(values), self._FieldCount))
 
         self._EventNo += 1
-        self._EventIdentified = True # TODO redundant
 
         text_values = [str(v).replace(',', '_').replace('"', "'").rstrip() for v in values]
         self._CsvWriter.writerow(text_values)
@@ -543,32 +527,25 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    @G_Global.TimeFunction
-    def _Select(self, user_projector):
-        return user_projector.Select(self._Connection)
-
-    def CollectEvents(self, event_collector, user_projector):
-        events = self._Select(user_projector)
-        with G_PerfTimerScope("G_Projector._Project") as timer:
-            for event in events:
-                user_projector.Project(event, event_collector)
-            timer.SetItemCount(event_collector.Count())
-
-
-    #-------------------------------------------------------
     def GetMeta(self):
         return (self._ProjectionSchema, self._EventMetrics)
 
 
     #-------------------------------------------------------
-    def RegisterProjector(self, name, user_projector, user_metrics = None):
+    def Project(self, name, user_projector, user_metrics = None):
         self._ProjectionSchema = self.CollectProjectionSchema(user_projector)
         self._EventMetrics = user_metrics
 
-        if not self._MetaOnly:
-            event_collector = G_ProjectionCollector(self._Filename, self._ProjectionSchema, user_projector, self._DateFieldType)
-            self.CollectEvents(event_collector, user_projector)
-            event_collector.Close()
+        if self._MetaOnly:
+            return
+
+        event_collector = G_ProjectionCollector(self._Filename, self._ProjectionSchema, self._DateFieldType)
+
+        with G_PerfTimerScope("G_Projector._Project") as timer:
+            user_projector.Project(self._Connection, event_collector)
+            timer.SetItemCount(event_collector.Count())
+
+        event_collector.Close()
 
 
 

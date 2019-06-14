@@ -29,13 +29,19 @@ class Analyser:
     class MatchEventFinish:
 
         #-------------------------------------------------------
-        def __init__(self, line):
+        def __init__(self, analyser, line):
+            self.Analyser = analyser
             self.Process = line.GetFieldValueUnsigned("Process")
 
 
         #-------------------------------------------------------
-        def AddEvent(self, line, collector, summary):
-            collector.AddEvent([self.Process, summary])
+        def AddEvent(self, context, line, summary):
+            values = context.GetInsertValues()
+            values.extend([self.Process, summary])
+
+            analyser = self.Analyser
+            analyser.Cursor.execute(analyser.InsertCmd, values)
+            return True
 
 
     #-----------------------------------------------------------
@@ -43,33 +49,37 @@ class Analyser:
         _RegexPlace = re.compile("([\d.]+)\splace")
 
         #-------------------------------------------------------
-        def __init__(self, line):
-            super().__init__(line)
+        def __init__(self, analyser, line):
+            super().__init__(analyser, line)
 
 
         #-------------------------------------------------------
-        def __call__(self, line, collector):
+        def __call__(self, context, line):
             if line.GetFieldText("Function") == "HandleReschedule":
                 place = "-"
                 match = re.search(self._RegexPlace, line.GetNonFieldText())
                 if match and match.lastindex == 1:
                     place = match[1]
 
-                self.AddEvent(line, collector, "reschedule: place:'{}'".format(place))
+                return self.AddEvent(context, line, "reschedule: place:'{}'".format(place))
+            else:
+                return False
 
 
     #-----------------------------------------------------------
     class MatchExpireEventFinish(MatchEventFinish):
 
         #-------------------------------------------------------
-        def __init__(self, line):
-            super().__init__(line)
+        def __init__(self, analyser, line):
+            super().__init__(analyser, line)
 
 
         #-------------------------------------------------------
-        def __call__(self, line, collector):
+        def __call__(self, context, line):
             if line.GetFieldText("Function") == "HandleAnnounce":
-                self.AddEvent(line, collector, "expire")
+                return self.AddEvent(context, line, "expire")
+            else:
+                return False
 
 
     #-----------------------------------------------------------
@@ -82,19 +92,24 @@ class Analyser:
 
 
     #-----------------------------------------------------------
-    @staticmethod
-    def DefineSchema(schema):
-        schema.AddField("process", "uint32")
-        schema.AddField("summary", "text")
+    def Begin(self, context):
+        self.Cursor = cursor = context.Connection.cursor()
+        self.InsertCmd = "INSERT INTO summary VALUES ({}, ?, ?)".format(context.GetInsertColumnsText())
+        cursor.execute("DROP TABLE IF EXISTS summary")
+        cursor.execute("CREATE TABLE summary ({}, process INT, info TEXT)".format(context.GetCreateTableColumnsText()))
 
 
     #-----------------------------------------------------------
-    @classmethod
-    def MatchEventStart(cls, line):
+    def MatchEventStart(self, context, line):
         if line.GetFieldText("Function") == "HandleReschedule":
-            return cls.MatchRescheduleEventFinish(line)
+            return __class__.MatchRescheduleEventFinish(self, line)
         else:
-            return cls.MatchExpireEventFinish(line)
+            return __class__.MatchExpireEventFinish(self, line)
+
+
+    #-----------------------------------------------------------
+    def End(self, context):
+        self.Cursor.close()
 
 
 
@@ -113,24 +128,38 @@ class Projector:
 
 
     #-----------------------------------------------------------
-    @staticmethod
-    def Select(db):
-        table_name = db.GetLocalTableName("summary")
-        cursor = db.cursor()
-        cursor.execute("SELECT start_line_no, finish_line_no, start_text, finish_text, duration_ns, process, summary FROM {}".format(table_name))
-        return cursor
+    def Project(self, connection, context):
+        cursor = connection.cursor()
+        cursor.execute("SELECT start_line_no, finish_line_no, process, start_text, finish_text, duration_ns, info FROM summary")
+
+        for event in cursor:
+            context.AddEvent([
+                context.CalcParentId(event[0], event[1], event[2], self.SameProcess),
+                event[3],
+                event[4],
+                context.CalcDuration(event[5]),
+                event[6]
+            ])
 
 
     #-----------------------------------------------------------
     @staticmethod
-    def Project(event, collector):
-        collector.AddEvent(event, [event["summary"]])
+    def SameProcess(parent_process, child_process):
+        """
+        Called to determine whether the `child` event can be
+        considered subordinate-to, or contained-within, the `parent`
+        event.
 
+        Both `parent` and `child` are objects returned via the
+        select query. The function should return True
+        if the child event is to be considered "contained by"
+        (or "subordinate to") the parent event, and False otherwise.
+        Contained events mey be displayed nested in the UI.
 
-    #-----------------------------------------------------------
-    @staticmethod
-    def IsContained(parent, child):
-        return parent["process"] == child["process"]
+        This routine is only called where schema.AddNesting()
+        was called in the DefineSchema() method.
+        """
+        return parent_process == child_process
 
 
 
@@ -417,6 +446,6 @@ class EventMetrics:
 
 ## GLOBAL ######################################################
 
-RegisterAnalyser("summary", Analyser())
-RegisterProjector("Summary", Projector(), EventMetrics())
+Analyse(Analyser())
+Project("Summary", Projector(), EventMetrics())
 

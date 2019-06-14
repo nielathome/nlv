@@ -640,17 +640,17 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
             globals = dict()
 
-            register_analyser = self.NullAnalyser
+            analyser_api = self.NullAnalyser
             if not meta_only:
                 analyser = G_Analyser(connection, log_schema, self.GetLogfile())
-                register_analyser = analyser.RegisterAnalyser
+                analyser_api = analyser.Analyse
 
-            globals.update(RegisterAnalyser = register_analyser)
+            globals.update(Analyse = analyser_api)
 
             projector = G_Projector(connection, meta_only, self.MakeTemporaryFilename(),
                 log_schema, self.GetLogfile()
             )
-            globals.update(RegisterProjector = projector.RegisterProjector)
+            globals.update(Project = projector.Project)
 
             exec(code, globals)
 

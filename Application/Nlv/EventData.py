@@ -209,7 +209,7 @@ class G_Analyser:
 
 
     #-------------------------------------------------------
-    def RegisterAnalyser(self, user_analyser):
+    def Analyse(self, user_analyser):
         # observation: this could be made multithreaded
 
         field_ids = self._LogFieldIds

@@ -254,36 +254,17 @@ class Projector:
 
     #-----------------------------------------------------------
     @staticmethod
-    def Select(connection):
+    def Project(connection, context):
         cursor = connection.cursor()
         cursor.execute("SELECT start_text, duration_ns, place, abool FROM reschedule")
-        return cursor
 
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def Project(event, collector):
-        collector.AddEvent(event, [event["place"], event["abool"]])
-
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def IsContained(parent, child):
-        """
-        Called to determine whether the `child` event can be
-        considered subordinate-to, or contained-within, the `parent`
-        event.
-
-        Both `parent` and `child` are objects returned via the
-        select query. The function should return True
-        if the child event is to be considered "contained by"
-        (or "subordinate to") the parent event, and False otherwise.
-        Contained events mey be displayed nested in the UI.
-
-        This routine is only called where schema.AddNesting()
-        was called in the DefineSchema() method.
-        """
-        return False
+        for event in cursor:
+            context.AddEvent([
+                event[0],
+                context.CalcDuration(event[1]),
+                event[2],
+                event[3]
+            ])
 
 
 
@@ -299,5 +280,5 @@ where:
     * `log_analyser` is an object, behaving as per `LogfileAnalyser`
 """
 
-RegisterAnalyser(Analyser())
-RegisterProjector("Reschedule", Projector())
+Analyse(Analyser())
+Project("Reschedule", Projector())
