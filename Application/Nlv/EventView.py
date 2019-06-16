@@ -648,7 +648,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             globals.update(Analyse = analyser_api)
 
             projector = G_Projector(connection, meta_only, self.MakeTemporaryFilename(),
-                log_schema, self.GetLogfile()
+                log_schema, self.GetLogNode()
             )
             globals.update(Project = projector.Project)
 

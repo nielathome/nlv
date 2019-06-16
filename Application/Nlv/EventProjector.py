@@ -29,6 +29,7 @@ matplotlib.use('WXAgg')
 
 # Application imports 
 from .Logmeta import G_FieldSchemata
+from .Project import G_Project
 
 # may not be needed
 from .MatchNode import G_MatchItem
@@ -426,7 +427,8 @@ class G_ProjectionCollector:
     """Collect and save event data from any number of event analyses"""
 
     #-------------------------------------------------------
-    def __init__(self, filename, projection_schema, date_fieldid):
+    def __init__(self, log_node, filename, projection_schema, date_fieldid):
+        self._LogNode = log_node
         self._CsvFile = open(filename, "w", newline = "")
         self._CsvWriter = csv.writer(self._CsvFile)
         self._EventNo = 0
@@ -481,6 +483,15 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
+    def FindDbFile(self, theme_id):
+        for node in self._LogNode.ListSubNodes(factory_id = G_Project.NodeID_LogAnalysis, recursive = True):
+            if node.GetCurrentThemeId("event") == theme_id:
+                return node.MakeTemporaryFilename(".db")
+
+        return None
+
+
+    #-------------------------------------------------------
     def CalcDuration(self, duration):
         return int(duration / self._ProjectionSchema.DurationScale)
 
@@ -499,6 +510,7 @@ class G_ProjectionCollector:
     #-------------------------------------------------------
     def Close(self):
         self._CsvFile.close()
+        self._LogNode = None
 
 
     
@@ -508,14 +520,15 @@ class G_Projector:
     """Project event analyses, creates an event table (CSV)"""
 
     #-------------------------------------------------------
-    def __init__(self, connection, meta_only, filename, log_schema, logfile):
+    def __init__(self, connection, meta_only, filename, log_schema, log_node):
         self._Connection = connection
         self._MetaOnly = meta_only
         self._Filename = filename
         self._ProjectionSchema = G_ProjectionSchema()
+        self._LogNode = log_node
         self._EventMetrics = None
 
-        date_field_id = logfile.GetTimecodeBase().GetFieldId() - 1
+        date_field_id = log_node.GetLogfile().GetTimecodeBase().GetFieldId() - 1
         self._DateFieldType = log_schema[date_field_id].Type
 
 
@@ -539,7 +552,8 @@ class G_Projector:
         if self._MetaOnly:
             return
 
-        event_collector = G_ProjectionCollector(self._Filename, self._ProjectionSchema, self._DateFieldType)
+        event_collector = G_ProjectionCollector(self._LogNode, self._Filename, self._ProjectionSchema, self._DateFieldType)
+        self._LogNode = None
 
         with G_PerfTimerScope("G_Projector._Project") as timer:
             user_projector.Project(self._Connection, event_collector)

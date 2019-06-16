@@ -28,66 +28,7 @@ class Analyser:
     """
 
     #-----------------------------------------------------------
-    class MatchEventFinish:
-        """
-        Callable object. Called during event analysis to identify
-        the finish of an event.
-        """
-
-        #-------------------------------------------------------
-        _RegexPlace = re.compile("([\d.]+)\splace")
-
-
-        #-------------------------------------------------------
-        def __init__(self, analyser):
-            self.Analyser = analyser
-
-
-        #-------------------------------------------------------
-        def __call__(self, context, line):
-            """
-            Called to determine whether a log line (candidate) marks
-            the finish of the event of interest. Only lines matching
-            the finish filter (see DefineFilter) will be passed to
-            this method.
-
-            :param `line`: provides access to the log line under
-            consideration. It provides the following methods:
-
-                . GetFieldText( field_name ) - fetches a field's value as text
-                . GetFieldValueUnsigned( field_name ) - fetches an unsigned field's value
-                . GetFieldValueSigned( field_name ) - fetches an integer field's value
-                . GetFieldValueFloat( field_name ) - fetches a float field's value
-                . GetNonFieldText() - fetches the non-field part of the log line
-
-            where the field_name is the log file's field name as defined
-            by its schema.
-        
-            :param `collector`: results accessor. The collector provides
-            two methods:
-
-                . AddEvent( recogniser_values )
-                . CancelEvent()
-
-            where:
-                * `recogniser_values` is a list of event field values.
-                  The length and types of the list members must match
-                  the descriptions provided by the analysers `DefineSchema`.
-            """
-
-            f_place = 0.0
-            match = re.search(self._RegexPlace, line.GetNonFieldText())
-            if match and match.lastindex == 1:
-                f_place = float(match[1])
-            f_bool = f_place > 0.16
-
-            values = context.GetInsertValues()
-            values.extend([f_place, f_bool])
-
-            analyser = self.Analyser
-            analyser.Cursor.execute(analyser.InsertCmd, values)
-
-            return True
+    _RegexPlace = re.compile("([\d.]+)\splace")
 
 
     #-----------------------------------------------------------
@@ -116,9 +57,19 @@ class Analyser:
     #-----------------------------------------------------------
     def Begin(self, context):
         self.Cursor = cursor = context.Connection.cursor()
-        self.InsertCmd = "INSERT INTO reschedule VALUES ({}, ?, ?)".format(context.GetInsertColumnsText())
         cursor.execute("DROP TABLE IF EXISTS reschedule")
-        cursor.execute("CREATE TABLE reschedule ({}, place REAL, abool INT)".format(context.GetCreateTableColumnsText()))
+        cursor.execute("""
+            CREATE TABLE reschedule
+            (
+                start_text TEXT,
+                start_line_no INT,
+                finish_text TEXT,
+                finish_line_no INT,
+                duration_ns INT,
+                process INT,
+                place REAL,
+                abool INT
+            )""")
 
 
     #-----------------------------------------------------------
@@ -132,7 +83,61 @@ class Analyser:
         a callable object which adheres to the MatchEventFinish
         concept.
         """
-        return self.MatchEventFinish(self)
+        self.Process = line.GetFieldValueUnsigned("Process")
+        return self.MatchEventFinish
+
+
+    #-----------------------------------------------------------
+    def MatchEventFinish(self, context, line):
+        """
+        Called to determine whether a log line (candidate) marks
+        the finish of the event of interest. Only lines matching
+        the finish filter (see DefineFilter) will be passed to
+        this method.
+
+        :param `line`: provides access to the log line under
+        consideration. It provides the following methods:
+
+            . GetFieldText( field_name ) - fetches a field's value as text
+            . GetFieldValueUnsigned( field_name ) - fetches an unsigned field's value
+            . GetFieldValueSigned( field_name ) - fetches an integer field's value
+            . GetFieldValueFloat( field_name ) - fetches a float field's value
+            . GetNonFieldText() - fetches the non-field part of the log line
+
+        where the field_name is the log file's field name as defined
+        by its schema.
+        
+        :param `collector`: results accessor. The collector provides
+        two methods:
+
+            . AddEvent( recogniser_values )
+            . CancelEvent()
+
+        where:
+            * `recogniser_values` is a list of event field values.
+                The length and types of the list members must match
+                the descriptions provided by the analysers `DefineSchema`.
+        """
+
+        ed = context.GetEventDetails()
+
+        f_place = 0.0
+        match = re.search(self._RegexPlace, line.GetNonFieldText())
+        if match and match.lastindex == 1:
+            f_place = float(match[1])
+        f_bool = f_place > 0.16
+
+
+        self.Cursor.execute("""
+            INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, [
+            ed[0], ed[1], ed[4], ed[5], ed[8],
+            self.Process,
+            f_place,
+            f_bool
+        ])
+
+        return True
 
 
     #-----------------------------------------------------------
@@ -249,7 +254,6 @@ class Projector:
         schema.AddDuration("Duration", scale = "s", width = 60, formatter = cls.SimpleFormatter)
         schema.AddField("Place", "float32", 60)
         schema.AddField("Abool", "bool", 60)
-
 
 
     #-----------------------------------------------------------

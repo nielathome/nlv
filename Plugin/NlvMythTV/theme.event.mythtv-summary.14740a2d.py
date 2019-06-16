@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,85 +26,48 @@ import re
 class Analyser:
 
     #-----------------------------------------------------------
-    class MatchEventFinish:
-
-        #-------------------------------------------------------
-        def __init__(self, analyser, line):
-            self.Analyser = analyser
-            self.Process = line.GetFieldValueUnsigned("Process")
-
-
-        #-------------------------------------------------------
-        def AddEvent(self, context, line, summary):
-            values = context.GetInsertValues()
-            values.extend([self.Process, summary])
-
-            analyser = self.Analyser
-            analyser.Cursor.execute(analyser.InsertCmd, values)
-            return True
-
-
-    #-----------------------------------------------------------
-    class MatchRescheduleEventFinish(MatchEventFinish):
-        _RegexPlace = re.compile("([\d.]+)\splace")
-
-        #-------------------------------------------------------
-        def __init__(self, analyser, line):
-            super().__init__(analyser, line)
-
-
-        #-------------------------------------------------------
-        def __call__(self, context, line):
-            if line.GetFieldText("Function") == "HandleReschedule":
-                place = "-"
-                match = re.search(self._RegexPlace, line.GetNonFieldText())
-                if match and match.lastindex == 1:
-                    place = match[1]
-
-                return self.AddEvent(context, line, "reschedule: place:'{}'".format(place))
-            else:
-                return False
-
-
-    #-----------------------------------------------------------
-    class MatchExpireEventFinish(MatchEventFinish):
-
-        #-------------------------------------------------------
-        def __init__(self, analyser, line):
-            super().__init__(analyser, line)
-
-
-        #-------------------------------------------------------
-        def __call__(self, context, line):
-            if line.GetFieldText("Function") == "HandleAnnounce":
-                return self.AddEvent(context, line, "expire")
-            else:
-                return False
-
-
-    #-----------------------------------------------------------
     @staticmethod
     def DefineFilter():
         return [
-            ('LogView Filter',  '(function = "HandleReschedule" and log ~= "Reschedule") or (function = "CalcParams")'),
-            ('LogView Filter',  '(function = "HandleReschedule" and log ~= "Scheduled") or (function = "HandleAnnounce" and log ~= "adding")')
+            ('LogView Filter', 'function = "CalcParams"'),
+            ('LogView Filter', 'function = "HandleAnnounce" and log ~= "adding"')
         ]
 
 
     #-----------------------------------------------------------
     def Begin(self, context):
         self.Cursor = cursor = context.Connection.cursor()
-        self.InsertCmd = "INSERT INTO summary VALUES ({}, ?, ?)".format(context.GetInsertColumnsText())
-        cursor.execute("DROP TABLE IF EXISTS summary")
-        cursor.execute("CREATE TABLE summary ({}, process INT, info TEXT)".format(context.GetCreateTableColumnsText()))
+        cursor.execute("DROP TABLE IF EXISTS expire")
+        cursor.execute("""
+            CREATE TABLE expire
+            (
+                start_text TEXT,
+                start_line_no INT,
+                finish_text TEXT,
+                finish_line_no INT,
+                duration_ns INT,
+                process INT
+            )""")
 
 
     #-----------------------------------------------------------
     def MatchEventStart(self, context, line):
-        if line.GetFieldText("Function") == "HandleReschedule":
-            return __class__.MatchRescheduleEventFinish(self, line)
-        else:
-            return __class__.MatchExpireEventFinish(self, line)
+        self.Process = line.GetFieldValueUnsigned("Process")
+        return self.MatchEventFinish
+
+
+    #-----------------------------------------------------------
+    def MatchEventFinish(self, context, line):
+        ed = context.GetEventDetails()
+
+        self.Cursor.execute("""
+            INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?)
+        """, [
+            ed[0], ed[1], ed[4], ed[5], ed[8],
+            self.Process
+        ])
+
+        return True
 
 
     #-----------------------------------------------------------
@@ -128,23 +91,8 @@ class Projector:
 
 
     #-----------------------------------------------------------
-    def Project(self, connection, context):
-        cursor = connection.cursor()
-        cursor.execute("SELECT start_line_no, finish_line_no, process, start_text, finish_text, duration_ns, info FROM summary")
-
-        for event in cursor:
-            context.AddEvent([
-                context.CalcParentId(event[0], event[1], event[2], self.SameProcess),
-                event[3],
-                event[4],
-                context.CalcDuration(event[5]),
-                event[6]
-            ])
-
-
-    #-----------------------------------------------------------
     @staticmethod
-    def SameProcess(parent_process, child_process):
+    def IsSameProcess(parent_process, child_process):
         """
         Called to determine whether the `child` event can be
         considered subordinate-to, or contained-within, the `parent`
@@ -160,6 +108,60 @@ class Projector:
         was called in the DefineSchema() method.
         """
         return parent_process == child_process
+
+
+    #-----------------------------------------------------------
+    def Project(self, connection, context):
+        cursor = connection.cursor()
+
+        select_expire = """
+            SELECT
+                start_line_no,
+                finish_line_no,
+                process,
+                start_text,
+                finish_text,
+                duration_ns,
+                'expire'
+            FROM expire
+        """
+
+        select_reschedule = """
+            SELECT
+                start_line_no,
+                finish_line_no,
+                process,
+                start_text,
+                finish_text,
+                duration_ns,
+                'P=[' || place || ']'
+            FROM dbs.reschedule
+        """
+
+        file = context.FindDbFile("B62B556A-DABA-4886-A469-F739492750D3")
+        if file is None:
+            select = """
+                {}
+                ORDER BY start_line_no ASC
+            """.format(select_expire)
+        else:
+            cursor.execute("ATTACH DATABASE '{}' AS dbs".format(file))
+            select = """
+                {}
+                UNION
+                {}
+                 ORDER BY start_line_no ASC
+            """.format(select_expire, select_reschedule)
+
+        cursor.execute(select)
+        for event in cursor:
+            context.AddEvent([
+                context.CalcParentId(event[0], event[1], event[2], self.IsSameProcess),
+                event[3],
+                event[4],
+                context.CalcDuration(event[5]),
+                event[6]
+            ])
 
 
 

@@ -121,7 +121,7 @@ class G_PerfTimer:
             dur_text = "elapsed:{:.2f}s".format(inclusive)
 
         args = ", ".join(self._Arguments)
-        logging.debug("G_PerfTimer: {}{}({}): {}{}".format("|--" * indent, self._Description, args, dur_text, per_item_text))
+        logging.debug("G_PerfTimer: {}{}({}): {} {}".format("|--" * indent, self._Description, args, dur_text, per_item_text))
 
         for child in self._Children:
             child._Report(indent + 1)

@@ -15,10 +15,13 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
+# Python imports
+import logging
 
 # Application imports 
 from .Logmeta import G_FieldSchemata
 from .MatchNode import G_MatchItem
+from .Project import G_Global
 
 # Content provider interface
 import Nlog
@@ -84,42 +87,6 @@ class G_Analyser:
     """Analyse a log, creates any number of event/feature tables"""
 
     #-------------------------------------------------------
-    _EventColumnNames = [
-        "start_text",
-        "start_line_no",
-        "start_utc",
-        "start_offset_ns",
-        "finish_text",
-        "finish_line_no",
-        "finish_utc",
-        "finish_offset_ns",
-        "duration_ns"
-    ]
-
-    _EventColumnTypes = [
-        "TEXT",
-        "INT",
-        "INT",
-        "INT",
-        "TEXT",
-        "INT",
-        "INT",
-        "INT",
-        "INT"
-    ]
-
-
-    #-------------------------------------------------------
-    @classmethod
-    def GetCreateTableColumnsText(cls):
-        cols = ["{} {}".format(n, t) for n, t in zip(cls._EventColumnNames, cls._EventColumnTypes)]
-        return ", ".join(cols)
-
-    def GetInsertColumnsText(cls):
-        return ", ".join(["?" for i in range(len(cls._EventColumnNames))])
-
-
-    #-------------------------------------------------------
     def __init__(self, connection, log_schema, logfile):
         self.Connection = connection
         self._LogFile = logfile
@@ -175,6 +142,7 @@ class G_Analyser:
         return lineset
 
 
+    @G_Global.TimeFunction
     def BuildLineSets(self, user_analyser):
         descs = user_analyser.DefineFilter()
         start_view = self.BuildLineSet(G_MatchItem(descs[0][0], descs[0][1]))
@@ -183,7 +151,20 @@ class G_Analyser:
 
 
     #-------------------------------------------------------
-    def GetInsertValues(self):
+    def GetEventDetails(self):
+        """
+        Return the following details about the event, as an array:
+            0 (start_text TEXT) - start time as text; in the same format as the logfile
+            1 (start_line_no INT) - start line number
+            2 (start_utc INT) - UTC date/time of event start, to previous whole second
+            3 (start_offset_ns INT) - offset from #2 to event start, in ns
+            4 (finish_text TEXT) - finish time as text; in the same format as the logfile
+            5 (finish_line_no INT) - finish line number
+            6 (finish_utc" INT) - UTC date/time of event finish, to previous whole second
+            7 (finish_offset_ns INT) - offset from #6 to event finish, in ns
+            8 (duration_ns INT) - event duration, in ns
+        """
+
         start_timecode = self._StartAccessor.GetUtcTimecode()
         start_timecode.Normalise()
 
@@ -209,6 +190,7 @@ class G_Analyser:
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def Analyse(self, user_analyser):
         # observation: this could be made multithreaded
 
