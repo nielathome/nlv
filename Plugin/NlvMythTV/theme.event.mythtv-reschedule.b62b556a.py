@@ -128,9 +128,8 @@ class Analyser:
         f_bool = f_place > 0.16
 
 
-        self.Cursor.execute("""
-            INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, [
+        self.Cursor.execute("INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        [
             ed[0], ed[1], ed[4], ed[5], ed[8],
             self.Process,
             f_place,
@@ -260,7 +259,14 @@ class Projector:
     @staticmethod
     def Project(connection, context):
         cursor = connection.cursor()
-        cursor.execute("SELECT start_text, duration_ns, place, abool FROM reschedule")
+        cursor.execute("""
+            SELECT
+                start_text,
+                duration_ns,
+                place,
+                abool 
+            FROM reschedule
+        """)
 
         for event in cursor:
             context.AddEvent([

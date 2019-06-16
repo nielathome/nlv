@@ -144,13 +144,41 @@ class G_Analyser:
 
     @G_Global.TimeFunction
     def BuildLineSets(self, user_analyser):
-        descs = user_analyser.DefineFilter()
-        start_view = self.BuildLineSet(G_MatchItem(descs[0][0], descs[0][1]))
-        finish_view = self.BuildLineSet(G_MatchItem(descs[1][0], descs[1][1]))
+        user_descs = user_analyser.DefineFilter()
+
+        start_desc = user_descs[0]
+        start_view = self.BuildLineSet(G_MatchItem(start_desc[0], start_desc[1]))
+
+        have_finish_desc = len(user_descs) > 1
+        if have_finish_desc:
+            finish_desc = user_descs[1]
+            finish_view = self.BuildLineSet(G_MatchItem(finish_desc[0], finish_desc[1]))
+        else:
+            finish_view = start_view
+
         return (start_view, finish_view)
 
 
     #-------------------------------------------------------
+    def GetEventStartDetails(self):
+        """
+        Return the following details about the event, as an array:
+            0 (start_text TEXT) - start time as text; in the same format as the logfile
+            1 (start_utc INT) - UTC date/time of event start, to previous whole second
+            2 (start_offset_ns INT) - offset from #2 to event start, in ns
+        """
+
+        start_timecode = self._StartAccessor.GetUtcTimecode()
+        start_timecode.Normalise()
+
+        return [
+            # event start details
+            self._StartAccessor.GetFieldText(self._DateFieldId),
+            start_timecode.GetUtcDatum(),
+            start_timecode.GetOffsetNs(),
+        ]
+
+
     def GetEventDetails(self):
         """
         Return the following details about the event, as an array:
@@ -211,6 +239,9 @@ class G_Analyser:
             match_finish_func = user_analyser.MatchEventStart(self, start_accessor)
 
             if match_finish_func is None:
+                continue
+
+            elif isinstance(match_finish_func, bool) and match_finish_func:
                 continue
 
             # convert the index (into the lineset) to the actual logfile line number

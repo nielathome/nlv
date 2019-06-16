@@ -36,6 +36,7 @@
     <Compile Include="Main.py" />
     <Compile Include="theme.event.mythtv-reschedule.b62b556a.py" />
     <Compile Include="theme.event.mythtv-summary.14740a2d.py" />
+    <Compile Include="theme.event.mythtv-program.f77128a9.py" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="formatter.mythtv.xml" />
@@ -43,6 +44,7 @@
     <Content Include="styleset.mythtv.xml" />
     <Content Include="theme.event.mythtv-reschedule.xml" />
     <Content Include="theme.event.mythtv-summary.xml" />
+    <Content Include="theme.event.mythtv-program.xml" />
     <Content Include="theme.log.mythtv.xml" />
     <Content Include="theme.view.mythtv-error.xml" />
     <Content Include="theme.view.mythtv-std.xml" />

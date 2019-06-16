@@ -60,9 +60,8 @@ class Analyser:
     def MatchEventFinish(self, context, line):
         ed = context.GetEventDetails()
 
-        self.Cursor.execute("""
-            INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?)
-        """, [
+        self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?)",
+        [
             ed[0], ed[1], ed[4], ed[5], ed[8],
             self.Process
         ])
@@ -123,8 +122,7 @@ class Projector:
                 finish_text,
                 duration_ns,
                 'expire'
-            FROM expire
-        """
+            FROM expire"""
 
         select_reschedule = """
             SELECT
@@ -135,8 +133,7 @@ class Projector:
                 finish_text,
                 duration_ns,
                 'P=[' || place || ']'
-            FROM dbs.reschedule
-        """
+            FROM dbs.reschedule"""
 
         file = context.FindDbFile("B62B556A-DABA-4886-A469-F739492750D3")
         if file is None:
