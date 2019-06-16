@@ -543,15 +543,15 @@ class G_Node:
 
 
     #-------------------------------------------------------
-    def DoClose(self):
+    def DoClose(self, delete):
         """Release external resources for this node; overridden where needed"""
         self.DetachDocument()
 
-    def Close(self):
+    def Close(self, delete = False):
         """Close node in the project"""
 
         for node in self.ListSubNodes(recursive = True, include_self = True):
-            node.DoClose()
+            node.DoClose(delete)
 
 
     #-------------------------------------------------------
@@ -1055,7 +1055,7 @@ class G_DeletableTreeNode(G_TreeNode):
         self.GetParentNode().Select()
 
         # perform orderly closedown of resources
-        self.Close()
+        self.Close(True)
 
         # remove tree item from tree
         tritem = self.GetTrItem()

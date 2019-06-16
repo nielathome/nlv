@@ -690,12 +690,12 @@ class G_ThemeGalleryNode(G_ThemeManagerNode):
 
 
     #-------------------------------------------------------
-    def DoClose(self):
+    def DoClose(self, delete):
         """Release all resources owned by the gallery"""
 
         self.GetThemeGallery().DecUse(self._Field.CurrentThemeId.Value)
 
-        super().DoClose()
+        super().DoClose(delete)
 
 
     #-------------------------------------------------------

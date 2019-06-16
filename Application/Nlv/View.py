@@ -722,7 +722,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def DoClose(self):
+    def DoClose(self, delete):
         """Release all resources owned by the view"""
 
         if self._S_Document is not None:
@@ -735,7 +735,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self._S_Document = None
             self._N_View = None
 
-        G_DisplayNode.DoClose(self)
+        super().DoClose(delete)
 
 
     #-------------------------------------------------------

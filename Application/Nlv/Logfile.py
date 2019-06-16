@@ -229,7 +229,7 @@ class G_DisplayNode(G_LogChildNode):
 
 
     #-------------------------------------------------------
-    def DoClose(self):
+    def DoClose(self, delete):
         """Remove display control from the UI"""
 
         if self._OwnsDisplayCtrl and self._DisplayCtrl is not None:
@@ -239,7 +239,7 @@ class G_DisplayNode(G_LogChildNode):
             notebook.DeletePage(page_index)
             self._DisplayFocusCtrl = self._DisplayCtrl = None
 
-        super().DoClose()
+        super().DoClose(delete)
 
 
     #-------------------------------------------------------
@@ -1007,14 +1007,14 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def DoClose(self):
+    def DoClose(self, delete):
         """Release all resources owned by the logfile"""
 
         if self._N_Logfile is not None:
             # force release references to Nlog objects
             self._N_Logfile = None
 
-        super().DoClose()
+        super().DoClose(delete)
 
 
     #-------------------------------------------------------

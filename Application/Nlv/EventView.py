@@ -372,7 +372,7 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
 
     #-------------------------------------------------------
     def OnCmdExcel(self, event):
-        filename = self.GetLogAnalysisNode().MakeTemporaryFilename()
+        filename = self.GetLogAnalysisNode().MakeTemporaryFilename(".csv")
         excel = com.Dispatch("Excel.Application")
         if excel is not None:
             excel.Workbooks.Open( Filename = filename)
@@ -552,9 +552,22 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def MakeTemporaryFilename(self, ext = ".csv"):
+    def DoClose(self, delete):
+        if delete:
+            self.RemoveTemporaryFiles()
+        super().DoClose(delete)
+
+
+    #-------------------------------------------------------
+    def MakeTemporaryFilename(self, ext):
         cachedir = self.GetLogNode().MakeSessionDir()
         return str((cachedir / self._Field.Guid.Value).with_suffix(ext))
+
+    def RemoveTemporaryFiles(self):
+        guid = self._Field.Guid.Value
+        for file in self.GetLogNode().MakeSessionDir().iterdir():
+            if str(file).find(guid) >= 0:
+                file.unlink()
 
 
     #-------------------------------------------------------
@@ -647,7 +660,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
             globals.update(Analyse = analyser_api)
 
-            projector = G_Projector(connection, meta_only, self.MakeTemporaryFilename(),
+            projector = G_Projector(connection, meta_only, self.MakeTemporaryFilename(".csv"),
                 log_schema, self.GetLogNode()
             )
             globals.update(Project = projector.Project)
@@ -690,7 +703,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         if self._EventMeta is None:
             return None
 
-        filename = self.MakeTemporaryFilename()
+        filename = self.MakeTemporaryFilename(".csv")
         valid = self._Field.AnalysisIsValid.Value
         return self.AnalysisProperties(self, self._EventMeta, filename, valid)
 
@@ -1267,9 +1280,9 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         """Release all resources owned by the view"""
         self.GetTableViewCtrl().ResetModel()
 
-    def DoClose(self):
+    def DoClose(self, delete):
         self.DoReleaseFiles()
-        G_DisplayNode.DoClose(self)
+        super().DoClose(delete)
 
 
     #-------------------------------------------------------
@@ -1605,9 +1618,9 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         """Release all resources owned by the view"""
         self.GetMetricsViewCtrl().ResetModel()
 
-    def DoClose(self):
+    def DoClose(self, delete):
         self.DoReleaseFiles()
-        G_DisplayNode.DoClose(self)
+        super().DoClose(delete)
 
 
     #-------------------------------------------------------
