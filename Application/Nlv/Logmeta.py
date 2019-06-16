@@ -38,7 +38,7 @@ class G_Builder:
     def __init__(self, element):
         self._Name = element.get("name")
         self._LogTheme = element.find("./theme[@theme_cls='log']").text
-        self._ViewThemes = [(e.get("factory"), e.text) for e in element.iterfind("./theme[@factory]")]
+        self._ViewThemes = [(e.get("factory"), e.get("theme_cls"), e.text) for e in element.iterfind("./theme[@factory]")]
 
 
     #-------------------------------------------------------

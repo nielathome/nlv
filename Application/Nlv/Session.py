@@ -603,8 +603,9 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
         theme_id = builder.GetLogTheme()
         desc = "Log theme: {}".format(GetThemeGallery("log").GetThemeName(theme_id))
 
-        for (factory, view_theme_id) in builder.GetViewThemes():
-            desc += "\nView theme: {}".format(GetThemeGallery("view").GetThemeName(view_theme_id))
+        for (factory, theme_cls, view_theme_id) in builder.GetViewThemes():
+            theme_cls_name = theme_cls[0].upper() + theme_cls[1:]
+            desc += "\n{} theme: {}".format(theme_cls_name, GetThemeGallery(theme_cls).GetThemeName(view_theme_id))
 
         self.SetLogBuilderText(desc)
 

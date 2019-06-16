@@ -153,10 +153,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     definitions here.
     -->
     <builders>
-      <builder name="MythTV Std Error" guid="4CCCC1C2-4960-4F8B-A8CA-EE3007124F62">
+      <builder name="MythTV + Programs" guid="50F34148-43D8-452E-B2E3-CDF0FCE90DD4">
         <theme theme_cls="log">116C22A2-3699-47B6-B8B7-4FC7C0A19F91</theme>
-        <theme factory="B6903A1F-2DE6-436C-BC35-B2B03AF78203">19ADE7AD-34CC-4407-8FB8-E24766EDFB37</theme>
-        <theme factory="B6903A1F-2DE6-436C-BC35-B2B03AF78203">5F5CE4CF-9E9D-4BD0-8E1F-9AE31FD88E95</theme>
+        <theme theme_cls="view" factory="B6903A1F-2DE6-436C-BC35-B2B03AF78203">19ADE7AD-34CC-4407-8FB8-E24766EDFB37</theme>
+        <theme theme_cls="event" factory="BED0DF17-1A62-4123-8097-0A41E9E23D1C">F77128A9-D9D3-4920-9EFE-07EFE8C5D5DA</theme>
+      </builder>
+      <builder name="MythTV + Std Error" guid="4CCCC1C2-4960-4F8B-A8CA-EE3007124F62">
+        <theme theme_cls="log">116C22A2-3699-47B6-B8B7-4FC7C0A19F91</theme>
+        <theme theme_cls="view" factory="B6903A1F-2DE6-436C-BC35-B2B03AF78203">19ADE7AD-34CC-4407-8FB8-E24766EDFB37</theme>
+        <theme theme_cls="view" factory="B6903A1F-2DE6-436C-BC35-B2B03AF78203">5F5CE4CF-9E9D-4BD0-8E1F-9AE31FD88E95</theme>
       </builder>
     </builders>
 

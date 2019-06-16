@@ -28,8 +28,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     <item field_id="DD9B316C-4F9E-4DF3-9970-0781D56980B0">Events</item>
 
     <!--
-    Event Match
-    Set the ReferenceRecogniser to a filename (with .py suffix) if the
+    Script
+    Set the ReferenceScript to a filename (with .py suffix) if the
     recogniser text is held in an external Python file. Otherwise, leave
     empty.
     -->

@@ -978,8 +978,8 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         else:
             # otherwise follow the instructions in the builder
             builder = self.GetLogSchema().GetBuilders().GetObjectByGuid(self._InitBuilderGuid)
-            for (factory_guid, view_theme_id) in builder.GetViewThemes():
-                self.AppendNode(factory_guid, view_theme_id)
+            for (factory_guid, theme_cls, view_theme_id) in builder.GetViewThemes():
+                self.AppendNode(factory_guid, view_theme_id, True)
 
 
     def PostInitLayout(self):
