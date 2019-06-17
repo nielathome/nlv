@@ -555,7 +555,7 @@ class G_Projector:
         event_collector = G_ProjectionCollector(self._LogNode, self._Filename, self._ProjectionSchema, self._DateFieldType)
         self._LogNode = None
 
-        with G_PerfTimerScope("G_Projector._Project") as timer:
+        with G_PerfTimerScope("G_Projector.Project") as timer:
             user_projector.Project(self._Connection, event_collector)
             timer.SetItemCount(event_collector.Count())
 
@@ -1426,8 +1426,11 @@ class G_ChartViewCtrl(wx.Panel):
             if not self._RealiseLock and self._RealiseChangeTracker.Changed(self._ChartDesigner.WantSelection):
                 (metrics, num_metrics, selection) = self.GetTableData()
                 self._Figure.clear()
-                self._ChartDesigner.Realise(self._Figure, metrics, num_metrics, self._ParamaterValues, selection)
-                self._Canvas.draw()
+                with G_PerfTimerScope("Design"):
+                    self._ChartDesigner.Realise(self._Figure, metrics, num_metrics, self._ParamaterValues, selection)
+
+                with G_PerfTimerScope("Draw"):
+                    self._Canvas.draw()
 
 
     #-------------------------------------------------------
@@ -1546,6 +1549,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def Assemble(self, events, analysis_props):
         self.ResetModel(analysis_props.ErrorReporter)
         with G_ScriptGuard("Assemble", self._ErrorReporter):

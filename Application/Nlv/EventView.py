@@ -1392,6 +1392,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def UpdateContent(self, analysis_props):
         """Load CSV event data into the viewer"""
 
@@ -1661,6 +1662,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def UnlockCharts(self):
         active_chart = self.GetMetricsViewCtrl().UnlockCharts()
         if active_chart is not None:
@@ -1668,6 +1670,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def UpdateContent(self, analysis_props):
         event_projector = self.GetLogAnalysisNode().FindChildNode(G_Project.NodeID_EventProjector, True)
         events_to_quantify = event_projector.GetTableViewCtrl().GetLineSet()

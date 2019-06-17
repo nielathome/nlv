@@ -145,7 +145,7 @@ class Projector:
             cursor.execute("ATTACH DATABASE '{}' AS dbs".format(file))
             select = """
                 {}
-                UNION
+                UNION ALL
                 {}
                  ORDER BY start_line_no ASC
             """.format(select_expire, select_reschedule)
