@@ -296,7 +296,7 @@ BOOST_PYTHON_MODULE( Nlog )
 	class_<NLogAccessor, logaccessor_ptr_t, boost::noncopyable>( "LogAccessor" )
 		;
 
-	// NLineSet and NView present similar interfaces to Pythin, but have
+	// NLineSet and NView present similar interfaces to Python, but have
 	// incompatible inheritance structure; so using a macro to extract the
 	// commonality
 	#define NFilterView_Members(CLS) \

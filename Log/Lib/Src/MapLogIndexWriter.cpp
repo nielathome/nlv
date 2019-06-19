@@ -17,7 +17,7 @@
 #include "StdAfx.h"
 
 // Application includes
-#include "LogIndexWriter.h"
+#include "MapLogIndexWriter.h"
 #include "Nmisc.h"
 
 // C++ includes

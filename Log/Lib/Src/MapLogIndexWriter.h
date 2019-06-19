@@ -17,7 +17,7 @@
 #pragma once
 
 // Nlog includes
-#include "LogIndexAccessor.h"
+#include "MapLogIndexAccessor.h"
 
 // C++ includes
 #include <atomic>

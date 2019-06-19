@@ -35,12 +35,6 @@
     <ClInclude Include="Hdr\FileMap.h">
       <Filter>Header Files\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Src\LogIndexAccessor.h">
-      <Filter>Header Files\Private</Filter>
-    </ClInclude>
-    <ClInclude Include="Src\LogIndexWriter.h">
-      <Filter>Header Files\Private</Filter>
-    </ClInclude>
     <ClInclude Include="Hdr\Ntime.h">
       <Filter>Header Files\Public</Filter>
     </ClInclude>
@@ -52,6 +46,12 @@
     </ClInclude>
     <ClInclude Include="Hdr\Nfilesystem.h">
       <Filter>Header Files\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\MapLogIndexAccessor.h">
+      <Filter>Header Files\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\MapLogIndexWriter.h">
+      <Filter>Header Files\Private</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -70,16 +70,16 @@
     <ClCompile Include="Src\FileMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\LogIndexAccessor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\LogIndexWriter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Src\LogAccessor.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Src\Misc.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\MapLogAccessor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\MapLogIndexAccessor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\MapLogIndexWriter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

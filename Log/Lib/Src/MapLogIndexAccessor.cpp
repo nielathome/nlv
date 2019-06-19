@@ -17,7 +17,7 @@
 #include "StdAfx.h"
 
 // Application includes
-#include "LogIndexAccessor.h"
+#include "MapLogIndexAccessor.h"
 
 // C++ includes
 #include <chrono>
