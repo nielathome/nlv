@@ -402,24 +402,9 @@ bool NHiliter::Hit( nlineno_t line_no )
  * NLogAccessor
  -----------------------------------------------------------------------*/
 
-NLogAccessor::NLogAccessor
-(
-	const std::string & accessor_name,
-	const std::string & guid,
-	unsigned text_offset_size,
-	fielddescriptor_list_t && field_descs,
-	const std::string & match_desc,
-	formatdescriptor_list_t && formatters
-)
+NLogAccessor::NLogAccessor( LogAccessorDescriptor & descriptor )
 {
-	SetImpl( LogAccessor::MakeLogAccessor(
-		accessor_name,
-		guid,
-		text_offset_size,
-		std::move( field_descs ),
-		match_desc,
-		std::move( formatters )
-	) );
+	SetImpl( LogAccessorFactory::Create( descriptor ) );
 }
 
 

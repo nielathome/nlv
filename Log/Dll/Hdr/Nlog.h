@@ -135,15 +135,7 @@ using selector_ptr_t = boost::intrusive_ptr<NSelector>;
 class NLogAccessor : public NHandle<LogAccessor>
 {
 public:
-	NLogAccessor
-	(
-		const std::string & name,
-		const std::string & guid,
-		unsigned text_offset_size,
-		fielddescriptor_list_t && field_descs,
-		const std::string & match_desc,
-		formatdescriptor_list_t && formatters
-	);
+	NLogAccessor( LogAccessorDescriptor & descriptor );
 
 public:
 	// Python interfaces; note default constructor is non-functional

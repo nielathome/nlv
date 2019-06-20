@@ -131,13 +131,17 @@ logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object for
 	using as_unsigned = python::extract<unsigned>;
 	using as_size = python::extract<size_t>;
 
-	const std::string accessor_name{ as_string{ log_schema.attr( "GetAccessorName" )() } };
-	const std::string guid{ as_string{ log_schema.attr( "GetGuid" )() } };
-	const std::string match_desc{ as_string{ log_schema.attr( "GetMatchDesc" )() } };
-	const size_t num_fields{ as_size{ log_schema.attr( "GetNumFields" )() } };
-	const unsigned text_offset_size{as_unsigned{ log_schema.attr( "GetTextOffsetSize" )() } };
+	LogAccessorDescriptor descriptor
+	{
+		as_string{ log_schema.attr( "GetAccessorName" )() },
+		as_string{ log_schema.attr( "GetGuid" )() },
+		as_string{ log_schema.attr( "GetMatchDesc" )() },
+		as_unsigned{ log_schema.attr( "GetTextOffsetSize" )() }
+	};
 
-	fielddescriptor_list_t field_descs; field_descs.reserve( num_fields + 2 );
+	const size_t num_fields{ as_size{ log_schema.attr( "GetNumFields" )() } };
+	fielddescriptor_list_t & field_descs{ descriptor.m_FieldDescriptors };
+	field_descs.reserve( num_fields + 2 );
 	for( size_t i = 0; i < num_fields; ++i )
 	{
 		python::object field_schema{ log_schema.attr( "GetFieldSchema" )(i) };
@@ -153,7 +157,7 @@ logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object for
 	}
 
 	const size_t num_formatters{ as_size{ formatter.attr( "GetNumFormats" )() } };
-	formatdescriptor_list_t formats;
+	formatdescriptor_list_t & formats{ descriptor.m_LineFormatters };
 	for( size_t i = 0; i < num_formatters; ++i )
 	{
 		const std::string regex_text{ as_string{ formatter.attr( "GetFormatRegex" )( i ) } };
@@ -171,17 +175,13 @@ logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object for
 		formats.push_back( std::move( line_formatter ) );
 	}
 
-	TraceDebug( "name:'%s' match_desc:'%s' guid:'%s'", accessor_name.c_str(), match_desc.c_str(), guid.c_str() );
+	TraceDebug( "name:'%s' match_desc:'%s' guid:'%s'",
+		descriptor.m_Name.c_str(),
+		descriptor.m_MatchDesc.c_str(),
+		descriptor.m_Guid.c_str()
+	);
 
-	logaccessor_ptr_t accessor{ new NLogAccessor{
-		accessor_name,
-		guid,
-		text_offset_size,
-		std::move( field_descs ),
-		match_desc,
-		std::move( formats )
-	} };
-
+	logaccessor_ptr_t accessor{ new NLogAccessor{ descriptor } };
 	const Error error{ accessor->Ok() ? e_OK : e_BadAccessorName };
 	if( !Ok( error ) )
 		accessor.reset();

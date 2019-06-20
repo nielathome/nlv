@@ -97,6 +97,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Src\FileMap.cpp" />
+    <ClCompile Include="Src\LogAccessor.cpp" />
     <ClCompile Include="Src\MapLogAccessor.cpp" />
     <ClCompile Include="Src\MapLogIndexAccessor.cpp" />
     <ClCompile Include="Src\MapLogIndexWriter.cpp" />

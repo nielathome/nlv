@@ -23,11 +23,7 @@
 // Intel TBB includes
 #include <tbb/flow_graph.h>
 
-
-//
-// The "M" name prefix below denotes an implementation based on memory mapping
-// of a file - via the FileMap class
-//
+void force_link_mapaccessor_module() {}
 
 
 
@@ -156,11 +152,11 @@ void LineFormatter::Apply( const LineBuffer & text, LineBuffer * fmt ) const
 
 
 /*-----------------------------------------------------------------------
- * MLogAccessor, declarations
+ * MapLogAccessor, declarations
  -----------------------------------------------------------------------*/
 
 // the default log accessor is based on file mapping; the log must be entirely static
-class MLogAccessor : public LogAccessor, public LogSchemaAccessor
+class MapLogAccessor : public LogAccessor, public LogSchemaAccessor
 {
 private:
 	// the logfile's text
@@ -189,7 +185,7 @@ private:
 	};
 
 	// line formatting
-	LineFormatter m_LineFormatter;
+	LineFormatter m_LineFormatters;
 
 protected:
 	// LineVisitor interface
@@ -197,6 +193,8 @@ protected:
 	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines ) const override;
 
 	std::filesystem::path CalcIndexPath( const std::filesystem::path & file_path );
+
+	MapLogAccessor( LogAccessorDescriptor & descriptor );
 
 public:
 	// LogAccessor interfaces
@@ -262,7 +260,10 @@ public:
 	}
 
 public:
-	MLogAccessor( const std::string & guid, const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs, const std::string & match_desc, formatdescriptor_list_t && formats );
+	static LogAccessor * MakeMapLogAccessor( LogAccessorDescriptor & descriptor )
+	{
+		return new MapLogAccessor( descriptor );
+	}
 
 	void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const
 	{
@@ -284,17 +285,33 @@ public:
 };
 
 
-
-/*-----------------------------------------------------------------------
- * MLogAccessor, definitions
- -----------------------------------------------------------------------*/
-
-CacheStatistics MLogAccessor::m_LineCacheStats[]
+static OnEvent RegisterMapLogAccessor
 {
-	{ "MLogAccessor/Text" }, { "MLogAccessor/Style" }
+	OnEvent::EventType::Startup,
+	[]() {
+		LogAccessorFactory::RegisterLogAccessor( "map", MapLogAccessor::MakeMapLogAccessor );
+	}
 };
 
-fielddescriptor_list_t && MLogAccessor::ExpandFieldDescriptors( const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs )
+
+
+/*-----------------------------------------------------------------------
+ * MapLogAccessor, definitions
+ -----------------------------------------------------------------------*/
+
+CacheStatistics MapLogAccessor::m_LineCacheStats[]
+{
+	{ "MapLogAccessor/Text" }, { "MapLogAccessor/Style" }
+};
+
+
+const std::string & ExpandFieldOffsetSize( unsigned text_offsets_size )
+{
+	return text_offsets_size == 16 ? c_Type_TextOffsets16 : c_Type_TextOffsets08;
+}
+
+
+fielddescriptor_list_t && MapLogAccessor::ExpandFieldDescriptors( const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs )
 {
 	// expand the application defined field descriptor list with 2 "hidden" fields:
 	// - the first field is always the line position
@@ -305,25 +322,18 @@ fielddescriptor_list_t && MLogAccessor::ExpandFieldDescriptors( const std::strin
 }
 
 
-MLogAccessor::MLogAccessor
-(
-	const std::string & guid,
-	const std::string & text_offsets_field_type,
-	fielddescriptor_list_t && field_descs,
-	const std::string & match_desc,
-	formatdescriptor_list_t && formats
-)
+MapLogAccessor::MapLogAccessor( LogAccessorDescriptor & descriptor )
 	:
-	m_Guid{ guid },
-	m_TextOffsetsFieldType{ text_offsets_field_type },
-	m_FieldDescriptors{ ExpandFieldDescriptors( text_offsets_field_type, std::move( field_descs ) ) },
-	m_MatchDesc{ match_desc },
-	m_LineFormatter{ std::move( formats ) }
+	m_Guid{ std::move( descriptor.m_Guid ) },
+	m_TextOffsetsFieldType{ ExpandFieldOffsetSize( descriptor.m_TextOffsetsSize ) },
+	m_FieldDescriptors{ ExpandFieldDescriptors( m_TextOffsetsFieldType, std::move( descriptor.m_FieldDescriptors ) ) },
+	m_MatchDesc{ std::move( descriptor.m_MatchDesc ) },
+	m_LineFormatters{ std::move( descriptor.m_LineFormatters ) }
 {
 }
 
 
-std::filesystem::path MLogAccessor::CalcIndexPath( const std::filesystem::path & file_path )
+std::filesystem::path MapLogAccessor::CalcIndexPath( const std::filesystem::path & file_path )
 {
 	using namespace std::filesystem;
 
@@ -346,7 +356,7 @@ std::filesystem::path MLogAccessor::CalcIndexPath( const std::filesystem::path &
 }
 
 
-Error MLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines )
+Error MapLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines )
 {
 	// map logfile
 	const Error log_error{ m_Log.Map( file_path ) };
@@ -404,7 +414,7 @@ Error MLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter
 }
 
 
-void MLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * line_buffer ) const
+void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * line_buffer ) const
 {
 	line_buffer->Clear();
 
@@ -416,12 +426,12 @@ void MLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_
 		LineBuffer text;
 		m_Index->CopyLine( line_no, field_mask, m_Text, &text );
 		m_Index->CopyStyle( line_no, field_mask, line_buffer );
-		m_LineFormatter.Apply( text, line_buffer );
+		m_LineFormatters.Apply( text, line_buffer );
 	}
 }
 
 
-const LineBuffer & MLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
+const LineBuffer & MapLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
 {
 	LineCache & line_cache{ m_LineCache[ static_cast<int>(type) ] };
 
@@ -435,50 +445,23 @@ const LineBuffer & MLogAccessor::GetLine( e_LineData type, nlineno_t line_no, ui
 }
 
 
-nlineno_t MLogAccessor::GetNumLines( void ) const
+nlineno_t MapLogAccessor::GetNumLines( void ) const
 {
 	return m_Index->GetNumLines();
 }
 
 
-LogAccessor * LogAccessor::MakeLogAccessor
-(
-	const std::string & accessor_name,
-	const std::string & guid,
-	unsigned text_offset_size,
-	fielddescriptor_list_t && field_descs,
-	const std::string & match_desc,
-	formatdescriptor_list_t && formatters
-)
-{
-	// currently, only one accessor mechanism is implemented
-	LogAccessor *accessor{ nullptr };
-	if( accessor_name == "map" )
-	{
-		const std::string & text_offsets_field_type{ text_offset_size == 16 ? c_Type_TextOffsets16 : c_Type_TextOffsets08 };
-
-		accessor = new MLogAccessor{
-			guid,
-			text_offsets_field_type,
-			std::move( field_descs ),
-			match_desc,
-			std::move( formatters )
-		};
-	}
-
-	return accessor;
-}
 
 
 
 /*-----------------------------------------------------------------------
- * MLineAccessorIrregular
+ * MapLineAccessorIrregular
  -----------------------------------------------------------------------*/
 
-class MLineAccessorIrregular : public LineAccessorIrregular
+class MapLineAccessorIrregular : public LineAccessorIrregular
 {
 private:
-	const MLogAccessor & m_LogAccessor;
+	const MapLogAccessor & m_LogAccessor;
 
 	nlineno_t m_ContinuationLineCount{ -1 };
 	nlineno_t m_ContinuationLine{ 0 };
@@ -493,7 +476,7 @@ private:
 	}
 
 public:
-	MLineAccessorIrregular( const MLogAccessor & log_accessor )
+	MapLineAccessorIrregular( const MapLogAccessor & log_accessor )
 		: m_LogAccessor{ log_accessor } {}
 
 	void Reset( nlineno_t line_no ) {
@@ -501,7 +484,7 @@ public:
 		SetLineNo( line_no );
 	}
 
-	MLineAccessorIrregular * NextIrregular( void ) {
+	MapLineAccessorIrregular * NextIrregular( void ) {
 		if( m_ContinuationLineCount < 0 )
 			Setup();
 
@@ -521,31 +504,31 @@ public:
 
 
 /*-----------------------------------------------------------------------
- * MLineAccessor
+ * MapLineAccessor
  -----------------------------------------------------------------------*/
 
-class MLineAccessor : public LineAccessor
+class MapLineAccessor : public LineAccessor
 {
 private:
 	// transient store for line information
 	mutable LineBuffer m_LineBuffer;
 
-	const MLogAccessor & m_LogAccessor;
+	const MapLogAccessor & m_LogAccessor;
 	const uint64_t m_FieldMask;
 
 private:
 	// continuation line handling
-	mutable MLineAccessorIrregular m_Irregulars;
+	mutable MapLineAccessorIrregular m_Irregulars;
 
 public:
-	MLineAccessor( const MLogAccessor & log_accessor, uint64_t field_mask )
+	MapLineAccessor( const MapLogAccessor & log_accessor, uint64_t field_mask )
 		:
 		m_LogAccessor{ log_accessor },
 		m_FieldMask{ field_mask },
 		m_Irregulars{ log_accessor }
 	{}
 
-	MLineAccessor( const MLineAccessor & map_line_accessor )
+	MapLineAccessor( const MapLineAccessor & map_line_accessor )
 		:
 		m_LogAccessor{ map_line_accessor.m_LogAccessor },
 		m_FieldMask{ map_line_accessor.m_FieldMask },
@@ -606,11 +589,11 @@ public:
  -----------------------------------------------------------------------*/
 
  // apply a task to a single line
-void MLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const
+void MapLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const
 {
 	const nlineno_t log_line_no{ task.VisitLineToLogLine( visit_line_no ) };
 
-	MLineAccessor accessor{ *this, field_mask };
+	MapLineAccessor accessor{ *this, field_mask };
 	accessor.SetLineNo( log_line_no );
 
 	task.Action( accessor, visit_line_no );
@@ -629,7 +612,7 @@ public:
 
 	TBBTask
 	(
-		const MLineAccessor & log_accessor,
+		const MapLineAccessor & log_accessor,
 		task_t line_task,
 		size_t sequence,
 		nlineno_t begin_line,
@@ -666,7 +649,7 @@ public:
 
 private:
 	// copy of the logfile/line accessor
-	MLineAccessor m_LogAccessor;
+	MapLineAccessor m_LogAccessor;
 
 	// line data over which the user task will be run
 	const nlineno_t m_BeginLine{ 0 }, m_EndLine{ 0 };
@@ -686,7 +669,7 @@ struct TBBSource
 	using Visitor = LineVisitor::Visitor;
 
 	// copy of the logfile/line accessor
-	MLineAccessor f_Accessor;
+	MapLineAccessor f_Accessor;
 
 	// reference back to the user visitor
 	Visitor & f_Visitor;
@@ -702,7 +685,7 @@ struct TBBSource
 
 	TBBSource
 	(
-		const MLineAccessor & accessor,
+		const MapLineAccessor & accessor,
 		Visitor & visitor,
 		nlineno_t num_lines,
 		bool include_irregular
@@ -742,11 +725,11 @@ struct TBBSource
 
 
 // run the user visitor task over all lines
-void MLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines ) const
+void MapLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines ) const
 {
 	tbb::flow::graph flow_graph;
 
-	MLineAccessor accessor{ *this, field_mask };
+	MapLineAccessor accessor{ *this, field_mask };
 
 	// the number of lines to process is either supplied by the caller
 	// (as view lines) or is taken from the log file

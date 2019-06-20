@@ -23,6 +23,7 @@
 
 // C++ includes
 #include <list>
+#include <map>
 #include <memory>
 #include <regex>
 #include <string>
@@ -406,17 +407,6 @@ enum class e_LineData
 // logical equivalent to a CellBuffer for a logfile
 struct LogAccessor : public LineVisitor
 {
-	// factory for creating LogAccessor interfaces
-	static LogAccessor * MakeLogAccessor
-	(
-		const std::string & accessor_name,
-		const std::string & guid,
-		unsigned text_offset_size,
-		fielddescriptor_list_t && field_descs,
-		const std::string & match_desc,
-		formatdescriptor_list_t && formatters
-	);
-
 	// lifetime management
 	virtual ~LogAccessor( void ) {}
 	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
@@ -439,3 +429,31 @@ struct LogAccessor : public LineVisitor
 	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
 };
 
+
+
+/*-----------------------------------------------------------------------
+ * LogAccessorFactory
+ -----------------------------------------------------------------------*/
+
+struct LogAccessorDescriptor
+{
+	std::string m_Name;
+	std::string m_Guid;
+	std::string m_MatchDesc;
+	unsigned m_TextOffsetsSize;
+	fielddescriptor_list_t m_FieldDescriptors;
+	formatdescriptor_list_t m_LineFormatters;
+};
+
+
+class LogAccessorFactory
+{
+public:
+	static void RegisterLogAccessor( const std::string & name, LogAccessor * (*creator)(LogAccessorDescriptor &) );
+
+	// factory for creating LogAccessor interfaces
+	static LogAccessor * Create( LogAccessorDescriptor & descriptor );
+
+protected:
+	static std::map<std::string, LogAccessor * (*)(LogAccessorDescriptor &)> m_Makers;
+};
