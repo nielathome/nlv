@@ -23,6 +23,9 @@ void force_link_dependencies()
 {
 	extern void force_link_mapaccessor_module();
 	force_link_mapaccessor_module();
+
+	extern void force_link_sqlaccessor_module();
+	force_link_sqlaccessor_module();
 }
 
 

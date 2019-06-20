@@ -377,6 +377,18 @@ fi
 # NLV
 ###############################################################################
 
+sqlite_lib=$wrkdir/sqlite3.lib
+
+if [ -n "$cfg_clean" ]; then
+  rm "$sqlite_lib"
+
+else
+  if [ ! -f "$sqlite_lib" ]; then
+    runbat Scripts/build_sqlite_lib.bat
+  fi
+fi
+
+  
 if [ -z "$cfg_clean" ]; then
   msg_header "Building NLV Release"
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/nlv.build.log"

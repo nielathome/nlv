@@ -58,7 +58,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;..\..</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -73,7 +73,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;..\..</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -82,6 +82,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\Deps\sqlite3.h" />
     <ClInclude Include="Hdr\FileMap.h" />
     <ClInclude Include="Hdr\LogAccessor.h" />
     <ClInclude Include="Hdr\Nfilesystem.h" />
@@ -104,6 +105,7 @@
     <ClCompile Include="Src\Misc.cpp" />
     <ClCompile Include="Src\Parser.cpp" />
     <ClCompile Include="Src\Select.cpp" />
+    <ClCompile Include="Src\SqlLogAccessor.cpp" />
     <ClCompile Include="Src\StdAfx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>

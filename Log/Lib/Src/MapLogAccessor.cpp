@@ -23,6 +23,7 @@
 // Intel TBB includes
 #include <tbb/flow_graph.h>
 
+// force link this module
 void force_link_mapaccessor_module() {}
 
 
@@ -171,7 +172,6 @@ private:
 	int m_TzOffset;
 
 	// field schema
-	static fielddescriptor_list_t && ExpandFieldDescriptors( const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs );
 	const std::string m_Guid;
 	const fielddescriptor_list_t m_FieldDescriptors;
 	const std::string m_MatchDesc;
@@ -189,7 +189,7 @@ private:
 
 protected:
 	// LineVisitor interface
-	void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask )  const override;
+	void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const override;
 	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines ) const override;
 
 	std::filesystem::path CalcIndexPath( const std::filesystem::path & file_path );
@@ -311,7 +311,7 @@ const std::string & ExpandFieldOffsetSize( unsigned text_offsets_size )
 }
 
 
-fielddescriptor_list_t && MapLogAccessor::ExpandFieldDescriptors( const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs )
+fielddescriptor_list_t && ExpandFieldDescriptors( const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs )
 {
 	// expand the application defined field descriptor list with 2 "hidden" fields:
 	// - the first field is always the line position

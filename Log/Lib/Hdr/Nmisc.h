@@ -17,6 +17,7 @@
 #pragma once
 
 // C++ includes
+#include <chrono>
 #include <functional>
 #include <list>
 
