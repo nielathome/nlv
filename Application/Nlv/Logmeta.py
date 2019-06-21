@@ -85,23 +85,13 @@ class G_FieldSchema:
             self.MinWidth = int(mw)
 
 
+## G_FieldList ##############################################
 
-## G_FieldSchemata ##########################################
-
-class G_FieldSchemata:
-    """
-    A list of G_FieldSchema-like objects; with an Nlog compatible interface.
-    """
+class G_FieldList:
 
     #-------------------------------------------------------
-    def __init__(self, guid = ""):
-        self._Guid = guid
-        self._RegexText = ""
-        self._FormatterGuid = None
+    def __init__(self):
         self._FieldSchemata = []
-
-    def _SetTextOffsetSize(self, size):
-        self._TextOffsetSize = size
 
 
     #-------------------------------------------------------
@@ -117,6 +107,27 @@ class G_FieldSchemata:
         idx = len(self._FieldSchemata)
         self._FieldSchemata.append(field_schema)
         return idx
+
+
+
+## G_FieldSchemata ##########################################
+
+class G_FieldSchemata(G_FieldList):
+    """
+    A list of G_FieldSchema-like objects; with an Nlog compatible interface.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, accessor_name, guid = ""):
+        super().__init__()
+
+        self._AccessorName = accessor_name
+        self._Guid = guid
+        self._RegexText = ""
+        self._FormatterGuid = None
+
+    def _SetTextOffsetSize(self, size):
+        self._TextOffsetSize = size
 
 
     #-------------------------------------------------------
@@ -146,8 +157,7 @@ class G_FieldSchemata:
         return self._FieldSchemata[field_id]
 
     def GetAccessorName(self):
-        # default is to use built in map accessor
-        return "map"
+        return self._AccessorName
 
     def GetGuid(self):
         return self._Guid
@@ -209,7 +219,7 @@ class G_LogSchema(G_FieldSchemata):
 
     #-------------------------------------------------------
     def __init__(self, element):
-        super().__init__()
+        super().__init__("map")
 
         self._Name = element.get("name")
         self._Guid = element.get("guid")

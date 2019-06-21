@@ -26,7 +26,7 @@ from .Project import G_Global
 # Content provider interface
 import Nlog
 
-
+ 
 
 ## G_LineAccessor ##########################################
 
@@ -268,5 +268,3 @@ class G_Analyser:
 
         user_analyser.End(self)
         user_analyser = None
-
-        self.Connection.commit()

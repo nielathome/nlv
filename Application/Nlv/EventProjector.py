@@ -263,9 +263,6 @@ class G_ProjectionFieldSchema:
         if formatter is not None:
             self.Formatter = formatter
 
-    def SetAsLastField(self):
-        self.Separator = "\r"
-
 
 
 ## G_ProjectionSchema ######################################
@@ -275,39 +272,13 @@ class G_ProjectionSchema(G_FieldSchemata):
 
     #-------------------------------------------------------
     def __init__(self, guid = ""):
-        super().__init__(guid)
+        super().__init__("map", guid)
         self._SetTextOffsetSize(16)
         self.DurationScale = 1
         self.ColParentId = None
         self.ColStart = None
         self.ColFinish = None
         self.ColDuration = None
-
-
-    #-------------------------------------------------------
-    def AddNesting(self, field_schema):
-        self.ColParentId = self.Append(field_schema)
-
-    def AddStart(self, field_schema):
-        self.ColStart = self.Append(field_schema)
-
-    def AddFinish(self, field_schema):
-        self.ColFinish = self.Append(field_schema)
-
-    def AddDuration(self, scale, field_schema):
-        self.ColDuration = self.Append(field_schema)
-        self.DurationScale = scale
-
-
-
-## G_CoreProjectionSchemaCollector #########################
-
-class G_CoreProjectionSchemaCollector:
-    """Collect schema data for a projector's table"""
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self._ProjectionSchema = G_ProjectionSchema("14C89CE3-E8A4-4F28-99EB-3EF5D5FD3B13")
 
 
     #-------------------------------------------------------
@@ -328,22 +299,59 @@ class G_CoreProjectionSchemaCollector:
         return al
 
 
-    @staticmethod
-    def MakeFieldSchema(name, type, width, align, formatter):
+    #-------------------------------------------------------
+    def MakeHiddenFieldSchema(self, name, type):
+        G_ProjectionTypeManager.ValidateType(type)
+        return self.Append(G_ProjectionFieldSchema(name, type, False))
+
+
+    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None):
         G_ProjectionTypeManager.ValidateType(type)
         al = __class__._CalcAlign(align)
-        return G_ProjectionFieldSchema(name, type, True, width, al, formatter)
+        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter))
+
+
+    #-------------------------------------------------------
+    def AddNesting(self):
+        self.ColParentId = self.MakeHiddenFieldSchema("parent_id", "int32")
+
+    def AddField(self, name, type, width, align, formatter):
+        self.ColParentId = self.MakeFieldSchema(name, type, width, align, formatter)
+
+    def AddStart(self, name, width, align, formatter):
+        self.ColStart = self.MakeFieldSchema(name, "text", width, align, formatter)
+        self.MakeHiddenFieldSchema("start_utc", "uint64")
+        self.MakeHiddenFieldSchema("start_offset_ns", "uint64")
+
+    def AddFinish(self, name, width, align, formatter):
+        self.ColFinish = self.MakeFieldSchema(name, "text", width, align, formatter)
+        self.MakeHiddenFieldSchema("finish_utc", "uint64")
+        self.MakeHiddenFieldSchema("finish_offset_ns", "uint64")
+
+    def AddDuration(self, scale, name, width, align, formatter):
+        self.ColDuration = self.MakeFieldSchema(name, "int64", width, align, formatter)
+        self.DurationScale = scale
+
+
+
+## G_CoreProjectionSchemaCollector #########################
+
+class G_CoreProjectionSchemaCollector:
+    """Collect schema data for a projector's table"""
+
+    #-------------------------------------------------------
+    def __init__(self):
+        self._ProjectionSchema = G_ProjectionSchema("14C89CE3-E8A4-4F28-99EB-3EF5D5FD3B13")
 
 
     #-------------------------------------------------------
     def AddField(self, name, type, width = 30, align = "centre", formatter = None):
-        field_schema = self.MakeFieldSchema(name, type, width, align, formatter)
-        self._ProjectionSchema.Append(field_schema)
+        self._ProjectionSchema.AddField(name, type, width, align, formatter)
 
 
     #-------------------------------------------------------
     def Close(self):
-        self._ProjectionSchema[-1].SetAsLastField()
+#        self._ProjectionSchema[-1].SetAsLastField()
         return self._ProjectionSchema
 
 
@@ -375,28 +383,18 @@ class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
 
     #-------------------------------------------------------
     def AddNesting(self):
-        field_schema = G_ProjectionFieldSchema("ParentId", "int32", False)
         self._ProjectionSchema.AddNesting(field_schema)
 
-
-    #-------------------------------------------------------
     def AddStart(self, name, width = 30, align = "centre", formatter = None):
-        field_schema = self.MakeFieldSchema(name, self._DateFieldType, width, align, formatter)
-        self._ProjectionSchema.AddStart(field_schema)
+        self._ProjectionSchema.AddStart(name, width, align, formatter)
 
-
-    #-------------------------------------------------------
     def AddFinish(self, name, width = 30, align = "centre", formatter = None):
-        field_schema = self.MakeFieldSchema(name, self._DateFieldType, width, align, formatter)
-        self._ProjectionSchema.AddFinish(field_schema)
+        self._ProjectionSchema.AddFinish(name, width, align, formatter)
 
-
-    #-------------------------------------------------------
     def AddDuration(self, name, scale = "us", width = 30, align = "centre", formatter = None):
         name = "{} ({})".format(name, scale)
         scale_factor = self._CalcScale(scale)
-        field_schema = self.MakeFieldSchema(name, "int64", width, align, formatter)
-        self._ProjectionSchema.AddDuration(scale_factor, field_schema)
+        self._ProjectionSchema.AddDuration(scale_factor, name, width, align, formatter)
 
         
 
@@ -425,6 +423,25 @@ class G_ProjectionItem:
 
 class G_ProjectionCollector:
     """Collect and save event data from any number of event analyses"""
+
+    #-------------------------------------------------------
+    _SqlTypeMap = dict(
+        bool = "INT",
+        uint08 = "INT",
+        uint16 = "INT",
+        uint32 = "INT",
+        uint64 = "INT",
+        int08 = "INT",
+        int16 = "INT",
+        int32 = "INT",
+        int64 = "INT",
+        float32 = "REAL",
+        float64 = "REAL",
+        enum08 = "INT",
+        enum16 = "INT",
+        text = "TEXT"
+    )
+
 
     #-------------------------------------------------------
     def __init__(self, log_node, filename, projection_schema, date_fieldid):
@@ -505,6 +522,22 @@ class G_ProjectionCollector:
 
         text_values = [str(v).replace(',', '_').replace('"', "'").rstrip() for v in values]
         self._CsvWriter.writerow(text_values)
+
+
+    #-------------------------------------------------------
+    def MakeProjectionTable(self, cursor):
+        table_name = "projection"
+        cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
+
+        ct_columns = ["[{}] {}".format(field_schema.Name, self._SqlTypeMap[field_schema.Type]) for field_schema in self._ProjectionSchema]
+
+        cursor.execute("""
+            CREATE TABLE {}
+            (
+                {}
+            )""".format(table_name, ", ".join(ct_columns)))
+
+        return table_name
 
 
     #-------------------------------------------------------

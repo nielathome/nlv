@@ -1394,7 +1394,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     @G_Global.TimeFunction
     def UpdateContent(self, analysis_props):
-        """Load CSV event data into the viewer"""
+        """Load event/feature data into the viewer"""
 
         # load events into event viewer data control
         events_view = self.GetTableViewCtrl()
