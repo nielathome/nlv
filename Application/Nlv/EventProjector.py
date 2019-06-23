@@ -361,9 +361,8 @@ class G_CoreProjectionSchemaCollector:
 class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
     
     #-------------------------------------------------------
-    def __init__(self, date_fieldtype):
+    def __init__(self):
         super().__init__()
-        self._DateFieldType = date_fieldtype
 
 
     #-------------------------------------------------------
@@ -444,27 +443,14 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def __init__(self, log_node, filename, projection_schema, date_fieldid):
+    def __init__(self, log_node, projection_schema):
         self._LogNode = log_node
-        self._CsvFile = open(filename, "w", newline = "")
-        self._CsvWriter = csv.writer(self._CsvFile)
         self._EventNo = 0
-        self._FieldCount = len(projection_schema)
         self._ProjectionSchema = projection_schema
-        self._DateFieldId = date_fieldid
 
         # note, somewhat arbitrary limit (32-bit signed-int-max)
         max = 2147483647
         self._Stack = [G_ProjectionItem()]
-
-        # row headers
-        headers = [field_schema.Name for field_schema in projection_schema]
-        self._CsvWriter.writerow(headers)
-
-
-    #-------------------------------------------------------
-    def Count(self):
-        return self._EventNo
 
 
     #-------------------------------------------------------
@@ -474,7 +460,8 @@ class G_ProjectionCollector:
 
     def _UpdateStack(self, start_line_no, finish_line_no, event_data):
         cur = G_ProjectionItem(self._EventNo, start_line_no, finish_line_no, event_data)
- 
+        self._EventNo += 1
+
         # remove any entries that finish before 'cur' starts
         while cur.LogStartLine > self._StackBack().LogFinishLine:
             self._Stack.pop()
@@ -514,17 +501,6 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def AddEvent(self, values):
-        if len(values) != self._FieldCount:
-            raise RuntimeError("Incorrect number of field values (including hidden): got:{} exp:{}".format(len(values), self._FieldCount))
-
-        self._EventNo += 1
-
-        text_values = [str(v).replace(',', '_').replace('"', "'").rstrip() for v in values]
-        self._CsvWriter.writerow(text_values)
-
-
-    #-------------------------------------------------------
     def MakeProjectionTable(self, cursor):
         table_name = "projection"
         cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
@@ -542,7 +518,6 @@ class G_ProjectionCollector:
 
     #-------------------------------------------------------
     def Close(self):
-        self._CsvFile.close()
         self._LogNode = None
 
 
@@ -550,24 +525,20 @@ class G_ProjectionCollector:
 ## G_Projector #############################################
 
 class G_Projector:
-    """Project event analyses, creates an event table (CSV)"""
+    """Project event analyses, creates an event table"""
 
     #-------------------------------------------------------
-    def __init__(self, connection, meta_only, filename, log_schema, log_node):
+    def __init__(self, connection, meta_only, log_node):
         self._Connection = connection
         self._MetaOnly = meta_only
-        self._Filename = filename
         self._ProjectionSchema = G_ProjectionSchema()
         self._LogNode = log_node
         self._EventMetrics = None
 
-        date_field_id = log_node.GetLogfile().GetTimecodeBase().GetFieldId() - 1
-        self._DateFieldType = log_schema[date_field_id].Type
-
 
     #-------------------------------------------------------
     def CollectProjectionSchema(self, user_projector):
-        schema_collector = G_ProjectionSchemaCollector(self._DateFieldType)
+        schema_collector = G_ProjectionSchemaCollector()
         user_projector.DefineSchema(schema_collector)
         return schema_collector.Close()
 
@@ -585,12 +556,11 @@ class G_Projector:
         if self._MetaOnly:
             return
 
-        event_collector = G_ProjectionCollector(self._LogNode, self._Filename, self._ProjectionSchema, self._DateFieldType)
+        event_collector = G_ProjectionCollector(self._LogNode, self._ProjectionSchema)
         self._LogNode = None
 
         with G_PerfTimerScope("G_Projector.Project") as timer:
             user_projector.Project(self._Connection, event_collector)
-            timer.SetItemCount(event_collector.Count())
 
         event_collector.Close()
 

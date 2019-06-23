@@ -650,6 +650,12 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
             connection = sqlite3.connect(self.MakeTemporaryFilename(".db"))
             connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA synchronous = OFF")
+
+            # commented out, as it yields strange "sqlite3.OperationalError:
+            # database table is locked" errors on the first db execute
+            #cursor.execute("PRAGMA journal_mode = MEMORY")
 
             globals = dict()
 
@@ -660,9 +666,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
             globals.update(Analyse = analyser_api)
 
-            projector = G_Projector(connection, meta_only, self.MakeTemporaryFilename(".csv"),
-                log_schema, self.GetLogNode()
-            )
+            projector = G_Projector(connection, meta_only, self.GetLogNode())
             globals.update(Project = projector.Project)
 
             exec(code, globals)
