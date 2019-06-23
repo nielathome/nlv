@@ -707,7 +707,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         if self._EventMeta is None:
             return None
 
-        filename = self.MakeTemporaryFilename(".csv")
+        filename = self.MakeTemporaryFilename(".db")
         valid = self._Field.AnalysisIsValid.Value
         return self.AnalysisProperties(self, self._EventMeta, filename, valid)
 

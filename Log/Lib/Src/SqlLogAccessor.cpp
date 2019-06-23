@@ -28,28 +28,177 @@ void force_link_sqlaccessor_module() {}
 
 
 
-void afunc( void )
-{
-	sqlite3 * db_handle{ nullptr };
+/*-----------------------------------------------------------------------
+ * SqlStatement
+ -----------------------------------------------------------------------*/
 
-	const int ret{ sqlite3_open( "hello", &db_handle ) };
+class SqlStatement;
+using statement_ptr_t = std::unique_ptr<SqlStatement>;
+
+class SqlStatement
+{
+private:
+	sqlite3_stmt * m_Handle{ nullptr };
+
+protected:
+	friend class SqlDb;
+	Error Open( sqlite3 * db, const char * sql_text );
+
+public:
+	~SqlStatement( void );
+
+	Error Step( void );
+	int GetAsInt( unsigned field_id );
+	Error Close( void );
+};
+
+
+SqlStatement::~SqlStatement( void )
+{
+	Close();
+}
+
+
+Error SqlStatement::Open( sqlite3 * db, const char * sql_text )
+{
+	const char * tail{ nullptr };
+	Error res{ e_OK };
+	const int sql_ret{ sqlite3_prepare_v2( db, sql_text, -1, &m_Handle, &tail ) };
+
+	if( sql_ret != SQLITE_OK )
+		res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] sql_text=[%s]", sql_ret, sqlite3_errstr( sql_ret ), sql_text );
+	else if( (tail != nullptr) && (*tail != '\0') )
+		res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] tail=[%s]", sql_ret, sqlite3_errstr( sql_ret ), tail );
+
+	return res;
+}
+
+
+Error SqlStatement::Step( void )
+{
+	Error res{ e_OK };
+	const int sql_ret{ sqlite3_step( m_Handle ) };
+
+	if( sql_ret == SQLITE_ROW )
+		res = e_SqlRow;
+
+	else if( sql_ret == SQLITE_DONE )
+		res = e_SqlDone;
+
+	else
+		res = TraceError( e_SqlStatementStep, "sql_res=[%d/%s]", sql_ret, sqlite3_errstr( sql_ret ) );
+
+	return res;
+}
+
+
+int SqlStatement::GetAsInt( unsigned field_id )
+{
+	return sqlite3_column_int( m_Handle, field_id );
+}
+
+
+Error SqlStatement::Close( void )
+{
+	Error res{ e_OK };
+
+	if( m_Handle != nullptr )
+	{
+		const int sql_ret{ sqlite3_finalize( m_Handle ) };
+		m_Handle = nullptr;
+
+		if( sql_ret != SQLITE_OK )
+			res = TraceError( e_SqlStatementClose, "sql_res=[%d/%s]", sql_ret, sqlite3_errstr( sql_ret ) );
+	}
+
+	return res;
 }
 
 
 
 /*-----------------------------------------------------------------------
-* SqlLogAccessor, declarations
------------------------------------------------------------------------*/
+ * SqlDb
+ -----------------------------------------------------------------------*/
+
+class SqlDb
+{
+private:
+	sqlite3 * m_Handle{ nullptr };
+
+public:
+	~SqlDb( void );
+
+	Error Open( const std::filesystem::path & file_path );
+	Error Close( void );
+
+	Error MakeStatement( const char * sql_text, statement_ptr_t & statement );
+};
+
+
+SqlDb::~SqlDb( void )
+{
+	Close();
+}
+
+
+Error SqlDb::Open( const std::filesystem::path & file_path )
+{
+	Error res{ e_OK };
+	const int sql_ret{ sqlite3_open16( file_path.c_str(), &m_Handle ) };
+
+	if( sql_ret != SQLITE_OK )
+		res = TraceError( e_SqlDbOpen, "sql_res=[%d/%s] sql_path=[%s]", sql_ret, sqlite3_errstr( sql_ret ), file_path.c_str() );
+
+	return res;
+}
+
+
+Error SqlDb::Close( void )
+{
+	Error res{ e_OK };
+
+	if( m_Handle != nullptr )
+	{
+		const int sql_ret{ sqlite3_close( m_Handle ) };
+		m_Handle = nullptr;
+
+		if( sql_ret != SQLITE_OK )
+			res = TraceError( e_SqlDbClose, "sql_res=[%d/%s]", sql_ret, sqlite3_errstr( sql_ret ) );
+	}
+
+	return res;
+}
+
+
+Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement )
+{
+	statement = std::make_unique<SqlStatement>();
+	return statement->Open( m_Handle, sql_text );
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlLogAccessor, declarations
+ -----------------------------------------------------------------------*/
 
 // the default log accessor is based on file mapping; the log must be entirely static
 class SqlLogAccessor : public LogAccessor, public LogSchemaAccessor
 {
 private:
+	// the SQLite database
+	SqlDb m_DB;
+
+	nlineno_t m_NumLines{ 0 };
+
 	// fake timecode; we don't support line timecodes in SQL logfiles yet
 	NTimecodeBase m_TimecodeBase;
 
 	// field schema
 	const fielddescriptor_list_t m_FieldDescriptors;
+
+private:
+	Error CalcNumLines( void );
 
 protected:
 	// LineVisitor interface
@@ -61,10 +210,13 @@ protected:
 public:
 	// LogAccessor interfaces
 
-	Error Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines ) override;
-	nlineno_t GetNumLines( void ) const override;
+	Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t ) override;
 	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
 	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const override;
+
+	nlineno_t GetNumLines( void ) const override {
+		return m_NumLines;
+	}
 
 	bool IsLineRegular( nlineno_t line_no ) const override {
 		return true;
@@ -143,17 +295,27 @@ SqlLogAccessor::SqlLogAccessor( LogAccessorDescriptor & descriptor )
 }
 
 
-Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines )
+Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter *, size_t )
 {
-	return Error::e_BadDay;
+	Error res{ m_DB.Open( file_path ) };
+
+	if( Ok( res ) )
+		UpdateError( res, CalcNumLines() );
+
+	return res;
 }
 
 
-nlineno_t SqlLogAccessor::GetNumLines( void ) const
+Error SqlLogAccessor::CalcNumLines( void )
 {
-	return 0;
-}
+	statement_ptr_t statement;
+	Error res{ m_DB.MakeStatement( "select count(*) from reschedule", statement ) };
+	UpdateError( res, statement->Step() );
+	if( Ok( res ) )
+		m_NumLines = statement->GetAsInt( 0 );
 
+	return res;
+}
 
 const LineBuffer & SqlLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
 {

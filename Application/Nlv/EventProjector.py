@@ -272,7 +272,7 @@ class G_ProjectionSchema(G_FieldSchemata):
 
     #-------------------------------------------------------
     def __init__(self, guid = ""):
-        super().__init__("map", guid)
+        super().__init__("sql", guid)
         self._SetTextOffsetSize(16)
         self.DurationScale = 1
         self.ColParentId = None
@@ -421,7 +421,7 @@ class G_ProjectionItem:
 ## G_ProjectionCollector ###################################
 
 class G_ProjectionCollector:
-    """Collect and save event data from any number of event analyses"""
+    """Collect event data from any number of event analyses"""
 
     #-------------------------------------------------------
     _SqlTypeMap = dict(

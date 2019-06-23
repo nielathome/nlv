@@ -32,6 +32,8 @@ enum Error : unsigned
 	e_OK,
 	e_TraceInfo,
 	e_TraceDebug,
+	e_SqlRow,
+	e_SqlDone,
 
 	e_Error = 0x10000,
 	e_Unknown,
@@ -79,7 +81,13 @@ enum Error : unsigned
 	e_OpenFileHandle,
 	e_CreateFileHandle,
 	e_FileSize,
-	e_FileSystem
+	e_FileSystem,
+
+	e_SqlDbOpen,
+	e_SqlDbClose,
+	e_SqlStatementOpen,
+	e_SqlStatementStep,
+	e_SqlStatementClose
 };
 
 
