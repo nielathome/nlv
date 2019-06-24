@@ -44,7 +44,7 @@ private:
 
 	// the lifetimes of the objects pointed-to here must be managed by this
 	// objects owner
-	LogAccessor * m_LogAccessor{ nullptr };
+	ViewAccessor * m_ViewAccessor{ nullptr };
 	LineAdornmentsProvider * m_LineAdornmentsProvider{ nullptr };
 
 protected:
@@ -70,7 +70,7 @@ protected:
 
 	// determine the number of characters in a view line
 	vint_t GetLineLength( vint_t view_line_no ) const {
-		return m_LogAccessor->GetLineLength( ViewLineToLogLine( view_line_no ), m_FieldViewMask );
+		return m_ViewAccessor->GetLineLength( ViewLineToLogLine( view_line_no ), m_FieldViewMask );
 	}
 
 	// convert a view position into a view line number and an offset within that line
@@ -98,8 +98,8 @@ protected:
 public:
 	// non-Scintilla interfaces
 
-	SViewCellBuffer( LogAccessor * accessor, LineAdornmentsProvider * provider )
-		: m_LogAccessor{ accessor }, m_LineAdornmentsProvider{ provider } {}
+	SViewCellBuffer( ViewAccessor * accessor, LineAdornmentsProvider * provider )
+		: m_ViewAccessor{ accessor }, m_LineAdornmentsProvider{ provider } {}
 
 	LineAdornmentsProvider * GetLineAdornmentsProvider( void ) const {
 		return m_LineAdornmentsProvider;
@@ -116,7 +116,7 @@ public:
 	}
 
 	const LineBuffer & GetLine( e_LineData type, vint_t view_line_no ) const {
-		return m_LogAccessor->GetLine( type, ViewLineToLogLine( view_line_no ), m_FieldViewMask );
+		return m_ViewAccessor->GetLine( type, ViewLineToLogLine( view_line_no ), m_FieldViewMask );
 	}
 
 	bool IsEmpty( void ) const {
@@ -138,6 +138,7 @@ public:
 	int MarkValue( vint_t line_no, int marker_base ) const;
 
 	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
+// NIEL should not be needed
 	template<typename T_FUNC>
 	void VisitLine( nlineno_t visit_line_no, T_FUNC & functor )
 	{
@@ -160,7 +161,7 @@ public:
 		};
 
 		Task task{ *this, functor };
-		m_LogAccessor->VisitLine( task, visit_line_no );
+		m_ViewAccessor->VisitLine( task, visit_line_no );
 	}
 
 public:
@@ -323,7 +324,7 @@ private:
 	const SViewCellBuffer * f_CellBuffer;
 
 public:
-	ViewTimecodeAccessor( const SViewCellBuffer * cell_buffer, LogAccessor * accessor )
+	ViewTimecodeAccessor( const SViewCellBuffer * cell_buffer, ViewAccessor * accessor )
 		: LogfileTimecodeAccessor{ accessor }, f_CellBuffer{ cell_buffer } {}
 
 	NTimecode GetUtcTimecode( vint_t line_no ) const override {

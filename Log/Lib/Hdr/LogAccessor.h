@@ -187,7 +187,7 @@ struct ProgressMeter
  * LineBuffer
  -----------------------------------------------------------------------*/
 
-// small class to hold a copy of a line's data
+// small class to hold a copy of a line's text
 class LineBuffer
 {
 private:
@@ -233,22 +233,10 @@ public:
  -----------------------------------------------------------------------*/
 
 // interface for accessing irregular log line data
-class LineAccessorIrregular
+struct LineAccessorIrregular
 {
-private:
-	nlineno_t m_LineNo{ 0 };
-
-protected:
-	void SetLineNo( nlineno_t line_no ) {
-		m_LineNo = line_no;
-	}
-
-public:
 	virtual nlineno_t GetLength( void ) const = 0;
-
-	nlineno_t GetLineNo( void ) const {
-		return m_LineNo;
-	}
+	virtual nlineno_t GetLineNo( void ) const = 0;
 };
 
 
@@ -273,6 +261,8 @@ struct LineAccessor : public LineAccessorIrregular
 // interface to support visiting all lines in a set (e.g. a log file)
 struct LineVisitor
 {
+	virtual ~LineVisitor( void ) {}
+
 	// perform a task on a single log-file line; implemented by Visitor user
 	struct Task
 	{
@@ -392,7 +382,7 @@ using formatdescriptor_list_t = std::list<FormatDescriptor>;
 
 
 /*-----------------------------------------------------------------------
- * LogAccessor
+ * ViewAccessor
  -----------------------------------------------------------------------*/
 
 enum class e_LineData
@@ -403,30 +393,34 @@ enum class e_LineData
 };
 
 
-// all access to a log file (and its index) is abstracted behind this interface
-// logical equivalent to a CellBuffer for a logfile
-struct LogAccessor : public LineVisitor
+struct ViewAccessor : public LineVisitor
 {
-	// lifetime management
-	virtual ~LogAccessor( void ) {}
-	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
-
 	// basic line access (for SViewCellBuffer)
 	virtual nlineno_t GetNumLines( void ) const = 0;
 	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const = 0;
-	virtual void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const = 0;
 
-	// line/field access
-	virtual bool IsLineRegular( nlineno_t line_no ) const = 0;
+// NIEL remove after re-factoring
 	virtual nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const = 0;
-	virtual fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const = 0;
 	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
-
-	// timezone control
-	virtual void SetTimezoneOffset( int offset_sec ) = 0;
 
 	// field schema access
 	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * LogAccessor
+ -----------------------------------------------------------------------*/
+
+struct LogAccessor : public ViewAccessor
+{
+	// core setup
+	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
+	virtual void CreateViewAccessor( void ) = 0;
+
+	// timezone control
+	virtual void SetTimezoneOffset( int offset_sec ) = 0;
 };
 
 

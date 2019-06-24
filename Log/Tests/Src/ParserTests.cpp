@@ -100,6 +100,8 @@ const time_t c_RefUtcDatum{ 1514817582 };    // Mon, 1  Jan 2018 14:39:42 GMT+00
 // mock line accessor
 struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 {
+	nlineno_t m_LineNo{ 0 };
+
 	// non-field log line text
 	const std::string & m_LogText;
 	const std::string & m_AnnotationText;
@@ -110,7 +112,6 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 	U_LineAccessor( const std::string & log_text, const std::string & annotation_text )
 		: m_LogText{ log_text }, m_AnnotationText{ annotation_text }
 	{
-		SetLineNo( 0 );
 		/* 0 */ m_FieldValues.push_back( (uint64_t) 42 );
 				m_TextValues.push_back( "42" );
 		/* 1 */ m_FieldValues.push_back( (uint64_t) 100 );
@@ -134,6 +135,10 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 
 	nlineno_t GetLength( void ) const override {
 		return nlineno_cast( m_LogText.size() );
+	}
+
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
 	}
 
 	static void StrToChrPtr( const std::string & str, const char ** first, const char ** last ) {

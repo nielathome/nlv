@@ -174,17 +174,18 @@ public:
  * LogfileTimecodeAccessor
  -----------------------------------------------------------------------*/
 
-struct LogAccessor;
+struct ViewAccessor;
 class LogfileTimecodeAccessor : public GlobalTracker::NTimecodeAccessor
 {
 private:
-	const LogAccessor * f_LogAccessor;
+	// NIEL naming is now broken
+	const ViewAccessor * f_ViewAccessor;
 
 protected:
 	NTimecode GetUtcTimecode( int line_no ) const override;
 
 public:
-	LogfileTimecodeAccessor( LogAccessor * accessor );
+	LogfileTimecodeAccessor( ViewAccessor * accessor );
 };
 
 

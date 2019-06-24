@@ -37,7 +37,7 @@ vint_t SViewCellBuffer::GetGlobalTrackerLine( unsigned idx ) const
 	if( !tracker.IsInUse() )
 		return -1;
 
-	ViewTimecodeAccessor accessor{ this, m_LogAccessor };
+	ViewTimecodeAccessor accessor{ this, m_ViewAccessor };
 	const NTimecode & target{ tracker.GetUtcTimecode() };
 
 	vint_t low_idx{ 0 }, high_idx{ m_NumLinesOrOne - 1 };
@@ -63,7 +63,7 @@ vint_t SViewCellBuffer::GetGlobalTrackerLine( unsigned idx ) const
 int SViewCellBuffer::MarkValue( vint_t line_no, int bit ) const
 {
 	int res{ 0 };
-	const ViewTimecodeAccessor accessor{ this, m_LogAccessor };
+	const ViewTimecodeAccessor accessor{ this, m_ViewAccessor };
 	const vint_t max_line_no{ m_NumLinesOrOne - 1 };
 
 	for( const GlobalTracker & tracker : GlobalTrackers::GetTrackers() )
@@ -242,8 +242,8 @@ struct FilterVisitor : public LineVisitor::Visitor
 void SViewCellBuffer::Filter( Selector * selector, bool add_irregular )
 {
 	PerfTimer timer;
-	FilterVisitor visitor{ selector, m_LineAdornmentsProvider, m_LogAccessor->GetNumLines(), add_irregular };
-	m_LogAccessor->VisitLines( visitor, m_FieldViewMask, false );
+	FilterVisitor visitor{ selector, m_LineAdornmentsProvider, m_ViewAccessor->GetNumLines(), add_irregular };
+	m_ViewAccessor->VisitLines( visitor, m_FieldViewMask, false );
 	visitor.Finish();
 
 	m_Lines = visitor.f_Lines;
@@ -261,7 +261,7 @@ void SViewCellBuffer::Filter( Selector * selector, bool add_irregular )
 	m_Tracker.RecordEvent();
 
 	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_LogAccessor->GetNumLines() ) );
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_ViewAccessor->GetNumLines() ) );
 }
 
 
@@ -362,7 +362,7 @@ std::vector<nlineno_t> SViewCellBuffer::Search( Selector * selector ) const
 	if( !m_IsEmpty )
 	{
 		PerfTimer timer;
-		m_LogAccessor->VisitLines( visitor, m_FieldViewMask, true, m_NumLinesOrOne );
+		m_ViewAccessor->VisitLines( visitor, m_FieldViewMask, true, m_NumLinesOrOne );
 		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
 	}
 

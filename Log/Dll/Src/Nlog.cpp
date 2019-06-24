@@ -751,15 +751,15 @@ void GlobalTrackers::SetGlobalTracker( unsigned tracker_idx, const NTimecode & u
  * LogfileTimecodeAccessor
  -----------------------------------------------------------------------*/
 
-LogfileTimecodeAccessor::LogfileTimecodeAccessor( LogAccessor * accessor )
-	: f_LogAccessor{ accessor }
+LogfileTimecodeAccessor::LogfileTimecodeAccessor( ViewAccessor * accessor )
+	: f_ViewAccessor{ accessor }
 {
 }
 
 
 NTimecode LogfileTimecodeAccessor::GetUtcTimecode( int line_no ) const
 {
-	return f_LogAccessor->GetUtcTimecode( line_no );
+	return f_ViewAccessor->GetUtcTimecode( line_no );
 }
 
 

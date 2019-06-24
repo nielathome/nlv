@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2017-2018 Niel Clausen. All rights reserved.
+// Copyright (C) 2017-2019 Niel Clausen. All rights reserved.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -64,7 +64,7 @@ private:
  * LineCache
  -----------------------------------------------------------------------*/
 
-class LineCache : public LineBuffer
+class LineCache
 {
 public:
 	LineCache( CacheStatistics & stats )
@@ -151,6 +151,37 @@ void LineFormatter::Apply( const LineBuffer & text, LineBuffer * fmt ) const
 }
 
 
+/*-----------------------------------------------------------------------
+ * MapViewAccessor, declarations
+ -----------------------------------------------------------------------*/
+
+class MapLogAccessor;
+
+class MapViewAccessor : public ViewAccessor
+{
+private:
+	// our substrate
+	MapLogAccessor * m_LogAccessor;
+
+protected:
+	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const {
+		return view_line_no; //  m_LineMap[ view_line_no ];
+	}
+
+public:
+	MapViewAccessor( MapLogAccessor * accessor );
+
+public:
+	// ViewAccessor interfaces
+
+	nlineno_t GetNumLines( void ) const override;
+	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
+	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override;
+	NTimecode GetUtcTimecode( nlineno_t line_no ) const override;
+	const LogSchemaAccessor * GetSchema( void ) const override;
+};
+
+
 
 /*-----------------------------------------------------------------------
  * MapLogAccessor, declarations
@@ -197,39 +228,26 @@ protected:
 	MapLogAccessor( LogAccessorDescriptor & descriptor );
 
 public:
-	// LogAccessor interfaces
+	// ViewAccessor intefaces
 
-	Error Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines ) override;
 	nlineno_t GetNumLines( void ) const override;
 	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
-	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const override;
-
-	bool IsLineRegular( nlineno_t line_no ) const override {
-		return m_Index->IsLineRegular( line_no );
-	}
-
-	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override {
-		return m_Index->GetLineLength( line_no, field_mask );
-	}
-
-	fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const override {
-		return m_Index->GetFieldValue( line_no, field_id );
-	}
-
-	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
-		const NTimecodeBase & timecode_base{ GetTimecodeBase() };
-		const int64_t offset{ GetFieldValue( line_no, timecode_base.GetFieldId() ).As<int64_t>() };
-
-		// apply the timezone offset to the result
-		return NTimecode{ timecode_base.GetUtcDatum() - m_TzOffset, offset };
-	}
 
 	void SetTimezoneOffset( int offset_sec ) override {
 		m_TzOffset = offset_sec;
 	}
 
+public:
+	// LogAccessor interfaces
+
+	Error Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines ) override;
+
 	const LogSchemaAccessor * GetSchema( void ) const override {
 		return this;
+	}
+
+	void CreateViewAccessor( void ) override {
+//		return nullptr;
 	}
 
 public:
@@ -260,10 +278,29 @@ public:
 	}
 
 public:
-	static LogAccessor * MakeMapLogAccessor( LogAccessorDescriptor & descriptor )
-	{
-		return new MapLogAccessor( descriptor );
+	// MapLineAccessor interfaces
+
+	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const;
+
+	bool IsLineRegular( nlineno_t line_no ) const {
+		return m_Index->IsLineRegular( line_no );
 	}
+
+nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const {
+	return m_Index->GetLineLength( line_no, field_mask );
+}
+
+	fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const {
+		return m_Index->GetFieldValue( line_no, field_id );
+	}
+
+NTimecode GetUtcTimecode( nlineno_t line_no ) const {
+	const NTimecodeBase & timecode_base{ GetTimecodeBase() };
+	const int64_t offset{ GetFieldValue( line_no, timecode_base.GetFieldId() ).As<int64_t>() };
+
+	// apply the timezone offset to the result
+	return NTimecode{ timecode_base.GetUtcDatum() - m_TzOffset, offset };
+}
 
 	void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const
 	{
@@ -282,6 +319,12 @@ public:
 		*first = m_Text + first_offset;
 		*last = m_Text + last_offset;
 	}
+
+public:
+	static LogAccessor * MakeMapLogAccessor( LogAccessorDescriptor & descriptor )
+	{
+		return new MapLogAccessor( descriptor );
+	}
 };
 
 
@@ -292,6 +335,41 @@ static OnEvent RegisterMapLogAccessor
 		LogAccessorFactory::RegisterLogAccessor( "map", MapLogAccessor::MakeMapLogAccessor );
 	}
 };
+
+
+
+/*-----------------------------------------------------------------------
+ * MapViewAccessor, definitions
+ -----------------------------------------------------------------------*/
+
+nlineno_t MapViewAccessor::GetNumLines( void ) const
+{
+	return m_LogAccessor->GetNumLines();
+}
+
+
+const LineBuffer & MapViewAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const 
+{
+	return m_LogAccessor->GetLine( type, line_no, field_mask );
+}
+
+
+nlineno_t MapViewAccessor::GetLineLength( nlineno_t line_no, uint64_t field_mask ) const
+{
+	return m_LogAccessor->GetLineLength( line_no, field_mask );
+}
+
+
+NTimecode MapViewAccessor::GetUtcTimecode( nlineno_t line_no ) const
+{
+	return m_LogAccessor->GetUtcTimecode( line_no );
+}
+
+
+const LogSchemaAccessor * MapViewAccessor::GetSchema( void ) const
+{
+	return m_LogAccessor->GetSchema();
+}
 
 
 
@@ -453,7 +531,6 @@ nlineno_t MapLogAccessor::GetNumLines( void ) const
 
 
 
-
 /*-----------------------------------------------------------------------
  * MapLineAccessorIrregular
  -----------------------------------------------------------------------*/
@@ -463,15 +540,16 @@ class MapLineAccessorIrregular : public LineAccessorIrregular
 private:
 	const MapLogAccessor & m_LogAccessor;
 
+	nlineno_t m_LineNo{ 0 };
 	nlineno_t m_ContinuationLineCount{ -1 };
 	nlineno_t m_ContinuationLine{ 0 };
 
 	void Setup( void ) {
-		nlineno_t line_no{ GetLineNo() };
+		nlineno_t line_no{ m_LineNo };
 		while( !m_LogAccessor.IsLineRegular( ++line_no ) )
 			;
 
-		m_ContinuationLineCount = line_no - GetLineNo() - 1;
+		m_ContinuationLineCount = line_no - m_LineNo - 1;
 		m_ContinuationLine = 0;
 	}
 
@@ -481,7 +559,7 @@ public:
 
 	void Reset( nlineno_t line_no ) {
 		m_ContinuationLineCount = -1;
-		SetLineNo( line_no );
+		m_LineNo = line_no;
 	}
 
 	MapLineAccessorIrregular * NextIrregular( void ) {
@@ -490,14 +568,21 @@ public:
 
 		if( m_ContinuationLine++ < m_ContinuationLineCount )
 		{
-			SetLineNo( GetLineNo() + 1 );
+			m_LineNo += 1;
 			return this;
 		}
 		return nullptr;
 	}
 
+public:
+	// LineAccessorIrregular intefaces
+
 	nlineno_t GetLength( void ) const override {
-		return m_LogAccessor.GetLineLength( GetLineNo(), 0 );
+		return m_LogAccessor.GetLineLength( m_LineNo, 0 );
+	}
+
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
 	}
 };
 
@@ -510,6 +595,8 @@ public:
 class MapLineAccessor : public LineAccessor
 {
 private:
+	nlineno_t m_LineNo{ 0 };
+
 	// transient store for line information
 	mutable LineBuffer m_LineBuffer;
 
@@ -537,14 +624,25 @@ public:
 
 	void SetLineNo( nlineno_t line_no ) {
 		m_Irregulars.Reset( line_no );
-		LineAccessor::SetLineNo( line_no );
+		m_LineNo =line_no;
+	}
+
+public:
+	// LineAccessorIrregular interfaces
+
+	nlineno_t GetLength( void ) const override {
+		return m_LogAccessor.GetLineLength( m_LineNo, m_FieldMask );
+	}
+
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
 	}
 
 public:
 	// LineAccessor interfaces
 
 	bool IsRegular( void ) const override {
-		return m_LogAccessor.IsLineRegular( GetLineNo() );
+		return m_LogAccessor.IsLineRegular( m_LineNo );
 	}
 
 	// switch this line accessor to the next continuation line
@@ -552,33 +650,29 @@ public:
 		return m_Irregulars.NextIrregular();
 	}
 
-	nlineno_t GetLength( void ) const override {
-		return m_LogAccessor.GetLineLength( GetLineNo(), m_FieldMask );
-	}
-
 	void GetText( const char ** first, const char ** last ) const override {
 		m_LineBuffer.Clear();
 
-		m_LogAccessor.CopyLine( e_LineData::Text, GetLineNo(), m_FieldMask, &m_LineBuffer );
+		m_LogAccessor.CopyLine( e_LineData::Text, m_LineNo, m_FieldMask, &m_LineBuffer );
 
 		*first = m_LineBuffer.First();
 		*last = m_LineBuffer.Last();
 	}
 
 	void GetNonFieldText( const char ** first, const char ** last ) const override {
-		m_LogAccessor.GetNonFieldText( GetLineNo(), first, last );
+		m_LogAccessor.GetNonFieldText( m_LineNo, first, last );
 	}
 
 	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
-		m_LogAccessor.GetFieldText( GetLineNo(), field_id, first, last );
+		m_LogAccessor.GetFieldText( m_LineNo, field_id, first, last );
 	}
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
-		return m_LogAccessor.GetFieldValue( GetLineNo(), field_id );
+		return m_LogAccessor.GetFieldValue( m_LineNo, field_id );
 	}
 
 	NTimecode GetUtcTimecode( void ) const override {
-		return m_LogAccessor.GetUtcTimecode( GetLineNo() );
+		return m_LogAccessor.GetUtcTimecode( m_LineNo );
 	}
 };
 

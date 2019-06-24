@@ -212,23 +212,23 @@ public:
 
 	Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t ) override;
 	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
-	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const override;
+//	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const override;
 
 	nlineno_t GetNumLines( void ) const override {
 		return m_NumLines;
 	}
 
-	bool IsLineRegular( nlineno_t line_no ) const override {
-		return true;
-	}
+	//bool IsLineRegular( nlineno_t line_no ) const override {
+	//	return true;
+	//}
 
 	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override {
 		return 0;
 	}
 
-	fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const override {
-		return FieldValue{};
-	}
+	////fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const override {
+	////	return FieldValue{};
+	////}
 
 	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
 		return NTimecode{};
@@ -266,6 +266,14 @@ public:
 	const NTimecodeBase & GetTimecodeBase( void ) const override {
 		return m_TimecodeBase;
 	}
+
+
+
+	void CreateViewAccessor( void ) override {
+		//		return nullptr;
+	}
+
+
 
 public:
 	static LogAccessor * MakeSqlLogAccessor( LogAccessorDescriptor & descriptor )
@@ -324,10 +332,10 @@ const LineBuffer & SqlLogAccessor::GetLine( e_LineData type, nlineno_t line_no, 
 }
 
 
-void SqlLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const
-{
-
-}
+//void SqlLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const
+//{
+//
+//}
 
 
 
