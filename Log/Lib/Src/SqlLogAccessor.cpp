@@ -179,6 +179,78 @@ Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement )
 
 
 /*-----------------------------------------------------------------------
+* MapViewAccessor, declarations
+-----------------------------------------------------------------------*/
+
+class SqlLogAccessor;
+
+class SqlViewAccessor : public ViewAccessor
+{
+private:
+	// our substrate
+	SqlLogAccessor * m_LogAccessor;
+
+	// map a view line number (index) to a logfile line number (value)
+	std::vector<nlineno_t> m_LineMap;
+
+	// warning: an empty Scintilla document has a line count of 1
+	// this flag disambiguates the two cases
+	bool m_IsEmpty{ true };
+	nlineno_t m_NumLinesOrOne{ 0 };
+
+public:
+	SqlViewAccessor( SqlLogAccessor * accessor )
+		: m_LogAccessor{ accessor }
+	{}
+
+public:
+	// LineVisitor interface
+
+	void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const override {}
+	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override {}
+
+public:
+	// ViewAccessor interfaces
+
+	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override {
+		static LineBuffer stack;
+		return stack;
+	}
+	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override {
+		return 0;
+	}
+	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
+		return NTimecode{};
+	}
+	ViewMap Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, uint64_t mask, bool add_irregular ) {
+		std::vector<nlineno_t> lines;
+		return ViewMap{ std::move(lines), 0, true, 1 };
+	}
+
+	// fetch nearest preceding view line number to the supplied log line
+	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
+		return 0;
+//		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
+	}
+
+	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
+		return m_LineMap[ view_line_no ];
+	}
+
+public:
+	// MapLineAccessor interfaces
+
+	//nlineno_t GetNumLines( void ) const;
+	//bool IsLineRegular( nlineno_t line_no ) const;
+	//void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const;
+	//void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const;
+	//void GetFieldText( nlineno_t line_no, unsigned field_id, const char ** first, const char ** last ) const;
+	//fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const;
+};
+
+
+
+/*-----------------------------------------------------------------------
  * SqlLogAccessor, declarations
  -----------------------------------------------------------------------*/
 
@@ -202,8 +274,9 @@ private:
 
 protected:
 	// LineVisitor interface
+
 	void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const override;
-	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines ) const override;
+	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override;
 
 	SqlLogAccessor( LogAccessorDescriptor & descriptor );
 
@@ -211,28 +284,28 @@ public:
 	// LogAccessor interfaces
 
 	Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t ) override;
-	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
+//	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
 //	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const override;
 
-	nlineno_t GetNumLines( void ) const override {
-		return m_NumLines;
-	}
+	//nlineno_t GetNumLines( void ) const override {
+	//	return m_NumLines;
+	//}
 
 	//bool IsLineRegular( nlineno_t line_no ) const override {
 	//	return true;
 	//}
 
-	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override {
-		return 0;
-	}
+	//nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override {
+	//	return 0;
+	//}
 
-	////fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const override {
-	////	return FieldValue{};
-	////}
+	//////fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const override {
+	//////	return FieldValue{};
+	//////}
 
-	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
-		return NTimecode{};
-	}
+	//NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
+	//	return NTimecode{};
+	//}
 
 	void SetTimezoneOffset( int offset_sec ) override {}
 
@@ -269,8 +342,8 @@ public:
 
 
 
-	void CreateViewAccessor( void ) override {
-		//		return nullptr;
+	viewaccessor_ptr_t CreateViewAccessor( void ) override {
+		return std::make_unique<SqlViewAccessor>( this );
 	}
 
 
@@ -325,11 +398,11 @@ Error SqlLogAccessor::CalcNumLines( void )
 	return res;
 }
 
-const LineBuffer & SqlLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
-{
-	static LineBuffer b;
-	return b;
-}
+//const LineBuffer & SqlLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
+//{
+//	static LineBuffer b;
+//	return b;
+//}
 
 
 //void SqlLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const
@@ -347,7 +420,7 @@ void SqlLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no, uint64_t f
 }
 
 
-void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines ) const
+void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const
 {
 
 }

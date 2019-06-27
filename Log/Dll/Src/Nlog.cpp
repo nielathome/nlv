@@ -418,7 +418,7 @@ NFilterView::NFilterView( logfile_ptr_t logfile )
 	m_Logfile{ logfile },
 	m_Adornments{ logfile->GetAdornments() },
 	m_AdornmentsProvider{ logfile->GetAdornments().get() },
-	m_CellBuffer{ logfile->GetLogAccessor(), &m_AdornmentsProvider }
+	m_CellBuffer{ logfile->GetLogAccessor()->CreateViewAccessor(), &m_AdornmentsProvider }
 {
 	Match descriptor{ Match::Type::e_Literal, std::string{}, false };
 	std::unique_ptr<Selector> selector{ Selector::MakeSelector( descriptor, true ) };
@@ -688,9 +688,9 @@ void NView::SetFieldMask( uint64_t field_mask )
  * GlobalTracker
  -----------------------------------------------------------------------*/
 
-bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAccessor * accessor ) const
+bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAccessor & accessor ) const
 {
-	const NTimecode timecode{ accessor->GetUtcTimecode( line_no ) };
+	const NTimecode timecode{ accessor.GetUtcTimecode( line_no ) };
 	const int64_t delta{ timecode - f_UtcTimecode };
 
 	const bool tracker_at_or_before{ delta >= 0 };
@@ -707,7 +707,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAcce
 	// tracker is at, or before, this line
 	if( tracker_at_or_before )
 	{
-		const NTimecode prev_timecode{ accessor->GetUtcTimecode( line_no - 1 ) };
+		const NTimecode prev_timecode{ accessor.GetUtcTimecode( line_no - 1 ) };
 		const int64_t prev_delta{ prev_timecode - f_UtcTimecode };
 		const bool tracker_at_or_before_prev{ prev_delta >= 0 };
 
@@ -720,7 +720,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAcce
 	// tracker is after this line
 	else
 	{
-		const NTimecode next_timecode{ accessor->GetUtcTimecode( line_no + 1 ) };
+		const NTimecode next_timecode{ accessor.GetUtcTimecode( line_no + 1 ) };
 		const int64_t next_delta{ next_timecode - f_UtcTimecode };
 		const bool tracker_at_or_after_next{ next_delta <= 0 };
 
@@ -748,18 +748,18 @@ void GlobalTrackers::SetGlobalTracker( unsigned tracker_idx, const NTimecode & u
 
 
 /*-----------------------------------------------------------------------
- * LogfileTimecodeAccessor
+ * ViewTimecodeAccessor
  -----------------------------------------------------------------------*/
 
-LogfileTimecodeAccessor::LogfileTimecodeAccessor( ViewAccessor * accessor )
+ViewTimecodeAccessor::ViewTimecodeAccessor( const ViewAccessor & accessor )
 	: f_ViewAccessor{ accessor }
 {
 }
 
 
-NTimecode LogfileTimecodeAccessor::GetUtcTimecode( int line_no ) const
+NTimecode ViewTimecodeAccessor::GetUtcTimecode( int line_no ) const
 {
-	return f_ViewAccessor->GetUtcTimecode( line_no );
+	return f_ViewAccessor.GetUtcTimecode( line_no );
 }
 
 

@@ -86,6 +86,7 @@
     <ClInclude Include="Hdr\FileMap.h" />
     <ClInclude Include="Hdr\LogAccessor.h" />
     <ClInclude Include="Hdr\Nfilesystem.h" />
+    <ClInclude Include="Hdr\Nline.h" />
     <ClInclude Include="Hdr\Nmisc.h" />
     <ClInclude Include="Hdr\Match.h" />
     <ClInclude Include="Hdr\Ntime.h" />

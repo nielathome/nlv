@@ -494,7 +494,7 @@ private:
 
 protected:
 	// virtualised cell buffer
-	SViewCellBuffer m_CellBuffer{ nullptr, nullptr };
+	SViewCellBuffer m_CellBuffer;
 
 	// array of hiliters
 	std::vector<hiliter_ptr_t> m_Hiliters;

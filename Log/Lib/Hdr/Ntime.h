@@ -128,7 +128,7 @@ public:
 	{
 		virtual NTimecode GetUtcTimecode( int line_no ) const = 0;
 	};
-	bool IsNearest( int line_no, int max_line_no, const NTimecodeAccessor * accessor ) const;
+	bool IsNearest( int line_no, int max_line_no, const NTimecodeAccessor & accessor ) const;
 
 	void SetUtcTimecode( const NTimecode & timecode ) {
 		f_InUse = true;
@@ -171,21 +171,18 @@ public:
 
 
 /*-----------------------------------------------------------------------
- * LogfileTimecodeAccessor
+ * ViewTimecodeAccessor
  -----------------------------------------------------------------------*/
 
 struct ViewAccessor;
-class LogfileTimecodeAccessor : public GlobalTracker::NTimecodeAccessor
+class ViewTimecodeAccessor : public GlobalTracker::NTimecodeAccessor
 {
 private:
-	// NIEL naming is now broken
-	const ViewAccessor * f_ViewAccessor;
-
-protected:
-	NTimecode GetUtcTimecode( int line_no ) const override;
+	const ViewAccessor & f_ViewAccessor;
 
 public:
-	LogfileTimecodeAccessor( ViewAccessor * accessor );
+	ViewTimecodeAccessor( const ViewAccessor & accessor );
+	NTimecode GetUtcTimecode( int line_no ) const override;
 };
 
 

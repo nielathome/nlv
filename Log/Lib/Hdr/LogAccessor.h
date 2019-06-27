@@ -17,6 +17,7 @@
 #pragma once
 
 // Nlog includes
+#include "Match.h"
 #include "Nfilesystem.h"
 #include "Ntime.h"
 #include "Ntrace.h"
@@ -269,25 +270,20 @@ struct LineVisitor
 		// can be called from multiple threads; note that the visit_line_no and the
 		// log_line line number can be different - the visitor line numbers are mapped
 		// by the VisitLineToLogLine member
-		virtual void Action( const LineAccessor & log_line, nlineno_t visit_line_no ) = 0;
+		virtual void Action( const LineAccessor & line, nlineno_t visit_line_no ) = 0;
 
-		// map a view line number to a log file line number; by default, the
-		// two number spaces are the same
-		virtual nlineno_t VisitLineToLogLine( nlineno_t visit_line_no ) const {
-			return visit_line_no;
-		}
 	};
-	using task_t = std::shared_ptr<Task>;
+	using task_ptr_t = std::shared_ptr<Task>;
 
 	// Visitor interface (callback); implemented by Visitor user
 	struct Visitor
 	{
 		// create a new Task for processing a subset of lines
-		virtual task_t MakeTask( nlineno_t num_lines ) = 0;
+		virtual task_ptr_t MakeTask( nlineno_t num_lines ) = 0;
 
 		// combine the computed results from the Task into this Visitor
 		// guaranteed to be called in visitor line-number sequence
-		virtual void Join( task_t task ) = 0;
+		virtual void Join( task_ptr_t task ) = 0;
 	};
 
 	// "visit" a single line; use as a generalised line accessor
@@ -315,7 +311,7 @@ struct LineVisitor
 	}
 
 	// visit all lines in scope; use for searching/filtering
-	virtual void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines = -1 ) const = 0;
+	virtual void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const = 0;
 };
 
 
@@ -393,19 +389,40 @@ enum class e_LineData
 };
 
 
+struct ViewMap
+{
+	std::vector<nlineno_t> f_Lines;
+	const nlineno_t f_TextLen{ 0 };
+	const bool f_IsEmpty{ true };
+	const nlineno_t f_NumLinesOrOne{ 0 };
+
+	ViewMap( std::vector<nlineno_t> && lines, nlineno_t text_len, bool is_empty, nlineno_t numlines_or_one )
+		:
+		f_Lines{ std::move( lines ) },
+		f_TextLen{ text_len },
+		f_IsEmpty{ is_empty },
+		f_NumLinesOrOne{ numlines_or_one }
+	{}
+};
+
+
 struct ViewAccessor : public LineVisitor
 {
 	// basic line access (for SViewCellBuffer)
-	virtual nlineno_t GetNumLines( void ) const = 0;
+//	virtual nlineno_t GetNumLines( void ) const = 0;
 	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const = 0;
+	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
+	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
 
 // NIEL remove after re-factoring
 	virtual nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const = 0;
 	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
 
-	// field schema access
-	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
+	// map data can be returned null
+	virtual ViewMap Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, uint64_t mask, bool add_irregular ) = 0;
 };
+
+using viewaccessor_ptr_t = std::unique_ptr<ViewAccessor>;
 
 
 
@@ -413,11 +430,14 @@ struct ViewAccessor : public LineVisitor
  * LogAccessor
  -----------------------------------------------------------------------*/
 
-struct LogAccessor : public ViewAccessor
+struct LogAccessor : public LineVisitor
 {
 	// core setup
 	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
-	virtual void CreateViewAccessor( void ) = 0;
+	virtual viewaccessor_ptr_t CreateViewAccessor( void ) = 0;
+
+	// field schema access
+	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
 
 	// timezone control
 	virtual void SetTimezoneOffset( int offset_sec ) = 0;

@@ -44,7 +44,7 @@ private:
 
 	// the lifetimes of the objects pointed-to here must be managed by this
 	// objects owner
-	ViewAccessor * m_ViewAccessor{ nullptr };
+	viewaccessor_ptr_t m_ViewAccessor;
 	LineAdornmentsProvider * m_LineAdornmentsProvider{ nullptr };
 
 protected:
@@ -54,23 +54,20 @@ protected:
 	// line start locations in the view
 	std::vector<vint_t> m_Lines;
 
-	// map a view line number (index) to a logfile line number (value)
-	std::vector<vint_t> m_LineMap;
-
 	// local copies of key metrics
 	vint_t m_TextLen{ 0 };
 	vint_t m_NumLinesOrOne{ 0 };
 
 	// warning: an empty Scintilla document has a line count of 1
 	// this flag disambiguates the two cases
-	bool m_IsEmpty{ false };
+	bool m_IsEmpty{ true };
 
 	// list of fields to display
 	uint64_t m_FieldViewMask{ 0 };
 
 	// determine the number of characters in a view line
 	vint_t GetLineLength( vint_t view_line_no ) const {
-		return m_ViewAccessor->GetLineLength( ViewLineToLogLine( view_line_no ), m_FieldViewMask );
+		return m_ViewAccessor->GetLineLength( view_line_no, m_FieldViewMask );
 	}
 
 	// convert a view position into a view line number and an offset within that line
@@ -98,8 +95,9 @@ protected:
 public:
 	// non-Scintilla interfaces
 
-	SViewCellBuffer( ViewAccessor * accessor, LineAdornmentsProvider * provider )
-		: m_ViewAccessor{ accessor }, m_LineAdornmentsProvider{ provider } {}
+	SViewCellBuffer( void ) {}
+	SViewCellBuffer( viewaccessor_ptr_t && accessor, LineAdornmentsProvider * provider )
+		: m_ViewAccessor{ std::move(accessor) }, m_LineAdornmentsProvider{ provider } {}
 
 	LineAdornmentsProvider * GetLineAdornmentsProvider( void ) const {
 		return m_LineAdornmentsProvider;
@@ -110,19 +108,24 @@ public:
 	}
 
 	vint_t GetGlobalTrackerLine( unsigned idx ) const;
-	vint_t LogLineToViewLine( vint_t log_line_no, bool exact = false ) const;
+
+	vint_t LogLineToViewLine( vint_t log_line_no, bool exact = false ) const {
+		return m_ViewAccessor->LogLineToViewLine( log_line_no, exact );
+	}
+
 	vint_t ViewLineToLogLine( vint_t view_line_no ) const {
-		return m_LineMap[ view_line_no ];
+		return m_ViewAccessor->ViewLineToLogLine( view_line_no );
 	}
 
 	const LineBuffer & GetLine( e_LineData type, vint_t view_line_no ) const {
-		return m_ViewAccessor->GetLine( type, ViewLineToLogLine( view_line_no ), m_FieldViewMask );
+		return m_ViewAccessor->GetLine( type, view_line_no, m_FieldViewMask );
 	}
 
 	bool IsEmpty( void ) const {
 		return m_IsEmpty;
 	}
 
+	// NIEL remove
 	vint_t GetNumLines( void ) const {
 		return IsEmpty() ? 0 : m_NumLinesOrOne;
 	}
@@ -138,30 +141,11 @@ public:
 	int MarkValue( vint_t line_no, int marker_base ) const;
 
 	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
-// NIEL should not be needed
+// NIEL should not be needed - move callers to the accessor
 	template<typename T_FUNC>
 	void VisitLine( nlineno_t visit_line_no, T_FUNC & functor )
 	{
-		using functor_t = T_FUNC;
-
-		struct Task : public LineVisitor::Task
-		{
-			const SViewCellBuffer & f_CellBuffer;
-			functor_t & f_Functor;
-			Task( const SViewCellBuffer & cell_buffer, functor_t & functor )
-				: f_CellBuffer{ cell_buffer }, f_Functor{ functor } {}
-
-			nlineno_t VisitLineToLogLine( nlineno_t visit_line_no ) const override {
-				return f_CellBuffer.ViewLineToLogLine( visit_line_no );
-			}
-
-			void Action( const LineAccessor & line, nlineno_t visit_line_no ) override {
-				f_Functor( line );
-			}
-		};
-
-		Task task{ *this, functor };
-		m_ViewAccessor->VisitLine( task, visit_line_no );
+		m_ViewAccessor->VisitLine( visit_line_no, functor );
 	}
 
 public:
@@ -309,25 +293,5 @@ public:
 	}
 	void PerformRedoStep( void ) override {
 		UnsupportedVoid( __FUNCTION__ );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * ViewTimecodeAccessor
- -----------------------------------------------------------------------*/
-
-class ViewTimecodeAccessor : public LogfileTimecodeAccessor
-{
-private:
-	const SViewCellBuffer * f_CellBuffer;
-
-public:
-	ViewTimecodeAccessor( const SViewCellBuffer * cell_buffer, ViewAccessor * accessor )
-		: LogfileTimecodeAccessor{ accessor }, f_CellBuffer{ cell_buffer } {}
-
-	NTimecode GetUtcTimecode( vint_t line_no ) const override {
-		return LogfileTimecodeAccessor::GetUtcTimecode( f_CellBuffer->ViewLineToLogLine( line_no ) );
 	}
 };

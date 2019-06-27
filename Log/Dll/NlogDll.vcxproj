@@ -109,7 +109,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Hdr\Nline.h" />
     <ClInclude Include="Hdr\Ntypes.h" />
     <ClInclude Include="Hdr\Nlog.h" />
     <ClInclude Include="Hdr\SCellBuffer.h" />
