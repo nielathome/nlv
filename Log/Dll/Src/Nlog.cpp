@@ -416,8 +416,7 @@ NLogAccessor::NLogAccessor( LogAccessorDescriptor & descriptor )
 NFilterView::NFilterView( logfile_ptr_t logfile )
 	:
 	m_Logfile{ logfile },
-	m_Adornments{ logfile->GetAdornments() },
-	m_AdornmentsProvider{ logfile->GetAdornments().get() },
+	m_AdornmentsProvider{ logfile->GetAdornments() },
 	m_CellBuffer{ logfile->GetLogAccessor()->CreateViewAccessor(), &m_AdornmentsProvider }
 {
 	Match descriptor{ Match::Type::e_Literal, std::string{}, false };
@@ -504,7 +503,7 @@ void NFilterView::SetNumHiliter( unsigned num_hiliter )
 void NFilterView::ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line )
 {
 	for( int line_no = view_fm_line; line_no <= view_to_line; ++line_no )
-		m_Adornments->ToggleUsermark( m_CellBuffer.ViewLineToLogLine( line_no) );
+		GetAdornments()->ToggleUsermark( m_CellBuffer.ViewLineToLogLine( line_no) );
 }
 
 
@@ -514,7 +513,7 @@ vint_t NFilterView::GetNextVisibleLine( vint_t view_line_no, bool forward, vint_
 	vint_t log_line_no{ m_CellBuffer.ViewLineToLogLine( view_line_no ) };
 	while( true )
 	{
-		log_line_no = (m_Adornments.get()->*get_next_log_line)(log_line_no, forward);
+		log_line_no = (GetAdornments().get()->*get_next_log_line)(log_line_no, forward);
 		if( log_line_no < 0 )
 			return log_line_no;
 
@@ -537,15 +536,16 @@ vint_t NFilterView::GetNextAnnotation( vint_t view_line_no, bool forward )
 }
 
 
+// NIEL - and similar; part ov NView only, not lineset ?
 void NFilterView::SetLocalTrackerLine( vint_t line_no )
 {
-	m_Adornments->SetLocalTrackerLine( m_CellBuffer.ViewLineToLogLine( line_no ) );
+	GetAdornments()->SetLocalTrackerLine( m_CellBuffer.ViewLineToLogLine( line_no ) );
 }
 
 
 vint_t NFilterView::GetLocalTrackerLine( void )
 {
-	return m_CellBuffer.LogLineToViewLine( m_Adornments->GetLocalTrackerLine() );
+	return m_CellBuffer.LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
 }
 
 

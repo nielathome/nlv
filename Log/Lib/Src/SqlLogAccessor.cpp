@@ -343,7 +343,7 @@ public:
 
 
 	viewaccessor_ptr_t CreateViewAccessor( void ) override {
-		return std::make_unique<SqlViewAccessor>( this );
+		return std::make_shared<SqlViewAccessor>( this );
 	}
 
 

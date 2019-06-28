@@ -96,8 +96,8 @@ public:
 	// non-Scintilla interfaces
 
 	SViewCellBuffer( void ) {}
-	SViewCellBuffer( viewaccessor_ptr_t && accessor, LineAdornmentsProvider * provider )
-		: m_ViewAccessor{ std::move(accessor) }, m_LineAdornmentsProvider{ provider } {}
+	SViewCellBuffer( viewaccessor_ptr_t accessor, LineAdornmentsProvider * provider )
+		: m_ViewAccessor{ accessor }, m_LineAdornmentsProvider{ provider } {}
 
 	LineAdornmentsProvider * GetLineAdornmentsProvider( void ) const {
 		return m_LineAdornmentsProvider;

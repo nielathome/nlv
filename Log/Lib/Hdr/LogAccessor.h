@@ -422,7 +422,7 @@ struct ViewAccessor : public LineVisitor
 	virtual ViewMap Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, uint64_t mask, bool add_irregular ) = 0;
 };
 
-using viewaccessor_ptr_t = std::unique_ptr<ViewAccessor>;
+using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
 
 
 

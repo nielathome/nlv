@@ -274,7 +274,7 @@ public:
 	Error Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines ) override;
 
 	viewaccessor_ptr_t CreateViewAccessor( void ) override {
-		return std::make_unique<MapViewAccessor>( this );
+		return std::make_shared<MapViewAccessor>( this );
 	}
 
 	void SetTimezoneOffset( int offset_sec ) override {
@@ -783,7 +783,6 @@ public:
 		for( nlineno_t visit_line_no = m_BeginLine; visit_line_no < m_EndLine; ++visit_line_no )
 		{
 			// map line numbers from the "arbitrary" line number space to real log lines
-//const nlineno_t log_line_no{ m_Task->VisitLineToLogLine( i ) };
 			m_LineAccessor.SetLineNo( visit_line_no );
 
 			if( m_SkipIrregular && !m_LineAccessor.IsRegular() )

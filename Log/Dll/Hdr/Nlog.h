@@ -392,7 +392,7 @@ using adornments_ptr_t = boost::intrusive_ptr<NAdornments>;
 class NLineAdornmentsProvider : public LineAdornmentsProvider
 {
 private:
-	const NAdornments * m_Adornments;
+	adornments_ptr_t m_Adornments;
 
 protected:
 	// LogAdornmentsProvider interfaces
@@ -414,8 +414,12 @@ protected:
 	}
 
 public:
-	NLineAdornmentsProvider( const NAdornments * adornments )
+	NLineAdornmentsProvider( adornments_ptr_t adornments )
 		: m_Adornments{ adornments } {}
+
+	adornments_ptr_t & GetAdornments( void ) {
+		return m_Adornments;
+	}
 };
 
 
@@ -483,8 +487,7 @@ private:
 	// We are a view onto this logfile
 	logfile_ptr_t m_Logfile;
 
-	// the logfile's adornments, and a provider
-	adornments_ptr_t m_Adornments;
+	// the logfile's adornments
 	NLineAdornmentsProvider m_AdornmentsProvider;
 
 	// numeric access to defined fields
@@ -498,6 +501,10 @@ protected:
 
 	// array of hiliters
 	std::vector<hiliter_ptr_t> m_Hiliters;
+
+	adornments_ptr_t & GetAdornments( void ) {
+		return m_AdornmentsProvider.GetAdornments();
+	}
 
 public:
 	NFilterView( logfile_ptr_t logfile );
