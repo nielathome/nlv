@@ -39,7 +39,7 @@ vint_t SLineMarkers::MarkValue( vint_t line )
 bool SLineAnnotation::HasStateChanged( void ) const
 {
 	const bool annotations_changed{ m_LogAnnotationsTracker.CompareTo( m_LogAnnotations->GetTracker() ) };
-	const bool cellbuffer_changed{ m_CellBufferTracker.CompareTo( m_CellBuffer.GetTracker() ) };
+	const bool cellbuffer_changed{ m_ViewTracker.CompareTo( m_ViewAccessor->GetProperties()->GetTracker() ) };
 	return annotations_changed || cellbuffer_changed;
 }
 
@@ -55,8 +55,8 @@ annotationsizes_list_t SLineAnnotation::GetAnnotationSizes( void ) const
 	for( const annotationsizes_list_t::value_type & elem : logfile_sizes )
 	{
 		const vint_t log_line{ elem.first };
-		const vint_t nearest_view_line{ m_CellBuffer.LogLineToViewLine( log_line ) };
-		const vint_t nearest_log_line{ m_CellBuffer.ViewLineToLogLine( nearest_view_line ) };
+		const vint_t nearest_view_line{ m_ViewAccessor->LogLineToViewLine( log_line ) };
+		const vint_t nearest_log_line{ m_ViewAccessor->ViewLineToLogLine( nearest_view_line ) };
 
 		if( nearest_log_line == log_line )
 			// the log file annotation is visible in this view

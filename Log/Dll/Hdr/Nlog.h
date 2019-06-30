@@ -417,7 +417,7 @@ public:
 	NLineAdornmentsProvider( adornments_ptr_t adornments )
 		: m_Adornments{ adornments } {}
 
-	adornments_ptr_t & GetAdornments( void ) {
+	adornments_ptr_t GetAdornments( void ) {
 		return m_Adornments;
 	}
 };
@@ -437,15 +437,18 @@ private:
 	bool m_SelectorChanged{ true };
 	selector_ptr_t m_Selector;
 	
+	// the view to search within
+	logfile_ptr_t m_Logfile;
+	viewaccessor_ptr_t m_ViewAccessor;
+
+	// detect chnages in the underlying view accessor
+	ChangeTracker m_ViewTracker;
+
 private:
 	// list of lines matched
 	std::vector<nlineno_t> m_MatchedLines;
 	void SetupMatchedLines( void );
-
-	// associated cell buffer; we do not hold a lifetime reference as the NView does that
-	// for us
-	ChangeTracker m_CellBufferTracker;
-	const SViewCellBuffer * m_CellBuffer{ nullptr };
+	void CalcMatchedLines( void );
 
 public:
 	// the Scintilla "indicator" matching to this hiliter
@@ -455,8 +458,8 @@ public:
 	void Hilite( const vint_t start, const char * first, const char * last, VControl * vcontrol );
 
 public:
-	NHiliter( unsigned indicator, const SViewCellBuffer * cell_buffer )
-		: m_CellBuffer{ cell_buffer }, m_Indicator{ indicator } {}
+	NHiliter( unsigned indicator, logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
+		: m_Indicator{ indicator }, m_Logfile{ logfile }, m_ViewAccessor{ view_accessor } {}
 
 public:
 	// Python interfaces; note default constructor is non-functional
@@ -487,8 +490,8 @@ private:
 	// We are a view onto this logfile
 	logfile_ptr_t m_Logfile;
 
-	// the logfile's adornments
-	NLineAdornmentsProvider m_AdornmentsProvider;
+	// our view accessor
+	viewaccessor_ptr_t m_ViewAccessor;
 
 	// numeric access to defined fields
 	fieldvalue_t GetFieldValue( vint_t line_no, vint_t field_no );
@@ -502,17 +505,14 @@ protected:
 	// array of hiliters
 	std::vector<hiliter_ptr_t> m_Hiliters;
 
-	adornments_ptr_t & GetAdornments( void ) {
-		return m_AdornmentsProvider.GetAdornments();
-	}
+	adornments_ptr_t GetAdornments( void );
 
 public:
-	NFilterView( logfile_ptr_t logfile );
+	NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
 public:
 	// Python interfaces; note default constructor is non-functional
-	NFilterView( void )
-		: m_AdornmentsProvider{ nullptr } {}
+	NFilterView( void ) {}
 
 	// raw text access to defined text/fields
 	std::string GetNonFieldText( vint_t line_no );
@@ -531,7 +531,7 @@ public:
 
 	// line count
 	vint_t GetNumLines( void ) const {
-		return m_CellBuffer.GetNumLines();
+		return m_ViewAccessor->GetNumLines();
 	}
 
 	// line number translation between the view and the underlying logfile
@@ -563,13 +563,13 @@ public:
 	NTimecode * GetUtcTimecode( vint_t line_no );
 
 	// Select the lines to display in the view
-	virtual void Filter( selector_ptr_t selector, bool add_irregular ) {
-		m_CellBuffer.Filter( selector->GetImpl(), add_irregular );
-	}
+	virtual void Filter( selector_ptr_t selector, bool add_irregular );
 
 	// Field visibility
 	virtual void SetFieldMask( uint64_t field_mask ) {
-		m_CellBuffer.SetFieldMask( field_mask );
+		ViewProperties * view_props{ m_ViewAccessor->GetProperties() };
+		if( view_props != nullptr )
+			view_props->SetFieldMask( field_mask );
 	}
 };
 
@@ -587,9 +587,7 @@ class NLineSet
 {
 public:
 	NLineSet( void ) {}
-
-	NLineSet( logfile_ptr_t logfile )
-		: NFilterView{ logfile } {}
+	NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 };
 
 
@@ -654,7 +652,7 @@ protected:
 	void __stdcall Notify_StartDrawLine( vint_t line_no ) override;
 
 public:
-	NView( logfile_ptr_t logfile );
+	NView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
 public:
 	// Python interfaces; note default constructor is non-functional

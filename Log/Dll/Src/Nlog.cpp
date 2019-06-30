@@ -367,7 +367,7 @@ void NHiliter::Hilite( const vint_t start, const char *first, const char *last, 
 
 void NHiliter::SetupMatchedLines( void )
 {
-	const bool buffer_changed{ m_CellBufferTracker.CompareTo( m_CellBuffer->GetTracker() ) };
+	const bool buffer_changed{ m_ViewTracker.CompareTo( m_ViewAccessor->GetProperties()->GetTracker() ) };
 	if( !m_SelectorChanged && !buffer_changed )
 		return;
 
@@ -376,10 +376,7 @@ void NHiliter::SetupMatchedLines( void )
 	if( !m_Selector )
 		m_MatchedLines.clear();
 	else
-	{
-		Selector * selector{ m_Selector->GetImpl() };
-		m_MatchedLines = m_CellBuffer->Search( selector );
-	}
+		CalcMatchedLines();
 }
 
 
@@ -399,6 +396,82 @@ bool NHiliter::Hit( nlineno_t line_no )
 
 
 /*-----------------------------------------------------------------------
+ * NHiliter - Searching
+ -----------------------------------------------------------------------*/
+
+// the search implementation is adapted from the filter implementation
+// search a single view line; must be thread safe
+struct SearchTask : public LineVisitor::Task
+{
+	// line data for the lines proccessed within this task
+	std::vector<nlineno_t> f_Map;
+	Selector * f_Selector;
+	const LineAdornmentsProvider & f_Provider;
+
+	SearchTask( const LineAdornmentsProvider & provider, Selector * selector, nlineno_t num_lines )
+		: f_Selector{ selector }, f_Provider{ provider }
+	{
+		f_Map.reserve( num_lines );
+	}
+
+	void Action( const LineAccessor & line, nlineno_t visit_line_no ) override
+	{
+		LineAdornmentsAccessor adornments{ & f_Provider, line.GetLineNo() };
+		if( f_Selector->Hit( line, adornments ) )
+			f_Map.push_back( visit_line_no );
+	}
+};
+
+
+// search all view lines
+struct SearchVisitor : public LineVisitor::Visitor
+{
+	// line data for all lines
+	std::vector<nlineno_t> f_Map;
+	Selector * f_Selector;
+	const LineAdornmentsProvider & f_Provider;
+
+	using task_ptr_t = LineVisitor::task_ptr_t;
+
+	SearchVisitor( const LineAdornmentsProvider & provider, Selector * selector )
+		: f_Selector{ selector }, f_Provider{ provider }
+	{
+		const size_t guestimated_average_search_hits{ 2048 };
+		f_Map.reserve( guestimated_average_search_hits );
+	}
+
+	task_ptr_t MakeTask( nlineno_t num_lines ) override
+	{
+		return std::make_shared<SearchTask>( f_Provider, f_Selector, num_lines );
+	}
+
+	void Join( task_ptr_t line_task ) override
+	{
+		SearchTask *filter_task{ dynamic_cast<SearchTask*>(line_task.get()) };
+
+		for( nlineno_t log_line_no : filter_task->f_Map )
+			f_Map.push_back( log_line_no );
+	}
+};
+
+
+void NHiliter::CalcMatchedLines( void )
+{
+	Selector * selector{ m_Selector->GetImpl() };
+	NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
+
+	SearchVisitor visitor{ adornments_provider, selector };
+
+	PerfTimer timer;
+	m_ViewAccessor->VisitLines( visitor, true );
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_ViewAccessor->GetMap()->m_NumLinesOrOne ) );
+
+	m_MatchedLines = std::move( visitor.f_Map);
+}
+
+
+
+/*-----------------------------------------------------------------------
  * NLogAccessor
  -----------------------------------------------------------------------*/
 
@@ -413,15 +486,28 @@ NLogAccessor::NLogAccessor( LogAccessorDescriptor & descriptor )
  * NFilterView
  -----------------------------------------------------------------------*/
 
-NFilterView::NFilterView( logfile_ptr_t logfile )
+NFilterView::NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	m_Logfile{ logfile },
-	m_AdornmentsProvider{ logfile->GetAdornments() },
-	m_CellBuffer{ logfile->GetLogAccessor()->CreateViewAccessor(), &m_AdornmentsProvider }
+	m_ViewAccessor{ view_accessor },
+	m_CellBuffer{ view_accessor }
 {
 	Match descriptor{ Match::Type::e_Literal, std::string{}, false };
-	std::unique_ptr<Selector> selector{ Selector::MakeSelector( descriptor, true ) };
-	m_CellBuffer.Filter( selector.get(), true );
+	selector_ptr_t selector{ new NSelector{ descriptor, true, nullptr } };
+	Filter( selector, true );
+}
+
+
+adornments_ptr_t NFilterView::GetAdornments( void )
+{
+	return m_Logfile->GetAdornments();
+}
+
+
+void NFilterView::Filter( selector_ptr_t selector, bool add_irregular )
+{
+	NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
+	m_ViewAccessor->Filter( selector->GetImpl(), &adornments_provider, add_irregular );
 }
 
 
@@ -429,7 +515,7 @@ std::string NFilterView::GetNonFieldText( vint_t line_no )
 {
 	std::string res;
 
-	m_CellBuffer.VisitLine( line_no, [&res] ( const LineAccessor & line ) {
+	m_ViewAccessor->VisitLine( line_no, [&res] ( const LineAccessor & line ) {
 		const char * first; const char * last;
 		line.GetNonFieldText( &first, &last );
 		res.assign( first, last );
@@ -446,7 +532,7 @@ std::string NFilterView::GetFieldText( vint_t line_no, vint_t field_no )
 
 	std::string res;
 
-	m_CellBuffer.VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
+	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		const char * first; const char * last;
 		line.GetFieldText( field_no + 1, &first, &last );
 		res.assign( first, last );
@@ -463,7 +549,7 @@ fieldvalue_t NFilterView::GetFieldValue( vint_t line_no, vint_t field_no )
 
 	fieldvalue_t res;
 
-	m_CellBuffer.VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
+	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		res = line.GetFieldValue( field_no + 1 );
 	} );
 
@@ -474,14 +560,14 @@ fieldvalue_t NFilterView::GetFieldValue( vint_t line_no, vint_t field_no )
 // line number translation between the view and the underlying logfile
 vint_t NFilterView::ViewLineToLogLine( vint_t view_line_no ) const
 {
-	return m_CellBuffer.ViewLineToLogLine( view_line_no );
+	return m_ViewAccessor->ViewLineToLogLine( view_line_no );
 }
 
 
 // return the view line at or after the supplied log line; otherwise -1
 vint_t NFilterView::LogLineToViewLine( vint_t log_line_no ) const
 {
-	vint_t view_line{ m_CellBuffer.LogLineToViewLine( log_line_no ) };
+	vint_t view_line{ m_ViewAccessor->LogLineToViewLine( log_line_no ) };
 	const vint_t new_log_line{ ViewLineToLogLine( view_line ) };
 
 	if( new_log_line < log_line_no )
@@ -496,28 +582,28 @@ void NFilterView::SetNumHiliter( unsigned num_hiliter )
 	m_Hiliters.clear();
 	m_Hiliters.reserve( num_hiliter );
 	for( unsigned i = 0; i < num_hiliter; ++i )
-		m_Hiliters.emplace_back( hiliter_ptr_t{ new NHiliter{ i, &m_CellBuffer } } );
+		m_Hiliters.emplace_back( hiliter_ptr_t{ new NHiliter{ i, m_Logfile, m_ViewAccessor } } );
 }
 
 
 void NFilterView::ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line )
 {
 	for( int line_no = view_fm_line; line_no <= view_to_line; ++line_no )
-		GetAdornments()->ToggleUsermark( m_CellBuffer.ViewLineToLogLine( line_no) );
+		GetAdornments()->ToggleUsermark( m_ViewAccessor->ViewLineToLogLine( line_no) );
 }
 
 
 // find the next visible view line for the source "get_next_log_line"
 vint_t NFilterView::GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line)(vint_t, bool) )
 {
-	vint_t log_line_no{ m_CellBuffer.ViewLineToLogLine( view_line_no ) };
+	vint_t log_line_no{ m_ViewAccessor->ViewLineToLogLine( view_line_no ) };
 	while( true )
 	{
 		log_line_no = (GetAdornments().get()->*get_next_log_line)(log_line_no, forward);
 		if( log_line_no < 0 )
 			return log_line_no;
 
-		view_line_no = m_CellBuffer.LogLineToViewLine( log_line_no, true );
+		view_line_no = m_ViewAccessor->LogLineToViewLine( log_line_no, true );
 		if( view_line_no >= 0 )
 			return view_line_no;
 	}
@@ -539,13 +625,13 @@ vint_t NFilterView::GetNextAnnotation( vint_t view_line_no, bool forward )
 // NIEL - and similar; part ov NView only, not lineset ?
 void NFilterView::SetLocalTrackerLine( vint_t line_no )
 {
-	GetAdornments()->SetLocalTrackerLine( m_CellBuffer.ViewLineToLogLine( line_no ) );
+	GetAdornments()->SetLocalTrackerLine( m_ViewAccessor->ViewLineToLogLine( line_no ) );
 }
 
 
 vint_t NFilterView::GetLocalTrackerLine( void )
 {
-	return m_CellBuffer.LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
+	return m_ViewAccessor->LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
 }
 
 
@@ -556,7 +642,7 @@ NTimecode * NFilterView::GetUtcTimecode( vint_t line_no )
 
 	NTimecode * res{ new NTimecode };
 
-	m_CellBuffer.VisitLine( line_no, [&res] ( const LineAccessor & line ) {
+	m_ViewAccessor->VisitLine( line_no, [&res] ( const LineAccessor & line ) {
 		*res = line.GetUtcTimecode();
 	} );
 
@@ -566,17 +652,29 @@ NTimecode * NFilterView::GetUtcTimecode( vint_t line_no )
 
 
 /*-----------------------------------------------------------------------
+ * NLineSet
+ -----------------------------------------------------------------------*/
+
+NLineSet::NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
+	:
+	NFilterView{ logfile, view_accessor }
+{
+}
+
+
+
+/*-----------------------------------------------------------------------
  * NView
  -----------------------------------------------------------------------*/
 
-NView::NView( logfile_ptr_t logfile )
+NView::NView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
-	NFilterView{ logfile },
+	NFilterView{ logfile, view_accessor },
 	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), m_CellBuffer } },
 	m_LineLevel{ new SLineLevels },
 	m_LineState{ new SLineState },
-	m_LineMargin{ new SLineAnnotation{ logfile->GetAdornments(), m_CellBuffer } },
-	m_LineAnnotation{ new SLineAnnotation{ logfile->GetAdornments(), m_CellBuffer } },
+	m_LineMargin{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
+	m_LineAnnotation{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
 	m_ContractionState{ new SContractionState{ m_LineAnnotation, m_CellBuffer} }
 {
 }
@@ -784,13 +882,13 @@ Error NLogfile::Open( const std::wstring &file_path, ProgressMeter * progress, s
 
 view_ptr_t NLogfile::CreateView( void )
 {
-	return new NView{ logfile_ptr_t{ this } };
+	return new NView{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
 }
 
 
 lineset_ptr_t NLogfile::CreateLineSet( void )
 {
-	return new NLineSet{ logfile_ptr_t{ this } };
+	return new NLineSet{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
 }
 
 

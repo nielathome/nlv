@@ -159,7 +159,11 @@ void LineFormatter::Apply( const LineBuffer & text, LineBuffer * fmt ) const
 
 class MapLogAccessor;
 
-class MapViewAccessor : public ViewAccessor
+class MapViewAccessor
+	:
+	public ViewProperties,
+	public ViewMap,
+	public ViewAccessor
 {
 private:
 	// our substrate
@@ -168,10 +172,8 @@ private:
 	// map a view line number (index) to a logfile line number (value)
 	std::vector<nlineno_t> m_LineMap;
 
-	// warning: an empty Scintilla document has a line count of 1
-	// this flag disambiguates the two cases
-	bool m_IsEmpty{ true };
-	nlineno_t m_NumLinesOrOne{ 0 };
+	// list of fields (columns) to display
+	uint64_t m_FieldViewMask{ 0 };
 
 public:
 	MapViewAccessor( MapLogAccessor * accessor )
@@ -181,16 +183,16 @@ public:
 public:
 	// LineVisitor interface
 
-	void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const override;
-	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override;
+	void VisitLine( LineVisitor::Task & task, nlineno_t visit_line_no ) const override;
+	void VisitLines( LineVisitor::Visitor & visitor, bool include_irregular ) const override;
 
 public:
 	// ViewAccessor interfaces
 
-	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
-	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override;
+	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const override;
+	nlineno_t GetLineLength( nlineno_t line_no ) const override;
 	NTimecode GetUtcTimecode( nlineno_t line_no ) const override;
-	ViewMap Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, uint64_t mask, bool add_irregular );
+	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
 
 	// fetch nearest preceding view line number to the supplied log line
 	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
@@ -201,12 +203,27 @@ public:
 		return m_LineMap[view_line_no];
 	}
 
+	ViewProperties * GetProperties( void ) override {
+		return this;
+	}
+
+	const ViewMap * GetMap( void ) override {
+		return this;
+	}
+
+public:
+	// ViewProperties interfaces
+
+	void SetFieldMask( uint64_t field_mask ) override;
+
 public:
 	// MapLineAccessor interfaces
 
-	nlineno_t GetNumLines( void ) const;
+	nlineno_t GetNumLines( void ) const override{
+		return m_IsEmpty ? 0 : m_NumLinesOrOne;
+	}
 	bool IsLineRegular( nlineno_t line_no ) const;
-	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const;
+	void CopyLine( e_LineData type, nlineno_t line_no, LineBuffer * buffer ) const;
 	void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const;
 	void GetFieldText( nlineno_t line_no, unsigned field_id, const char ** first, const char ** last ) const;
 	fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const;
@@ -256,7 +273,7 @@ protected:
 public:
 	// LineVisitor interface
 
-	void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const override;
+	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
 	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override;
 
 public:
@@ -321,7 +338,7 @@ public:
 		return m_Index->IsLineRegular( line_no );
 	}
 
-	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const {
+	nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask = 0 ) const {
 		return m_Index->GetLineLength( line_no, field_mask );
 	}
 
@@ -377,27 +394,15 @@ static OnEvent RegisterMapLogAccessor
  * MapViewAccessor, definitions
  -----------------------------------------------------------------------*/
 
-nlineno_t MapViewAccessor::GetNumLines( void ) const
+const LineBuffer & MapViewAccessor::GetLine( e_LineData type, nlineno_t line_no ) const
 {
-	return m_IsEmpty ? 0 : m_NumLinesOrOne;
+	return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask );
 }
 
 
-bool MapViewAccessor::IsLineRegular( nlineno_t line_no ) const
+nlineno_t MapViewAccessor::GetLineLength( nlineno_t line_no ) const
 {
-	return m_LogAccessor->IsLineRegular( ViewLineToLogLine( line_no ) );
-}
-
-
-nlineno_t MapViewAccessor::GetLineLength( nlineno_t line_no, uint64_t field_mask ) const
-{
-	return m_LogAccessor->GetLineLength( ViewLineToLogLine( line_no ), field_mask );
-}
-
-
-const LineBuffer & MapViewAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const 
-{
-	return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), field_mask );
+	return m_LogAccessor->GetLineLength( ViewLineToLogLine( line_no ), m_FieldViewMask );
 }
 
 
@@ -407,9 +412,41 @@ NTimecode MapViewAccessor::GetUtcTimecode( nlineno_t line_no ) const
 }
 
 
-void MapViewAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const
+void MapViewAccessor::SetFieldMask( uint64_t field_mask )
 {
-	return m_LogAccessor->CopyLine( type, ViewLineToLogLine( line_no ), field_mask, buffer );
+	// record the change
+	m_Tracker.RecordEvent();
+	m_FieldViewMask = field_mask;
+
+	if( !m_IsEmpty )
+	{
+		PerfTimer timer;
+
+		// TODO: parallelise
+		nlineno_t pos{ 0 };
+		for( nlineno_t line_no = 0; line_no < m_NumLinesOrOne; ++line_no )
+		{
+			m_Lines[ line_no ] = pos;
+			pos += GetLineLength( line_no );
+		}
+
+		m_TextLen = m_Lines[ m_NumLinesOrOne ] = pos;
+
+		// write out performance data
+		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
+	}
+}
+
+
+bool MapViewAccessor::IsLineRegular( nlineno_t line_no ) const
+{
+	return m_LogAccessor->IsLineRegular( ViewLineToLogLine( line_no ) );
+}
+
+
+void MapViewAccessor::CopyLine( e_LineData type, nlineno_t line_no, LineBuffer * buffer ) const
+{
+	return m_LogAccessor->CopyLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask, buffer );
 }
 
 
@@ -635,9 +672,10 @@ public:
 	// LineAccessorIrregular intefaces
 
 	nlineno_t GetLength( void ) const override {
-		return m_Accessor.GetLineLength( m_LineNo, 0 );
+		return m_Accessor.GetLineLength( m_LineNo );
 	}
 
+// NIEL needed?
 	nlineno_t GetLineNo( void ) const override {
 		return m_LineNo;
 	}
@@ -656,31 +694,21 @@ public:
 	using accessor_t = T_ACCESSOR;
 
 private:
+	// continuation line handling
+	mutable MapLineAccessorIrregular<accessor_t> m_Irregulars;
+
+protected:
+	const accessor_t & m_Accessor;
 	nlineno_t m_LineNo{ 0 };
 
 	// transient store for line information
 	mutable LineBuffer m_LineBuffer;
 
-	const accessor_t & m_Accessor;
-	const uint64_t m_FieldMask;
-
-private:
-	// continuation line handling
-	mutable MapLineAccessorIrregular<accessor_t> m_Irregulars;
-
 public:
-	MapLineAccessor( const accessor_t & accessor, uint64_t field_mask )
+	MapLineAccessor( const accessor_t & accessor )
 		:
 		m_Accessor{ accessor },
-		m_FieldMask{ field_mask },
 		m_Irregulars{ accessor }
-	{}
-
-	MapLineAccessor( const MapLineAccessor & map_line_accessor )
-		:
-		m_Accessor{ map_line_accessor.m_Accessor },
-		m_FieldMask{ map_line_accessor.m_FieldMask },
-		m_Irregulars { map_line_accessor.m_Accessor }
 	{}
 
 	void SetLineNo( nlineno_t line_no ) {
@@ -690,10 +718,6 @@ public:
 
 public:
 	// LineAccessorIrregular interfaces
-
-	nlineno_t GetLength( void ) const override {
-		return m_Accessor.GetLineLength( m_LineNo, m_FieldMask );
-	}
 
 	nlineno_t GetLineNo( void ) const override {
 		return m_LineNo;
@@ -711,15 +735,6 @@ public:
 		return m_Irregulars.NextIrregular();
 	}
 
-	void GetText( const char ** first, const char ** last ) const override {
-		m_LineBuffer.Clear();
-
-		m_Accessor.CopyLine( e_LineData::Text, m_LineNo, m_FieldMask, &m_LineBuffer );
-
-		*first = m_LineBuffer.First();
-		*last = m_LineBuffer.Last();
-	}
-
 	void GetNonFieldText( const char ** first, const char ** last ) const override {
 		m_Accessor.GetNonFieldText( m_LineNo, first, last );
 	}
@@ -734,6 +749,62 @@ public:
 
 	NTimecode GetUtcTimecode( void ) const override {
 		return m_Accessor.GetUtcTimecode( m_LineNo );
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * MapLogLineAccessor
+ -----------------------------------------------------------------------*/
+
+class MapLogLineAccessor : public MapLineAccessor<MapLogAccessor>
+{
+private:
+	uint64_t m_FieldMask;
+
+public:
+	MapLogLineAccessor( const MapLineAccessor::accessor_t & accessor, uint64_t field_mask )
+		: MapLineAccessor{ accessor }, m_FieldMask{ field_mask } {}
+
+	nlineno_t GetLength( void ) const override {
+		return m_Accessor.GetLineLength( m_LineNo, m_FieldMask );
+	}
+
+	void GetText( const char ** first, const char ** last ) const override {
+		m_LineBuffer.Clear();
+
+		m_Accessor.CopyLine( e_LineData::Text, m_LineNo, m_FieldMask, &m_LineBuffer );
+
+		*first = m_LineBuffer.First();
+		*last = m_LineBuffer.Last();
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * MapViewLineAccessor
+ -----------------------------------------------------------------------*/
+
+class MapViewLineAccessor : public MapLineAccessor<MapViewAccessor>
+{
+public:
+	MapViewLineAccessor( const MapLineAccessor::accessor_t & accessor )
+		: MapLineAccessor{ accessor } {}
+
+
+	nlineno_t GetLength( void ) const override {
+		return m_Accessor.GetLineLength( m_LineNo );
+	}
+
+	void GetText( const char ** first, const char ** last ) const override {
+		m_LineBuffer.Clear();
+
+		m_Accessor.CopyLine( e_LineData::Text, m_LineNo, &m_LineBuffer );
+
+		*first = m_LineBuffer.First();
+		*last = m_LineBuffer.Last();
 	}
 };
 
@@ -874,21 +945,19 @@ struct TBBSource
 
 
 // run the user visitor task over all lines
-template<typename T_ACCESSOR>
-void VisitLines( const T_ACCESSOR & accessor, LineVisitor::Visitor & visitor, uint64_t field_mask, bool include_irregular )
+template<typename T_ACCESSOR, typename T_LINEACCESSOR>
+void VisitLines( const T_ACCESSOR & accessor, T_LINEACCESSOR & line_accessor, LineVisitor::Visitor & visitor, bool include_irregular )
 {
 	using accessor_t = T_ACCESSOR;
-	using lineaccessor_t = MapLineAccessor<accessor_t>;
+	using lineaccessor_t = T_LINEACCESSOR;
 	using tbb_task_ptr_t = ::tbb_task_ptr_t<lineaccessor_t>;
 	using tbb_source_t = TBBSource<lineaccessor_t>;
 
 	tbb::flow::graph flow_graph;
 
-	lineaccessor_t line_accessor{ accessor, field_mask };
-
-	// the number of lines to process is either supplied by the caller
-	// (as view lines) or is taken from the log file
+	// the number of lines to process
 	const nlineno_t line_count{ accessor.GetNumLines() };
+	visitor.SetNumLines( line_count );
 
 	// create batches of lines to process
 	tbb::flow::source_node<tbb_task_ptr_t> source {
@@ -931,33 +1000,35 @@ void VisitLines( const T_ACCESSOR & accessor, LineVisitor::Visitor & visitor, ui
 }
 
 
-void MapLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const
+void MapLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
-	MapLineAccessor<MapLogAccessor> accessor{ *this, field_mask };
-	accessor.SetLineNo( visit_line_no );
+	MapLogLineAccessor line_accessor{ *this, 0 };
+	line_accessor.SetLineNo( visit_line_no );
 
-	task.Action( accessor, visit_line_no );
+	task.Action( line_accessor, visit_line_no );
 }
 
 
 void MapLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const
 {
-	::VisitLines<MapLogAccessor>( *this, visitor, field_mask, include_irregular );
+	MapLogLineAccessor line_accessor{ *this, field_mask };
+	::VisitLines<MapLogAccessor, MapLogLineAccessor>( *this, line_accessor, visitor, include_irregular );
 }
 
 
-void MapViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask ) const
+void MapViewAccessor::VisitLine( LineVisitor::Task & task, nlineno_t visit_line_no ) const
 {
-	MapLineAccessor<MapViewAccessor> accessor{ *this, field_mask };
-	accessor.SetLineNo( visit_line_no );
+	MapViewLineAccessor line_accessor{ *this };
+	line_accessor.SetLineNo( visit_line_no );
 
-	task.Action( accessor, visit_line_no );
+	task.Action( line_accessor, visit_line_no );
 }
 
 
-void MapViewAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const
+void MapViewAccessor::VisitLines( LineVisitor::Visitor & visitor, bool include_irregular ) const
 {
-	::VisitLines<MapViewAccessor>( *this, visitor, field_mask, include_irregular );
+	MapViewLineAccessor line_accessor{ *this };
+	::VisitLines<MapViewAccessor, MapViewLineAccessor>( *this, line_accessor, visitor, include_irregular );
 }
 
 
@@ -1028,11 +1099,13 @@ struct FilterVisitor : public LineVisitor::Visitor
 
 	using task_ptr_t = LineVisitor::task_ptr_t;
 
-	FilterVisitor( const FilterData & filter_data, nlineno_t num_log_lines )
-		: f_FilterData{ filter_data }
+	FilterVisitor( const FilterData & filter_data )
+		: f_FilterData{ filter_data } {}
+
+	void SetNumLines( nlineno_t num_lines ) override
 	{
-		f_Lines.reserve( num_log_lines + 1 );
-		f_Map.reserve( num_log_lines + 1 );
+		f_Lines.reserve( num_lines + 1 );
+		f_Map.reserve( num_lines + 1 );
 	}
 
 	task_ptr_t MakeTask( nlineno_t num_lines ) override
@@ -1065,8 +1138,10 @@ struct FilterVisitor : public LineVisitor::Visitor
 };
 
 
-ViewMap MapViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, uint64_t mask, bool add_irregular )
+void MapViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular )
 {
+	PerfTimer timer;
+
 	FilterData filter_data
 	{
 		add_irregular,
@@ -1074,10 +1149,12 @@ ViewMap MapViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * a
 		adornments_provider
 	};
 
-	FilterVisitor visitor{ filter_data, m_LogAccessor->GetNumLines() };
-	m_LogAccessor->VisitLines( visitor, mask, false );
+	FilterVisitor visitor{ filter_data };
+	m_LogAccessor->VisitLines( visitor, m_FieldViewMask, false );
 	visitor.Finish();
 
+	m_TextLen = visitor.f_ViewPos;
+	m_Lines = std::move( visitor.f_Lines );
 	m_LineMap = std::move( visitor.f_Map );
 
 	// an empty document in Scintilla requires a line count of one
@@ -1087,13 +1164,11 @@ ViewMap MapViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * a
 	// use m_IsEmpty to distinguish the two cases
 	m_NumLinesOrOne = nlineno_cast( !m_IsEmpty ? m_LineMap.size() - 1 : 1 );
 
-	return ViewMap
-	{
-		std::move( visitor.f_Lines ),
-		visitor.f_ViewPos,
-		m_IsEmpty,
-		m_NumLinesOrOne
-	};
+	// record the change
+	m_Tracker.RecordEvent();
+
+	// write out performance data
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
 }
 
 

@@ -257,20 +257,20 @@ private:
 	annotations_ptr_t m_LogAnnotations;
 	ChangeTracker m_LogAnnotationsTracker;
 
-	// back reference to cell buffer in our owning view
-	const SViewCellBuffer & m_CellBuffer;
-	ChangeTracker m_CellBufferTracker;
+	// view data
+	viewaccessor_ptr_t m_ViewAccessor;
+	ChangeTracker m_ViewTracker;
 
 protected:
 	const NAnnotation * GetAnnotation( vint_t line ) const;
 
 	vint_t ViewLineToLogLine( vint_t view_line_no ) const {
-		return m_CellBuffer.ViewLineToLogLine( view_line_no );
+		return m_ViewAccessor->ViewLineToLogLine( view_line_no );
 	}
 
 public:
-	SLineAnnotation( annotations_ptr_t log_annotations, const SViewCellBuffer & cell_buffer )
-		: m_LogAnnotations{ log_annotations }, m_CellBuffer{ cell_buffer } {}
+	SLineAnnotation( annotations_ptr_t log_annotations, viewaccessor_ptr_t view_accessor )
+		: m_LogAnnotations{ log_annotations }, m_ViewAccessor{ view_accessor } {}
 
 	bool HasStateChanged( void ) const;
 	annotationsizes_list_t GetAnnotationSizes( void ) const;

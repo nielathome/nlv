@@ -19,6 +19,7 @@
 // Nlog includes
 #include "Match.h"
 #include "Nfilesystem.h"
+#include "Nmisc.h"
 #include "Ntime.h"
 #include "Ntrace.h"
 
@@ -193,19 +194,28 @@ class LineBuffer
 {
 private:
 	static const unsigned c_TypicalLineLength{ 2048 };
+	
+	bool m_Reserved{ false };
 	std::string m_Buffer;
 
-public:
-	LineBuffer( void ) {
-		// improve chance that Append does not have to re-allocate string
-		m_Buffer.reserve( c_TypicalLineLength );
+	void Reserve( void )
+	{
+		if( !m_Reserved )
+		{
+			// improve chance that Append does not have to re-allocate string
+			m_Buffer.reserve( c_TypicalLineLength );
+			m_Reserved = true;
+		}
 	}
 
+public:
 	void Append( char ch, size_t cnt = 1 ) {
+		Reserve();
 		m_Buffer.append( cnt, ch );
 	}
 
 	void Append( const char * first, const char * last ) {
+		Reserve();
 		m_Buffer.append( first, last );
 	}
 
@@ -278,6 +288,9 @@ struct LineVisitor
 	// Visitor interface (callback); implemented by Visitor user
 	struct Visitor
 	{
+		// the total number of lines that will be processed
+		virtual void SetNumLines( nlineno_t num_lines ) {}
+
 		// create a new Task for processing a subset of lines
 		virtual task_ptr_t MakeTask( nlineno_t num_lines ) = 0;
 
@@ -287,7 +300,7 @@ struct LineVisitor
 	};
 
 	// "visit" a single line; use as a generalised line accessor
-	virtual void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask = 0 ) const = 0;
+	virtual void VisitLine( Task & task, nlineno_t visit_line_no ) const = 0;
 
 	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
 	template<typename T_FUNC>
@@ -309,9 +322,6 @@ struct LineVisitor
 		LocalTask task{ functor };
 		VisitLine( task, visit_line_no );
 	}
-
-	// visit all lines in scope; use for searching/filtering
-	virtual void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const = 0;
 };
 
 
@@ -378,6 +388,46 @@ using formatdescriptor_list_t = std::list<FormatDescriptor>;
 
 
 /*-----------------------------------------------------------------------
+ * ViewProperties
+ -----------------------------------------------------------------------*/
+
+class ViewProperties
+{
+protected:
+	ChangeTracker m_Tracker{ true };
+
+public:
+	const ChangeTracker & GetTracker( void ) const {
+		return m_Tracker;
+	}
+
+	// set the field mask and re-calculate line lengths
+	virtual void SetFieldMask( uint64_t field_mask ) = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * ViewMap
+ -----------------------------------------------------------------------*/
+
+struct ViewMap
+{
+	// line start locations in the view
+	std::vector<nlineno_t> m_Lines;
+
+	// key text metrics
+	nlineno_t m_TextLen{ 0 };
+	nlineno_t m_NumLinesOrOne{ 0 };
+
+	// warning: an empty Scintilla document has a line count of 1
+	// this flag disambiguates the two cases
+	bool m_IsEmpty{ true };
+};
+
+
+
+/*-----------------------------------------------------------------------
  * ViewAccessor
  -----------------------------------------------------------------------*/
 
@@ -389,37 +439,34 @@ enum class e_LineData
 };
 
 
-struct ViewMap
-{
-	std::vector<nlineno_t> f_Lines;
-	const nlineno_t f_TextLen{ 0 };
-	const bool f_IsEmpty{ true };
-	const nlineno_t f_NumLinesOrOne{ 0 };
-
-	ViewMap( std::vector<nlineno_t> && lines, nlineno_t text_len, bool is_empty, nlineno_t numlines_or_one )
-		:
-		f_Lines{ std::move( lines ) },
-		f_TextLen{ text_len },
-		f_IsEmpty{ is_empty },
-		f_NumLinesOrOne{ numlines_or_one }
-	{}
-};
-
-
 struct ViewAccessor : public LineVisitor
 {
+	// visit all lines in scope; use for searching/filtering
+	virtual void VisitLines( Visitor & visitor, bool include_irregular ) const = 0;
+
 	// basic line access (for SViewCellBuffer)
-//	virtual nlineno_t GetNumLines( void ) const = 0;
-	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const = 0;
+	virtual nlineno_t GetNumLines( void ) const = 0;
+	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const = 0;
 	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
 	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
 
-// NIEL remove after re-factoring
-	virtual nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const = 0;
+	// view configuration; optional (can return null)
+	virtual ViewProperties * GetProperties( void ) {
+		return nullptr;
+	}
+
+	// view map; optional (can return null)
+	virtual const ViewMap * GetMap( void ) {
+		return nullptr;
+	}
+	
+	// NIEL remove after re-factoring
+	virtual nlineno_t GetLineLength( nlineno_t line_no ) const = 0;
 	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
 
-	// map data can be returned null
-	virtual ViewMap Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, uint64_t mask, bool add_irregular ) = 0;
+	// update the view to contain solely logfile lines which are matched by
+	// the given selector
+	virtual void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) = 0;
 };
 
 using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
@@ -432,6 +479,9 @@ using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
 
 struct LogAccessor : public LineVisitor
 {
+	// visit all lines in scope; use for searching/filtering
+	virtual void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const = 0;
+
 	// core setup
 	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
 	virtual viewaccessor_ptr_t CreateViewAccessor( void ) = 0;
