@@ -469,8 +469,7 @@ NLogAccessor::NLogAccessor( LogAccessorDescriptor & descriptor )
 NFilterView::NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	m_Logfile{ logfile },
-	m_ViewAccessor{ view_accessor },
-	m_CellBuffer{ view_accessor }
+	m_ViewAccessor{ view_accessor }
 {
 	Match descriptor{ Match::Type::e_Literal, std::string{}, false };
 	selector_ptr_t selector{ new NSelector{ descriptor, true, nullptr } };
@@ -679,6 +678,7 @@ NLineSet::NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 NView::NView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	NFilterView{ logfile, view_accessor },
+	m_CellBuffer{ view_accessor },
 	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), view_accessor } },
 	m_LineLevel{ new SLineLevels },
 	m_LineState{ new SLineState },

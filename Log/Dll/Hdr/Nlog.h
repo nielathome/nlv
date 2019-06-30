@@ -495,9 +495,6 @@ private:
 	vint_t GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) );
 
 protected:
-	// virtualised cell buffer
-	SViewCellBuffer m_CellBuffer;
-
 	// array of hiliters
 	std::vector<hiliter_ptr_t> m_Hiliters;
 
@@ -597,6 +594,9 @@ class NView
 	public VContent
 {
 private:
+	// virtualised cell buffer
+	SViewCellBuffer m_CellBuffer;
+
 	// virtualised marker/annotation/etc data
 	linemarker_ptr_t m_LineMarker;
 	linelevel_ptr_t  m_LineLevel;
