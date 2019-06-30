@@ -423,6 +423,9 @@ struct ViewMap
 	// warning: an empty Scintilla document has a line count of 1
 	// this flag disambiguates the two cases
 	bool m_IsEmpty{ true };
+
+	virtual nlineno_t GetLineLength( nlineno_t line_no ) const = 0;
+	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
 };
 
 
@@ -444,7 +447,7 @@ struct ViewAccessor : public LineVisitor
 	// visit all lines in scope; use for searching/filtering
 	virtual void VisitLines( Visitor & visitor, bool include_irregular ) const = 0;
 
-	// basic line access (for SViewCellBuffer)
+	// basic line access
 	virtual nlineno_t GetNumLines( void ) const = 0;
 	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const = 0;
 	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
@@ -460,10 +463,6 @@ struct ViewAccessor : public LineVisitor
 		return nullptr;
 	}
 	
-	// NIEL remove after re-factoring
-	virtual nlineno_t GetLineLength( nlineno_t line_no ) const = 0;
-	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
-
 	// update the view to contain solely logfile lines which are matched by
 	// the given selector
 	virtual void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) = 0;

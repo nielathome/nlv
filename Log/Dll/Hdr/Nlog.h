@@ -334,10 +334,6 @@ private:
 	void GetState( json & store ) const;
 	void PutState( const json & store );
 
-	// line markers
-	int LogMarkValue( vint_t log_line_no );
-	int ViewMarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer );
-
 protected:
 	LogAccessor * GetLogAccessor() const {
 		return m_LogAccessor->GetImpl();
@@ -354,8 +350,8 @@ public:
 		return m_LocalTrackerLine;
 	}
 
-	// identify the set of markers to show at a given line
-	int MarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer );
+	// identify the set of log markers to show at a given line
+	int LogMarkValue( vint_t log_line_no );
 
 public:
 	// Python interfaces
@@ -554,10 +550,7 @@ public:
 	// tracked line marker support
 	void SetLocalTrackerLine( vint_t line_no );
 	vint_t GetLocalTrackerLine( void );
-
-	vint_t GetGlobalTrackerLine( unsigned idx ) {
-		return m_CellBuffer.GetGlobalTrackerLine( idx );
-	}
+	vint_t GetGlobalTrackerLine( unsigned idx );
 
 	// numeric access to a line's timecode, timecode is referenced to UTC
 	NTimecode * GetUtcTimecode( vint_t line_no );

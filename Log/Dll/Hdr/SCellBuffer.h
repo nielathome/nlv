@@ -40,13 +40,12 @@ struct Selector;
 class SViewCellBuffer : public VCellBuffer
 {
 private:
-	viewaccessor_ptr_t m_ViewAccessor;
-
-protected:
 	// the view converts logical positions/lines (as presented to the CellBuffer user)
 	// to actual positions/lines in an underlying logfile
 	const ViewMap * m_ViewMap{ nullptr };
+	viewaccessor_ptr_t m_ViewAccessor;
 
+protected:
 	// convert a view position into a view line number and an offset within that line
 	void PositionToInfo( vint_t pos, vint_t *view_line_no, vint_t *offset ) const {
 		// identify the view's line number
@@ -76,32 +75,9 @@ public:
 	SViewCellBuffer( viewaccessor_ptr_t accessor )
 		: m_ViewAccessor{ accessor }, m_ViewMap{ accessor->GetMap() } {}
 
-	vint_t GetGlobalTrackerLine( unsigned idx ) const;
-
-	vint_t LogLineToViewLine( vint_t log_line_no, bool exact = false ) const {
-		return m_ViewAccessor->LogLineToViewLine( log_line_no, exact );
-	}
-
-	vint_t ViewLineToLogLine( vint_t view_line_no ) const {
-		return m_ViewAccessor->ViewLineToLogLine( view_line_no );
-	}
-
 	const LineBuffer & GetLine( e_LineData type, vint_t view_line_no ) const {
 		return m_ViewAccessor->GetLine( type, view_line_no );
 	}
-
-	// NIEL used ?
-	bool IsEmpty( void ) const {
-		return m_ViewMap->m_IsEmpty;
-	}
-
-	// NIEL remove
-	vint_t GetNumLines( void ) const {
-		return IsEmpty() ? 0 : m_ViewMap->m_NumLinesOrOne;
-	}
-
-	std::vector<nlineno_t> Search( Selector * selector ) const;
-	int MarkValue( vint_t line_no, int marker_base ) const;
 
 public:
 	// Scintilla interfaces

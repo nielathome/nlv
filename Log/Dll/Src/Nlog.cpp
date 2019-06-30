@@ -293,26 +293,6 @@ int NAdornments::LogMarkValue( vint_t log_line_no )
 }
 
 
-int NAdornments::ViewMarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer )
-{
-	const int marker_base{ 0x1 << (int) NConstants::e_StyleBaseTracker };
-	return cell_buffer.MarkValue( view_line_no, marker_base );
-}
-
-
-int NAdornments::MarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer )
-{
-	// most markers come from the logfile
-	const int log_markers{ LogMarkValue( cell_buffer.ViewLineToLogLine( view_line_no ) ) };
-
-	// the global timecode markers come from the cell buffer, as knowledge of the neighbouring
-	// lines is needed to perform the "nearest" time calculations
-	const int global_markers{ ViewMarkValue( view_line_no, cell_buffer ) };
-
-	return log_markers | global_markers;
-}
-
-
 bool NAdornments::HasUsermark( vint_t log_line_no ) const
 {
 	return m_UserMarkers.find( log_line_no ) != m_UserMarkers.end();
@@ -635,6 +615,35 @@ vint_t NFilterView::GetLocalTrackerLine( void )
 }
 
 
+vint_t NFilterView::GetGlobalTrackerLine( unsigned idx )
+{
+	const GlobalTracker & tracker{ GlobalTrackers::GetGlobalTracker( idx ) };
+	if( !tracker.IsInUse() )
+		return -1;
+
+	ViewTimecodeAccessor accessor{ m_ViewAccessor };
+	const NTimecode & target{ tracker.GetUtcTimecode() };
+	const ViewMap * view_map{ m_ViewAccessor->GetMap() };
+
+	vint_t low_idx{ 0 }, high_idx{ view_map->m_NumLinesOrOne - 1 };
+	do
+	{
+		const vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
+		const NTimecode value{ accessor.GetUtcTimecode( idx ) };
+		if( target < value )
+			high_idx = idx - 1;
+		else
+			low_idx = idx;
+	} while( low_idx < high_idx );
+
+
+	if( tracker.IsNearest( low_idx, view_map->m_NumLinesOrOne, accessor ) )
+		return low_idx;
+	else
+		return low_idx + 1;
+}
+
+
 NTimecode * NFilterView::GetUtcTimecode( vint_t line_no )
 {
 	// as elsewhere, field 0 is an internal (hidden) field, so the public field
@@ -670,12 +679,12 @@ NLineSet::NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 NView::NView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	NFilterView{ logfile, view_accessor },
-	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), m_CellBuffer } },
+	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), view_accessor } },
 	m_LineLevel{ new SLineLevels },
 	m_LineState{ new SLineState },
 	m_LineMargin{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
 	m_LineAnnotation{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
-	m_ContractionState{ new SContractionState{ m_LineAnnotation, m_CellBuffer} }
+	m_ContractionState{ new SContractionState{ m_LineAnnotation, view_accessor } }
 {
 }
 
@@ -849,7 +858,7 @@ void GlobalTrackers::SetGlobalTracker( unsigned tracker_idx, const NTimecode & u
  * ViewTimecodeAccessor
  -----------------------------------------------------------------------*/
 
-ViewTimecodeAccessor::ViewTimecodeAccessor( const ViewAccessor & accessor )
+ViewTimecodeAccessor::ViewTimecodeAccessor( viewaccessor_ptr_t accessor )
 	: f_ViewAccessor{ accessor }
 {
 }
@@ -857,7 +866,7 @@ ViewTimecodeAccessor::ViewTimecodeAccessor( const ViewAccessor & accessor )
 
 NTimecode ViewTimecodeAccessor::GetUtcTimecode( int line_no ) const
 {
-	return f_ViewAccessor.GetUtcTimecode( line_no );
+	return f_ViewAccessor->GetMap()->GetUtcTimecode( line_no );
 }
 
 

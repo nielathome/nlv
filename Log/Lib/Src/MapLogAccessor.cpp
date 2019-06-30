@@ -181,6 +181,12 @@ public:
 	{}
 
 public:
+	// ViewMap interfaces
+
+	nlineno_t GetLineLength( nlineno_t line_no ) const override;
+	NTimecode GetUtcTimecode( nlineno_t line_no ) const override;
+
+public:
 	// LineVisitor interface
 
 	void VisitLine( LineVisitor::Task & task, nlineno_t visit_line_no ) const override;
@@ -190,9 +196,11 @@ public:
 	// ViewAccessor interfaces
 
 	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const override;
-	nlineno_t GetLineLength( nlineno_t line_no ) const override;
-	NTimecode GetUtcTimecode( nlineno_t line_no ) const override;
 	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
+
+	nlineno_t GetNumLines( void ) const override {
+		return m_IsEmpty ? 0 : m_NumLinesOrOne;
+	}
 
 	// fetch nearest preceding view line number to the supplied log line
 	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
@@ -219,9 +227,6 @@ public:
 public:
 	// MapLineAccessor interfaces
 
-	nlineno_t GetNumLines( void ) const override{
-		return m_IsEmpty ? 0 : m_NumLinesOrOne;
-	}
 	bool IsLineRegular( nlineno_t line_no ) const;
 	void CopyLine( e_LineData type, nlineno_t line_no, LineBuffer * buffer ) const;
 	void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const;
@@ -394,12 +399,6 @@ static OnEvent RegisterMapLogAccessor
  * MapViewAccessor, definitions
  -----------------------------------------------------------------------*/
 
-const LineBuffer & MapViewAccessor::GetLine( e_LineData type, nlineno_t line_no ) const
-{
-	return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask );
-}
-
-
 nlineno_t MapViewAccessor::GetLineLength( nlineno_t line_no ) const
 {
 	return m_LogAccessor->GetLineLength( ViewLineToLogLine( line_no ), m_FieldViewMask );
@@ -409,6 +408,12 @@ nlineno_t MapViewAccessor::GetLineLength( nlineno_t line_no ) const
 NTimecode MapViewAccessor::GetUtcTimecode( nlineno_t line_no ) const
 {
 	return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
+}
+
+
+const LineBuffer & MapViewAccessor::GetLine( e_LineData type, nlineno_t line_no ) const
+{
+	return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask );
 }
 
 

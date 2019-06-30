@@ -31,52 +31,6 @@
  * SViewCellBuffer - New
  -----------------------------------------------------------------------*/
 
-vint_t SViewCellBuffer::GetGlobalTrackerLine( unsigned idx ) const
-{
-	const GlobalTracker & tracker{ GlobalTrackers::GetGlobalTracker( idx ) };
-	if( !tracker.IsInUse() )
-		return -1;
-
-	ViewTimecodeAccessor accessor{ * m_ViewAccessor };
-	const NTimecode & target{ tracker.GetUtcTimecode() };
-
-	vint_t low_idx{ 0 }, high_idx{ m_ViewMap->m_NumLinesOrOne - 1 };
-	do
-	{
-		const vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
-		const NTimecode value{ accessor.GetUtcTimecode( idx ) };
-		if( target < value )
-			high_idx = idx - 1;
-		else
-			low_idx = idx;
-	} while( low_idx < high_idx );
-
-
-	if( tracker.IsNearest( low_idx, m_ViewMap->m_NumLinesOrOne, accessor ) )
-		return low_idx;
-	else
-		return low_idx + 1;
-}
-
-
-// identify Scintilla marker's to be displayed against the given line
-int SViewCellBuffer::MarkValue( vint_t line_no, int bit ) const
-{
-	int res{ 0 };
-	const ViewTimecodeAccessor accessor{ * m_ViewAccessor };
-	const vint_t max_line_no{ m_ViewMap->m_NumLinesOrOne - 1 };
-
-	for( const GlobalTracker & tracker : GlobalTrackers::GetTrackers() )
-	{
-		bit <<= 1;
-		if( tracker.IsInUse() && tracker.IsNearest( line_no, max_line_no, accessor ) )
-			res |= bit;
-	}
-
-	return res;
-}
-
-
 vint_t SViewCellBuffer::PositionToViewLine( vint_t want_pos ) const
 {
 	return NLine::Lookup( m_ViewMap->m_Lines, m_ViewMap->m_NumLinesOrOne, want_pos );
@@ -109,7 +63,7 @@ void SViewCellBuffer::GetRange( e_LineData type, char * buffer, vint_t position,
 
 	while( at < end )
 	{
-		vint_t len{ m_ViewAccessor->GetLineLength( view_line_no ) - first_offset };
+		vint_t len{ m_ViewMap->GetLineLength( view_line_no ) - first_offset };
 		if( (at + len) > end )
 			len = end - at;
 

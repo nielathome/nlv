@@ -18,6 +18,7 @@
 
 // C++ includes
 #include <vector>
+#include <memory>
 
 
 
@@ -174,14 +175,17 @@ public:
  * ViewTimecodeAccessor
  -----------------------------------------------------------------------*/
 
+//forwards
 struct ViewAccessor;
+using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
+
 class ViewTimecodeAccessor : public GlobalTracker::NTimecodeAccessor
 {
 private:
-	const ViewAccessor & f_ViewAccessor;
+	viewaccessor_ptr_t f_ViewAccessor;
 
 public:
-	ViewTimecodeAccessor( const ViewAccessor & accessor );
+	ViewTimecodeAccessor( viewaccessor_ptr_t accessor );
 	NTimecode GetUtcTimecode( int line_no ) const override;
 };
 

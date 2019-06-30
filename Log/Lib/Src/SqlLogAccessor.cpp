@@ -220,12 +220,6 @@ public:
 		static LineBuffer stack;
 		return stack;
 	}
-	nlineno_t GetLineLength( nlineno_t line_no ) const override {
-		return 0;
-	}
-	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
-		return NTimecode{};
-	}
 	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override {
 		
 	}

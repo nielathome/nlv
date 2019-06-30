@@ -148,12 +148,15 @@ private:
 	// all markers are handled via the logfile
 	adornments_ptr_t m_Adornments;
 
-	// back reference to cell buffer in our owning view
-	const SViewCellBuffer & m_CellBuffer;
+	// view data
+	viewaccessor_ptr_t m_ViewAccessor;
+
+protected:
+	vint_t ViewMarkValue( vint_t line );
 
 public:
-	SLineMarkers( adornments_ptr_t adornments, const SViewCellBuffer & cell_buffer )
-		: m_Adornments{ adornments }, m_CellBuffer{ cell_buffer } {}
+	SLineMarkers( adornments_ptr_t adornments, viewaccessor_ptr_t view_accessor )
+		: m_Adornments{ adornments }, m_ViewAccessor{ view_accessor } {}
 
 	vint_t MarkValue( vint_t line ) override;
 
@@ -264,10 +267,6 @@ private:
 protected:
 	const NAnnotation * GetAnnotation( vint_t line ) const;
 
-	vint_t ViewLineToLogLine( vint_t view_line_no ) const {
-		return m_ViewAccessor->ViewLineToLogLine( view_line_no );
-	}
-
 public:
 	SLineAnnotation( annotations_ptr_t log_annotations, viewaccessor_ptr_t view_accessor )
 		: m_LogAnnotations{ log_annotations }, m_ViewAccessor{ view_accessor } {}
@@ -327,9 +326,8 @@ private:
 	// interface to annotations we're tracking
 	lineannotation_ptr_t m_Annotations;
 
-	// back reference to cell buffer in our owning view
-	const SViewCellBuffer & m_CellBuffer;
-
+	// view data
+	viewaccessor_ptr_t m_ViewAccessor;
 
 	// cached annotation values
 	mutable annotationsizes_list_t m_AnnotationSizes;
@@ -346,8 +344,8 @@ protected:
 	void ValidateCache( void ) const ;
 
 public:
-	SContractionState( lineannotation_ptr_t annotations, const SViewCellBuffer & cell_buffer )
-		: m_Annotations{ annotations }, m_CellBuffer{ cell_buffer } {}
+	SContractionState( lineannotation_ptr_t annotations, viewaccessor_ptr_t view_accessor )
+		: m_Annotations{ annotations }, m_ViewAccessor{ view_accessor } {}
 
 	vint_t LinesInDoc() const override;
 	vint_t LinesDisplayed() const override;

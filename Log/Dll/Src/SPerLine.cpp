@@ -25,9 +25,33 @@
  * SLineMarkers
  -----------------------------------------------------------------------*/
 
-vint_t SLineMarkers::MarkValue( vint_t line )
+int SLineMarkers::ViewMarkValue( vint_t view_line_no )
 {
-	return m_Adornments->MarkValue( line, m_CellBuffer );
+	int res{ 0 }, bit{ 0x1 << (int) NConstants::e_StyleBaseTracker };
+
+	const ViewTimecodeAccessor timecode_accessor{ m_ViewAccessor };
+	const vint_t max_line_no{ m_ViewAccessor->GetMap()->m_NumLinesOrOne - 1 };
+
+	for( const GlobalTracker & tracker : GlobalTrackers::GetTrackers() )
+	{
+		bit <<= 1;
+		if( tracker.IsInUse() && tracker.IsNearest( view_line_no, max_line_no, timecode_accessor ) )
+			res |= bit;
+	}
+
+	return res;
+}
+
+vint_t SLineMarkers::MarkValue( vint_t view_line_no )
+{
+	// most markers come from the logfile
+	const vint_t log_line_no{ m_ViewAccessor->ViewLineToLogLine( view_line_no ) };
+	const int log_markers{ m_Adornments->LogMarkValue( log_line_no ) };
+	
+	// the global timecode markers
+	const int global_markers{ ViewMarkValue( view_line_no ) };
+	
+	return log_markers | global_markers;
 }
 
 
@@ -69,7 +93,7 @@ annotationsizes_list_t SLineAnnotation::GetAnnotationSizes( void ) const
 
 const NAnnotation * SLineAnnotation::GetAnnotation( vint_t line ) const
 {
-	return m_LogAnnotations->GetAnnotation( ViewLineToLogLine( line ) );
+	return m_LogAnnotations->GetAnnotation( m_ViewAccessor->ViewLineToLogLine( line ) );
 }
 
 
@@ -87,7 +111,7 @@ vint_t SLineAnnotation::Style( vint_t line ) const
 
 void SLineAnnotation::SetStyle( vint_t line, vint_t style )
 {
-	m_LogAnnotations->SetAnnotationStyle( ViewLineToLogLine( line ), style );
+	m_LogAnnotations->SetAnnotationStyle( m_ViewAccessor->ViewLineToLogLine( line ), style );
 }
 
 
@@ -105,7 +129,7 @@ const char *SLineAnnotation::Text( vint_t line ) const
 
 void SLineAnnotation::SetText( vint_t line, const char * text )
 {
-	m_LogAnnotations->SetAnnotationText( ViewLineToLogLine( line ), text );
+	m_LogAnnotations->SetAnnotationText( m_ViewAccessor->ViewLineToLogLine( line ), text );
 }
 
 
@@ -172,7 +196,7 @@ void SContractionState::ValidateCache( void ) const
 	m_DocFromDisplay.Clear();
 	m_Height.Clear();
 
-	m_LinesinDocument = m_CellBuffer.IsEmpty() ? 0 : m_CellBuffer.Lines();
+	m_LinesinDocument = m_ViewAccessor->GetNumLines();
 	const vint_t annotation_lines{ SumAnnotationSizes( m_LinesinDocument ) };
 	m_LinesDisplayed = m_LinesinDocument + annotation_lines;
 }
