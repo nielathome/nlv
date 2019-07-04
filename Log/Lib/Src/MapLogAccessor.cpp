@@ -17,90 +17,15 @@
 #include "StdAfx.h"
 
 // Application includes
+#include "Cache.h"
 #include "MapLogIndexWriter.h"
 #include "Nline.h"
-#include "Nmisc.h"
 
 // Intel TBB includes
 #include <tbb/flow_graph.h>
 
 // force link this module
 void force_link_mapaccessor_module() {}
-
-
-
-/*-----------------------------------------------------------------------
- * LineCache
- -----------------------------------------------------------------------*/
-
-class LineCacheElement : public LineBuffer
-{
-protected:
-	friend class LineCache;
-
-	std::tuple<bool, unsigned> Hit( nlineno_t line_no, uint64_t field_mask ) const
-	{
-		if( (m_LineNo == line_no) && (m_FieldMask == field_mask) )
-			return{ true, ++m_Count };
-		else
-			return{ false, m_Count };
-	}
-
-	void Reset( nlineno_t line_no, uint64_t field_mask )
-	{
-		m_LineNo = line_no;
-		m_FieldMask = field_mask;
-		m_Count = 1;
-	}
-
-private:
-	nlineno_t m_LineNo{ -1 };
-	uint64_t m_FieldMask{ 0 };
-	mutable unsigned m_Count{ 0 };
-};
-
-
-
-/*-----------------------------------------------------------------------
- * LineCache
- -----------------------------------------------------------------------*/
-
-class LineCache
-{
-public:
-	LineCache( CacheStatistics & stats )
-		: m_Stats{ stats } {}
-
-	std::tuple<bool, LineBuffer*> Hit( nlineno_t line_no, uint64_t field_mask )
-	{
-		m_Stats.Lookup();
-
-		unsigned lowest_count{ std::numeric_limits<unsigned>::max() };
-		LineCacheElement * oldest{ nullptr };
-		for( LineCacheElement & line : m_Lines )
-		{
-			bool hit; unsigned count;
-			std::tie( hit, count ) = line.Hit( line_no, field_mask );
-			if( hit )
-				return{ true, &line };
-			else if( count < lowest_count )
-			{
-				lowest_count = count;
-				oldest = &line;
-			}
-		}
-
-		m_Stats.Miss();
-		oldest->Reset( line_no, field_mask );
-		return{ false, oldest };
-	}
-
-private:
-	CacheStatistics & m_Stats;
-
-	static const size_t c_NumLine{ 4 };
-	LineCacheElement m_Lines[ c_NumLine ];
-};
 
 
 
@@ -261,11 +186,25 @@ private:
 	const std::string m_MatchDesc;
 
 	// Line/style caching
+	struct LineKey
+	{
+		nlineno_t f_LineNo;
+		uint64_t f_FieldMask;
+
+		bool operator < ( const LineKey & rhs ) const {
+			if( f_LineNo != rhs.f_LineNo )
+				return f_LineNo < rhs.f_LineNo;
+			else
+				return f_FieldMask < rhs.f_FieldMask;
+		}
+	};
+
+	using LineCache = Cache<LineBuffer, LineKey>;
 	static CacheStatistics m_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
 	mutable LineCache m_LineCache[ static_cast<int>(e_LineData::_Count) ]
 	{
-		{ m_LineCacheStats[ 0 ] },
-		{ m_LineCacheStats[ 1 ] }
+		{ 128, m_LineCacheStats[ 0 ] },
+		{ 128, m_LineCacheStats[ 1 ] }
 	};
 
 	// line formatting
@@ -603,8 +542,7 @@ void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t fiel
 
 	else
 	{
-		LineBuffer text;
-		m_Index->CopyLine( line_no, field_mask, m_Text, &text );
+		const LineBuffer & text{ GetLine( e_LineData::Text, line_no, field_mask ) };
 		m_Index->CopyStyle( line_no, field_mask, line_buffer );
 		m_LineFormatters.Apply( text, line_buffer );
 	}
@@ -614,11 +552,10 @@ void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t fiel
 const LineBuffer & MapLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
 {
 	LineCache & line_cache{ m_LineCache[ static_cast<int>(type) ] };
+	std::pair<bool, LineBuffer*> found{ line_cache.Find( { line_no, field_mask } ) };
 
-	bool hit; LineBuffer * line;
-	std::tie(hit, line ) = line_cache.Hit( line_no, field_mask );
-
-	if( !hit )
+	LineBuffer * line{ found.second };
+	if( !found.first )
 		CopyLine( type, line_no, field_mask, line );
 
 	return *line;
