@@ -83,6 +83,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\Deps\sqlite3.h" />
+    <ClInclude Include="Hdr\Cache.h" />
     <ClInclude Include="Hdr\FileMap.h" />
     <ClInclude Include="Hdr\LogAccessor.h" />
     <ClInclude Include="Hdr\Nfilesystem.h" />
