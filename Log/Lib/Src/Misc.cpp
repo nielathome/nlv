@@ -65,8 +65,9 @@ void CacheStatistics::Report( void )
 {
 	if( m_Lookups != 0 )
 	{
-		const double ratio{ (100.0 * m_Misses) / m_Lookups };
-		TraceDebug( "%s: lookups:%llu misses:%llu ratio:%.2f%%", m_Name, m_Lookups, m_Misses, ratio );
+		const uint64_t hits{ m_Lookups - m_Misses };
+		const double ratio{ 100.0 * hits / m_Lookups };
+		TraceDebug( "%s: lookups:%llu hits:%llu ratio:%.2f%%", m_Name, m_Lookups, hits, ratio );
 	}
 	else
 		TraceDebug( "%s: lookups:0", m_Name );
