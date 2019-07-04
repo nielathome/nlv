@@ -76,7 +76,7 @@ public:
 		: m_ViewAccessor{ accessor }, m_ViewMap{ accessor->GetMap() } {}
 
 	const LineBuffer & GetLine( e_LineData type, vint_t view_line_no ) const {
-		return m_ViewAccessor->GetLine( type, view_line_no );
+		return m_ViewMap->GetLine( type, view_line_no );
 	}
 
 public:

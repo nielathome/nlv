@@ -179,7 +179,7 @@ Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement )
 
 
 /*-----------------------------------------------------------------------
-* MapViewAccessor, declarations
+* SqlViewAccessor, declarations
 -----------------------------------------------------------------------*/
 
 class SqlLogAccessor;
@@ -189,14 +189,6 @@ class SqlViewAccessor : public ViewAccessor
 private:
 	// our substrate
 	SqlLogAccessor * m_LogAccessor;
-
-	// map a view line number (index) to a logfile line number (value)
-	std::vector<nlineno_t> m_LineMap;
-
-	// warning: an empty Scintilla document has a line count of 1
-	// this flag disambiguates the two cases
-	bool m_IsEmpty{ true };
-	nlineno_t m_NumLinesOrOne{ 0 };
 
 public:
 	SqlViewAccessor( SqlLogAccessor * accessor )
@@ -216,33 +208,16 @@ public:
 		return 0;
 	}
 
-	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const override {
-		static LineBuffer stack;
-		return stack;
-	}
-	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override {
-		
-	}
+	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
 
 	// fetch nearest preceding view line number to the supplied log line
 	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
-		return 0;
-//		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
+		return log_line_no;
 	}
 
 	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
-		return m_LineMap[ view_line_no ];
+		return view_line_no;
 	}
-
-public:
-	// MapLineAccessor interfaces
-
-	//nlineno_t GetNumLines( void ) const;
-	//bool IsLineRegular( nlineno_t line_no ) const;
-	//void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const;
-	//void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const;
-	//void GetFieldText( nlineno_t line_no, unsigned field_id, const char ** first, const char ** last ) const;
-	//fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const;
 };
 
 
@@ -251,7 +226,6 @@ public:
  * SqlLogAccessor, declarations
  -----------------------------------------------------------------------*/
 
-// the default log accessor is based on file mapping; the log must be entirely static
 class SqlLogAccessor : public LogAccessor, public LogSchemaAccessor
 {
 private:
@@ -259,9 +233,6 @@ private:
 	SqlDb m_DB;
 
 	nlineno_t m_NumLines{ 0 };
-
-	// fake timecode; we don't support line timecodes in SQL logfiles yet
-	NTimecodeBase m_TimecodeBase;
 
 	// field schema
 	const fielddescriptor_list_t m_FieldDescriptors;
@@ -281,30 +252,10 @@ public:
 	// LogAccessor interfaces
 
 	Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t ) override;
-//	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const override;
-//	void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const override;
 
-	//nlineno_t GetNumLines( void ) const override {
-	//	return m_NumLines;
-	//}
-
-	//bool IsLineRegular( nlineno_t line_no ) const override {
-	//	return true;
-	//}
-
-	//nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const override {
-	//	return 0;
-	//}
-
-	//////fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const override {
-	//////	return FieldValue{};
-	//////}
-
-	//NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
-	//	return NTimecode{};
-	//}
-
-	void SetTimezoneOffset( int offset_sec ) override {}
+	void SetTimezoneOffset( int offset_sec ) override {
+		// unsupported
+	}
 
 	const LogSchemaAccessor * GetSchema( void ) const override {
 		return this;
@@ -332,18 +283,17 @@ public:
 	const char * GetFieldEnumName( unsigned field_id, uint16_t enum_id ) const override {
 		return nullptr;
 	}
-
-	const NTimecodeBase & GetTimecodeBase( void ) const override {
-		return m_TimecodeBase;
-	}
-
-
-
+	
 	viewaccessor_ptr_t CreateViewAccessor( void ) override {
 		return std::make_shared<SqlViewAccessor>( this );
 	}
 
 
+
+	const NTimecodeBase & GetTimecodeBase( void ) const override {
+		static NTimecodeBase fake;
+		return fake;
+	}
 
 public:
 	static LogAccessor * MakeSqlLogAccessor( LogAccessorDescriptor & descriptor )
@@ -369,7 +319,6 @@ static OnEvent RegisterMapLogAccessor
 
 SqlLogAccessor::SqlLogAccessor( LogAccessorDescriptor & descriptor )
 {
-
 }
 
 
@@ -419,5 +368,24 @@ void SqlLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 
 void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const
 {
+	statement_ptr_t statement;
+	//if( !Ok( m_DB.MakeStatement( "select * from projection", statement ) ) )
+	//	return;
 
+	//while( statement->Step() )
+	//{
+	//	create a line visiotr
+	//}
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlViewAccessor, definitions
+ -----------------------------------------------------------------------*/
+
+
+void SqlViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) 
+{
+	// TODO
 }

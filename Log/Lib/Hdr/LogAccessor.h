@@ -411,6 +411,13 @@ public:
  * ViewMap
  -----------------------------------------------------------------------*/
 
+enum class e_LineData
+{
+	Text,
+	Style,
+	_Count
+};
+
 struct ViewMap
 {
 	// line start locations in the view
@@ -425,6 +432,7 @@ struct ViewMap
 	bool m_IsEmpty{ true };
 
 	virtual nlineno_t GetLineLength( nlineno_t line_no ) const = 0;
+	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const = 0;
 	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
 };
 
@@ -434,14 +442,6 @@ struct ViewMap
  * ViewAccessor
  -----------------------------------------------------------------------*/
 
-enum class e_LineData
-{
-	Text,
-	Style,
-	_Count
-};
-
-
 struct ViewAccessor : public LineVisitor
 {
 	// visit all lines in scope; use for searching/filtering
@@ -449,7 +449,6 @@ struct ViewAccessor : public LineVisitor
 
 	// basic line access
 	virtual nlineno_t GetNumLines( void ) const = 0;
-	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const = 0;
 	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
 	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
 

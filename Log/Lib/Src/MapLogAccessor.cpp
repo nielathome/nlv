@@ -109,6 +109,7 @@ public:
 	// ViewMap interfaces
 
 	nlineno_t GetLineLength( nlineno_t line_no ) const override;
+	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const override;
 	NTimecode GetUtcTimecode( nlineno_t line_no ) const override;
 
 public:
@@ -120,7 +121,6 @@ public:
 public:
 	// ViewAccessor interfaces
 
-	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const override;
 	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
 
 	nlineno_t GetNumLines( void ) const override {
@@ -344,15 +344,15 @@ nlineno_t MapViewAccessor::GetLineLength( nlineno_t line_no ) const
 }
 
 
-NTimecode MapViewAccessor::GetUtcTimecode( nlineno_t line_no ) const
-{
-	return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
-}
-
-
 const LineBuffer & MapViewAccessor::GetLine( e_LineData type, nlineno_t line_no ) const
 {
 	return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask );
+}
+
+
+NTimecode MapViewAccessor::GetUtcTimecode( nlineno_t line_no ) const
+{
+	return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
 }
 
 
