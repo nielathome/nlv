@@ -46,7 +46,10 @@ vint_t SLineMarkers::MarkValue( vint_t view_line_no )
 {
 	// most markers come from the logfile
 	const vint_t log_line_no{ m_ViewAccessor->ViewLineToLogLine( view_line_no ) };
-	const int log_markers{ m_Adornments->LogMarkValue( log_line_no ) };
+	int log_markers{ 0 };
+	m_ViewAccessor->VisitLine( view_line_no, [&log_markers, log_line_no, this] ( const LineAccessor & line ) {
+		log_markers = m_Adornments->LogMarkValue( log_line_no, line );
+	} );
 	
 	// the global timecode markers
 	const int global_markers{ ViewMarkValue( view_line_no ) };

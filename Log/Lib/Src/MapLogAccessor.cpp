@@ -217,7 +217,6 @@ protected:
 public:
 	// LineVisitor interface
 
-	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
 	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override;
 
 public:
@@ -939,15 +938,6 @@ void VisitLines( const T_ACCESSOR & accessor, T_LINEACCESSOR & line_accessor, Li
 
 	source.activate();
 	flow_graph.wait_for_all();
-}
-
-
-void MapLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
-{
-	MapLogLineAccessor line_accessor{ *this, 0 };
-	line_accessor.SetLineNo( visit_line_no );
-
-	task.Action( line_accessor, visit_line_no );
 }
 
 

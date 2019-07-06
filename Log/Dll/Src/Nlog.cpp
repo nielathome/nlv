@@ -204,24 +204,24 @@ const NAnnotation * NAnnotations::GetAnnotation( vint_t log_line_no ) const
 }
 
 
-void NAnnotations::SetAnnotationText( vint_t line, const char * text )
+void NAnnotations::SetAnnotationText( vint_t log_line_no, const char * text )
 {
 	// assume empty text means "delete"
 	m_Tracker.RecordEvent();
 	if( (text == nullptr) || (text[ 0 ] == '\0') )
 	{
-		annotation_map_t::const_iterator iannotation{ m_AnnotationMap.find( line ) };
+		annotation_map_t::const_iterator iannotation{ m_AnnotationMap.find( log_line_no ) };
 		if( iannotation != m_AnnotationMap.end() )
 			m_AnnotationMap.erase( iannotation );
 	}
 	else
-		m_AnnotationMap[ line ] = NAnnotation{ text };
+		m_AnnotationMap[ log_line_no ] = NAnnotation{ text };
 }
 
 
-void NAnnotations::SetAnnotationStyle( vint_t line, vint_t style )
+void NAnnotations::SetAnnotationStyle( vint_t log_line_no, vint_t style )
 {
-	annotation_map_t::iterator iannotation{ m_AnnotationMap.find( line ) };
+	annotation_map_t::iterator iannotation{ m_AnnotationMap.find( log_line_no ) };
 	if( iannotation != m_AnnotationMap.end() )
 		iannotation->second.SetStyle( style );
 }
@@ -238,8 +238,7 @@ vint_t NAnnotations::GetNextAnnotation( nlineno_t current, bool forward )
  * NAdornments
  -----------------------------------------------------------------------*/
 
-NAdornments::NAdornments( logaccessor_ptr_t log_accessor )
-	: m_LogAccessor{ log_accessor }
+NAdornments::NAdornments( void )
 {
 	RegisterStateProvider( "0EF8EE4F-4402-40F5-A9F7-5E48BC8876A6",
 		MakeStateProvider( this, &NAdornments::GetState, &NAdornments::PutState )
@@ -261,25 +260,20 @@ void NAdornments::PutState( const json & store )
 }
 
 
-int NAdornments::LogMarkValue( vint_t log_line_no )
+int NAdornments::LogMarkValue( vint_t log_line_no, const LineAccessor & line )
 {
 	NLineAdornmentsProvider provider{ this };
 	LineAdornmentsAccessor adornments{ &provider, log_line_no };
 
 	int res{ 0 }, bit{ 0x1 << (int) NConstants::e_StyleBaseMarker };
 
-	GetLogAccessor()->VisitLine( log_line_no,
-		[this, &res, &bit, &adornments] ( const LineAccessor & line )
-		{
-			// process auto markers first (i.e. lowest precedence is first item)
-			for( const selector_ptr_t &selector : m_AutoMarkers )
-			{
-				if( selector && selector->GetImpl()->Hit( line, adornments ) )
-					res |= bit;
-				bit <<= 1;
-			}
-		}
-	);
+	// process auto markers first (i.e. lowest precedence is first item)
+	for( const selector_ptr_t &selector : m_AutoMarkers )
+	{
+		if( selector && selector->GetImpl()->Hit( line, adornments ) )
+			res |= bit;
+		bit <<= 1;
+	}
 
 	// user marker is last - has highest precedence
 	if( m_UserMarkers.find( log_line_no ) != m_UserMarkers.end() )
@@ -878,7 +872,7 @@ NTimecode ViewTimecodeAccessor::GetUtcTimecode( int line_no ) const
 NLogfile::NLogfile( logaccessor_ptr_t log_accessor )
 	:
 	m_LogAccessor{ log_accessor },
-	m_Adornments{ new NAdornments{ log_accessor } }
+	m_Adornments{ new NAdornments }
 {
 }
 

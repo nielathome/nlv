@@ -296,8 +296,8 @@ protected:
 public:
 	annotationsizes_list_t GetAnnotationSizes( void ) const;
 	const NAnnotation * GetAnnotation( vint_t log_line_no ) const;
-	void SetAnnotationText( vint_t line, const char * text );
-	void SetAnnotationStyle( vint_t line, vint_t style );
+	void SetAnnotationText( vint_t log_line_no, const char * text );
+	void SetAnnotationStyle( vint_t log_line_no, vint_t style );
 
 	// find next annotated line in the given direction
 	vint_t GetNextAnnotation( nlineno_t current, bool forward );
@@ -317,9 +317,6 @@ public:
 class NAdornments : public NAnnotations
 {
 private:
-	// the logfile's data
-	logaccessor_ptr_t m_LogAccessor;
-
 	// auto-markers (derived via line selection)
 	std::vector<selector_ptr_t> m_AutoMarkers;
 
@@ -334,13 +331,8 @@ private:
 	void GetState( json & store ) const;
 	void PutState( const json & store );
 
-protected:
-	LogAccessor * GetLogAccessor() const {
-		return m_LogAccessor->GetImpl();
-	}
-
 public:
-	NAdornments( logaccessor_ptr_t accessor );
+	NAdornments( void );
 
 	// tracked line
 	void SetLocalTrackerLine( vint_t log_line_no ) {
@@ -351,7 +343,7 @@ public:
 	}
 
 	// identify the set of log markers to show at a given line
-	int LogMarkValue( vint_t log_line_no );
+	int LogMarkValue( vint_t log_line_no, const LineAccessor & line );
 
 public:
 	// Python interfaces

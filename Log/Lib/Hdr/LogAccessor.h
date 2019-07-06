@@ -269,7 +269,7 @@ struct LineAccessor : public LineAccessorIrregular
  * LineVisitor
  -----------------------------------------------------------------------*/
 
-// interface to support visiting all lines in a set (e.g. a log file)
+// base data to support visiting all lines in a set (e.g. a log file)
 struct LineVisitor
 {
 	virtual ~LineVisitor( void ) {}
@@ -298,30 +298,6 @@ struct LineVisitor
 		// guaranteed to be called in visitor line-number sequence
 		virtual void Join( task_ptr_t task ) = 0;
 	};
-
-	// "visit" a single line; use as a generalised line accessor
-	virtual void VisitLine( Task & task, nlineno_t visit_line_no ) const = 0;
-
-	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
-	template<typename T_FUNC>
-	void VisitLine( nlineno_t visit_line_no, T_FUNC & functor )
-	{
-		using functor_t = T_FUNC;
-
-		struct LocalTask : public Task
-		{
-			functor_t & f_Functor;
-			LocalTask( functor_t & functor )
-				: f_Functor{ functor } {}
-
-			void Action( const LineAccessor & line, nlineno_t visit_line_no ) override {
-				f_Functor( line );
-			}
-		};
-
-		LocalTask task{ functor };
-		VisitLine( task, visit_line_no );
-	}
 };
 
 
@@ -444,6 +420,30 @@ struct ViewMap
 
 struct ViewAccessor : public LineVisitor
 {
+	// "visit" a single line; use as a generalised line accessor
+	virtual void VisitLine( Task & task, nlineno_t visit_line_no ) const = 0;
+
+	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
+	template<typename T_FUNC>
+	void VisitLine( nlineno_t visit_line_no, T_FUNC & functor )
+	{
+		using functor_t = T_FUNC;
+
+		struct LocalTask : public Task
+		{
+			functor_t & f_Functor;
+			LocalTask( functor_t & functor )
+				: f_Functor{ functor } {}
+
+			void Action( const LineAccessor & line, nlineno_t visit_line_no ) override {
+				f_Functor( line );
+			}
+		};
+
+		LocalTask task{ functor };
+		VisitLine( task, visit_line_no );
+	}
+
 	// visit all lines in scope; use for searching/filtering
 	virtual void VisitLines( Visitor & visitor, bool include_irregular ) const = 0;
 

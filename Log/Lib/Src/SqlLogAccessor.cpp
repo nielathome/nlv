@@ -243,7 +243,6 @@ private:
 protected:
 	// LineVisitor interface
 
-	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
 	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override;
 
 	SqlLogAccessor( LogAccessorDescriptor & descriptor );
@@ -344,26 +343,9 @@ Error SqlLogAccessor::CalcNumLines( void )
 	return res;
 }
 
-//const LineBuffer & SqlLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
-//{
-//	static LineBuffer b;
-//	return b;
-//}
-
-
-//void SqlLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const
-//{
-//
-//}
 
 
 
-
-
-void SqlLogAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
-{
-
-}
 
 
 void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const
