@@ -33,7 +33,7 @@ void force_link_sqlaccessor_module() {}
  -----------------------------------------------------------------------*/
 
 class SqlStatement;
-using statement_ptr_t = std::unique_ptr<SqlStatement>;
+using statement_ptr_t = std::shared_ptr<SqlStatement>;
 
 class SqlStatement
 {
@@ -47,8 +47,11 @@ protected:
 public:
 	~SqlStatement( void );
 
+	Error Bind( int idx, int64_t value );
 	Error Step( void );
-	int GetAsInt( unsigned field_id );
+	int GetAsInt( unsigned field_id ) const;
+	int64_t GetAsInt64( unsigned field_id ) const;
+	void GetAsText( unsigned field_id, const char ** first, const char ** last ) const;
 	Error Close( void );
 };
 
@@ -74,6 +77,18 @@ Error SqlStatement::Open( sqlite3 * db, const char * sql_text )
 }
 
 
+Error SqlStatement::Bind( int idx, int64_t value )
+{
+	Error res{ e_OK };
+	const int sql_ret{ sqlite3_bind_int64( m_Handle, idx, value ) };
+
+	if( sql_ret != SQLITE_OK )
+		res = TraceError( e_SqlStatementBind, "sql_res=[%d/%s]", sql_ret, sqlite3_errstr( sql_ret ) );
+
+	return res;
+}
+
+
 Error SqlStatement::Step( void )
 {
 	Error res{ e_OK };
@@ -92,9 +107,22 @@ Error SqlStatement::Step( void )
 }
 
 
-int SqlStatement::GetAsInt( unsigned field_id )
+int SqlStatement::GetAsInt( unsigned field_id ) const
 {
 	return sqlite3_column_int( m_Handle, field_id );
+}
+
+
+int64_t SqlStatement::GetAsInt64( unsigned field_id ) const
+{
+	return sqlite3_column_int64( m_Handle, field_id );
+}
+
+
+void SqlStatement::GetAsText( unsigned field_id, const char ** first, const char ** last ) const
+{
+	*first = reinterpret_cast<const char *>(sqlite3_column_text( m_Handle, field_id ));
+	*last = *first + sqlite3_column_bytes( m_Handle, field_id );
 }
 
 
@@ -131,7 +159,7 @@ public:
 	Error Open( const std::filesystem::path & file_path );
 	Error Close( void );
 
-	Error MakeStatement( const char * sql_text, statement_ptr_t & statement );
+	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) const;
 };
 
 
@@ -170,9 +198,9 @@ Error SqlDb::Close( void )
 }
 
 
-Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement )
+Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement ) const
 {
-	statement = std::make_unique<SqlStatement>();
+	statement = std::make_shared<SqlStatement>();
 	return statement->Open( m_Handle, sql_text );
 }
 
@@ -184,11 +212,17 @@ Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement )
 
 class SqlLogAccessor;
 
-class SqlViewAccessor : public ViewAccessor
+class SqlViewAccessor
+	:
+	public ViewProperties,
+	public ViewAccessor
 {
 private:
 	// our substrate
 	SqlLogAccessor * m_LogAccessor;
+
+	// list of fields (columns) to display/search
+	uint64_t m_FieldViewMask{ 0 };
 
 public:
 	SqlViewAccessor( SqlLogAccessor * accessor )
@@ -196,18 +230,20 @@ public:
 	{}
 
 public:
-	// LineVisitor interface
+	// ViewProperties interfaces
 
-	void VisitLine( Task & task, nlineno_t visit_line_no ) const override {}
-	void VisitLines( Visitor & visitor ) const override {}
+	void SetFieldMask( uint64_t field_mask ) override {
+		// record the change
+		m_Tracker.RecordEvent();
+		m_FieldViewMask = field_mask;
+	}
 
 public:
 	// ViewAccessor interfaces
 
-	nlineno_t GetNumLines( void ) const override {
-		return 0;
-	}
-
+	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
+	void VisitLines( Visitor & visitor ) const override;
+	nlineno_t GetNumLines( void ) const override;
 	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
 
 	// fetch nearest preceding view line number to the supplied log line
@@ -217,6 +253,10 @@ public:
 
 	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
 		return view_line_no;
+	}
+
+	ViewProperties * GetProperties( void ) override {
+		return this;
 	}
 };
 
@@ -300,8 +340,12 @@ public:
 		return new SqlLogAccessor( descriptor );
 	}
 
-	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) {
+	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) const {
 		return m_DB.MakeStatement( sql_text, statement );
+	}
+
+	nlineno_t GetNumLines( void ) const {
+		return m_NumLines;
 	}
 };
 
@@ -338,7 +382,7 @@ Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 Error SqlLogAccessor::CalcNumLines( void )
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( "select count(*) from reschedule", statement ) };
+	Error res{ MakeStatement( "SELECT count(*) FROM projection", statement ) };
 
 	if( Ok( res ) )
 		UpdateError( res, statement->Step() );
@@ -355,7 +399,6 @@ Error SqlLogAccessor::CalcNumLines( void )
  * SqlLineAccessor
  -----------------------------------------------------------------------*/
 
-#if 0
 //template<typename T_ACCESSOR>
 class SqlLineAccessor : public LineAccessor
 {
@@ -363,38 +406,42 @@ public:
 	using accessor_t = SqlLogAccessor;
 
 protected:
-	statement_ptr_t & m_Statement;
-	
-	const accessor_t & m_Accessor;
+//	const accessor_t & m_Accessor;
+	statement_ptr_t m_Statement;
 	nlineno_t m_LineNo{ 0 };
 
 	// transient store for line information
 	mutable LineBuffer m_LineBuffer;
 
 public:
-	SqlLineAccessor( const accessor_t & accessor )
-		: m_Accessor{ accessor } {}
+	SqlLineAccessor( /*const accessor_t & accessor,*/ statement_ptr_t statement )
+		: /*m_Accessor{ accessor },*/ m_Statement{ statement } {}
 
-	void SetLineNo( nlineno_t line_no ) {
-		m_LineNo = line_no;
-	}
-
-public:
-	// LineAccessorIrregular interfaces
-
-	nlineno_t GetLineNo( void ) const override {
-		return m_LineNo;
+	void IncLineNo( void ) {
+		++m_LineNo;
 	}
 
 public:
 	// LineAccessor interfaces
 
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
+	}
+
+	nlineno_t GetLength( void ) const override {
+		return 0;
+	}
+
+	void GetText( const char ** first, const char ** last ) const override {
+		*first = *last = nullptr;
+	}
+
 	// irregular/continuation lines not supported
 	bool IsRegular( void ) const override {
 		return true;
 	}
-	const LineAccessorIrregular * NextIrregular( void ) const override {
-		return nullptr;
+	nlineno_t NextIrregularLineLength( void ) const override {
+		return -1;
 	}
 
 	void GetNonFieldText( const char ** first, const char ** last ) const override {
@@ -403,18 +450,18 @@ public:
 	}
 
 	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
-		m_Accessor.GetFieldText( m_LineNo, field_id, first, last );
+		m_Statement->GetAsText( field_id - 1, first, last );
 	}
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
-		return m_Accessor.GetFieldValue( m_LineNo, field_id );
+		return m_Statement->GetAsInt64( field_id - 1 );
 	}
 
 	NTimecode GetUtcTimecode( void ) const override {
-		return m_Accessor.GetUtcTimecode( m_LineNo );
+		return NTimecode{};
+//		return m_Accessor.GetUtcTimecode( m_LineNo );
 	}
 };
-#endif
 
 
 /*-----------------------------------------------------------------------
@@ -425,13 +472,17 @@ public:
 void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask ) const
 {
 	statement_ptr_t statement;
-	//if( !Ok( m_DB.MakeStatement( "select * from projection", statement ) ) )
-	//	return;
+	Error res{ MakeStatement( "SELECT * FROM projection", statement ) };
+	if( !Ok( res ) )
+		return;
 
-	//while( statement->Step() )
-	//{
-	//	create a line visiotr
-	//}
+	task_ptr_t task{ visitor.MakeTask( m_NumLines ) };
+	SqlLineAccessor line{ statement };
+	while( statement->Step() == Error::e_SqlRow )
+	{
+		task->Action( line );
+		line.IncLineNo();
+	}
 }
 
 
@@ -440,6 +491,34 @@ void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask ) const
  * SqlViewAccessor, definitions
  -----------------------------------------------------------------------*/
 
+void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
+{
+	statement_ptr_t statement;
+	Error res{ m_LogAccessor->MakeStatement( "SELECT * FROM projection WHERE rowid = ?1", statement ) };
+
+	if( Ok( res ) )
+		UpdateError( res, statement->Bind( 1, visit_line_no + 1 ) );
+
+	if( Ok( res ) )
+		UpdateError( res, statement->Step() );
+
+	if( Ok( res ) )
+	{
+		SqlLineAccessor line{ statement };
+		task.Action( line );
+	}
+}
+
+
+void SqlViewAccessor::VisitLines( Visitor & visitor ) const
+{
+
+}
+
+nlineno_t SqlViewAccessor::GetNumLines( void ) const
+{
+	return m_LogAccessor->GetNumLines();
+}
 
 void SqlViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) 
 {

@@ -97,13 +97,18 @@ private:
 	// map a view line number (index) to a logfile line number (value)
 	std::vector<nlineno_t> m_LineMap;
 
-	// list of fields (columns) to display
+	// list of fields (columns) to display/search
 	uint64_t m_FieldViewMask{ 0 };
 
 public:
 	MapViewAccessor( MapLogAccessor * accessor )
 		: m_LogAccessor{ accessor }
 	{}
+
+public:
+	// ViewProperties interfaces
+
+	void SetFieldMask( uint64_t field_mask ) override;
 
 public:
 	// ViewMap interfaces
@@ -113,14 +118,10 @@ public:
 	NTimecode GetUtcTimecode( nlineno_t line_no ) const override;
 
 public:
-	// LineVisitor interface
+	// ViewAccessor interface
 
 	void VisitLine( LineVisitor::Task & task, nlineno_t visit_line_no ) const override;
 	void VisitLines( LineVisitor::Visitor & visitor ) const override;
-
-public:
-	// ViewAccessor interfaces
-
 	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
 
 	nlineno_t GetNumLines( void ) const override {
@@ -143,11 +144,6 @@ public:
 	const ViewMap * GetMap( void ) override {
 		return this;
 	}
-
-public:
-	// ViewProperties interfaces
-
-	void SetFieldMask( uint64_t field_mask ) override;
 
 public:
 	// MapLineAccessor interfaces

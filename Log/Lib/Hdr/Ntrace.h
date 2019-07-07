@@ -86,6 +86,7 @@ enum Error : unsigned
 	e_SqlDbOpen,
 	e_SqlDbClose,
 	e_SqlStatementOpen,
+	e_SqlStatementBind,
 	e_SqlStatementStep,
 	e_SqlStatementClose
 };

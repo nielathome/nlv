@@ -248,9 +248,9 @@ struct LineAccessor
 {
 	virtual nlineno_t GetLineNo( void ) const = 0;
 	virtual nlineno_t GetLength( void ) const = 0;
+	virtual void GetText( const char ** first, const char ** last ) const = 0;
 	virtual bool IsRegular( void ) const = 0;
 	virtual nlineno_t NextIrregularLineLength( void ) const = 0;
-	virtual void GetText( const char ** first, const char ** last ) const = 0;
 	virtual void GetNonFieldText( const char ** first, const char ** last ) const = 0;
 	virtual void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const = 0;
 	virtual fieldvalue_t GetFieldValue( unsigned field_id ) const = 0;
@@ -444,10 +444,8 @@ struct ViewAccessor : public LineVisitor
 	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
 	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
 
-	// view configuration; optional (can return null)
-	virtual ViewProperties * GetProperties( void ) {
-		return nullptr;
-	}
+	// view configuration
+	virtual ViewProperties * GetProperties( void ) = 0;
 
 	// view map; optional (can return null)
 	virtual const ViewMap * GetMap( void ) {

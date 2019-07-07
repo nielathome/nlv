@@ -316,7 +316,7 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.ColParentId = self.MakeHiddenFieldSchema("parent_id", "int32")
 
     def AddField(self, name, type, width, align, formatter):
-        self.ColParentId = self.MakeFieldSchema(name, type, width, align, formatter)
+        self.MakeFieldSchema(name, type, width, align, formatter)
 
     def AddStart(self, name, width, align, formatter):
         self.ColStart = self.MakeFieldSchema(name, "text", width, align, formatter)
