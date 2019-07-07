@@ -492,6 +492,9 @@ protected:
 
 	adornments_ptr_t GetAdornments( void );
 
+	// Select the lines to display in the view
+	void Filter( selector_ptr_t selector, bool add_irregular );
+
 public:
 	NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
@@ -544,9 +547,6 @@ public:
 	// numeric access to a line's timecode, timecode is referenced to UTC
 	NTimecode * GetUtcTimecode( vint_t line_no );
 
-	// Select the lines to display in the view
-	virtual void Filter( selector_ptr_t selector, bool add_irregular );
-
 	// Field visibility
 	virtual void SetFieldMask( uint64_t field_mask ) {
 		ViewProperties * view_props{ m_ViewAccessor->GetProperties() };
@@ -570,6 +570,11 @@ class NLineSet
 public:
 	NLineSet( void ) {}
 	NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
+
+	// Select the lines to display in the lineset
+	void Filter( selector_ptr_t selector ) {
+		NFilterView::Filter( selector, false );
+	}
 };
 
 
@@ -647,7 +652,7 @@ public:
 	virtual unsigned long long GetContent( void );
 
 	// Select the lines to display in the view
-	void Filter( selector_ptr_t selector, bool add_irregular ) override;
+	void Filter( selector_ptr_t selector );
 
 	// Field visibility
 	void SetFieldMask( uint64_t field_mask ) override;

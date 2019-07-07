@@ -1012,7 +1012,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         if selector is None:
             return False
 
-        self._N_View.Filter(selector, True)
+        self._N_View.Filter(selector)
         return True
 
 

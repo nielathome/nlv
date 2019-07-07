@@ -308,11 +308,11 @@ BOOST_PYTHON_MODULE( Nlog )
 		.def( "GetFieldValueFloat", &CLS::GetFieldValueFloat ) \
 		.def( "SetNumHiliter", &CLS::SetNumHiliter ) \
 		.def( "GetHiliter", &CLS::GetHiliter ) \
-		.def( "Filter", &CLS::Filter ) \
 		.def( "SetFieldMask", &CLS::SetFieldMask )
 
 	class_<NLineSet, lineset_ptr_t, boost::noncopyable>( "LineSet" )
 		NFilterView_Members( NLineSet )
+		.def( "Filter", &NLineSet::Filter )
 		.def( "GetNumLines", &NLineSet::GetNumLines )
 		.def( "ViewLineToLogLine", &NLineSet::ViewLineToLogLine )
 		.def( "LogLineToViewLine", &NLineSet::LogLineToViewLine )
@@ -320,6 +320,7 @@ BOOST_PYTHON_MODULE( Nlog )
 
 	class_<NView, view_ptr_t, boost::noncopyable>( "View" )
 		NFilterView_Members( NView )
+		.def( "Filter", &NView::Filter )
 		.def( "GetContent", &NView::GetContent )
 		.def( "ToggleBookmarks", &NView::ToggleBookmarks )
 		.def( "GetNextBookmark", &NView::GetNextBookmark )

@@ -936,7 +936,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             if self._N_LineSet is None:
                 return True
 
-            self._N_LineSet.Filter(selector, False)
+            self._N_LineSet.Filter(selector)
 
         map = self._ParentKeyToChildKeys = dict()
 

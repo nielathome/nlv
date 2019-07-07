@@ -770,10 +770,10 @@ unsigned long long NView::GetContent( void )
 }
 
 
-void NView::Filter( selector_ptr_t selector, bool add_irregular )
+void NView::Filter( selector_ptr_t selector )
 {
 	NTextChanged handler{ m_CellBuffer, GetControl() };
-	NFilterView::Filter( selector, add_irregular );
+	NFilterView::Filter( selector, true );
 }
 
 

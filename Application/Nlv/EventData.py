@@ -138,7 +138,7 @@ class G_Analyser:
             raise RuntimeError("Broken filter: {}".format(match.MatchText))
 
         lineset = self._LogFile.CreateLineSet()
-        lineset.Filter(selector, False)
+        lineset.Filter(selector)
         return lineset
 
 
