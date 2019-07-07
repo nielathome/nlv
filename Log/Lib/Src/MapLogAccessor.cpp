@@ -116,7 +116,7 @@ public:
 	// LineVisitor interface
 
 	void VisitLine( LineVisitor::Task & task, nlineno_t visit_line_no ) const override;
-	void VisitLines( LineVisitor::Visitor & visitor, bool include_irregular ) const override;
+	void VisitLines( LineVisitor::Visitor & visitor ) const override;
 
 public:
 	// ViewAccessor interfaces
@@ -217,7 +217,7 @@ protected:
 public:
 	// LineVisitor interface
 
-	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override;
+	void VisitLines( Visitor & visitor, uint64_t field_mask ) const override;
 
 public:
 	// MapViewAccessor intefaces
@@ -794,11 +794,11 @@ public:
 	{
 		for( nlineno_t visit_line_no = m_BeginLine; visit_line_no < m_EndLine; ++visit_line_no )
 		{
-			// map line numbers from the "arbitrary" line number space to real log lines
 			m_LineAccessor.SetLineNo( visit_line_no );
 
 			if( m_SkipIrregular && !m_LineAccessor.IsRegular() )
 				continue;
+
 			m_Task->Action( m_LineAccessor, visit_line_no );
 		}
 	}
@@ -941,10 +941,11 @@ void VisitLines( const T_ACCESSOR & accessor, T_LINEACCESSOR & line_accessor, Li
 }
 
 
-void MapLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const
+void MapLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask ) const
 {
+	// don't include irregular lines in the visit
 	MapLogLineAccessor line_accessor{ *this, field_mask };
-	::VisitLines<MapLogAccessor, MapLogLineAccessor>( *this, line_accessor, visitor, include_irregular );
+	::VisitLines<MapLogAccessor, MapLogLineAccessor>( *this, line_accessor, visitor, false );
 }
 
 
@@ -957,10 +958,11 @@ void MapViewAccessor::VisitLine( LineVisitor::Task & task, nlineno_t visit_line_
 }
 
 
-void MapViewAccessor::VisitLines( LineVisitor::Visitor & visitor, bool include_irregular ) const
+void MapViewAccessor::VisitLines( LineVisitor::Visitor & visitor ) const
 {
+	// do include irregular lines in the visit
 	MapViewLineAccessor line_accessor{ *this };
-	::VisitLines<MapViewAccessor, MapViewLineAccessor>( *this, line_accessor, visitor, include_irregular );
+	::VisitLines<MapViewAccessor, MapViewLineAccessor>( *this, line_accessor, visitor, true );
 }
 
 
@@ -1005,7 +1007,7 @@ struct FilterTask : public LineVisitor::Task
 		f_ViewPos += line.GetLength();
 
 		// if requested, add in any irregular continuation lines
-		// add the selected line and all of its continuations
+		// i.e. add the selected line and all of its continuations
 		if( !f_FilterData.f_AddIrregular )
 			return;
 
@@ -1082,7 +1084,7 @@ void MapViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * ador
 	};
 
 	FilterVisitor visitor{ filter_data };
-	m_LogAccessor->VisitLines( visitor, m_FieldViewMask, false );
+	m_LogAccessor->VisitLines( visitor, m_FieldViewMask );
 	visitor.Finish();
 
 	m_TextLen = visitor.f_ViewPos;

@@ -199,7 +199,7 @@ public:
 	// LineVisitor interface
 
 	void VisitLine( Task & task, nlineno_t visit_line_no ) const override {}
-	void VisitLines( Visitor & visitor, bool include_irregular ) const override {}
+	void VisitLines( Visitor & visitor ) const override {}
 
 public:
 	// ViewAccessor interfaces
@@ -243,7 +243,7 @@ private:
 protected:
 	// LineVisitor interface
 
-	void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const override;
+	void VisitLines( Visitor & visitor, uint64_t field_mask ) const override;
 
 	SqlLogAccessor( LogAccessorDescriptor & descriptor );
 
@@ -300,6 +300,9 @@ public:
 		return new SqlLogAccessor( descriptor );
 	}
 
+	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) {
+		return m_DB.MakeStatement( sql_text, statement );
+	}
 };
 
 static OnEvent RegisterMapLogAccessor
@@ -335,8 +338,11 @@ Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 Error SqlLogAccessor::CalcNumLines( void )
 {
 	statement_ptr_t statement;
-	Error res{ m_DB.MakeStatement( "select count(*) from reschedule", statement ) };
-	UpdateError( res, statement->Step() );
+	Error res{ MakeStatement( "select count(*) from reschedule", statement ) };
+
+	if( Ok( res ) )
+		UpdateError( res, statement->Step() );
+
 	if( Ok( res ) )
 		m_NumLines = statement->GetAsInt( 0 );
 
@@ -345,10 +351,78 @@ Error SqlLogAccessor::CalcNumLines( void )
 
 
 
+/*-----------------------------------------------------------------------
+ * SqlLineAccessor
+ -----------------------------------------------------------------------*/
+
+#if 0
+//template<typename T_ACCESSOR>
+class SqlLineAccessor : public LineAccessor
+{
+public:
+	using accessor_t = SqlLogAccessor;
+
+protected:
+	statement_ptr_t & m_Statement;
+	
+	const accessor_t & m_Accessor;
+	nlineno_t m_LineNo{ 0 };
+
+	// transient store for line information
+	mutable LineBuffer m_LineBuffer;
+
+public:
+	SqlLineAccessor( const accessor_t & accessor )
+		: m_Accessor{ accessor } {}
+
+	void SetLineNo( nlineno_t line_no ) {
+		m_LineNo = line_no;
+	}
+
+public:
+	// LineAccessorIrregular interfaces
+
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
+	}
+
+public:
+	// LineAccessor interfaces
+
+	// irregular/continuation lines not supported
+	bool IsRegular( void ) const override {
+		return true;
+	}
+	const LineAccessorIrregular * NextIrregular( void ) const override {
+		return nullptr;
+	}
+
+	void GetNonFieldText( const char ** first, const char ** last ) const override {
+		static const char dummy{ '\0' };
+		*first = *last = &dummy;
+	}
+
+	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
+		m_Accessor.GetFieldText( m_LineNo, field_id, first, last );
+	}
+
+	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
+		return m_Accessor.GetFieldValue( m_LineNo, field_id );
+	}
+
+	NTimecode GetUtcTimecode( void ) const override {
+		return m_Accessor.GetUtcTimecode( m_LineNo );
+	}
+};
+#endif
 
 
+/*-----------------------------------------------------------------------
+ * LineVisitor
+ -----------------------------------------------------------------------*/
 
-void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const
+
+void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask ) const
 {
 	statement_ptr_t statement;
 	//if( !Ok( m_DB.MakeStatement( "select * from projection", statement ) ) )

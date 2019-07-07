@@ -437,7 +437,7 @@ void NHiliter::CalcMatchedLines( void )
 	SearchVisitor visitor{ adornments_provider, selector };
 
 	PerfTimer timer;
-	m_ViewAccessor->VisitLines( visitor, true );
+	m_ViewAccessor->VisitLines( visitor );
 	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_ViewAccessor->GetMap()->m_NumLinesOrOne ) );
 
 	m_MatchedLines = std::move( visitor.f_Map);

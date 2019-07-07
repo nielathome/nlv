@@ -295,7 +295,7 @@ struct LineVisitor
 		virtual task_ptr_t MakeTask( nlineno_t num_lines ) = 0;
 
 		// combine the computed results from the Task into this Visitor
-		// guaranteed to be called in visitor line-number sequence
+		// guaranteed to be called in visitor line-number order
 		virtual void Join( task_ptr_t task ) = 0;
 	};
 };
@@ -445,7 +445,7 @@ struct ViewAccessor : public LineVisitor
 	}
 
 	// visit all lines in scope; use for searching/filtering
-	virtual void VisitLines( Visitor & visitor, bool include_irregular ) const = 0;
+	virtual void VisitLines( Visitor & visitor ) const = 0;
 
 	// basic line access
 	virtual nlineno_t GetNumLines( void ) const = 0;
@@ -478,7 +478,7 @@ using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
 struct LogAccessor : public LineVisitor
 {
 	// visit all lines in scope; use for searching/filtering
-	virtual void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular ) const = 0;
+	virtual void VisitLines( Visitor & visitor, uint64_t field_mask ) const = 0;
 
 	// core setup
 	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
