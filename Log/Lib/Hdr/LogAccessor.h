@@ -243,19 +243,13 @@ public:
  * LineAccessor
  -----------------------------------------------------------------------*/
 
-// interface for accessing irregular log line data
-struct LineAccessorIrregular
+// interface for accessing log line data
+struct LineAccessor
 {
-	virtual nlineno_t GetLength( void ) const = 0;
 	virtual nlineno_t GetLineNo( void ) const = 0;
-};
-
-
-// interface for accessing regular log line data
-struct LineAccessor : public LineAccessorIrregular
-{
+	virtual nlineno_t GetLineLength( void ) const = 0;
 	virtual bool IsRegular( void ) const = 0;
-	virtual const LineAccessorIrregular * NextIrregular( void ) const = 0;
+	virtual nlineno_t NextIrregularLineLength( void ) const = 0;
 	virtual void GetText( const char ** first, const char ** last ) const = 0;
 	virtual void GetNonFieldText( const char ** first, const char ** last ) const = 0;
 	virtual void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const = 0;

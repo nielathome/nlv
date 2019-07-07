@@ -125,20 +125,20 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 		/* 8 */ m_FieldValues.push_back( (double) 96.7 );
 	}
 
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
+	}
+
+	nlineno_t GetLineLength( void ) const override {
+		return nlineno_cast( m_LogText.size() );
+	}
+
 	bool IsRegular( void ) const override {
 		return false;
 	}
 
-	const LineAccessorIrregular * NextIrregular( void ) const override {
-		return nullptr;
-	}
-
-	nlineno_t GetLength( void ) const override {
-		return nlineno_cast( m_LogText.size() );
-	}
-
-	nlineno_t GetLineNo( void ) const override {
-		return m_LineNo;
+	nlineno_t NextIrregularLineLength( void ) const override {
+		return -1;
 	}
 
 	static void StrToChrPtr( const std::string & str, const char ** first, const char ** last ) {

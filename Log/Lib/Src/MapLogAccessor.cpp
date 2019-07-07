@@ -563,68 +563,6 @@ const LineBuffer & MapLogAccessor::GetLine( e_LineData type, nlineno_t line_no, 
 
 
 /*-----------------------------------------------------------------------
- * MapLineAccessorIrregular
- -----------------------------------------------------------------------*/
-
-template<typename T_ACCESSOR>
-class MapLineAccessorIrregular : public LineAccessorIrregular
-{
-public:
-	using accessor_t = T_ACCESSOR;
-
-private:
-	const accessor_t & m_Accessor;
-
-	nlineno_t m_LineNo{ 0 };
-	nlineno_t m_ContinuationLineCount{ -1 };
-	nlineno_t m_ContinuationLine{ 0 };
-
-	void Setup( void ) {
-		nlineno_t line_no{ m_LineNo };
-		while( !m_Accessor.IsLineRegular( ++line_no ) )
-			;
-
-		m_ContinuationLineCount = line_no - m_LineNo - 1;
-		m_ContinuationLine = 0;
-	}
-
-public:
-	MapLineAccessorIrregular( const accessor_t & accessor )
-		: m_Accessor{ accessor } {}
-
-	void Reset( nlineno_t line_no ) {
-		m_ContinuationLineCount = -1;
-		m_LineNo = line_no;
-	}
-
-	MapLineAccessorIrregular * NextIrregular( void ) {
-		if( m_ContinuationLineCount < 0 )
-			Setup();
-
-		if( m_ContinuationLine++ < m_ContinuationLineCount )
-		{
-			m_LineNo += 1;
-			return this;
-		}
-		return nullptr;
-	}
-
-public:
-	// LineAccessorIrregular intefaces
-
-	nlineno_t GetLength( void ) const override {
-		return m_Accessor.GetLineLength( m_LineNo );
-	}
-
-// NIEL needed?
-	nlineno_t GetLineNo( void ) const override {
-		return m_LineNo;
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
  * MapLineAccessor
  -----------------------------------------------------------------------*/
 
@@ -635,12 +573,12 @@ public:
 	using accessor_t = T_ACCESSOR;
 
 private:
-	// continuation line handling
-	mutable MapLineAccessorIrregular<accessor_t> m_Irregulars;
+	// continuation (next) line handling
+	mutable nlineno_t m_IrregularLineNo{ -1 };
 
 protected:
 	const accessor_t & m_Accessor;
-	nlineno_t m_LineNo{ 0 };
+	nlineno_t m_LineNo{ -1 };
 
 	// transient store for line information
 	mutable LineBuffer m_LineBuffer;
@@ -648,32 +586,31 @@ protected:
 public:
 	MapLineAccessor( const accessor_t & accessor )
 		:
-		m_Accessor{ accessor },
-		m_Irregulars{ accessor }
+		m_Accessor{ accessor }
 	{}
 
 	void SetLineNo( nlineno_t line_no ) {
-		m_Irregulars.Reset( line_no );
-		m_LineNo =line_no;
-	}
-
-public:
-	// LineAccessorIrregular interfaces
-
-	nlineno_t GetLineNo( void ) const override {
-		return m_LineNo;
+		m_LineNo = line_no;
+		m_IrregularLineNo = line_no + 1;
 	}
 
 public:
 	// LineAccessor interfaces
+
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
+	}
 
 	bool IsRegular( void ) const override {
 		return m_Accessor.IsLineRegular( m_LineNo );
 	}
 
 	// switch this line accessor to the next continuation line
-	const LineAccessorIrregular * NextIrregular( void ) const override {
-		return m_Irregulars.NextIrregular();
+	nlineno_t NextIrregularLineLength( void ) const override {
+		if( m_Accessor.IsLineRegular( m_IrregularLineNo ) )
+			return -1;
+		else
+			return m_Accessor.GetLineLength( m_IrregularLineNo++ );
 	}
 
 	void GetNonFieldText( const char ** first, const char ** last ) const override {
@@ -708,7 +645,7 @@ public:
 	MapLogLineAccessor( const MapLineAccessor::accessor_t & accessor, uint64_t field_mask )
 		: MapLineAccessor{ accessor }, m_FieldMask{ field_mask } {}
 
-	nlineno_t GetLength( void ) const override {
+	nlineno_t GetLineLength( void ) const override {
 		return m_Accessor.GetLineLength( m_LineNo, m_FieldMask );
 	}
 
@@ -735,7 +672,7 @@ public:
 		: MapLineAccessor{ accessor } {}
 
 
-	nlineno_t GetLength( void ) const override {
+	nlineno_t GetLineLength( void ) const override {
 		return m_Accessor.GetLineLength( m_LineNo );
 	}
 
@@ -1004,19 +941,19 @@ struct FilterTask : public LineVisitor::Task
 		// add the selected line
 		f_Lines.push_back( f_ViewPos );
 		f_Map.push_back( visit_line_no++ );
-		f_ViewPos += line.GetLength();
+		f_ViewPos += line.GetLineLength();
 
 		// if requested, add in any irregular continuation lines
 		// i.e. add the selected line and all of its continuations
 		if( !f_FilterData.f_AddIrregular )
 			return;
 
-		const LineAccessorIrregular * add{ nullptr };
-		while( (add = line.NextIrregular()) != nullptr )
+		nlineno_t irregular_line_length{ 0 };
+		while( (irregular_line_length = line.NextIrregularLineLength()) >= 0 )
 		{
 			f_Lines.push_back( f_ViewPos );
 			f_Map.push_back( visit_line_no++ );
-			f_ViewPos += add->GetLength();
+			f_ViewPos += irregular_line_length;
 		};
 	}
 };
