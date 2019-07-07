@@ -388,11 +388,12 @@ struct SearchTask : public LineVisitor::Task
 		f_Map.reserve( num_lines );
 	}
 
-	void Action( const LineAccessor & line, nlineno_t visit_line_no ) override
+	void Action( const LineAccessor & line ) override
 	{
-		LineAdornmentsAccessor adornments{ & f_Provider, line.GetLineNo() };
+		const nlineno_t view_line_no{ line.GetLineNo() };
+		LineAdornmentsAccessor adornments{ & f_Provider, view_line_no };
 		if( f_Selector->Hit( line, adornments ) )
-			f_Map.push_back( visit_line_no );
+			f_Map.push_back( view_line_no );
 	}
 };
 

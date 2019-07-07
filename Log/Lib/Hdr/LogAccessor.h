@@ -247,7 +247,7 @@ public:
 struct LineAccessor
 {
 	virtual nlineno_t GetLineNo( void ) const = 0;
-	virtual nlineno_t GetLineLength( void ) const = 0;
+	virtual nlineno_t GetLength( void ) const = 0;
 	virtual bool IsRegular( void ) const = 0;
 	virtual nlineno_t NextIrregularLineLength( void ) const = 0;
 	virtual void GetText( const char ** first, const char ** last ) const = 0;
@@ -271,10 +271,8 @@ struct LineVisitor
 	// perform a task on a single log-file line; implemented by Visitor user
 	struct Task
 	{
-		// can be called from multiple threads; note that the visit_line_no and the
-		// log_line line number can be different - the visitor line numbers are mapped
-		// by the VisitLineToLogLine member
-		virtual void Action( const LineAccessor & line, nlineno_t visit_line_no ) = 0;
+		// can be called from multiple threads
+		virtual void Action( const LineAccessor & line ) = 0;
 
 	};
 	using task_ptr_t = std::shared_ptr<Task>;
@@ -429,7 +427,7 @@ struct ViewAccessor : public LineVisitor
 			LocalTask( functor_t & functor )
 				: f_Functor{ functor } {}
 
-			void Action( const LineAccessor & line, nlineno_t visit_line_no ) override {
+			void Action( const LineAccessor & line ) override {
 				f_Functor( line );
 			}
 		};

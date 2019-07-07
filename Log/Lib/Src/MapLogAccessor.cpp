@@ -645,7 +645,7 @@ public:
 	MapLogLineAccessor( const MapLineAccessor::accessor_t & accessor, uint64_t field_mask )
 		: MapLineAccessor{ accessor }, m_FieldMask{ field_mask } {}
 
-	nlineno_t GetLineLength( void ) const override {
+	nlineno_t GetLength( void ) const override {
 		return m_Accessor.GetLineLength( m_LineNo, m_FieldMask );
 	}
 
@@ -672,7 +672,7 @@ public:
 		: MapLineAccessor{ accessor } {}
 
 
-	nlineno_t GetLineLength( void ) const override {
+	nlineno_t GetLength( void ) const override {
 		return m_Accessor.GetLineLength( m_LineNo );
 	}
 
@@ -736,7 +736,7 @@ public:
 			if( m_SkipIrregular && !m_LineAccessor.IsRegular() )
 				continue;
 
-			m_Task->Action( m_LineAccessor, visit_line_no );
+			m_Task->Action( m_LineAccessor );
 		}
 	}
 
@@ -891,7 +891,7 @@ void MapViewAccessor::VisitLine( LineVisitor::Task & task, nlineno_t visit_line_
 	MapViewLineAccessor line_accessor{ *this };
 	line_accessor.SetLineNo( visit_line_no );
 
-	task.Action( line_accessor, visit_line_no );
+	task.Action( line_accessor );
 }
 
 
@@ -932,16 +932,17 @@ struct FilterTask : public LineVisitor::Task
 		f_Map.reserve( num_lines );
 	}
 
-	void Action( const LineAccessor & line, nlineno_t visit_line_no ) override
+	void Action( const LineAccessor & line ) override
 	{
-		LineAdornmentsAccessor adornments{ f_FilterData.f_LineAdornmentsProvider, visit_line_no };
+		nlineno_t log_line_no{ line.GetLineNo() };
+		LineAdornmentsAccessor adornments{ f_FilterData.f_LineAdornmentsProvider, log_line_no };
 		if( !f_FilterData.f_Selector->Hit( line, adornments ) )
 			return;
 
 		// add the selected line
 		f_Lines.push_back( f_ViewPos );
-		f_Map.push_back( visit_line_no++ );
-		f_ViewPos += line.GetLineLength();
+		f_Map.push_back( log_line_no++ );
+		f_ViewPos += line.GetLength();
 
 		// if requested, add in any irregular continuation lines
 		// i.e. add the selected line and all of its continuations
@@ -952,7 +953,7 @@ struct FilterTask : public LineVisitor::Task
 		while( (irregular_line_length = line.NextIrregularLineLength()) >= 0 )
 		{
 			f_Lines.push_back( f_ViewPos );
-			f_Map.push_back( visit_line_no++ );
+			f_Map.push_back( log_line_no++ );
 			f_ViewPos += irregular_line_length;
 		};
 	}

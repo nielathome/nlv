@@ -129,7 +129,7 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 		return m_LineNo;
 	}
 
-	nlineno_t GetLineLength( void ) const override {
+	nlineno_t GetLength( void ) const override {
 		return nlineno_cast( m_LogText.size() );
 	}
 
