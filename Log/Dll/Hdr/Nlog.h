@@ -436,7 +436,6 @@ private:
 	// list of lines matched
 	std::vector<nlineno_t> m_MatchedLines;
 	void SetupMatchedLines( void );
-	void CalcMatchedLines( void );
 
 public:
 	// the Scintilla "indicator" matching to this hiliter

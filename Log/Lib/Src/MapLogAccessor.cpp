@@ -28,7 +28,6 @@
 void force_link_mapaccessor_module() {}
 
 
-
 /*-----------------------------------------------------------------------
  * LineFormatter, declarations
  -----------------------------------------------------------------------*/
@@ -83,6 +82,7 @@ void LineFormatter::Apply( const LineBuffer & text, LineBuffer * fmt ) const
  -----------------------------------------------------------------------*/
 
 class MapLogAccessor;
+struct Visitor;
 
 class MapViewAccessor
 	:
@@ -105,6 +105,8 @@ public:
 		: m_LogAccessor{ accessor }
 	{}
 
+	void VisitLines( Visitor & visitor ) const;
+
 public:
 	// ViewProperties interfaces
 
@@ -120,9 +122,9 @@ public:
 public:
 	// ViewAccessor interface
 
-	void VisitLine( LineVisitor::Task & task, nlineno_t visit_line_no ) const override;
-	void VisitLines( LineVisitor::Visitor & visitor ) const override;
+	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
 	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
+	std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider ) override;
 
 	nlineno_t GetNumLines( void ) const override {
 		return m_IsEmpty ? 0 : m_NumLinesOrOne;
@@ -211,9 +213,7 @@ protected:
 	MapLogAccessor( LogAccessorDescriptor & descriptor );
 
 public:
-	// LineVisitor interface
-
-	void VisitLines( Visitor & visitor, uint64_t field_mask ) const override;
+	void VisitLines( Visitor & visitor, uint64_t field_mask ) const;
 
 public:
 	// MapViewAccessor intefaces
@@ -685,8 +685,23 @@ public:
 
 
 /*-----------------------------------------------------------------------
- * LineVisitor
+ * VisitLines
  -----------------------------------------------------------------------*/
+
+ // Visitor interface (callback); implemented by Visitor user
+struct Visitor
+{
+	// the total number of lines that will be processed
+	virtual void SetNumLines( nlineno_t num_lines ) {}
+
+	// create a new Task for processing a subset of lines
+	virtual task_ptr_t MakeTask( nlineno_t num_lines ) = 0;
+
+	// combine the computed results from the Task into this Visitor
+	// guaranteed to be called in visitor line-number order
+	virtual void Join( task_ptr_t task ) = 0;
+};
+
 
 // the TBB task iterates the user task over a batch of lines - in a worker thread
 template<typename T_LINEACCESSOR>
@@ -694,7 +709,6 @@ class TBBTask
 {
 public:
 	// type for the user's task
-	using task_ptr_t = LineVisitor::task_ptr_t;
 	using lineaccessor_t = T_LINEACCESSOR;
 
 	// sequence number for downstream serialisation of work
@@ -758,7 +772,6 @@ using tbb_task_ptr_t = std::shared_ptr<TBBTask<T_LINEACCESSOR>>;
 template<typename T_LINEACCESSOR>
 struct TBBSource
 {
-	using Visitor = LineVisitor::Visitor;
 	using lineaccessor_t = T_LINEACCESSOR;
 	using tbb_task_ptr_t = ::tbb_task_ptr_t<lineaccessor_t>;
 
@@ -820,7 +833,7 @@ struct TBBSource
 
 // run the user visitor task over all lines
 template<typename T_ACCESSOR, typename T_LINEACCESSOR>
-void VisitLines( const T_ACCESSOR & accessor, T_LINEACCESSOR & line_accessor, LineVisitor::Visitor & visitor, bool include_irregular )
+void VisitLines( const T_ACCESSOR & accessor, T_LINEACCESSOR & line_accessor, Visitor & visitor, bool include_irregular )
 {
 	using accessor_t = T_ACCESSOR;
 	using lineaccessor_t = T_LINEACCESSOR;
@@ -882,7 +895,7 @@ void MapLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask ) const
 }
 
 
-void MapViewAccessor::VisitLine( LineVisitor::Task & task, nlineno_t visit_line_no ) const
+void MapViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
 	MapViewLineAccessor line_accessor{ *this };
 	line_accessor.SetLineNo( visit_line_no );
@@ -891,7 +904,7 @@ void MapViewAccessor::VisitLine( LineVisitor::Task & task, nlineno_t visit_line_
 }
 
 
-void MapViewAccessor::VisitLines( LineVisitor::Visitor & visitor ) const
+void MapViewAccessor::VisitLines( Visitor & visitor ) const
 {
 	// do include irregular lines in the visit
 	MapViewLineAccessor line_accessor{ *this };
@@ -913,7 +926,7 @@ struct FilterData
 
 
 // filter a single log file line; must be thread safe
-struct FilterTask : public LineVisitor::Task
+struct FilterTask : public Task
 {
 	// line data for the lines proccessed within this task
 	std::vector<nlineno_t> f_Lines;
@@ -957,7 +970,7 @@ struct FilterTask : public LineVisitor::Task
 
 
 // filter all log file lines
-struct FilterVisitor : public LineVisitor::Visitor
+struct FilterVisitor : public Visitor
 {
 	// line data for all lines
 	std::vector<nlineno_t> f_Lines;
@@ -965,7 +978,7 @@ struct FilterVisitor : public LineVisitor::Visitor
 	nlineno_t f_ViewPos{ 0 };
 	const FilterData & f_FilterData;
 
-	using task_ptr_t = LineVisitor::task_ptr_t;
+	using task_ptr_t = task_ptr_t;
 
 	FilterVisitor( const FilterData & filter_data )
 		: f_FilterData{ filter_data } {}
@@ -1036,7 +1049,79 @@ void MapViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * ador
 	m_Tracker.RecordEvent();
 
 	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_LogAccessor->GetNumLines() ) );
 }
 
 
+
+/*-----------------------------------------------------------------------
+ * MapViewAccessor - Searching
+ -----------------------------------------------------------------------*/
+
+// the search implementation is adapted from the filter implementation
+// search a single view line; must be thread safe
+struct SearchTask : public Task
+{
+	// line data for the lines proccessed within this task
+	std::vector<nlineno_t> f_Map;
+	Selector * f_Selector;
+	const LineAdornmentsProvider & f_Provider;
+
+	SearchTask( const LineAdornmentsProvider & provider, Selector * selector, nlineno_t num_lines )
+		: f_Selector{ selector }, f_Provider{ provider }
+	{
+		f_Map.reserve( num_lines );
+	}
+
+	void Action( const LineAccessor & line ) override
+	{
+		const nlineno_t view_line_no{ line.GetLineNo() };
+		LineAdornmentsAccessor adornments{ & f_Provider, view_line_no };
+		if( f_Selector->Hit( line, adornments ) )
+			f_Map.push_back( view_line_no );
+	}
+};
+
+
+// search all view lines
+struct SearchVisitor : public Visitor
+{
+	// line data for all lines
+	std::vector<nlineno_t> f_Map;
+	Selector * f_Selector;
+	const LineAdornmentsProvider & f_Provider;
+
+	using task_ptr_t = task_ptr_t;
+
+	SearchVisitor( const LineAdornmentsProvider & provider, Selector * selector )
+		: f_Selector{ selector }, f_Provider{ provider }
+	{
+		const size_t guestimated_average_search_hits{ 2048 };
+		f_Map.reserve( guestimated_average_search_hits );
+	}
+
+	task_ptr_t MakeTask( nlineno_t num_lines ) override
+	{
+		return std::make_shared<SearchTask>( f_Provider, f_Selector, num_lines );
+	}
+
+	void Join( task_ptr_t line_task ) override
+	{
+		SearchTask *filter_task{ dynamic_cast<SearchTask*>(line_task.get()) };
+
+		for( nlineno_t log_line_no : filter_task->f_Map )
+			f_Map.push_back( log_line_no );
+	}
+};
+
+
+std::vector<nlineno_t> MapViewAccessor::Search( Selector * selector, LineAdornmentsProvider * adornments_provider )
+{
+	SearchVisitor visitor{ * adornments_provider, selector };
+
+	PerfTimer timer;
+	VisitLines( visitor );
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( GetNumLines() ) );
+
+	return std::move( visitor.f_Map);
+}

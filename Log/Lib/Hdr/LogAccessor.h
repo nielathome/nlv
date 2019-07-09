@@ -260,37 +260,18 @@ struct LineAccessor
 
 
 /*-----------------------------------------------------------------------
- * LineVisitor
+ * Task
  -----------------------------------------------------------------------*/
 
-// base data to support visiting all lines in a set (e.g. a log file)
-struct LineVisitor
+// perform a task on a single log-file line
+struct Task
 {
-	virtual ~LineVisitor( void ) {}
+	// can be called from multiple threads
+	virtual void Action( const LineAccessor & line ) = 0;
 
-	// perform a task on a single log-file line; implemented by Visitor user
-	struct Task
-	{
-		// can be called from multiple threads
-		virtual void Action( const LineAccessor & line ) = 0;
-
-	};
-	using task_ptr_t = std::shared_ptr<Task>;
-
-	// Visitor interface (callback); implemented by Visitor user
-	struct Visitor
-	{
-		// the total number of lines that will be processed
-		virtual void SetNumLines( nlineno_t num_lines ) {}
-
-		// create a new Task for processing a subset of lines
-		virtual task_ptr_t MakeTask( nlineno_t num_lines ) = 0;
-
-		// combine the computed results from the Task into this Visitor
-		// guaranteed to be called in visitor line-number order
-		virtual void Join( task_ptr_t task ) = 0;
-	};
 };
+
+using task_ptr_t = std::shared_ptr<Task>;
 
 
 
@@ -410,7 +391,7 @@ struct ViewMap
  * ViewAccessor
  -----------------------------------------------------------------------*/
 
-struct ViewAccessor : public LineVisitor
+struct ViewAccessor
 {
 	// "visit" a single line; use as a generalised line accessor
 	virtual void VisitLine( Task & task, nlineno_t visit_line_no ) const = 0;
@@ -436,9 +417,6 @@ struct ViewAccessor : public LineVisitor
 		VisitLine( task, visit_line_no );
 	}
 
-	// visit all lines in scope; use for searching/filtering
-	virtual void VisitLines( Visitor & visitor ) const = 0;
-
 	// basic line access
 	virtual nlineno_t GetNumLines( void ) const = 0;
 	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
@@ -455,6 +433,9 @@ struct ViewAccessor : public LineVisitor
 	// update the view to contain solely logfile lines which are matched by
 	// the given selector
 	virtual void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) = 0;
+
+	// search the view
+	virtual std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider) = 0;
 };
 
 using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
@@ -465,11 +446,8 @@ using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
  * LogAccessor
  -----------------------------------------------------------------------*/
 
-struct LogAccessor : public LineVisitor
+struct LogAccessor
 {
-	// visit all lines in scope; use for searching/filtering
-	virtual void VisitLines( Visitor & visitor, uint64_t field_mask ) const = 0;
-
 	// core setup
 	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
 	virtual viewaccessor_ptr_t CreateViewAccessor( void ) = 0;

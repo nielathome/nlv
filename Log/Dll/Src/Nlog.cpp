@@ -349,8 +349,13 @@ void NHiliter::SetupMatchedLines( void )
 
 	if( !m_Selector )
 		m_MatchedLines.clear();
+
 	else
-		CalcMatchedLines();
+	{
+		Selector * selector{ m_Selector->GetImpl() };
+		NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
+		m_MatchedLines = m_ViewAccessor->Search( selector, &adornments_provider );
+	}
 }
 
 
@@ -367,82 +372,6 @@ bool NHiliter::Hit( nlineno_t line_no )
 	return NLine::Lookup( m_MatchedLines, nlineno_cast( m_MatchedLines.size() ), line_no, true ) >= 0;
 }
 
-
-
-/*-----------------------------------------------------------------------
- * NHiliter - Searching
- -----------------------------------------------------------------------*/
-
-// the search implementation is adapted from the filter implementation
-// search a single view line; must be thread safe
-struct SearchTask : public LineVisitor::Task
-{
-	// line data for the lines proccessed within this task
-	std::vector<nlineno_t> f_Map;
-	Selector * f_Selector;
-	const LineAdornmentsProvider & f_Provider;
-
-	SearchTask( const LineAdornmentsProvider & provider, Selector * selector, nlineno_t num_lines )
-		: f_Selector{ selector }, f_Provider{ provider }
-	{
-		f_Map.reserve( num_lines );
-	}
-
-	void Action( const LineAccessor & line ) override
-	{
-		const nlineno_t view_line_no{ line.GetLineNo() };
-		LineAdornmentsAccessor adornments{ & f_Provider, view_line_no };
-		if( f_Selector->Hit( line, adornments ) )
-			f_Map.push_back( view_line_no );
-	}
-};
-
-
-// search all view lines
-struct SearchVisitor : public LineVisitor::Visitor
-{
-	// line data for all lines
-	std::vector<nlineno_t> f_Map;
-	Selector * f_Selector;
-	const LineAdornmentsProvider & f_Provider;
-
-	using task_ptr_t = LineVisitor::task_ptr_t;
-
-	SearchVisitor( const LineAdornmentsProvider & provider, Selector * selector )
-		: f_Selector{ selector }, f_Provider{ provider }
-	{
-		const size_t guestimated_average_search_hits{ 2048 };
-		f_Map.reserve( guestimated_average_search_hits );
-	}
-
-	task_ptr_t MakeTask( nlineno_t num_lines ) override
-	{
-		return std::make_shared<SearchTask>( f_Provider, f_Selector, num_lines );
-	}
-
-	void Join( task_ptr_t line_task ) override
-	{
-		SearchTask *filter_task{ dynamic_cast<SearchTask*>(line_task.get()) };
-
-		for( nlineno_t log_line_no : filter_task->f_Map )
-			f_Map.push_back( log_line_no );
-	}
-};
-
-
-void NHiliter::CalcMatchedLines( void )
-{
-	Selector * selector{ m_Selector->GetImpl() };
-	NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
-
-	SearchVisitor visitor{ adornments_provider, selector };
-
-	PerfTimer timer;
-	m_ViewAccessor->VisitLines( visitor );
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_ViewAccessor->GetMap()->m_NumLinesOrOne ) );
-
-	m_MatchedLines = std::move( visitor.f_Map);
-}
 
 
 

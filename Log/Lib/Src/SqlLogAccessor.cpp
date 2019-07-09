@@ -17,8 +17,8 @@
 #include "StdAfx.h"
 
 // Application includes
-#include "Nmisc.h"
 #include "LogAccessor.h"
+#include "Nmisc.h"
 
 // C includes
 #include "Deps/sqlite3.h"
@@ -224,6 +224,9 @@ private:
 	// list of fields (columns) to display/search
 	uint64_t m_FieldViewMask{ 0 };
 
+protected:
+	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, Selector * selector, LineAdornmentsProvider * adornments_provider );
+
 public:
 	SqlViewAccessor( SqlLogAccessor * accessor )
 		: m_LogAccessor{ accessor }
@@ -242,9 +245,9 @@ public:
 	// ViewAccessor interfaces
 
 	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
-	void VisitLines( Visitor & visitor ) const override;
 	nlineno_t GetNumLines( void ) const override;
-	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
+	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool ) override;
+	std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider ) override;
 
 	// fetch nearest preceding view line number to the supplied log line
 	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
@@ -281,10 +284,6 @@ private:
 	Error CalcNumLines( void );
 
 protected:
-	// LineVisitor interface
-
-	void VisitLines( Visitor & visitor, uint64_t field_mask ) const override;
-
 	SqlLogAccessor( LogAccessorDescriptor & descriptor );
 
 public:
@@ -347,6 +346,9 @@ public:
 	nlineno_t GetNumLines( void ) const {
 		return m_NumLines;
 	}
+
+	template<typename T_FUNCTOR>
+	void VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const;
 };
 
 static OnEvent RegisterMapLogAccessor
@@ -364,6 +366,7 @@ static OnEvent RegisterMapLogAccessor
  -----------------------------------------------------------------------*/
 
 SqlLogAccessor::SqlLogAccessor( LogAccessorDescriptor & descriptor )
+	: m_FieldDescriptors{ std::move( descriptor.m_FieldDescriptors ) }
 {
 }
 
@@ -402,11 +405,9 @@ Error SqlLogAccessor::CalcNumLines( void )
 //template<typename T_ACCESSOR>
 class SqlLineAccessor : public LineAccessor
 {
-public:
-	using accessor_t = SqlLogAccessor;
-
 protected:
-//	const accessor_t & m_Accessor;
+	const unsigned m_NumFields;
+	const uint64_t m_FieldViewMask;
 	statement_ptr_t m_Statement;
 	nlineno_t m_LineNo{ 0 };
 
@@ -414,10 +415,11 @@ protected:
 	mutable LineBuffer m_LineBuffer;
 
 public:
-	SqlLineAccessor( /*const accessor_t & accessor,*/ statement_ptr_t statement )
-		: /*m_Accessor{ accessor },*/ m_Statement{ statement } {}
+	SqlLineAccessor( unsigned num_fields, uint64_t field_mask, statement_ptr_t statement )
+		: m_NumFields{ num_fields }, m_FieldViewMask{ field_mask }, m_Statement{ statement } {}
 
 	void IncLineNo( void ) {
+		m_LineBuffer.Clear();
 		++m_LineNo;
 	}
 
@@ -429,11 +431,24 @@ public:
 	}
 
 	nlineno_t GetLength( void ) const override {
-		return 0;
+		const char * first{ nullptr }; const char * last{ nullptr };
+		GetText( &first, &last );
+		return nlineno_cast( last - first + 1 );
 	}
 
 	void GetText( const char ** first, const char ** last ) const override {
-		*first = *last = nullptr;
+		uint64_t bit{ 0x1 };
+		for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, bit <<= 1 )
+			if( m_FieldViewMask & bit )
+			{
+				const char * f{ nullptr }; const char * l{ nullptr };
+				GetFieldText( field_id + 1, &f, &l );
+// NIEL can we fix magix +- 1
+				m_LineBuffer.Append( f, l );
+			}
+
+		*first = m_LineBuffer.First();
+		*last = m_LineBuffer.Last();
 	}
 
 	// irregular/continuation lines not supported
@@ -464,23 +479,23 @@ public:
 };
 
 
+
 /*-----------------------------------------------------------------------
- * LineVisitor
+ * 
  -----------------------------------------------------------------------*/
 
-
-void SqlLogAccessor::VisitLines( Visitor & visitor, uint64_t field_mask ) const
+template<typename T_FUNCTOR>
+void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( "SELECT * FROM projection", statement ) };
+	Error res{ MakeStatement( projection, statement ) };
 	if( !Ok( res ) )
 		return;
 
-	task_ptr_t task{ visitor.MakeTask( m_NumLines ) };
-	SqlLineAccessor line{ statement };
+	SqlLineAccessor line{ static_cast<unsigned>( GetNumFields() ), field_mask, statement };
 	while( statement->Step() == Error::e_SqlRow )
 	{
-		task->Action( line );
+		func( line );
 		line.IncLineNo();
 	}
 }
@@ -504,23 +519,78 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 
 	if( Ok( res ) )
 	{
-		SqlLineAccessor line{ statement };
+		SqlLineAccessor line{ static_cast<unsigned>(m_LogAccessor->GetNumFields()), m_FieldViewMask, statement };
 		task.Action( line );
 	}
 }
 
 
-void SqlViewAccessor::VisitLines( Visitor & visitor ) const
-{
-
-}
-
 nlineno_t SqlViewAccessor::GetNumLines( void ) const
 {
+// NIEL ignores filter
 	return m_LogAccessor->GetNumLines();
 }
 
-void SqlViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) 
+
+std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, nlineno_t num_visit_lines, Selector * selector, LineAdornmentsProvider * adornments_provider )
 {
-	// TODO
+	std::vector<nlineno_t> map;
+	map.reserve( num_visit_lines );
+
+	m_LogAccessor->VisitLines
+	(
+		projection,
+		[&map, selector, adornments_provider] ( const LineAccessor & line )
+		{
+			const nlineno_t log_line_no{ line.GetLineNo() };
+			LineAdornmentsAccessor adornments{ adornments_provider, log_line_no };
+			if( selector->Hit( line, adornments ) )
+				map.push_back( log_line_no );
+		},
+		m_FieldViewMask
+	);
+
+	return map;
 }
+
+
+void SqlViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool ) 
+{
+	PerfTimer timer;
+
+	const nlineno_t num_log_lines{ m_LogAccessor->GetNumLines() };
+	std::vector<nlineno_t> map{ MapViewLines(
+		"SELECT * FROM projection",
+		num_log_lines,
+		selector,
+		adornments_provider
+	) };
+
+	// record the change
+	m_Tracker.RecordEvent();
+
+	// write out performance data
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( num_log_lines ) );
+}
+
+
+std::vector<nlineno_t> SqlViewAccessor::Search( Selector * selector, LineAdornmentsProvider * adornments_provider )
+{
+// NIEL ignores filter
+
+	PerfTimer timer;
+
+	const nlineno_t num_view_lines{ GetNumLines() };
+	std::vector<nlineno_t> map{ MapViewLines(
+		"SELECT * FROM projection",
+		num_view_lines,
+		selector,
+		adornments_provider
+	) };
+
+	// write out performance data
+	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( num_view_lines ) );
+
+	return map;
+}
+
