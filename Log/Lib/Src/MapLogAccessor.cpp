@@ -78,90 +78,10 @@ void LineFormatter::Apply( const LineBuffer & text, LineBuffer * fmt ) const
 
 
 /*-----------------------------------------------------------------------
- * MapViewAccessor, declarations
- -----------------------------------------------------------------------*/
-
-class MapLogAccessor;
-struct Visitor;
-
-class MapViewAccessor
-	:
-	public ViewProperties,
-	public ViewMap,
-	public ViewAccessor
-{
-private:
-	// our substrate
-	MapLogAccessor * m_LogAccessor;
-
-	// map a view line number (index) to a logfile line number (value)
-	std::vector<nlineno_t> m_LineMap;
-
-	// list of fields (columns) to display/search
-	uint64_t m_FieldViewMask{ 0 };
-
-public:
-	MapViewAccessor( MapLogAccessor * accessor )
-		: m_LogAccessor{ accessor }
-	{}
-
-	void VisitLines( Visitor & visitor ) const;
-
-public:
-	// ViewProperties interfaces
-
-	void SetFieldMask( uint64_t field_mask ) override;
-
-public:
-	// ViewMap interfaces
-
-	nlineno_t GetLineLength( nlineno_t line_no ) const override;
-	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const override;
-	NTimecode GetUtcTimecode( nlineno_t line_no ) const override;
-
-public:
-	// ViewAccessor interface
-
-	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
-	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
-	std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider ) override;
-
-	nlineno_t GetNumLines( void ) const override {
-		return m_IsEmpty ? 0 : m_NumLinesOrOne;
-	}
-
-	// fetch nearest preceding view line number to the supplied log line
-	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
-		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
-	}
-
-	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
-		return m_LineMap[view_line_no];
-	}
-
-	ViewProperties * GetProperties( void ) override {
-		return this;
-	}
-
-	const ViewMap * GetMap( void ) override {
-		return this;
-	}
-
-public:
-	// MapLineAccessor interfaces
-
-	bool IsLineRegular( nlineno_t line_no ) const;
-	void CopyLine( e_LineData type, nlineno_t line_no, LineBuffer * buffer ) const;
-	void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const;
-	void GetFieldText( nlineno_t line_no, unsigned field_id, const char ** first, const char ** last ) const;
-	fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const;
-};
-
-
-
-/*-----------------------------------------------------------------------
  * MapLogAccessor, declarations
  -----------------------------------------------------------------------*/
+
+struct Visitor;
 
 // the default log accessor is based on file mapping; the log must be entirely static
 class MapLogAccessor : public LogAccessor, public LogSchemaAccessor
@@ -228,10 +148,7 @@ public:
 	// LogAccessor interfaces
 
 	Error Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines ) override;
-
-	viewaccessor_ptr_t CreateViewAccessor( void ) override {
-		return std::make_shared<MapViewAccessor>( this );
-	}
+	viewaccessor_ptr_t CreateViewAccessor( void ) override;
 
 	void SetTimezoneOffset( int offset_sec ) override {
 		m_TzOffset = offset_sec;
@@ -330,81 +247,103 @@ static OnEvent RegisterMapLogAccessor
 
 
 /*-----------------------------------------------------------------------
- * MapViewAccessor, definitions
+ * MapViewAccessor, declarations
  -----------------------------------------------------------------------*/
 
-nlineno_t MapViewAccessor::GetLineLength( nlineno_t line_no ) const
+class MapViewAccessor
+	:
+	public ViewProperties,
+	public ViewMap,
+	public ViewAccessor
 {
-	return m_LogAccessor->GetLineLength( ViewLineToLogLine( line_no ), m_FieldViewMask );
-}
+private:
+	// our substrate
+	MapLogAccessor * m_LogAccessor;
 
+	// map a view line number (index) to a logfile line number (value)
+	std::vector<nlineno_t> m_LineMap;
 
-const LineBuffer & MapViewAccessor::GetLine( e_LineData type, nlineno_t line_no ) const
-{
-	return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask );
-}
+	// list of fields (columns) to display/search
+	uint64_t m_FieldViewMask{ 0 };
 
+public:
+	MapViewAccessor( MapLogAccessor * accessor )
+		: m_LogAccessor{ accessor }
+	{}
 
-NTimecode MapViewAccessor::GetUtcTimecode( nlineno_t line_no ) const
-{
-	return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
-}
+	void VisitLines( Visitor & visitor ) const;
 
+public:
+	// ViewProperties interfaces
 
-void MapViewAccessor::SetFieldMask( uint64_t field_mask )
-{
-	// record the change
-	m_Tracker.RecordEvent();
-	m_FieldViewMask = field_mask;
+	void SetFieldMask( uint64_t field_mask ) override;
 
-	if( !m_IsEmpty )
-	{
-		PerfTimer timer;
+public:
+	// ViewMap interfaces
 
-		// TODO: parallelise
-		nlineno_t pos{ 0 };
-		for( nlineno_t line_no = 0; line_no < m_NumLinesOrOne; ++line_no )
-		{
-			m_Lines[ line_no ] = pos;
-			pos += GetLineLength( line_no );
-		}
-
-		m_TextLen = m_Lines[ m_NumLinesOrOne ] = pos;
-
-		// write out performance data
-		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
+	nlineno_t GetLineLength( nlineno_t line_no ) const override {
+		return m_LogAccessor->GetLineLength( ViewLineToLogLine( line_no ), m_FieldViewMask );
 	}
-}
 
+	const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const override {
+		return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask );
+	}
 
-bool MapViewAccessor::IsLineRegular( nlineno_t line_no ) const
-{
-	return m_LogAccessor->IsLineRegular( ViewLineToLogLine( line_no ) );
-}
+	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
+		return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
+	}
 
+public:
+	// ViewAccessor interface
 
-void MapViewAccessor::CopyLine( e_LineData type, nlineno_t line_no, LineBuffer * buffer ) const
-{
-	return m_LogAccessor->CopyLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask, buffer );
-}
+	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
+	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
+	std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider ) override;
 
+	nlineno_t GetNumLines( void ) const override {
+		return m_IsEmpty ? 0 : m_NumLinesOrOne;
+	}
 
-void MapViewAccessor::GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const
-{
-	return m_LogAccessor->GetNonFieldText( ViewLineToLogLine( line_no ), first, last );
-}
+	// fetch nearest preceding view line number to the supplied log line
+	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
+		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
+	}
 
+	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
+		return m_LineMap[view_line_no];
+	}
 
-void MapViewAccessor::GetFieldText( nlineno_t line_no, unsigned field_id, const char ** first, const char ** last ) const
-{
-	return m_LogAccessor->GetFieldText( ViewLineToLogLine( line_no ), field_id, first, last );
-}
+	ViewProperties * GetProperties( void ) override {
+		return this;
+	}
 
+	const ViewMap * GetMap( void ) override {
+		return this;
+	}
 
-fieldvalue_t MapViewAccessor::GetFieldValue( nlineno_t line_no, unsigned field_id ) const
-{
-	return m_LogAccessor->GetFieldValue( ViewLineToLogLine( line_no ), field_id );
-}
+public:
+	// MapLineAccessor interfaces
+
+	bool IsLineRegular( nlineno_t line_no ) const {
+		return m_LogAccessor->IsLineRegular( ViewLineToLogLine( line_no ) );
+	}
+
+	void CopyLine( e_LineData type, nlineno_t line_no, LineBuffer * buffer ) const {
+		return m_LogAccessor->CopyLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask, buffer );
+	}
+
+	void GetNonFieldText( nlineno_t line_no, const char ** first, const char ** last ) const {
+		return m_LogAccessor->GetNonFieldText( ViewLineToLogLine( line_no ), first, last );
+	}
+
+	void GetFieldText( nlineno_t line_no, unsigned field_id, const char ** first, const char ** last ) const {
+		return m_LogAccessor->GetFieldText( ViewLineToLogLine( line_no ), field_id, first, last );
+	}
+
+	fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const {
+		return m_LogAccessor->GetFieldValue( ViewLineToLogLine( line_no ), field_id );
+	}
+};
 
 
 
@@ -528,6 +467,12 @@ Error MapLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 }
 
 
+viewaccessor_ptr_t MapLogAccessor::CreateViewAccessor( void )
+{
+	return std::make_shared<MapViewAccessor>( this );
+}
+
+
 void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * line_buffer ) const
 {
 	line_buffer->Clear();
@@ -554,6 +499,37 @@ const LineBuffer & MapLogAccessor::GetLine( e_LineData type, nlineno_t line_no, 
 		CopyLine( type, line_no, field_mask, line );
 
 	return *line;
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * MapViewAccessor, definitions
+ -----------------------------------------------------------------------*/
+
+void MapViewAccessor::SetFieldMask( uint64_t field_mask )
+{
+	// record the change
+	m_Tracker.RecordEvent();
+	m_FieldViewMask = field_mask;
+
+	if( !m_IsEmpty )
+	{
+		PerfTimer timer;
+
+		// TODO: parallelise
+		nlineno_t pos{ 0 };
+		for( nlineno_t line_no = 0; line_no < m_NumLinesOrOne; ++line_no )
+		{
+			m_Lines[ line_no ] = pos;
+			pos += GetLineLength( line_no );
+		}
+
+		m_TextLen = m_Lines[ m_NumLinesOrOne ] = pos;
+
+		// write out performance data
+		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
+	}
 }
 
 

@@ -207,8 +207,101 @@ Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement )
 
 
 /*-----------------------------------------------------------------------
-* SqlViewAccessor, declarations
------------------------------------------------------------------------*/
+ * SqlLogAccessor, declarations
+ -----------------------------------------------------------------------*/
+
+class SqlLogAccessor : public LogAccessor, public LogSchemaAccessor
+{
+private:
+	// the SQLite database
+	SqlDb m_DB;
+
+	nlineno_t m_NumLines{ 0 };
+
+	// field schema
+	const fielddescriptor_list_t m_FieldDescriptors;
+
+private:
+	Error CalcNumLines( void );
+
+protected:
+	SqlLogAccessor( LogAccessorDescriptor & descriptor );
+
+public:
+	// LogAccessor interfaces
+
+	Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t ) override;
+
+	void SetTimezoneOffset( int offset_sec ) override {
+		// unsupported
+	}
+
+	const LogSchemaAccessor * GetSchema( void ) const override {
+		return this;
+	}
+
+public:
+	// LogSchemaAccessor interfaces
+
+	size_t GetNumFields( void ) const override {
+		return m_FieldDescriptors.size();
+	}
+
+	std::string GetFieldName( unsigned field_id ) const override {
+		return m_FieldDescriptors[ field_id ].f_Name;
+	}
+
+	FieldValueType GetFieldType( unsigned field_id ) const override {
+		return FieldValueType::unsigned64;
+	}
+
+	uint16_t GetFieldEnumCount( unsigned field_id ) const override {
+		return 0;
+	}
+
+	const char * GetFieldEnumName( unsigned field_id, uint16_t enum_id ) const override {
+		return nullptr;
+	}
+	
+	viewaccessor_ptr_t CreateViewAccessor( void ) override;
+
+
+	const NTimecodeBase & GetTimecodeBase( void ) const override {
+		static NTimecodeBase fake;
+		return fake;
+	}
+
+public:
+	static LogAccessor * MakeSqlLogAccessor( LogAccessorDescriptor & descriptor )
+	{
+		return new SqlLogAccessor( descriptor );
+	}
+
+	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) const {
+		return m_DB.MakeStatement( sql_text, statement );
+	}
+
+	nlineno_t GetNumLines( void ) const {
+		return m_NumLines;
+	}
+
+	template<typename T_FUNCTOR>
+	void VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const;
+};
+
+static OnEvent RegisterMapLogAccessor
+{
+	OnEvent::EventType::Startup,
+	[]() {
+		LogAccessorFactory::RegisterLogAccessor( "sql", SqlLogAccessor::MakeSqlLogAccessor );
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlViewAccessor, declarations
+ -----------------------------------------------------------------------*/
 
 class SqlLogAccessor;
 
@@ -266,108 +359,18 @@ public:
 
 
 /*-----------------------------------------------------------------------
- * SqlLogAccessor, declarations
- -----------------------------------------------------------------------*/
-
-class SqlLogAccessor : public LogAccessor, public LogSchemaAccessor
-{
-private:
-	// the SQLite database
-	SqlDb m_DB;
-
-	nlineno_t m_NumLines{ 0 };
-
-	// field schema
-	const fielddescriptor_list_t m_FieldDescriptors;
-
-private:
-	Error CalcNumLines( void );
-
-protected:
-	SqlLogAccessor( LogAccessorDescriptor & descriptor );
-
-public:
-	// LogAccessor interfaces
-
-	Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t ) override;
-
-	void SetTimezoneOffset( int offset_sec ) override {
-		// unsupported
-	}
-
-	const LogSchemaAccessor * GetSchema( void ) const override {
-		return this;
-	}
-
-public:
-	// LogSchemaAccessor interfaces
-
-	size_t GetNumFields( void ) const override {
-		return m_FieldDescriptors.size();
-	}
-
-	std::string GetFieldName( unsigned field_id ) const override {
-		return m_FieldDescriptors[ field_id ].f_Name;
-	}
-
-	FieldValueType GetFieldType( unsigned field_id ) const override {
-		return FieldValueType::unsigned64;
-	}
-
-	uint16_t GetFieldEnumCount( unsigned field_id ) const override {
-		return 0;
-	}
-
-	const char * GetFieldEnumName( unsigned field_id, uint16_t enum_id ) const override {
-		return nullptr;
-	}
-	
-	viewaccessor_ptr_t CreateViewAccessor( void ) override {
-		return std::make_shared<SqlViewAccessor>( this );
-	}
-
-
-
-	const NTimecodeBase & GetTimecodeBase( void ) const override {
-		static NTimecodeBase fake;
-		return fake;
-	}
-
-public:
-	static LogAccessor * MakeSqlLogAccessor( LogAccessorDescriptor & descriptor )
-	{
-		return new SqlLogAccessor( descriptor );
-	}
-
-	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) const {
-		return m_DB.MakeStatement( sql_text, statement );
-	}
-
-	nlineno_t GetNumLines( void ) const {
-		return m_NumLines;
-	}
-
-	template<typename T_FUNCTOR>
-	void VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const;
-};
-
-static OnEvent RegisterMapLogAccessor
-{
-	OnEvent::EventType::Startup,
-	[]() {
-		LogAccessorFactory::RegisterLogAccessor( "sql", SqlLogAccessor::MakeSqlLogAccessor );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
  * SqlLogAccessor, definitions
  -----------------------------------------------------------------------*/
 
 SqlLogAccessor::SqlLogAccessor( LogAccessorDescriptor & descriptor )
 	: m_FieldDescriptors{ std::move( descriptor.m_FieldDescriptors ) }
 {
+}
+
+
+viewaccessor_ptr_t SqlLogAccessor::CreateViewAccessor( void )
+{
+	return std::make_shared<SqlViewAccessor>( this );
 }
 
 
@@ -394,6 +397,23 @@ Error SqlLogAccessor::CalcNumLines( void )
 		m_NumLines = statement->GetAsInt( 0 );
 
 	return res;
+}
+
+
+template<typename T_FUNCTOR>
+void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const
+{
+	statement_ptr_t statement;
+	Error res{ MakeStatement( projection, statement ) };
+	if( !Ok( res ) )
+		return;
+
+	SqlLineAccessor line{ static_cast<unsigned>(GetNumFields()), field_mask, statement };
+	while( statement->Step() == Error::e_SqlRow )
+	{
+		func( line );
+		line.IncLineNo();
+	}
 }
 
 
@@ -477,28 +497,6 @@ public:
 //		return m_Accessor.GetUtcTimecode( m_LineNo );
 	}
 };
-
-
-
-/*-----------------------------------------------------------------------
- * 
- -----------------------------------------------------------------------*/
-
-template<typename T_FUNCTOR>
-void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const
-{
-	statement_ptr_t statement;
-	Error res{ MakeStatement( projection, statement ) };
-	if( !Ok( res ) )
-		return;
-
-	SqlLineAccessor line{ static_cast<unsigned>( GetNumFields() ), field_mask, statement };
-	while( statement->Step() == Error::e_SqlRow )
-	{
-		func( line );
-		line.IncLineNo();
-	}
-}
 
 
 

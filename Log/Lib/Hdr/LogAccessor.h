@@ -243,7 +243,7 @@ public:
  * LineAccessor
  -----------------------------------------------------------------------*/
 
-// interface for accessing log line data
+// interface for accessing log line data and metadata
 struct LineAccessor
 {
 	virtual nlineno_t GetLineNo( void ) const = 0;
@@ -295,6 +295,25 @@ struct LogSchemaAccessor
 
 
 /*-----------------------------------------------------------------------
+ * LogAccessor
+ -----------------------------------------------------------------------*/
+
+struct LogAccessor
+{
+	// core setup
+	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
+	virtual viewaccessor_ptr_t CreateViewAccessor( void ) = 0;
+
+	// field schema access
+	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
+
+	// timezone control
+	virtual void SetTimezoneOffset( int offset_sec ) = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
  * FieldDescriptor
  -----------------------------------------------------------------------*/
 
@@ -337,6 +356,39 @@ using formatdescriptor_list_t = std::list<FormatDescriptor>;
 
 
 /*-----------------------------------------------------------------------
+ * LogAccessorDescriptor
+ -----------------------------------------------------------------------*/
+
+struct LogAccessorDescriptor
+{
+	std::string m_Name;
+	std::string m_Guid;
+	std::string m_MatchDesc;
+	unsigned m_TextOffsetsSize;
+	fielddescriptor_list_t m_FieldDescriptors;
+	formatdescriptor_list_t m_LineFormatters;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * LogAccessorFactory
+ -----------------------------------------------------------------------*/
+class LogAccessorFactory
+{
+public:
+	static void RegisterLogAccessor( const std::string & name, LogAccessor * (*creator)(LogAccessorDescriptor &) );
+
+	// factory for creating LogAccessor interfaces
+	static LogAccessor * Create( LogAccessorDescriptor & descriptor );
+
+protected:
+	static std::map<std::string, LogAccessor * (*)(LogAccessorDescriptor &)> m_Makers;
+};
+
+
+
+/*-----------------------------------------------------------------------
  * ViewProperties
  -----------------------------------------------------------------------*/
 
@@ -367,6 +419,7 @@ enum class e_LineData
 	_Count
 };
 
+// ViewMeta ?
 struct ViewMap
 {
 	// line start locations in the view
@@ -439,51 +492,3 @@ struct ViewAccessor
 };
 
 using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
-
-
-
-/*-----------------------------------------------------------------------
- * LogAccessor
- -----------------------------------------------------------------------*/
-
-struct LogAccessor
-{
-	// core setup
-	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
-	virtual viewaccessor_ptr_t CreateViewAccessor( void ) = 0;
-
-	// field schema access
-	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
-
-	// timezone control
-	virtual void SetTimezoneOffset( int offset_sec ) = 0;
-};
-
-
-
-/*-----------------------------------------------------------------------
- * LogAccessorFactory
- -----------------------------------------------------------------------*/
-
-struct LogAccessorDescriptor
-{
-	std::string m_Name;
-	std::string m_Guid;
-	std::string m_MatchDesc;
-	unsigned m_TextOffsetsSize;
-	fielddescriptor_list_t m_FieldDescriptors;
-	formatdescriptor_list_t m_LineFormatters;
-};
-
-
-class LogAccessorFactory
-{
-public:
-	static void RegisterLogAccessor( const std::string & name, LogAccessor * (*creator)(LogAccessorDescriptor &) );
-
-	// factory for creating LogAccessor interfaces
-	static LogAccessor * Create( LogAccessorDescriptor & descriptor );
-
-protected:
-	static std::map<std::string, LogAccessor * (*)(LogAccessorDescriptor &)> m_Makers;
-};
