@@ -401,12 +401,6 @@ NFilterView::NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accesso
 }
 
 
-adornments_ptr_t NFilterView::GetAdornments( void )
-{
-	return m_Logfile->GetAdornments();
-}
-
-
 void NFilterView::Filter( selector_ptr_t selector, bool add_irregular )
 {
 	NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
@@ -486,84 +480,6 @@ void NFilterView::SetNumHiliter( unsigned num_hiliter )
 	m_Hiliters.reserve( num_hiliter );
 	for( unsigned i = 0; i < num_hiliter; ++i )
 		m_Hiliters.emplace_back( hiliter_ptr_t{ new NHiliter{ i, m_Logfile, m_ViewAccessor } } );
-}
-
-
-void NFilterView::ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line )
-{
-	for( int line_no = view_fm_line; line_no <= view_to_line; ++line_no )
-		GetAdornments()->ToggleUsermark( m_ViewAccessor->ViewLineToLogLine( line_no) );
-}
-
-
-// find the next visible view line for the source "get_next_log_line"
-vint_t NFilterView::GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line)(vint_t, bool) )
-{
-	vint_t log_line_no{ m_ViewAccessor->ViewLineToLogLine( view_line_no ) };
-	while( true )
-	{
-		log_line_no = (GetAdornments().get()->*get_next_log_line)(log_line_no, forward);
-		if( log_line_no < 0 )
-			return log_line_no;
-
-		view_line_no = m_ViewAccessor->LogLineToViewLine( log_line_no, true );
-		if( view_line_no >= 0 )
-			return view_line_no;
-	}
-}
-
-
-vint_t NFilterView::GetNextBookmark( vint_t view_line_no, bool forward )
-{
-	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextUsermark );
-}
-
-
-vint_t NFilterView::GetNextAnnotation( vint_t view_line_no, bool forward )
-{
-	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextAnnotation );
-}
-
-
-// NIEL - and similar; part ov NView only, not lineset ?
-void NFilterView::SetLocalTrackerLine( vint_t line_no )
-{
-	GetAdornments()->SetLocalTrackerLine( m_ViewAccessor->ViewLineToLogLine( line_no ) );
-}
-
-
-vint_t NFilterView::GetLocalTrackerLine( void )
-{
-	return m_ViewAccessor->LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
-}
-
-
-vint_t NFilterView::GetGlobalTrackerLine( unsigned idx )
-{
-	const GlobalTracker & tracker{ GlobalTrackers::GetGlobalTracker( idx ) };
-	if( !tracker.IsInUse() )
-		return -1;
-
-	ViewTimecodeAccessor accessor{ m_ViewAccessor };
-	const NTimecode & target{ tracker.GetUtcTimecode() };
-	const ViewMap * view_map{ m_ViewAccessor->GetMap() };
-
-	vint_t low_idx{ 0 }, high_idx{ view_map->m_NumLinesOrOne - 1 };
-	do
-	{
-		const vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
-		const NTimecode value{ accessor.GetUtcTimecode( idx ) };
-		if( target < value )
-			high_idx = idx - 1;
-		else
-			low_idx = idx;
-	} while( low_idx < high_idx );
-
-
-	if( tracker.IsNearest( low_idx, view_map->m_NumLinesOrOne, accessor ) )
-		return low_idx;
-	else
-		return low_idx + 1;
 }
 
 
@@ -711,6 +627,89 @@ void NView::SetFieldMask( uint64_t field_mask )
 {
 	NTextChanged handler{ m_CellBuffer, GetControl() };
 	NFilterView::SetFieldMask( field_mask );
+}
+
+
+void NView::ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line )
+{
+	for( int line_no = view_fm_line; line_no <= view_to_line; ++line_no )
+		GetAdornments()->ToggleUsermark( m_ViewAccessor->ViewLineToLogLine( line_no ) );
+}
+
+
+adornments_ptr_t NView::GetAdornments( void )
+{
+	return m_Logfile->GetAdornments();
+}
+
+
+// find the next visible view line for the source "get_next_log_line"
+vint_t NView::GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) )
+{
+	vint_t log_line_no{ m_ViewAccessor->ViewLineToLogLine( view_line_no ) };
+	while( true )
+	{
+		log_line_no = (GetAdornments().get()->*get_next_log_line)(log_line_no, forward);
+		if( log_line_no < 0 )
+			return log_line_no;
+
+		view_line_no = m_ViewAccessor->LogLineToViewLine( log_line_no, true );
+		if( view_line_no >= 0 )
+			return view_line_no;
+	}
+}
+
+
+vint_t NView::GetNextBookmark( vint_t view_line_no, bool forward )
+{
+	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextUsermark );
+}
+
+
+vint_t NView::GetNextAnnotation( vint_t view_line_no, bool forward )
+{
+	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextAnnotation );
+}
+
+
+void NView::SetLocalTrackerLine( vint_t line_no )
+{
+	GetAdornments()->SetLocalTrackerLine( m_ViewAccessor->ViewLineToLogLine( line_no ) );
+}
+
+
+vint_t NView::GetLocalTrackerLine( void )
+{
+	return m_ViewAccessor->LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
+}
+
+
+vint_t NView::GetGlobalTrackerLine( unsigned idx )
+{
+	const GlobalTracker & tracker{ GlobalTrackers::GetGlobalTracker( idx ) };
+	if( !tracker.IsInUse() )
+		return -1;
+
+	ViewTimecodeAccessor accessor{ m_ViewAccessor };
+	const NTimecode & target{ tracker.GetUtcTimecode() };
+	const ViewMap * view_map{ m_ViewAccessor->GetMap() };
+
+	vint_t low_idx{ 0 }, high_idx{ view_map->m_NumLinesOrOne - 1 };
+	do
+	{
+		const vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
+		const NTimecode value{ accessor.GetUtcTimecode( idx ) };
+		if( target < value )
+			high_idx = idx - 1;
+		else
+			low_idx = idx;
+	} while( low_idx < high_idx );
+
+
+	if( tracker.IsNearest( low_idx, view_map->m_NumLinesOrOne, accessor ) )
+		return low_idx;
+	else
+		return low_idx + 1;
 }
 
 

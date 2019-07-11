@@ -474,22 +474,18 @@ using hiliter_ptr_t = boost::intrusive_ptr<NHiliter>;
 class NFilterView
 {
 private:
-	// We are a view onto this logfile
-	logfile_ptr_t m_Logfile;
-
-	// our view accessor
-	viewaccessor_ptr_t m_ViewAccessor;
-
 	// numeric access to defined fields
 	fieldvalue_t GetFieldValue( vint_t line_no, vint_t field_no );
-
-	vint_t GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) );
 
 protected:
 	// array of hiliters
 	std::vector<hiliter_ptr_t> m_Hiliters;
 
-	adornments_ptr_t GetAdornments( void );
+	// We are a view onto this logfile
+	logfile_ptr_t m_Logfile;
+
+	// our view accessor
+	viewaccessor_ptr_t m_ViewAccessor;
 
 	// Select the lines to display in the view
 	void Filter( selector_ptr_t selector, bool add_irregular );
@@ -531,18 +527,6 @@ public:
 		return m_Hiliters[ hiliter ];
 	}
 
-	// Bookmarks ("user" defined marker)
-	void ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line );
-	vint_t GetNextBookmark( vint_t view_line_no, bool forward );
-
-	// find next annotated line in this view in the given direction
-	vint_t GetNextAnnotation( nlineno_t current, bool forward );
-
-	// tracked line marker support
-	void SetLocalTrackerLine( vint_t line_no );
-	vint_t GetLocalTrackerLine( void );
-	vint_t GetGlobalTrackerLine( unsigned idx );
-
 	// numeric access to a line's timecode, timecode is referenced to UTC
 	NTimecode * GetUtcTimecode( vint_t line_no );
 
@@ -567,6 +551,8 @@ class NLineSet
 	public NLifeTime
 {
 public:
+	// Python interfaces; note default constructor is non-functional
+
 	NLineSet( void ) {}
 	NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
@@ -625,6 +611,10 @@ private:
 		}
 	};
 
+private:
+	adornments_ptr_t GetAdornments( void );
+	vint_t GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) );
+
 protected:
 	// VContent interfaces
 	void Release( void ) override;
@@ -655,6 +645,19 @@ public:
 
 	// Field visibility
 	void SetFieldMask( uint64_t field_mask ) override;
+
+	// Bookmarks ("user" defined marker)
+	void ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line );
+	vint_t GetNextBookmark( vint_t view_line_no, bool forward );
+
+	// find next annotated line in this view in the given direction
+	vint_t GetNextAnnotation( nlineno_t current, bool forward );
+
+	// tracked line marker support
+	void SetLocalTrackerLine( vint_t line_no );
+	vint_t GetLocalTrackerLine( void );
+	vint_t GetGlobalTrackerLine( unsigned idx );
+
 };
 
 
