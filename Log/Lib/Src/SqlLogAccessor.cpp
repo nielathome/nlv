@@ -159,7 +159,7 @@ public:
 	Error Open( const std::filesystem::path & file_path );
 	Error Close( void );
 
-	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) const;
+	Error MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const;
 };
 
 
@@ -198,10 +198,16 @@ Error SqlDb::Close( void )
 }
 
 
-Error SqlDb::MakeStatement( const char * sql_text, statement_ptr_t & statement ) const
+Error SqlDb::MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const
 {
 	statement = std::make_shared<SqlStatement>();
-	return statement->Open( m_Handle, sql_text );
+
+	Error res{ statement->Open( m_Handle, sql_text ) };
+
+	if( step && Ok( res ) )
+		UpdateError( res, statement->Step() );
+
+	return res;
 }
 
 
@@ -216,12 +222,14 @@ private:
 	// the SQLite database
 	SqlDb m_DB;
 
+	NTimecodeBase m_TimecodeBase;
 	nlineno_t m_NumLines{ 0 };
 
 	// field schema
 	const fielddescriptor_list_t m_FieldDescriptors;
 
 private:
+	Error GetDatum( void );
 	Error CalcNumLines( void );
 
 protected:
@@ -243,6 +251,8 @@ public:
 public:
 	// LogSchemaAccessor interfaces
 
+	viewaccessor_ptr_t CreateViewAccessor( void ) override;
+
 	size_t GetNumFields( void ) const override {
 		return m_FieldDescriptors.size();
 	}
@@ -262,13 +272,9 @@ public:
 	const char * GetFieldEnumName( unsigned field_id, uint16_t enum_id ) const override {
 		return nullptr;
 	}
-	
-	viewaccessor_ptr_t CreateViewAccessor( void ) override;
-
 
 	const NTimecodeBase & GetTimecodeBase( void ) const override {
-		static NTimecodeBase fake;
-		return fake;
+		return m_TimecodeBase;
 	}
 
 public:
@@ -277,8 +283,8 @@ public:
 		return new SqlLogAccessor( descriptor );
 	}
 
-	Error MakeStatement( const char * sql_text, statement_ptr_t & statement ) const {
-		return m_DB.MakeStatement( sql_text, statement );
+	Error MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const {
+		return m_DB.MakeStatement( sql_text, step, statement );
 	}
 
 	nlineno_t GetNumLines( void ) const {
@@ -379,7 +385,26 @@ Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 	Error res{ m_DB.Open( file_path ) };
 
 	if( Ok( res ) )
+		UpdateError( res, GetDatum() );
+
+	if( Ok( res ) )
 		UpdateError( res, CalcNumLines() );
+
+	return res;
+}
+
+
+Error SqlLogAccessor::GetDatum( void )
+{
+	statement_ptr_t statement;
+	Error res{ MakeStatement( "SELECT * FROM projection_meta", true, statement ) };
+
+	if( Ok( res ) )
+	{
+		const time_t utc_datum{ statement->GetAsInt64( 0 ) };
+		const unsigned field_id{ static_cast<unsigned>(statement->GetAsInt( 1 )) };
+		m_TimecodeBase = NTimecodeBase{ utc_datum, field_id };
+	}
 
 	return res;
 }
@@ -388,10 +413,7 @@ Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 Error SqlLogAccessor::CalcNumLines( void )
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( "SELECT count(*) FROM projection", statement ) };
-
-	if( Ok( res ) )
-		UpdateError( res, statement->Step() );
+	Error res{ MakeStatement( "SELECT count(*) FROM projection", true, statement ) };
 
 	if( Ok( res ) )
 		m_NumLines = statement->GetAsInt( 0 );
@@ -404,11 +426,11 @@ template<typename T_FUNCTOR>
 void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( projection, statement ) };
+	Error res{ MakeStatement( projection, false, statement ) };
 	if( !Ok( res ) )
 		return;
 
-	SqlLineAccessor line{ static_cast<unsigned>(GetNumFields()), field_mask, statement };
+	SqlLineAccessor line{ this, field_mask, statement };
 	while( statement->Step() == Error::e_SqlRow )
 	{
 		func( line );
@@ -427,6 +449,7 @@ class SqlLineAccessor : public LineAccessor
 {
 protected:
 	const unsigned m_NumFields;
+	const NTimecodeBase m_TimecodeBase;
 	const uint64_t m_FieldViewMask;
 	statement_ptr_t m_Statement;
 	nlineno_t m_LineNo{ 0 };
@@ -435,8 +458,13 @@ protected:
 	mutable LineBuffer m_LineBuffer;
 
 public:
-	SqlLineAccessor( unsigned num_fields, uint64_t field_mask, statement_ptr_t statement )
-		: m_NumFields{ num_fields }, m_FieldViewMask{ field_mask }, m_Statement{ statement } {}
+	SqlLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
+		:
+		m_NumFields{ static_cast<unsigned>(log_accessor->GetNumFields()) },
+		m_TimecodeBase{ log_accessor->GetTimecodeBase() },
+		m_FieldViewMask{ field_mask },
+		m_Statement{ statement }
+	{}
 
 	void IncLineNo( void ) {
 		m_LineBuffer.Clear();
@@ -493,8 +521,8 @@ public:
 	}
 
 	NTimecode GetUtcTimecode( void ) const override {
-		return NTimecode{};
-//		return m_Accessor.GetUtcTimecode( m_LineNo );
+		const int64_t offset{ m_Statement->GetAsInt64( m_TimecodeBase.GetFieldId() ) };
+		return NTimecode{ m_TimecodeBase.GetUtcDatum(), offset };
 	}
 };
 
@@ -507,7 +535,7 @@ public:
 void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
 	statement_ptr_t statement;
-	Error res{ m_LogAccessor->MakeStatement( "SELECT * FROM projection WHERE rowid = ?1", statement ) };
+	Error res{ m_LogAccessor->MakeStatement( "SELECT * FROM projection WHERE rowid = ?1", false, statement ) };
 
 	if( Ok( res ) )
 		UpdateError( res, statement->Bind( 1, visit_line_no + 1 ) );
@@ -517,7 +545,7 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 
 	if( Ok( res ) )
 	{
-		SqlLineAccessor line{ static_cast<unsigned>(m_LogAccessor->GetNumFields()), m_FieldViewMask, statement };
+		SqlLineAccessor line{ m_LogAccessor, m_FieldViewMask, statement };
 		task.Action( line );
 	}
 }

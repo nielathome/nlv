@@ -277,7 +277,9 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.DurationScale = 1
         self.ColParentId = None
         self.ColStart = None
+        self.ColStartOffset = None
         self.ColFinish = None
+        self.ColFinishOffset = None
         self.ColDuration = None
 
 
@@ -320,13 +322,11 @@ class G_ProjectionSchema(G_FieldSchemata):
 
     def AddStart(self, name, width, align, formatter):
         self.ColStart = self.MakeFieldSchema(name, "text", width, align, formatter)
-        self.MakeHiddenFieldSchema("start_utc", "uint64")
-        self.MakeHiddenFieldSchema("start_offset_ns", "uint64")
+        self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "uint64")
 
     def AddFinish(self, name, width, align, formatter):
         self.ColFinish = self.MakeFieldSchema(name, "text", width, align, formatter)
-        self.MakeHiddenFieldSchema("finish_utc", "uint64")
-        self.MakeHiddenFieldSchema("finish_offset_ns", "uint64")
+        self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "uint64")
 
     def AddDuration(self, scale, name, width, align, formatter):
         self.ColDuration = self.MakeFieldSchema(name, "int64", width, align, formatter)
@@ -501,19 +501,49 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def MakeProjectionTable(self, cursor):
-        table_name = "projection"
-        cursor.execute("DROP TABLE IF EXISTS {}".format(table_name))
+    def MakeProjectionMetaTable(self, cursor, utc_datum):
+        cursor.execute("DROP TABLE IF EXISTS projection_meta")
+        cursor.execute("""
+            CREATE TABLE projection_meta
+            (
+                utc_datum INT,
+                field_id INT
+            )""")
 
-        ct_columns = ["[{}] {}".format(field_schema.Name, self._SqlTypeMap[field_schema.Type]) for field_schema in self._ProjectionSchema]
+        field_id = self._ProjectionSchema.ColStartOffset
+        if field_id is None:
+            field_id = 0
 
         cursor.execute("""
-            CREATE TABLE {}
+            INSERT INTO projection_meta
+            (
+                utc_datum,
+                field_id
+            )
+            VALUES
+            (
+                {utc_datum},
+                {field_id}
+            )""".format(utc_datum = utc_datum, field_id = field_id))
+
+
+    #-------------------------------------------------------
+    def MakeProjectionTable(self, cursor):
+        ct_columns = ["[{}] {}".format(field_schema.Name, self._SqlTypeMap[field_schema.Type]) for field_schema in self._ProjectionSchema]
+
+        cursor.execute("DROP TABLE IF EXISTS projection")
+        cursor.execute("""
+            CREATE TABLE projection
             (
                 {}
-            )""".format(table_name, ", ".join(ct_columns)))
+            )""".format(", ".join(ct_columns)))
 
-        return table_name
+        cursor.execute("DROP TABLE IF EXISTS filter")
+        cursor.execute("""
+            CREATE TABLE filter
+            (
+                log_row_no INT
+            )""")
 
 
     #-------------------------------------------------------
@@ -732,21 +762,20 @@ class G_TableDataModel(wx.dataview.DataViewModel):
     #-------------------------------------------------------
     def GetEventRange(self, item):
         table_schema = self._TableSchema
-        if table_schema.ColStart is None:
+        if table_schema.ColStartOffset is None:
             return (None, None)
 
         item_key = self.ItemToKey(item)
-        start_offset = finish_offset = self.GetFieldValue(item_key, table_schema.ColStart)
+        start_offset = finish_offset = self.GetFieldValue(item_key, table_schema.ColStartOffset)
 
-        # if we have a real finish time, then use it
-        if table_schema.ColFinish is not None:
-            finish_offset = self.GetFieldValue(item_key, table_schema.ColFinish)
+        # if we have a duration, then use it
+        if table_schema.ColDuration is not None:
+            duration = self.GetFieldValue(item_key, table_schema.ColDuration)
+            finish_offset = start_offset + duration
 
-        # otherwise, synthesise a finish time; for cases where the duration is rounded
-        # this will not be entirely accurate - which may show up in the UI
-        elif table_schema.ColDuration is not None:
-            scaled_duration = self.GetFieldValue(item_key, table_schema.ColDuration)
-            finish_offset = start_offset + scaled_duration * table_schema.DurationScale
+        # otherwise, calculate duration based on available finish time
+        elif table_schema.ColFinishOffset is not None:
+            finish_offset = self.GetFieldValue(item_key, table_schema.ColFinishOffset)
 
         utc_datum = self._N_Logfile.GetTimecodeBase().GetUtcDatum()
         return (Nlog.NTimecode(utc_datum, start_offset),

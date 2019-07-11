@@ -1305,15 +1305,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def GetTimecodeBase(self):
         return self.GetLogfile().GetTimecodeBase()
 
-    def GetUtcTimecode(self, utcbase, offset):
-        billionths = 1000000000
-        whole_offset = int(offset / billionths)
-
-        utcbase += whole_offset
-        nsec = offset - (whole_offset * billionths)
-
-        return Nlog.NTimecode(utcbase, nsec)        
-
 
     #-------------------------------------------------------
     def OnDisplayKey(self, key_code, modifiers, view_node):

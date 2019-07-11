@@ -123,23 +123,33 @@ class Projector:
     def Project(connection, context):
         cursor = connection.cursor()
 
-        table_name = context.MakeProjectionTable(cursor)
+        cursor.execute("""
+            SELECT
+                start_utc
+            FROM
+                reschedule
+            LIMIT
+                1
+            """)
+
+        utc_datum = cursor.fetchone()[0]
+        context.MakeProjectionMetaTable(cursor, utc_datum)
+
+        context.MakeProjectionTable(cursor)
 
         cursor.execute("""
-            INSERT INTO {}
+            INSERT INTO projection
             SELECT
                 start_text,
-                start_utc,
-                start_offset_ns,
+                start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
                 finish_text,
-                finish_utc,
-                finish_offset_ns,
+                finish_offset_ns + (finish_utc - {utc_datum}) * 1000000000,
                 duration_ns,
                 place,
                 abool
             FROM
                 reschedule
-            """.format(table_name))
+            """.format(utc_datum = utc_datum))
 
         cursor.close()
         connection.commit()
