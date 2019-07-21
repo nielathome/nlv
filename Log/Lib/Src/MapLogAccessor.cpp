@@ -298,8 +298,8 @@ public:
 	// ViewAccessor interface
 
 	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
-	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
-	std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider ) override;
+	void Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) override;
+	std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider ) override;
 
 	nlineno_t GetNumLines( void ) const override {
 		return m_IsEmpty ? 0 : m_NumLinesOrOne;
@@ -897,7 +897,7 @@ void MapViewAccessor::VisitLines( Visitor & visitor ) const
 struct FilterData
 {
 	bool f_AddIrregular;
-	Selector * f_Selector;
+	selector_ptr_a f_Selector;
 	LineAdornmentsProvider * f_LineAdornmentsProvider;
 };
 
@@ -996,7 +996,7 @@ struct FilterVisitor : public Visitor
 };
 
 
-void MapViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular )
+void MapViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool add_irregular )
 {
 	PerfTimer timer;
 
@@ -1041,10 +1041,10 @@ struct SearchTask : public Task
 {
 	// line data for the lines proccessed within this task
 	std::vector<nlineno_t> f_Map;
-	Selector * f_Selector;
+	selector_ptr_a f_Selector;
 	const LineAdornmentsProvider & f_Provider;
 
-	SearchTask( const LineAdornmentsProvider & provider, Selector * selector, nlineno_t num_lines )
+	SearchTask( const LineAdornmentsProvider & provider, selector_ptr_a selector, nlineno_t num_lines )
 		: f_Selector{ selector }, f_Provider{ provider }
 	{
 		f_Map.reserve( num_lines );
@@ -1065,12 +1065,12 @@ struct SearchVisitor : public Visitor
 {
 	// line data for all lines
 	std::vector<nlineno_t> f_Map;
-	Selector * f_Selector;
+	selector_ptr_a f_Selector;
 	const LineAdornmentsProvider & f_Provider;
 
 	using task_ptr_t = task_ptr_t;
 
-	SearchVisitor( const LineAdornmentsProvider & provider, Selector * selector )
+	SearchVisitor( const LineAdornmentsProvider & provider, selector_ptr_a selector )
 		: f_Selector{ selector }, f_Provider{ provider }
 	{
 		const size_t guestimated_average_search_hits{ 2048 };
@@ -1092,7 +1092,7 @@ struct SearchVisitor : public Visitor
 };
 
 
-std::vector<nlineno_t> MapViewAccessor::Search( Selector * selector, LineAdornmentsProvider * adornments_provider )
+std::vector<nlineno_t> MapViewAccessor::Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider )
 {
 	SearchVisitor visitor{ * adornments_provider, selector };
 

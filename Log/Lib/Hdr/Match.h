@@ -18,6 +18,7 @@
 
 // C++ includes
 #include <string>
+#include <memory>
 
 
 
@@ -94,8 +95,11 @@ struct Match
  -----------------------------------------------------------------------*/
 
 // forwards
+struct Selector;
 struct LineAccessor;
 struct LogSchemaAccessor;
+using selector_ptr_t = std::unique_ptr<Selector>;
+using selector_ptr_a = const selector_ptr_t &;
 
 // general interface for identifying lines which match a criterion
 struct Selector
@@ -121,5 +125,5 @@ struct Selector
 	}
 
 	// factory
-	static Selector * MakeSelector( const Match & match, bool empty_selects_all, const LogSchemaAccessor * schema = nullptr );
+	static selector_ptr_t MakeSelector( const Match & match, bool empty_selects_all, const LogSchemaAccessor * schema = nullptr );
 };

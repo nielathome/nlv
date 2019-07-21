@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2017-2018 Niel Clausen. All rights reserved.
+// Copyright (C) 2017-2019 Niel Clausen. All rights reserved.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -54,40 +54,10 @@ namespace
 
 
 /*-----------------------------------------------------------------------
- * MODULE
+ * ADAPTERS
  -----------------------------------------------------------------------*/
 
-// Python initialisation
-void Setup( object logger )
-{
-	// startup message
-	static OnEvent evt{ OnEvent::EventType::Startup,
-		[] () {
-			const char * build =
-			#ifdef _DEBUG
-				"debug";
-			#else
-				"release";
-			#endif
-			TraceDebug( "DLL running: build:'%s'", build );
-	} };
-
-	// run shutdown actions before tracing re-directed
-	const bool startup{ logger.is_none() ? false : true };
-	if( !startup )
-		OnEvent::RunEvents( OnEvent::EventType::Shutdown );
-
-	// re-direct trace output
-	SetTraceFunc( startup ? TraceToPython : nullptr );
-	g_Logger = logger;
-
-	// run startup actions after tracing re-directed
-	if( startup )
-		OnEvent::RunEvents( OnEvent::EventType::Startup );
-}
-
-
-// Python access to LogAccessor factory
+// LogAccessor factory
 logaccessor_ptr_t MakeLogAccessor( object log_schema )
 {
 	LogAccessorDescriptor descriptor
@@ -144,6 +114,56 @@ logaccessor_ptr_t MakeLogAccessor( object log_schema )
 }
 
 
+// Selector factory
+selector_ptr_t MakeSelector( object match, bool empty_selects_all, const LogSchemaAccessor * log_schema )
+{
+	Match descriptor{
+		extract<Match::Type>{ match.attr( "GetSelectorId" )() },
+		extract<std::string>{ match.attr( "MatchText" ) },
+		extract<bool>{ match.attr( "MatchCase" ) }
+	};
+
+	selector_ptr_t selector{ Selector::MakeSelector( descriptor, empty_selects_all, log_schema ) };
+	const Error error{ selector ? e_OK : TraceError( e_BadSelectorDefinition, "'%s'", descriptor.m_Text.c_str() ) };
+	return selector;
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * MODULE
+ -----------------------------------------------------------------------*/
+
+// Python initialisation
+void Setup( object logger )
+{
+	// startup message
+	static OnEvent evt{ OnEvent::EventType::Startup,
+		[] () {
+			const char * build =
+			#ifdef _DEBUG
+				"debug";
+			#else
+				"release";
+			#endif
+			TraceDebug( "DLL running: build:'%s'", build );
+	} };
+
+	// run shutdown actions before tracing re-directed
+	const bool startup{ logger.is_none() ? false : true };
+	if( !startup )
+		OnEvent::RunEvents( OnEvent::EventType::Shutdown );
+
+	// re-direct trace output
+	SetTraceFunc( startup ? TraceToPython : nullptr );
+	g_Logger = logger;
+
+	// run startup actions after tracing re-directed
+	if( startup )
+		OnEvent::RunEvents( OnEvent::EventType::Startup );
+}
+
+
 // Python access to logfile factory
 logfile_ptr_t MakeLogfile( const std::string & nlog_path, object log_schema, object progress )
 {
@@ -177,27 +197,6 @@ logfile_ptr_t MakeLogfile( const std::string & nlog_path, object log_schema, obj
 
 	return logfile;
 }
-
-
-// Python access to Selector factory
-selector_ptr_t MakeSelector( object match, bool empty_selects_all, const NLogfile * logfile = nullptr )
-{
-	Match descriptor{
-		extract<Match::Type>{ match.attr( "GetSelectorId" )() },
-		extract<std::string>{ match.attr( "MatchText" ) },
-		extract<bool>{ match.attr( "MatchCase" ) }
-	};
-
-	const LogSchemaAccessor * schema{ logfile ? logfile->GetSchema() : nullptr };
-
-	selector_ptr_t selector{ new NSelector{ descriptor, empty_selects_all, schema } };
-	const Error error{ selector->Ok() ? e_OK : TraceError( e_BadSelectorDefinition, "'%s'", descriptor.m_Text.c_str() ) };
-	if( !Ok( error ) )
-		selector.reset();
-
-	return selector;
-}
-BOOST_PYTHON_FUNCTION_OVERLOADS( MakeSelectorOverloads, MakeSelector, 2, 3 )
 
 
 // Python access to the global tracker array
@@ -248,7 +247,7 @@ BOOST_PYTHON_MODULE( Nlog )
 	class_<NHiliter, hiliter_ptr_t, boost::noncopyable>( "Hiliter" )
 		.def( "Search", &NHiliter::Search )
 		.def( "Hit", &NHiliter::Hit )
-		.def( "SetSelector", &NHiliter::SetSelector )
+		.def( "SetMatch", &NHiliter::SetMatch )
 		;
 
 	enum_<Match::Type>( "EnumSelector" )
@@ -274,9 +273,6 @@ BOOST_PYTHON_MODULE( Nlog )
 		.def( "GetOffsetNs", &NTimecode::GetOffsetNs )
 		.def( "Normalise", &NTimecode::Normalise )
 		.def( "Subtract", &NTimecode::Subtract )
-		;
-
-	class_<NSelector, selector_ptr_t, boost::noncopyable>( "Selector" )
 		;
 
 	// NLineSet and NView present similar interfaces to Python, but have
@@ -327,6 +323,5 @@ BOOST_PYTHON_MODULE( Nlog )
 
 	def( "Setup", Setup );
 	def( "MakeLogfile", MakeLogfile );
-	def( "MakeSelector", MakeSelector, MakeSelectorOverloads{} );
 	def( "SetGlobalTracker", SetGlobalTracker );
 }

@@ -487,10 +487,10 @@ struct ViewAccessor
 	
 	// update the view to contain solely logfile lines which are matched by
 	// the given selector
-	virtual void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) = 0;
+	virtual void Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) = 0;
 
 	// search the view
-	virtual std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider) = 0;
+	virtual std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider) = 0;
 };
 
 using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;

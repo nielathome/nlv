@@ -955,11 +955,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if self._N_LineSet is None:
             return True
 
-        selector = hiliter._Match.MakeSelector(self._N_Logfile, empty_selects_all = False)
-        if selector is not None:
-            self._N_LineSet.GetHiliter(hiliter._Id).SetSelector(selector)
-            return True
-        return False
+        return self._N_LineSet.GetHiliter(hiliter._Id).SetMatch(hiliter._Match)
 
         
     def FilterLineSet(self, match):
@@ -969,14 +965,10 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             return False
 
         if match is not None:
-            selector = match.MakeSelector(self._N_Logfile)
-            if selector is None:
-                return False
-
             if self._N_LineSet is None:
                 return True
 
-            self._N_LineSet.Filter(selector)
+            return self._N_LineSet.Filter(match)
 
         map = self._ParentKeyToChildKeys = dict()
 

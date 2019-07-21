@@ -1100,20 +1100,16 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def UpdateMarkerMatch(self, index, match):
         """A marker GUI page match field has been edited; update logfile"""
-        valid_selector = True
+        valid_match = True
         if match.IsEmpty():
             self.GetLogfile().ClearAutoMarker(index)
         else:
-            selector = match.MakeSelector(self.GetLogfile())
-            if selector is None:
-                valid_selector = False
-            else:
-                self.GetLogfile().SetAutoMarker(index, selector)
+            valid_match = self.GetLogfile().SetAutoMarker(index, match)
 
-        if valid_selector:
+        if valid_match:
             self.RefreshViews()
 
-        return  valid_selector
+        return valid_match
 
 
     #-------------------------------------------------------

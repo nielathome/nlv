@@ -324,7 +324,7 @@ private:
 	uint64_t m_FieldViewMask{ 0 };
 
 protected:
-	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, Selector * selector, LineAdornmentsProvider * adornments_provider );
+	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider );
 
 public:
 	SqlViewAccessor( SqlLogAccessor * accessor )
@@ -345,8 +345,8 @@ public:
 
 	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
 	nlineno_t GetNumLines( void ) const override;
-	void Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool ) override;
-	std::vector<nlineno_t> Search( Selector * selector, LineAdornmentsProvider * adornments_provider ) override;
+	void Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool ) override;
+	std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider ) override;
 
 	// fetch nearest preceding view line number to the supplied log line
 	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
@@ -558,7 +558,7 @@ nlineno_t SqlViewAccessor::GetNumLines( void ) const
 }
 
 
-std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, nlineno_t num_visit_lines, Selector * selector, LineAdornmentsProvider * adornments_provider )
+std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider )
 {
 	std::vector<nlineno_t> map;
 	map.reserve( num_visit_lines );
@@ -566,7 +566,7 @@ std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, n
 	m_LogAccessor->VisitLines
 	(
 		projection,
-		[&map, selector, adornments_provider] ( const LineAccessor & line )
+		[&map, &selector, adornments_provider] ( const LineAccessor & line )
 		{
 			const nlineno_t log_line_no{ line.GetLineNo() };
 			LineAdornmentsAccessor adornments{ adornments_provider, log_line_no };
@@ -580,7 +580,7 @@ std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, n
 }
 
 
-void SqlViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * adornments_provider, bool ) 
+void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool )
 {
 	PerfTimer timer;
 
@@ -602,7 +602,7 @@ void SqlViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * ador
 }
 
 
-std::vector<nlineno_t> SqlViewAccessor::Search( Selector * selector, LineAdornmentsProvider * adornments_provider )
+std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider )
 {
 // NIEL ignores filter
 

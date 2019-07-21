@@ -20,13 +20,13 @@
 #include <vector>
 #include <set>
 
-// Boost includes
-#include <boost/intrusive_ptr.hpp>
-
 // JSON includes
 #include "nlohmann/json.hpp"
-
 using json = nlohmann::json;
+
+// Boost includes; must be after JSON, otherwise the JSON headers don't compile (!)
+#include <boost/intrusive_ptr.hpp>
+#include <boost/python/object_fwd.hpp>
 
 // Application includes
 #include "FileMap.h"
@@ -35,6 +35,10 @@ using json = nlohmann::json;
 #include "Ntime.h"
 #include "SCellBuffer.h"
 #include "SPerLine.h"
+
+// forwards
+selector_ptr_t MakeSelector( boost::python::object match, bool empty_selects_all, const LogSchemaAccessor * schema = nullptr );
+
 
 
 /*-----------------------------------------------------------------------
@@ -59,71 +63,6 @@ class NLifeTime : public VLifeTime
 protected:
 	void Release( void ) override;
 };
-
-
-
-/*-----------------------------------------------------------------------
- * NHandle
- -----------------------------------------------------------------------*/
-
-// A number of Python objects are implemented as a lifetime managed wrapper
-// around a plain C++ object. This is effectively a handle idiom. Its benefit
-// is that it allows the behaviour of the Python object to be altered by
-// swapping the class type of the held inner object.
-
-template<typename T_IMPL>
-class NHandle : public NLifeTime
-{
-private:
-	using impl_t = T_IMPL;
-
-	impl_t * m_Impl{ nullptr };
-
-	void Clean( void ) {
-		if( m_Impl )
-			delete m_Impl;
-		m_Impl = nullptr;
-	}
-
-protected:
-	void SetImpl( impl_t * impl ) {
-		Clean();
-		m_Impl = impl;
-	}
-
-public:
-	~NHandle( void ) {
-		Clean();
-	}
-
-	impl_t *GetImpl( void ) const {
-		return m_Impl;
-	}
-
-	bool Ok( void ) const {
-		return m_Impl != nullptr;
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * NSelector
- -----------------------------------------------------------------------*/
-
-// Python interface to the line searching/filtering system
-class NSelector : public NHandle<Selector>
-{
-public:
-	NSelector( const Match & match, bool empty_selects_all, const LogSchemaAccessor * schema ) {
-		SetImpl( Selector::MakeSelector( match, empty_selects_all, schema ) );
-	}
-
-public:
-	// Python interfaces; note default constructor is non-functional
-	NSelector( void ) {}
-};
-using selector_ptr_t = boost::intrusive_ptr<NSelector>;
 
 
 
@@ -336,9 +275,7 @@ public:
 		m_AutoMarkers.resize( num_marker );
 	}
 
-	void SetAutoMarker( unsigned marker, selector_ptr_t selector ) {
-		m_AutoMarkers[ marker ] = selector;
-	}
+	bool SetAutoMarker( unsigned marker, boost::python::object match, logfile_ptr_t logfile );
 
 	void ClearAutoMarker( unsigned marker ) {
 		m_AutoMarkers[ marker ] = nullptr;
@@ -436,13 +373,9 @@ public:
 		: m_Indicator{ 0 } {}
 
 	// find next matched line in the given direction
+	bool SetMatch( boost::python::object match );
 	nlineno_t Search( nlineno_t current, bool forward );
 	bool Hit( nlineno_t line_no );
-
-	void SetSelector( selector_ptr_t selector ) {
-		m_SelectorChanged = true;
-		m_Selector = selector;
-	}
 };
 using hiliter_ptr_t = boost::intrusive_ptr<NHiliter>;
 
@@ -470,7 +403,8 @@ protected:
 	viewaccessor_ptr_t m_ViewAccessor;
 
 	// Select the lines to display in the view
-	void Filter( selector_ptr_t selector, bool add_irregular );
+	void Filter( selector_ptr_a selector, bool add_irregular );
+	bool Filter( boost::python::object match, bool add_irregular );
 
 public:
 	NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
@@ -539,9 +473,7 @@ public:
 	NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
 	// Select the lines to display in the lineset
-	void Filter( selector_ptr_t selector ) {
-		NFilterView::Filter( selector, false );
-	}
+	bool Filter( boost::python::object match );
 };
 
 
@@ -623,7 +555,7 @@ public:
 	virtual unsigned long long GetContent( void );
 
 	// Select the lines to display in the view
-	void Filter( selector_ptr_t selector );
+	bool Filter( boost::python::object match );
 
 	// Field visibility
 	void SetFieldMask( uint64_t field_mask ) override;
@@ -699,9 +631,7 @@ public:
 		m_Adornments->SetNumAutoMarker( num_marker );
 	}
 
-	void SetAutoMarker( unsigned marker, selector_ptr_t selector ) {
-		m_Adornments->SetAutoMarker( marker, selector );
-	}
+	bool SetAutoMarker( unsigned marker, boost::python::object match );
 
 	void ClearAutoMarker( unsigned marker ) {
 		m_Adornments->ClearAutoMarker( marker );

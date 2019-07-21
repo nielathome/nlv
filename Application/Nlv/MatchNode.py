@@ -153,10 +153,6 @@ class G_MatchItem(D_Document.D_Value):
     def GetSelectorId(self):
         return self.GetMetaData().SelectorId
 
-    def MakeSelector(self, logfile = None, empty_selects_all = True):
-        # if the match is empty, the returned selector will match everything
-        return Nlog.MakeSelector(self, empty_selects_all, logfile)
-
 
     #-------------------------------------------------------
     def IsEmpty(self):

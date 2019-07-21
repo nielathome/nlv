@@ -22,6 +22,7 @@
 
 // Boost includes
 #include <boost/lexical_cast.hpp>
+#include <boost/python/object.hpp>
 
 // C++ includes
 #include <string>
@@ -268,9 +269,9 @@ int NAdornments::LogMarkValue( vint_t log_line_no, const LineAccessor & line )
 	int res{ 0 }, bit{ 0x1 << (int) NConstants::e_StyleBaseMarker };
 
 	// process auto markers first (i.e. lowest precedence is first item)
-	for( const selector_ptr_t &selector : m_AutoMarkers )
+	for( const selector_ptr_t & selector : m_AutoMarkers )
 	{
-		if( selector && selector->GetImpl()->Hit( line, adornments ) )
+		if( selector && selector->Hit( line, adornments ) )
 			res |= bit;
 		bit <<= 1;
 	}
@@ -286,6 +287,16 @@ int NAdornments::LogMarkValue( vint_t log_line_no, const LineAccessor & line )
 	return res;
 }
 
+bool NAdornments::SetAutoMarker( unsigned marker, boost::python::object match, logfile_ptr_t logfile )
+{
+	if( selector_ptr_t selector{ MakeSelector( match, false, logfile->GetSchema() ) } )
+	{
+		m_AutoMarkers[ marker ] = std::move(selector);
+		return true;
+	}
+	else
+		return false;
+}
 
 bool NAdornments::HasUsermark( vint_t log_line_no ) const
 {
@@ -335,7 +346,20 @@ void NHiliter::Hilite( const vint_t start, const char *first, const char *last, 
 	};
 
 	if( m_Selector )
-		m_Selector->GetImpl()->Visit( first, last, HiliteVisitor{ start, first, m_Indicator, vcontrol } );
+		m_Selector->Visit( first, last, HiliteVisitor{ start, first, m_Indicator, vcontrol } );
+}
+
+
+bool NHiliter::SetMatch( boost::python::object match )
+{
+	if( selector_ptr_t selector{ MakeSelector( match, false, m_Logfile->GetSchema() ) } )
+	{
+		m_SelectorChanged = true;
+		m_Selector = std::move( selector );
+		return true;
+	}
+	else
+		return false;
 }
 
 
@@ -352,9 +376,8 @@ void NHiliter::SetupMatchedLines( void )
 
 	else
 	{
-		Selector * selector{ m_Selector->GetImpl() };
 		NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
-		m_MatchedLines = m_ViewAccessor->Search( selector, &adornments_provider );
+		m_MatchedLines = m_ViewAccessor->Search( m_Selector, &adornments_provider );
 	}
 }
 
@@ -385,15 +408,27 @@ NFilterView::NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accesso
 	m_ViewAccessor{ view_accessor }
 {
 	Match descriptor{ Match::Type::e_Literal, std::string{}, false };
-	selector_ptr_t selector{ new NSelector{ descriptor, true, nullptr } };
+	selector_ptr_t selector{ Selector::MakeSelector( descriptor, true, nullptr ) };
 	Filter( selector, true );
 }
 
 
-void NFilterView::Filter( selector_ptr_t selector, bool add_irregular )
+void NFilterView::Filter( selector_ptr_a selector, bool add_irregular )
 {
 	NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
-	m_ViewAccessor->Filter( selector->GetImpl(), &adornments_provider, add_irregular );
+	m_ViewAccessor->Filter( selector, &adornments_provider, add_irregular );
+}
+
+
+bool NFilterView::Filter( boost::python::object match, bool add_irregular )
+{
+	if( selector_ptr_t selector{ MakeSelector( match, true, m_Logfile->GetSchema() ) } )
+	{
+		Filter( selector, add_irregular );
+		return true;
+	}
+	else
+		return false;
 }
 
 
@@ -496,6 +531,11 @@ NLineSet::NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	NFilterView{ logfile, view_accessor }
 {
+}
+
+bool NLineSet::Filter( boost::python::object match )
+{
+	return NFilterView::Filter( match, false );
 }
 
 
@@ -605,10 +645,10 @@ unsigned long long NView::GetContent( void )
 }
 
 
-void NView::Filter( selector_ptr_t selector )
+bool NView::Filter( boost::python::object match )
 {
 	NTextChanged handler{ m_CellBuffer, GetControl() };
-	NFilterView::Filter( selector, true );
+	return NFilterView::Filter( match, true );
 }
 
 
@@ -813,3 +853,7 @@ lineset_ptr_t NLogfile::CreateLineSet( void )
 }
 
 
+bool  NLogfile::SetAutoMarker( unsigned marker, boost::python::object match )
+{
+	return m_Adornments->SetAutoMarker( marker, match, logfile_ptr_t{ this } );
+}
