@@ -126,53 +126,44 @@ BOOST_PYTHON_FUNCTION_OVERLOADS( MakeLogfileOverloads, MakeLogfile, 3, 4 )
 // Python access to LogAccessor factory
 logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object formatter )
 {
-	using as_string = python::extract<std::string>;
-	using as_char = python::extract<char>;
-	using as_unsigned = python::extract<unsigned>;
-	using as_size = python::extract<size_t>;
+	using namespace python;
 
 	LogAccessorDescriptor descriptor
 	{
-		as_string{ log_schema.attr( "GetAccessorName" )() },
-		as_string{ log_schema.attr( "GetGuid" )() },
-		as_string{ log_schema.attr( "GetMatchDesc" )() },
-		as_unsigned{ log_schema.attr( "GetTextOffsetSize" )() }
+		extract<std::string>{ log_schema.attr( "GetAccessorName" )() },
+		extract<std::string>{ log_schema.attr( "GetGuid" )() },
+		extract<std::string>{ log_schema.attr( "GetMatchDesc" )() },
+		extract<unsigned>{ log_schema.attr( "GetTextOffsetSize" )() }
 	};
 
-	const size_t num_fields{ as_size{ log_schema.attr( "GetNumFields" )() } };
-	fielddescriptor_list_t & field_descs{ descriptor.m_FieldDescriptors };
-	field_descs.reserve( num_fields + 2 );
-	for( size_t i = 0; i < num_fields; ++i )
+	stl_input_iterator<object> end;
+
+	for( auto ifield_schema = stl_input_iterator<object>{ log_schema }; ifield_schema != end; ++ifield_schema )
 	{
-		python::object field_schema{ log_schema.attr( "GetFieldSchema" )(i) };
-
-		const std::string field_type{ as_string{ field_schema.attr( "Type" ) } };
-		const std::string field_name{ as_string{ field_schema.attr( "Name" ) } };
-		const std::string separator{ as_string{ field_schema.attr( "Separator" ) } };
-		const unsigned separator_count{ as_unsigned{ field_schema.attr( "SeparatorCount" ) } };
-		const unsigned min_width{ as_unsigned{ field_schema.attr( "MinWidth" ) } };
-
-		// using emplace_back here results in compiler unable to find FieldDescriptor constructor ??
-		field_descs.push_back( FieldDescriptor{ field_type, field_name, separator, separator_count, min_width } );
+		descriptor.m_FieldDescriptors.push_back( FieldDescriptor
+		{
+			extract<std::string>{ ifield_schema->attr( "Type" ) },
+			extract<std::string>{ ifield_schema->attr( "Name" ) },
+			extract<std::string>{ ifield_schema->attr( "Separator" ) },
+			extract<unsigned>{ ifield_schema->attr( "SeparatorCount" ) },
+			extract<unsigned>{ ifield_schema->attr( "MinWidth" ) }
+		} );
 	}
 
-	const size_t num_formatters{ as_size{ formatter.attr( "GetNumFormats" )() } };
-	formatdescriptor_list_t & formats{ descriptor.m_LineFormatters };
-	for( size_t i = 0; i < num_formatters; ++i )
+	for( auto iformat = stl_input_iterator<object>{ formatter }; iformat != end; ++iformat )
 	{
-		const std::string regex_text{ as_string{ formatter.attr( "GetFormatRegex" )( i ) } };
+		const std::string regex_text{ extract<std::string>{ iformat->attr( "RegexText" ) } };
 		std::regex_constants::syntax_option_type flags{
 			std::regex_constants::ECMAScript
 			| std::regex_constants::optimize
 		};
 
-		FormatDescriptor line_formatter{ std::regex{ regex_text, flags} };
+		std::vector<unsigned> style_nos;
+		for( auto istyleno = stl_input_iterator<object>{ iformat->attr( "StyleNumbers" ) }; istyleno != end; ++istyleno )
+			style_nos.push_back( extract<unsigned>{ *istyleno } );
 
-		const size_t num_styles{ as_size{ formatter.attr( "GetFormatNumStyles" )( i ) } };
-		for( size_t j = 0; j < num_styles; ++j )
-			line_formatter.m_Styles.push_back( as_unsigned{ formatter.attr( "GetFormatStyle" )( i, j ) } );
-
-		formats.push_back( std::move( line_formatter ) );
+		FormatDescriptor line_formatter{ std::regex{ regex_text, flags }, std::move(style_nos) };
+		descriptor.m_LineFormatters.push_back( std::move( line_formatter ) );
 	}
 
 	TraceDebug( "name:'%s' match_desc:'%s' guid:'%s'",
@@ -193,10 +184,12 @@ logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object for
 // Python access to Selector factory
 selector_ptr_t MakeSelector( python::object match, bool empty_selects_all, const NLogfile * logfile = nullptr )
 {
+	using namespace python;
+
 	Match descriptor{
-		python::extract<Match::Type>{ match.attr( "GetSelectorId" )() },
-		python::extract<std::string>{ match.attr( "MatchText" ) },
-		python::extract<bool>{ match.attr( "MatchCase" ) }
+		extract<Match::Type>{ match.attr( "GetSelectorId" )() },
+		extract<std::string>{ match.attr( "MatchText" ) },
+		extract<bool>{ match.attr( "MatchCase" ) }
 	};
 
 	const LogSchemaAccessor * schema{ logfile ? logfile->GetSchema() : nullptr };
