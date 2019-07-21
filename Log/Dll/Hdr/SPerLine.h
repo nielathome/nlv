@@ -150,13 +150,14 @@ private:
 
 	// view data
 	viewaccessor_ptr_t m_ViewAccessor;
+	const ViewMap * m_ViewMap;
 
 protected:
 	vint_t ViewMarkValue( vint_t line );
 
 public:
 	SLineMarkers( adornments_ptr_t adornments, viewaccessor_ptr_t view_accessor )
-		: m_Adornments{ adornments }, m_ViewAccessor{ view_accessor } {}
+		: m_Adornments{ adornments }, m_ViewAccessor{ view_accessor }, m_ViewMap{ view_accessor->GetMap() } {}
 
 	vint_t MarkValue( vint_t line ) override;
 
@@ -262,6 +263,7 @@ private:
 
 	// view data
 	viewaccessor_ptr_t m_ViewAccessor;
+	const ViewMap * m_ViewMap;
 	ChangeTracker m_ViewTracker;
 
 protected:
@@ -269,7 +271,7 @@ protected:
 
 public:
 	SLineAnnotation( annotations_ptr_t log_annotations, viewaccessor_ptr_t view_accessor )
-		: m_LogAnnotations{ log_annotations }, m_ViewAccessor{ view_accessor } {}
+		: m_LogAnnotations{ log_annotations }, m_ViewAccessor{ view_accessor }, m_ViewMap{ view_accessor->GetMap() } {}
 
 	bool HasStateChanged( void ) const;
 	annotationsizes_list_t GetAnnotationSizes( void ) const;

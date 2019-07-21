@@ -368,9 +368,7 @@ public:
 		: m_Indicator{ indicator }, m_Logfile{ logfile }, m_ViewAccessor{ view_accessor } {}
 
 public:
-	// Python interfaces; note default constructor is non-functional
-	NHiliter( void )
-		: m_Indicator{ 0 } {}
+	// Python interfaces
 
 	// find next matched line in the given direction
 	bool SetMatch( boost::python::object match );
@@ -382,69 +380,100 @@ using hiliter_ptr_t = boost::intrusive_ptr<NHiliter>;
 
 
 /*-----------------------------------------------------------------------
- * NFilterView
+ * NViewCore
  -----------------------------------------------------------------------*/
 
-// An interface to a set of logfile lines.
-class NFilterView
+class NViewCore
 {
-private:
-	// numeric access to defined fields
-	fieldvalue_t GetFieldValue( vint_t line_no, vint_t field_no );
-
 protected:
-	// array of hiliters
-	std::vector<hiliter_ptr_t> m_Hiliters;
+	NViewCore( logfile_ptr_t logfile = logfile_ptr_t{}, viewaccessor_ptr_t view_accessor = viewaccessor_ptr_t{} );
 
 	// We are a view onto this logfile
 	logfile_ptr_t m_Logfile;
 
 	// our view accessor
 	viewaccessor_ptr_t m_ViewAccessor;
+	const ViewMap * m_ViewMap;
 
-	// Select the lines to display in the view
+protected:
 	void Filter( selector_ptr_a selector, bool add_irregular );
+
+public:
 	bool Filter( boost::python::object match, bool add_irregular );
-
-public:
-	NFilterView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
-
-public:
-	// Python interfaces; note default constructor is non-functional
-	NFilterView( void ) {}
-
-	// raw text access to defined text/fields
-	std::string GetNonFieldText( vint_t line_no );
-	std::string GetFieldText( vint_t line_no, vint_t field_no );
-
-	// numeric access to defined fields
-	uint64_t GetFieldValueUnsigned( vint_t line_no, vint_t field_no ) {
-		return GetFieldValue( line_no, field_no ).Convert<uint64_t>();
-	}
-	int64_t GetFieldValueSigned( vint_t line_no, vint_t field_no ) {
-		return GetFieldValue( line_no, field_no ).Convert<int64_t>();
-	}
-	double GetFieldValueFloat( vint_t line_no, vint_t field_no ) {
-		return GetFieldValue( line_no, field_no ).Convert<double>();
-	}
 
 	// line count
 	vint_t GetNumLines( void ) const {
 		return m_ViewAccessor->GetNumLines();
 	}
+};
 
+
+
+/*-----------------------------------------------------------------------
+ * NViewFieldAccess
+ -----------------------------------------------------------------------*/
+
+class NViewFieldAccess : public virtual NViewCore
+{
+private:
+	// numeric access to defined fields
+	fieldvalue_t GetFieldValue( vint_t line_no, vint_t field_no );
+
+public:
+	// raw text access to defined text/fields
+
+	std::string GetNonFieldText( vint_t line_no );
+	std::string GetFieldText( vint_t line_no, vint_t field_no );
+
+	// numeric access to defined fields
+
+	uint64_t GetFieldValueUnsigned( vint_t line_no, vint_t field_no ) {
+		return GetFieldValue( line_no, field_no ).Convert<uint64_t>();
+	}
+
+	int64_t GetFieldValueSigned( vint_t line_no, vint_t field_no ) {
+		return GetFieldValue( line_no, field_no ).Convert<int64_t>();
+	}
+
+	double GetFieldValueFloat( vint_t line_no, vint_t field_no ) {
+		return GetFieldValue( line_no, field_no ).Convert<double>();
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NViewLineTranslation
+ -----------------------------------------------------------------------*/
+
+class NViewLineTranslation : public virtual NViewCore
+{
+public:
 	// line number translation between the view and the underlying logfile
 	vint_t ViewLineToLogLine( vint_t view_line_no ) const;
 	vint_t LogLineToViewLine( vint_t log_line_no ) const;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NViewHiliting
+ -----------------------------------------------------------------------*/
+
+class NViewHiliting : public virtual NViewCore
+{
+protected:
+	// array of hiliters
+	std::vector<hiliter_ptr_t> m_Hiliters;
+
+public:
+	// Python interfaces
 
 	// Hiliting control
 	void SetNumHiliter( unsigned num_hiliter );
 	hiliter_ptr_t GetHiliter( unsigned hiliter ) {
 		return m_Hiliters[ hiliter ];
 	}
-
-	// numeric access to a line's timecode, timecode is referenced to UTC
-	NTimecode * GetUtcTimecode( vint_t line_no );
 
 	// Field visibility
 	virtual void SetFieldMask( uint64_t field_mask ) {
@@ -457,20 +486,48 @@ public:
 
 
 /*-----------------------------------------------------------------------
+ * NViewTimecode
+ -----------------------------------------------------------------------*/
+
+class NViewTimecode : public virtual NViewCore
+{
+public:
+	// numeric access to a line's timecode, timecode is referenced to UTC
+	NTimecode * GetUtcTimecode( vint_t line_no );
+};
+
+
+
+/*-----------------------------------------------------------------------
  * NLineSet
  -----------------------------------------------------------------------*/
 
-// Python interface to NFilterView
 class NLineSet
 	:
-	public NFilterView,
+	public NViewFieldAccess,
+	public NViewLineTranslation,
 	public NLifeTime
 {
 public:
-	// Python interfaces; note default constructor is non-functional
-
-	NLineSet( void ) {}
 	NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NEventView
+ -----------------------------------------------------------------------*/
+
+class NEventView
+	:
+	public NViewFieldAccess,
+	public NViewHiliting,
+	public NLifeTime
+{
+public:
+	// Python interfaces
+
+	NEventView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
 	// Select the lines to display in the lineset
 	bool Filter( boost::python::object match );
@@ -479,14 +536,16 @@ public:
 
 
 /*-----------------------------------------------------------------------
- * NView
+ * NLogView
  -----------------------------------------------------------------------*/
 
 // A particular view of a logfile. Provides a method to create a Scintilla
 // compatible (virtualised) content interface of the view.
-class NView
+class NLogView
 	:
-	public NFilterView,
+	public NViewFieldAccess,
+	public NViewHiliting,
+	public NViewTimecode,
 	public VContent
 {
 private:
@@ -545,11 +604,10 @@ protected:
 	void __stdcall Notify_StartDrawLine( vint_t line_no ) override;
 
 public:
-	NView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
+	NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
 public:
-	// Python interfaces; note default constructor is non-functional
-	NView( void ) {}
+	// Python interfaces
 
 	// Create an interface Scintilla can use to acces this view of the logfile.
 	virtual unsigned long long GetContent( void );
@@ -592,7 +650,8 @@ private:
 
 
 public:
-	NLogfile( void ) {}
+	// Python interfaces
+
 	NLogfile( logaccessor_ptr_t && log_accessor );
 	Error Open( const std::wstring & file_path, ProgressMeter * progress );
 
@@ -623,8 +682,9 @@ public:
 	}
 
 	// View management
-	view_ptr_t CreateView( void );
-	lineset_ptr_t CreateLineSet( void );
+	logview_ptr_t CreateLogView( void );
+	eventview_ptr_t CreateEventView( void );
+	lineset_ptr_t CreateLineSet( boost::python::object match );
 
 	// Marker control
 	void SetNumAutoMarker( unsigned num_marker ) {

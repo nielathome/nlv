@@ -282,6 +282,15 @@ public:
 public:
 	// ViewMap interfaces
 
+	// fetch nearest preceding view line number to the supplied log line
+	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
+		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
+	}
+
+	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
+		return m_LineMap[ view_line_no ];
+	}
+
 	nlineno_t GetLineLength( nlineno_t line_no ) const override {
 		return m_LogAccessor->GetLineLength( ViewLineToLogLine( line_no ), m_FieldViewMask );
 	}
@@ -303,15 +312,6 @@ public:
 
 	nlineno_t GetNumLines( void ) const override {
 		return m_IsEmpty ? 0 : m_NumLinesOrOne;
-	}
-
-	// fetch nearest preceding view line number to the supplied log line
-	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
-		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
-	}
-
-	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
-		return m_LineMap[view_line_no];
 	}
 
 	ViewProperties * GetProperties( void ) override {

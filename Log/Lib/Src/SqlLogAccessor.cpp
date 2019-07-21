@@ -348,15 +348,6 @@ public:
 	void Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool ) override;
 	std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider ) override;
 
-	// fetch nearest preceding view line number to the supplied log line
-	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
-		return log_line_no;
-	}
-
-	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
-		return view_line_no;
-	}
-
 	ViewProperties * GetProperties( void ) override {
 		return this;
 	}

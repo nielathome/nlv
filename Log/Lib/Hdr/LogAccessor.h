@@ -421,7 +421,6 @@ enum class e_LineData
 	_Count
 };
 
-// ViewMeta ?
 struct ViewMap
 {
 	// line start locations in the view
@@ -434,6 +433,9 @@ struct ViewMap
 	// warning: an empty Scintilla document has a line count of 1
 	// this flag disambiguates the two cases
 	bool m_IsEmpty{ true };
+
+	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
+	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
 
 	virtual nlineno_t GetLineLength( nlineno_t line_no ) const = 0;
 	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const = 0;
@@ -474,8 +476,6 @@ struct ViewAccessor
 
 	// basic line access
 	virtual nlineno_t GetNumLines( void ) const = 0;
-	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
-	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
 
 	// view configuration
 	virtual ViewProperties * GetProperties( void ) = 0;

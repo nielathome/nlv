@@ -133,8 +133,8 @@ class G_Analyser:
     def BuildLineSet(self, recogniser_match):
         match = self.BuildLVFText(recogniser_match)
 
-        lineset = self._LogFile.CreateLineSet()
-        if not lineset.Filter(match):
+        lineset = self._LogFile.CreateLineSet(match)
+        if lineset is None:
             raise RuntimeError("Broken filter: {}".format(match.MatchText))
 
         return lineset

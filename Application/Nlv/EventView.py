@@ -1668,7 +1668,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     @G_Global.TimeFunction
     def UpdateContent(self, analysis_props):
         event_projector = self.GetLogAnalysisNode().FindChildNode(G_Project.NodeID_EventProjector, True)
-        events_to_quantify = event_projector.GetTableViewCtrl().GetLineSet()
+        events_to_quantify = event_projector.GetTableViewCtrl().GetEventView()
         self.GetMetricsViewCtrl().Assemble(events_to_quantify, analysis_props)
 
         self.GetMetricsViewCtrl().UpdateMetrics().Realise()

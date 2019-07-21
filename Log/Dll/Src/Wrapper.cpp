@@ -239,12 +239,12 @@ BOOST_PYTHON_MODULE( Nlog )
 	// although boost::noncopyable is specified here, Boost still attempts
 	// to make use of a copy constructor, so the kludged default constructors
 	// are needed for the time being
-	class_<PerfTimer, boost::noncopyable>( "PerfTimer" )
+	class_<PerfTimer>( "PerfTimer" )
 		.def( "Overall", &PerfTimer::Overall )
 		.def( "PerItem", &PerfTimer::PerItem )
 		;
 
-	class_<NHiliter, hiliter_ptr_t, boost::noncopyable>( "Hiliter" )
+	class_<NHiliter, hiliter_ptr_t, boost::noncopyable>( "Hiliter", no_init )
 		.def( "Search", &NHiliter::Search )
 		.def( "Hit", &NHiliter::Hit )
 		.def( "SetMatch", &NHiliter::SetMatch )
@@ -263,57 +263,69 @@ BOOST_PYTHON_MODULE( Nlog )
 		.export_values()
 		;
 
-	class_<NTimecodeBase, boost::noncopyable>( "NTimecodeBase", init<time_t, unsigned>() )
+	class_<NTimecodeBase, boost::noncopyable>( "TimecodeBase", init<time_t, unsigned>() )
 		.def( "GetUtcDatum", &NTimecodeBase::GetUtcDatum )
 		.def( "GetFieldId", &NTimecodeBase::GetFieldId )
 		;
 
-	class_<NTimecode, boost::noncopyable>( "NTimecode", init<time_t, int64_t>() )
+	class_<NTimecode, boost::noncopyable>( "Timecode", init<time_t, int64_t>() )
 		.def( "GetUtcDatum", &NTimecode::GetUtcDatum )
 		.def( "GetOffsetNs", &NTimecode::GetOffsetNs )
 		.def( "Normalise", &NTimecode::Normalise )
 		.def( "Subtract", &NTimecode::Subtract )
 		;
 
-	// NLineSet and NView present similar interfaces to Python, but have
-	// incompatible inheritance structure; so using a macro to extract the
-	// commonality
-	#define NFilterView_Members(CLS) \
-		.def( "GetUtcTimecode", &CLS::GetUtcTimecode, return_value_policy<manage_new_object>() ) \
-		.def( "GetNonFieldText", &CLS::GetNonFieldText ) \
-		.def( "GetFieldText", &CLS::GetFieldText ) \
-		.def( "GetFieldValueUnsigned", &CLS::GetFieldValueUnsigned ) \
-		.def( "GetFieldValueSigned", &CLS::GetFieldValueSigned ) \
-		.def( "GetFieldValueFloat", &CLS::GetFieldValueFloat ) \
-		.def( "SetNumHiliter", &CLS::SetNumHiliter ) \
-		.def( "GetHiliter", &CLS::GetHiliter ) \
-		.def( "SetFieldMask", &CLS::SetFieldMask )
-
-	class_<NLineSet, lineset_ptr_t, boost::noncopyable>( "LineSet" )
-		NFilterView_Members( NLineSet )
-		.def( "Filter", &NLineSet::Filter )
-		.def( "GetNumLines", &NLineSet::GetNumLines )
-		.def( "ViewLineToLogLine", &NLineSet::ViewLineToLogLine )
-		.def( "LogLineToViewLine", &NLineSet::LogLineToViewLine )
+	class_<NViewCore>( "ViewCore", no_init )
+		.def( "GetNumLines", &NViewCore::GetNumLines )
 		;
 
-	class_<NView, view_ptr_t, boost::noncopyable>( "View" )
-		NFilterView_Members( NView )
-		.def( "Filter", &NView::Filter )
-		.def( "GetContent", &NView::GetContent )
-		.def( "ToggleBookmarks", &NView::ToggleBookmarks )
-		.def( "GetNextBookmark", &NView::GetNextBookmark )
-		.def( "GetNextAnnotation", &NView::GetNextAnnotation )
-		.def( "SetLocalTrackerLine", &NView::SetLocalTrackerLine )
-		.def( "GetLocalTrackerLine", &NView::GetLocalTrackerLine )
-		.def( "GetGlobalTrackerLine", &NView::GetGlobalTrackerLine )
+	class_<NViewFieldAccess>( "ViewFieldAccess", no_init )
+		.def( "GetNonFieldText", &NViewFieldAccess::GetNonFieldText ) \
+		.def( "GetFieldText", &NViewFieldAccess::GetFieldText ) \
+		.def( "GetFieldValueUnsigned", &NViewFieldAccess::GetFieldValueUnsigned ) \
+		.def( "GetFieldValueSigned", &NViewFieldAccess::GetFieldValueSigned ) \
+		.def( "GetFieldValueFloat", &NViewFieldAccess::GetFieldValueFloat ) \
 		;
 
-	class_<NLogfile, logfile_ptr_t, boost::noncopyable>( "Logfile" )
+	class_<NViewLineTranslation>( "ViewLineTranslation", no_init )
+		.def( "ViewLineToLogLine", &NViewLineTranslation::ViewLineToLogLine )
+		.def( "LogLineToViewLine", &NViewLineTranslation::LogLineToViewLine )
+		;
+
+	class_<NViewHiliting>( "ViewHiliting", no_init )
+		.def( "SetNumHiliter", &NViewHiliting::SetNumHiliter ) \
+		.def( "GetHiliter", &NViewHiliting::GetHiliter ) \
+		.def( "SetFieldMask", &NViewHiliting::SetFieldMask )
+		;
+
+	class_<NViewTimecode>( "ViewTimecode", no_init )
+		.def( "GetUtcTimecode", &NViewTimecode::GetUtcTimecode, return_value_policy<manage_new_object>() ) \
+		;
+
+	class_<NLineSet, lineset_ptr_t, bases<NViewFieldAccess, NViewLineTranslation>>( "LineSet", no_init )
+		;
+
+	class_<NEventView, eventview_ptr_t, bases<NViewCore, NViewFieldAccess, NViewHiliting>>( "NEventView", no_init )
+		.def( "Filter", &NEventView::Filter )
+		;
+
+	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewHiliting, NViewTimecode>>( "LogView", no_init )
+		.def( "Filter", &NLogView::Filter )
+		.def( "GetContent", &NLogView::GetContent )
+		.def( "ToggleBookmarks", &NLogView::ToggleBookmarks )
+		.def( "GetNextBookmark", &NLogView::GetNextBookmark )
+		.def( "GetNextAnnotation", &NLogView::GetNextAnnotation )
+		.def( "SetLocalTrackerLine", &NLogView::SetLocalTrackerLine )
+		.def( "GetLocalTrackerLine", &NLogView::GetLocalTrackerLine )
+		.def( "GetGlobalTrackerLine", &NLogView::GetGlobalTrackerLine )
+		;
+
+	class_<NLogfile, logfile_ptr_t, boost::noncopyable>( "Logfile", no_init )
 		.def( "GetState", &NLogfile::GetState )
 		.def( "PutState", &NLogfile::PutState )
-		.def( "CreateView", &NLogfile::CreateView )
 		.def( "CreateLineSet", &NLogfile::CreateLineSet )
+		.def( "CreateLogView", &NLogfile::CreateLogView )
+		.def( "CreateEventView", &NLogfile::CreateEventView )
 		.def( "SetNumAutoMarker", &NLogfile::SetNumAutoMarker )
 		.def( "SetAutoMarker", &NLogfile::SetAutoMarker )
 		.def( "ClearAutoMarker", &NLogfile::ClearAutoMarker )

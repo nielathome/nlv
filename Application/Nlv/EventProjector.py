@@ -690,7 +690,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
     #-------------------------------------------------------
     def Reset(self, table_schema = None):
         self._N_Logfile = None
-        self._N_LineSet = None
+        self._N_EventView = None
 
         if table_schema is None:
             table_schema = G_ProjectionSchema()
@@ -720,28 +720,28 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
     def GetFieldValue(self, item_key, col_num):
         type = self.GetFieldType(col_num)
-        return G_ProjectionTypeManager.GetValue(type, self._N_LineSet, item_key, col_num)
+        return G_ProjectionTypeManager.GetValue(type, self._N_EventView, item_key, col_num)
 
     def GetFieldDisplayValue(self, item_key, col_num):
         icon = None
         (type, is_first) = self.GetFieldInfo(col_num)
         if is_first:
             icon = self._Icons[item_key in self._ParentKeyToChildKeys]
-        return G_ProjectionTypeManager.GetDisplayValue(type, icon, self._N_LineSet, item_key, col_num)
+        return G_ProjectionTypeManager.GetDisplayValue(type, icon, self._N_EventView, item_key, col_num)
 
 
     #-------------------------------------------------------
     def GetTableSchema(self):
         return self._TableSchema
 
-    def GetLineSet(self):
-        return self._N_LineSet
+    def GetEventView(self):
+        return self._N_EventView
 
     def GetNumItems(self):
-        if self._N_LineSet is None:
+        if self._N_EventView is None:
             return 0
         else:
-            return self._N_LineSet.GetNumLines()
+            return self._N_EventView.GetNumLines()
 
 
     #-------------------------------------------------------
@@ -758,12 +758,12 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if parent_id < 0:
             return parent_id
 
-        candidate_parent_key = self._N_LineSet.LogLineToViewLine(parent_id)
+        candidate_parent_key = self._N_EventView.LogLineToViewLine(parent_id)
         if candidate_parent_key < 0:
             return candidate_parent_key
 
         # check for an exact match
-        actual_parent_id = self._N_LineSet.ViewLineToLogLine(candidate_parent_key)
+        actual_parent_id = self._N_EventView.ViewLineToLogLine(candidate_parent_key)
         if parent_id == actual_parent_id:
             return candidate_parent_key
 
@@ -789,8 +789,8 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             finish_offset = self.GetFieldValue(item_key, table_schema.ColFinishOffset)
 
         utc_datum = self._N_Logfile.GetTimecodeBase().GetUtcDatum()
-        return (Nlog.NTimecode(utc_datum, start_offset),
-            Nlog.NTimecode(utc_datum, finish_offset)
+        return (Nlog.Timecode(utc_datum, start_offset),
+            Nlog.Timecode(utc_datum, finish_offset)
         )
 
 
@@ -814,7 +814,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         to provide the tree hierarchy.
         """
 
-        if self._N_LineSet is None:
+        if self._N_EventView is None:
             return 0
 
         count = 0
@@ -895,7 +895,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
         item_key = self.ItemToKey(item)
         for hiliter in self._Hiliters:
-            if self._N_LineSet.GetHiliter(hiliter._Id).Hit(item_key):
+            if self._N_EventView.GetHiliter(hiliter._Id).Hit(item_key):
                 wrapped_attr.SetBgColour(hiliter._Colour)
                 break
 
@@ -937,7 +937,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
           cur_key = self.ItemToKey(cur_item)
   
         if what == "hilite":
-            next_key = self._N_LineSet.GetHiliter(index).Search(cur_key, forward)
+            next_key = self._N_EventView.GetHiliter(index).Search(cur_key, forward)
 
         if next_key >= 0:
             return self.KeyToItem(next_key)
@@ -952,10 +952,10 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if hiliter._Match is None:
             return True
 
-        if self._N_LineSet is None:
+        if self._N_EventView is None:
             return True
 
-        return self._N_LineSet.GetHiliter(hiliter._Id).SetMatch(hiliter._Match)
+        return self._N_EventView.GetHiliter(hiliter._Id).SetMatch(hiliter._Match)
 
         
     def FilterLineSet(self, match):
@@ -965,10 +965,10 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             return False
 
         if match is not None:
-            if self._N_LineSet is None:
+            if self._N_EventView is None:
                 return True
 
-            return self._N_LineSet.Filter(match)
+            return self._N_EventView.Filter(match)
 
         map = self._ParentKeyToChildKeys = dict()
 
@@ -997,12 +997,12 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
         # robustness, for broken logfiles ...
         if self._N_Logfile is not None:
-            self._N_LineSet = self._N_Logfile.CreateLineSet()
+            self._N_EventView = self._N_Logfile.CreateEventView()
 
             self.MaskLineSet()
             self.FilterLineSet(self._FilterMatch)
 
-            self._N_LineSet.SetNumHiliter(len(self._Hiliters))
+            self._N_EventView.SetNumHiliter(len(self._Hiliters))
             for hiliter in self._Hiliters:
                 self.HiliteLineSet(hiliter)
         
@@ -1019,8 +1019,8 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
     def SetNumHiliter(self, num_hiliter):
         self._Hiliters = [G_TableHiliter(i) for i in range(num_hiliter)]
-        if self._N_LineSet is not None:
-            self._N_LineSet.SetNumHiliter(num_hiliter)
+        if self._N_EventView is not None:
+            self._N_EventView.SetNumHiliter(num_hiliter)
 
 
     #-------------------------------------------------------
@@ -1064,9 +1064,9 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             in_mask = self._RawFieldMask
         self._RawFieldMask = in_mask
 
-        if self._N_LineSet is not None:
+        if self._N_EventView is not None:
             full_mask = self.CalcLineSetFieldMask(in_mask)
-            self._N_LineSet.SetFieldMask(full_mask)
+            self._N_EventView.SetFieldMask(full_mask)
 
             
     def SetFieldMask(self, in_mask):
@@ -1141,8 +1141,8 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def GetLineSet(self):
-        return self.GetModel().GetLineSet()
+    def GetEventView(self):
+        return self.GetModel().GetEventView()
 
 
     #-------------------------------------------------------
@@ -1435,7 +1435,7 @@ class G_ChartViewCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def GetTableData(self):
-        metrics = self._TableViewCtrl.GetLineSet()
+        metrics = self._TableViewCtrl.GetEventView()
         num_metrics = metrics.GetNumLines()
         selection = self._TableViewCtrl.GetSelectedItems()
         return (metrics, num_metrics, selection)

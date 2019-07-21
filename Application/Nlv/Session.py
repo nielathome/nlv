@@ -867,7 +867,7 @@ class G_SessionTrackerOptionsNode(G_SessionChildNode, G_TabContainedNode):
         for i in range(G_Const.NumGlobalTrackers):
             tracker = self._GlobalTrackerTimecodes[i]
             if tracker.InUse.Value:
-                timecodes.append(Nlog.NTimecode(tracker.UtcDatum.Value, tracker.OffsetNs.Value))
+                timecodes.append(Nlog.Timecode(tracker.UtcDatum.Value, tracker.OffsetNs.Value))
 
         self.SetTrackers(False, 0, timecodes)
 
