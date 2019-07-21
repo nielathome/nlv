@@ -18,7 +18,7 @@
 
 // Boost includes
 #include <boost/python.hpp>
-namespace python = boost::python;
+using namespace boost::python;
 
 // Application includes
 #include "Nlog.h"
@@ -35,7 +35,7 @@ namespace python = boost::python;
 namespace
 {
 	// logger object to call-back into Python
-	python::object g_Logger;
+	object g_Logger;
 
 
 	// tracing can be sent to Python for distribution and storage
@@ -58,7 +58,7 @@ namespace
  -----------------------------------------------------------------------*/
 
 // Python initialisation
-void Setup( python::object logger )
+void Setup( object logger )
 {
 	// startup message
 	static OnEvent evt{ OnEvent::EventType::Startup,
@@ -87,53 +87,15 @@ void Setup( python::object logger )
 }
 
 
-// Python access to logfile factory
-logfile_ptr_t MakeLogfile( const std::string & nlog_path, NLogAccessor * log_accessor, python::object progress, size_t skip_lines = 0 )
-{
-	using converter_t = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>;
-	std::wstring wnlog_path{ converter_t{}.from_bytes( nlog_path ) };
-
-	struct PythonProgress : public ProgressMeter
-	{
-		python::object & f_Progress;
-		PythonProgress( python::object & progress )
-			: f_Progress{ progress } {}
-
-		void SetRange( size_t range ) override {
-			if( !f_Progress.is_none() )
-				f_Progress.attr( "SetRange" )( range );
-		}
-
-		virtual void SetProgress( size_t value ) override {
-			if( !f_Progress.is_none() )
-				f_Progress.attr( "SetProgress" )( value );
-		}
-
-	} meter{ progress };
-
-	TraceDebug( "path:'%S'", wnlog_path.c_str() );
-
-	logfile_ptr_t logfile{ new NLogfile{ log_accessor } };
-	const Error error{ logfile->Open( wnlog_path, &meter, skip_lines ) };
-	if( !Ok( error ) )
-		logfile.reset();
-
-	return logfile;
-}
-BOOST_PYTHON_FUNCTION_OVERLOADS( MakeLogfileOverloads, MakeLogfile, 3, 4 )
-
-
 // Python access to LogAccessor factory
-logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object formatter )
+logaccessor_ptr_t MakeLogAccessor( object log_schema )
 {
-	using namespace python;
-
 	LogAccessorDescriptor descriptor
 	{
-		extract<std::string>{ log_schema.attr( "GetAccessorName" )() },
-		extract<std::string>{ log_schema.attr( "GetGuid" )() },
-		extract<std::string>{ log_schema.attr( "GetMatchDesc" )() },
-		extract<unsigned>{ log_schema.attr( "GetTextOffsetSize" )() }
+		extract<std::string>{ log_schema.attr( "AccessorName" ) },
+		extract<std::string>{ log_schema.attr( "Guid" ) },
+		extract<std::string>{ log_schema.attr( "RegexText" ) },
+		extract<unsigned>{ log_schema.attr( "TextOffsetSize" ) }
 	};
 
 	stl_input_iterator<object> end;
@@ -150,6 +112,7 @@ logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object for
 		} );
 	}
 
+	object formatter{ log_schema.attr( "GetFormatter" )() };
 	for( auto iformat = stl_input_iterator<object>{ formatter }; iformat != end; ++iformat )
 	{
 		const std::string regex_text{ extract<std::string>{ iformat->attr( "RegexText" ) } };
@@ -162,18 +125,18 @@ logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object for
 		for( auto istyleno = stl_input_iterator<object>{ iformat->attr( "StyleNumbers" ) }; istyleno != end; ++istyleno )
 			style_nos.push_back( extract<unsigned>{ *istyleno } );
 
-		FormatDescriptor line_formatter{ std::regex{ regex_text, flags }, std::move(style_nos) };
+		FormatDescriptor line_formatter{ std::regex{ regex_text, flags }, std::move( style_nos ) };
 		descriptor.m_LineFormatters.push_back( std::move( line_formatter ) );
 	}
 
 	TraceDebug( "name:'%s' match_desc:'%s' guid:'%s'",
 		descriptor.m_Name.c_str(),
-		descriptor.m_MatchDesc.c_str(),
+		descriptor.m_RegexText.c_str(),
 		descriptor.m_Guid.c_str()
 	);
 
-	logaccessor_ptr_t accessor{ new NLogAccessor{ descriptor } };
-	const Error error{ accessor->Ok() ? e_OK : e_BadAccessorName };
+	logaccessor_ptr_t accessor{ LogAccessorFactory::Create( descriptor ) };
+	const Error error{ accessor ? e_OK : e_BadAccessorName };
 	if( !Ok( error ) )
 		accessor.reset();
 
@@ -181,11 +144,44 @@ logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object for
 }
 
 
-// Python access to Selector factory
-selector_ptr_t MakeSelector( python::object match, bool empty_selects_all, const NLogfile * logfile = nullptr )
+// Python access to logfile factory
+logfile_ptr_t MakeLogfile( const std::string & nlog_path, object log_schema, object progress )
 {
-	using namespace python;
+	using converter_t = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>;
+	std::wstring wnlog_path{ converter_t{}.from_bytes( nlog_path ) };
 
+	struct PythonProgress : public ProgressMeter
+	{
+		object & f_Progress;
+		PythonProgress( object & progress )
+			: f_Progress{ progress } {}
+
+		void SetRange( size_t range ) override {
+			if( !f_Progress.is_none() )
+				f_Progress.attr( "SetRange" )( range );
+		}
+
+		virtual void SetProgress( size_t value ) override {
+			if( !f_Progress.is_none() )
+				f_Progress.attr( "SetProgress" )( value );
+		}
+
+	} meter{ progress };
+
+	TraceDebug( "path:'%S'", wnlog_path.c_str() );
+
+	logfile_ptr_t logfile{ new NLogfile{ std::move( MakeLogAccessor( log_schema ) ) } };
+	const Error error{ logfile->Open( wnlog_path, &meter ) };
+	if( !Ok( error ) )
+		logfile.reset();
+
+	return logfile;
+}
+
+
+// Python access to Selector factory
+selector_ptr_t MakeSelector( object match, bool empty_selects_all, const NLogfile * logfile = nullptr )
+{
 	Match descriptor{
 		extract<Match::Type>{ match.attr( "GetSelectorId" )() },
 		extract<std::string>{ match.attr( "MatchText" ) },
@@ -229,7 +225,6 @@ namespace boost
 {
 	template <> NHiliter const volatile * get_pointer( NHiliter const volatile *n ) { return n; }
 	template <> NSelector const volatile * get_pointer( NSelector const volatile *n ) { return n; }
-	template <> NLogAccessor const volatile * get_pointer( NLogAccessor const volatile *n ) { return n;  }
 	template <> NView const volatile * get_pointer( NView const volatile *n ) { return n; }
 	template <> NLineSet const volatile * get_pointer( NLineSet const volatile *n ) { return n; }
 	template <> NLogfile const volatile * get_pointer( NLogfile const volatile *n ) { return n; }
@@ -242,8 +237,6 @@ namespace boost
 //  https://wiki.python.org/moin/boost.python/PointersAndSmartPointers
 BOOST_PYTHON_MODULE( Nlog )
 {
-	using namespace python;
-
 	// although boost::noncopyable is specified here, Boost still attempts
 	// to make use of a copy constructor, so the kludged default constructors
 	// are needed for the time being
@@ -284,9 +277,6 @@ BOOST_PYTHON_MODULE( Nlog )
 		;
 
 	class_<NSelector, selector_ptr_t, boost::noncopyable>( "Selector" )
-		;
-
-	class_<NLogAccessor, logaccessor_ptr_t, boost::noncopyable>( "LogAccessor" )
 		;
 
 	// NLineSet and NView present similar interfaces to Python, but have
@@ -336,8 +326,7 @@ BOOST_PYTHON_MODULE( Nlog )
 		;
 
 	def( "Setup", Setup );
-	def( "MakeLogfile", MakeLogfile, MakeLogfileOverloads{} );
-	def( "MakeLogAccessor", MakeLogAccessor );
+	def( "MakeLogfile", MakeLogfile );
 	def( "MakeSelector", MakeSelector, MakeSelectorOverloads{} );
 	def( "SetGlobalTracker", SetGlobalTracker );
 }

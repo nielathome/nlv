@@ -128,24 +128,6 @@ using selector_ptr_t = boost::intrusive_ptr<NSelector>;
 
 
 /*-----------------------------------------------------------------------
- * NLogAccessor
- -----------------------------------------------------------------------*/
-
-// Python interface to the log accessor system
-class NLogAccessor : public NHandle<LogAccessor>
-{
-public:
-	NLogAccessor( LogAccessorDescriptor & descriptor );
-
-public:
-	// Python interfaces; note default constructor is non-functional
-	NLogAccessor( void ) {}
-};
-using logaccessor_ptr_t = boost::intrusive_ptr<NLogAccessor>;
-
-
-
-/*-----------------------------------------------------------------------
  * NStateManager
  -----------------------------------------------------------------------*/
 
@@ -678,13 +660,14 @@ private:
 
 
 public:
-	NLogfile( logaccessor_ptr_t log_accessor = nullptr );
-	Error Open( const std::wstring & file_path, ProgressMeter * progress, size_t skip_lines );
+	NLogfile( void ) {}
+	NLogfile( logaccessor_ptr_t && log_accessor );
+	Error Open( const std::wstring & file_path, ProgressMeter * progress );
 
 	// returns raw pointer, caller must hold ownership over this object
 	// for as long as the raw-pointer is needed
 	LogAccessor * GetLogAccessor( void ) const {
-		return m_LogAccessor->GetImpl();
+		return m_LogAccessor.get();
 	}
 
 	const LogSchemaAccessor * GetSchema( void ) const {

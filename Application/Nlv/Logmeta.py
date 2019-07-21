@@ -106,16 +106,16 @@ class G_FieldSchemata(G_FieldList):
     """
 
     #-------------------------------------------------------
-    def __init__(self, accessor_name, guid = ""):
+    def __init__(self, accessor_name, guid):
         super().__init__()
 
-        self._AccessorName = accessor_name
-        self._Guid = guid
-        self._RegexText = ""
+        self.AccessorName = accessor_name
+        self.Guid = guid
+        self.RegexText = ""
         self._FormatterGuid = None
 
     def _SetTextOffsetSize(self, size):
-        self._TextOffsetSize = size
+        self.TextOffsetSize = size
 
 
     #-------------------------------------------------------
@@ -125,30 +125,10 @@ class G_FieldSchemata(G_FieldList):
         else:
             return GetFormatter(self._FormatterGuid)
 
-    def MakeLogAccessor(self):
-        """Make a LogAccessor, needed by NLog to read/interpret a logfile"""
-        return Nlog.MakeLogAccessor(self, self.GetFormatter())
-
 
     #-------------------------------------------------------
     def GetFieldNames(self):
         return [fs.Name for fs in self if fs.Available]
-
-
-    #-------------------------------------------------------
-    # Nlog callback interface
-
-    def GetAccessorName(self):
-        return self._AccessorName
-
-    def GetGuid(self):
-        return self._Guid
-
-    def GetMatchDesc(self):
-        return self._RegexText
-
-    def GetTextOffsetSize(self):
-        return self._TextOffsetSize
 
 
     
@@ -201,10 +181,9 @@ class G_LogSchema(G_FieldSchemata):
 
     #-------------------------------------------------------
     def __init__(self, element):
-        super().__init__("map")
+        super().__init__("map", element.get("guid"))
 
         self._Name = element.get("name")
-        self._Guid = element.get("guid")
         self._Desc = element.find("description").text
         self._Ext = element.find("extension").text
 
@@ -234,10 +213,10 @@ class G_LogSchema(G_FieldSchemata):
             builders = self._Builders = G_XmlStore("builder", G_Builder)
             builders.AppendXml(elem)
 
-        self._RegexText = ""
+        self.RegexText = ""
         match = element.find("regex")
         if match is not None:
-            self._RegexText = match.text
+            self.RegexText = match.text
 
         for f in element.iterfind("field"):
             self.append(G_FieldSchema(f))

@@ -34,16 +34,16 @@ void force_link_dependencies()
  * LogAccessorFactory
  -----------------------------------------------------------------------*/
 
-std::map<std::string, LogAccessor * (*)(LogAccessorDescriptor &)> LogAccessorFactory::m_Makers;
+std::map<std::string, logaccessor_ptr_t (*)(LogAccessorDescriptor &)> LogAccessorFactory::m_Makers;
 
 
-void LogAccessorFactory::RegisterLogAccessor( const std::string & name, LogAccessor * (*creator)(LogAccessorDescriptor &) )
+void LogAccessorFactory::RegisterLogAccessor( const std::string & name, logaccessor_ptr_t (*creator)(LogAccessorDescriptor &) )
 {
 	m_Makers[ name ] = creator;
 }
 
 
-LogAccessor * LogAccessorFactory::Create( LogAccessorDescriptor & descriptor )
+logaccessor_ptr_t LogAccessorFactory::Create( LogAccessorDescriptor & descriptor )
 {
 	return m_Makers[ descriptor.m_Name ]( descriptor );
 }

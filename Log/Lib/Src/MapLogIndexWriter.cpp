@@ -1059,7 +1059,7 @@ Error LogIndexWriter::WriteLineRegex( WriteContext & cxt, size_t offset, const c
 }
 
 
-Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, ProgressMeter * progress, size_t skip_lines )
+Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, ProgressMeter * progress )
 {
 	const nlineno_t num_char{ nlineno_cast( m_Log.GetSize() ) };
 	const nlineno_t num_char_minus_one{ num_char - 1 };
@@ -1122,13 +1122,8 @@ Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, Pr
 			cxt.f_LineNo += 1;
 			const nlineno_t end{ i + 1 };
 
-			if( skip_lines == 0 )
-			{
-				num_lines += 1;
-				UpdateError( res, WriteLine( cxt, start, text + start, text + end ) );
-			}
-			else
-				skip_lines -= 1;
+			num_lines += 1;
+			UpdateError( res, WriteLine( cxt, start, text + start, text + end ) );
 
 			start = end;
 
@@ -1153,7 +1148,7 @@ Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, Pr
 }
 
 
-Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME modified_time, const std::string & guid, ProgressMeter * progress, size_t skip_lines )
+Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME modified_time, const std::string & guid, ProgressMeter * progress )
 {
 	// detect and ignore empty logfiles
 	PerfTimer timer;
@@ -1175,7 +1170,7 @@ Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME 
 	IndexFileHeaderV2 header;
 	WriteContext cxt{ string_table, header, stream };
 	nlineno_t num_lines{ 0 };
-	UpdateError( res, WriteLines( cxt, &num_lines, progress, skip_lines ) );
+	UpdateError( res, WriteLines( cxt, &num_lines, progress ) );
 
 	// align up to 8-byte boundary
 	const size_t pos_line_end{ stream.tellp() };

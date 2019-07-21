@@ -545,6 +545,17 @@ class G_ProjectionCollector:
                 log_row_no INT
             )""")
 
+#        cursor.execute("""
+#            CREATE VIEW IF NOT EXISTS filtered_projection
+#            (
+#                ?
+#            )
+#            AS
+#            SELECT *
+#            """)
+#look at parent handling - want to design out view-to-log line conversions in python ...
+
+
 
     #-------------------------------------------------------
     def Close(self):
@@ -990,7 +1001,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
         num_fields = self.GetColumnCount()
         if Path(filename).exists() and num_fields != 0:
-            self._N_Logfile = Nlog.MakeLogfile(filename, table_schema.MakeLogAccessor(), None, 1)
+            self._N_Logfile = Nlog.MakeLogfile(filename, table_schema, None)
 
         # robustness, for broken logfiles ...
         if self._N_Logfile is not None:

@@ -959,7 +959,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
 
         # open the logfile
         self._FullPath = fullpath = Path().cwd().joinpath(self._Field.RelativeLogfilePath.Value)
-        self._N_Logfile = Nlog.MakeLogfile(str(fullpath), self.GetLogSchema().MakeLogAccessor(), progress_dlg)
+        self._N_Logfile = Nlog.MakeLogfile(str(fullpath), self.GetLogSchema(), progress_dlg)
 
         if self._N_Logfile is None:
             raise RuntimeError("Unable to index logfile {}".format(self._FullPath))

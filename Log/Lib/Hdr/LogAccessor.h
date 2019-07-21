@@ -301,7 +301,7 @@ struct LogSchemaAccessor
 struct LogAccessor
 {
 	// core setup
-	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
+	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter * ) = 0;
 	virtual viewaccessor_ptr_t CreateViewAccessor( void ) = 0;
 
 	// field schema access
@@ -310,6 +310,8 @@ struct LogAccessor
 	// timezone control
 	virtual void SetTimezoneOffset( int offset_sec ) = 0;
 };
+
+using logaccessor_ptr_t = std::unique_ptr<LogAccessor>;
 
 
 
@@ -363,7 +365,7 @@ struct LogAccessorDescriptor
 {
 	std::string m_Name;
 	std::string m_Guid;
-	std::string m_MatchDesc;
+	std::string m_RegexText;
 	unsigned m_TextOffsetsSize;
 	fielddescriptor_list_t m_FieldDescriptors;
 	formatdescriptor_list_t m_LineFormatters;
@@ -377,13 +379,13 @@ struct LogAccessorDescriptor
 class LogAccessorFactory
 {
 public:
-	static void RegisterLogAccessor( const std::string & name, LogAccessor * (*creator)(LogAccessorDescriptor &) );
+	static void RegisterLogAccessor( const std::string & name, logaccessor_ptr_t (*creator)(LogAccessorDescriptor &) );
 
 	// factory for creating LogAccessor interfaces
-	static LogAccessor * Create( LogAccessorDescriptor & descriptor );
+	static logaccessor_ptr_t Create( LogAccessorDescriptor & descriptor );
 
 protected:
-	static std::map<std::string, LogAccessor * (*)(LogAccessorDescriptor &)> m_Makers;
+	static std::map<std::string, logaccessor_ptr_t (*)(LogAccessorDescriptor &)> m_Makers;
 };
 
 

@@ -61,9 +61,9 @@ private:
 	}
 
 protected:
-	Error WriteLines( WriteContext & cxt, nlineno_t * num_lines, ProgressMeter * progress, size_t skip_lines );
+	Error WriteLines( WriteContext & cxt, nlineno_t * num_lines, ProgressMeter * progress );
 
 public:
 	LogIndexWriter( const FileMap & fmap, const fielddescriptor_list_t & field_descs, const std::string & match_desc );
-	Error Write( const std::filesystem::path & index_path, FILETIME modified_time, const std::string & guid, ProgressMeter * progress, size_t skip_lines );
+	Error Write( const std::filesystem::path & index_path, FILETIME modified_time, const std::string & guid, ProgressMeter * progress );
 };

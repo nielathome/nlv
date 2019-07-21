@@ -376,17 +376,6 @@ bool NHiliter::Hit( nlineno_t line_no )
 
 
 /*-----------------------------------------------------------------------
- * NLogAccessor
- -----------------------------------------------------------------------*/
-
-NLogAccessor::NLogAccessor( LogAccessorDescriptor & descriptor )
-{
-	SetImpl( LogAccessorFactory::Create( descriptor ) );
-}
-
-
-
-/*-----------------------------------------------------------------------
  * NFilterView
  -----------------------------------------------------------------------*/
 
@@ -798,17 +787,17 @@ NTimecode ViewTimecodeAccessor::GetUtcTimecode( int line_no ) const
  * NLogfile
  -----------------------------------------------------------------------*/
 
-NLogfile::NLogfile( logaccessor_ptr_t log_accessor )
+NLogfile::NLogfile( logaccessor_ptr_t && log_accessor )
 	:
-	m_LogAccessor{ log_accessor },
+	m_LogAccessor{ std::move(log_accessor) },
 	m_Adornments{ new NAdornments }
 {
 }
 
 
-Error NLogfile::Open( const std::wstring &file_path, ProgressMeter * progress, size_t skip_lines )
+Error NLogfile::Open( const std::wstring &file_path, ProgressMeter * progress )
 {
-	return GetLogAccessor()->Open( file_path, progress, skip_lines );
+	return GetLogAccessor()->Open( file_path, progress );
 }
 
 

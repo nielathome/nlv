@@ -232,13 +232,10 @@ private:
 	Error GetDatum( void );
 	Error CalcNumLines( void );
 
-protected:
-	SqlLogAccessor( LogAccessorDescriptor & descriptor );
-
 public:
 	// LogAccessor interfaces
 
-	Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t ) override;
+	Error Open( const std::filesystem::path & file_path, ProgressMeter * ) override;
 
 	void SetTimezoneOffset( int offset_sec ) override {
 		// unsupported
@@ -278,11 +275,14 @@ public:
 	}
 
 public:
-	static LogAccessor * MakeSqlLogAccessor( LogAccessorDescriptor & descriptor )
+	SqlLogAccessor( LogAccessorDescriptor & descriptor );
+
+	static logaccessor_ptr_t MakeSqlLogAccessor( LogAccessorDescriptor & descriptor )
 	{
-		return new SqlLogAccessor( descriptor );
+		return std::make_unique<SqlLogAccessor>( descriptor );
 	}
 
+public:
 	Error MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const {
 		return m_DB.MakeStatement( sql_text, step, statement );
 	}
@@ -380,7 +380,7 @@ viewaccessor_ptr_t SqlLogAccessor::CreateViewAccessor( void )
 }
 
 
-Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter *, size_t )
+Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter * )
 {
 	Error res{ m_DB.Open( file_path ) };
 
@@ -591,6 +591,8 @@ void SqlViewAccessor::Filter( Selector * selector, LineAdornmentsProvider * ador
 		selector,
 		adornments_provider
 	) };
+
+//	write results to the filter table
 
 	// record the change
 	m_Tracker.RecordEvent();

@@ -101,7 +101,7 @@ private:
 	// field schema
 	const std::string m_Guid;
 	const fielddescriptor_list_t m_FieldDescriptors;
-	const std::string m_MatchDesc;
+	const std::string m_RegexText;
 
 	// Line/style caching
 	struct LineKey
@@ -130,7 +130,6 @@ private:
 
 protected:
 	std::filesystem::path CalcIndexPath( const std::filesystem::path & file_path );
-	MapLogAccessor( LogAccessorDescriptor & descriptor );
 
 public:
 	void VisitLines( Visitor & visitor, uint64_t field_mask ) const;
@@ -147,7 +146,7 @@ public:
 public:
 	// LogAccessor interfaces
 
-	Error Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines ) override;
+	Error Open( const std::filesystem::path & file_path, ProgressMeter * progress ) override;
 	viewaccessor_ptr_t CreateViewAccessor( void ) override;
 
 	void SetTimezoneOffset( int offset_sec ) override {
@@ -229,9 +228,11 @@ public:
 	}
 
 public:
-	static LogAccessor * MakeMapLogAccessor( LogAccessorDescriptor & descriptor )
+	MapLogAccessor( LogAccessorDescriptor & descriptor );
+
+	static logaccessor_ptr_t MakeMapLogAccessor( LogAccessorDescriptor & descriptor )
 	{
-		return new MapLogAccessor( descriptor );
+		return std::make_unique<MapLogAccessor>( descriptor );
 	}
 };
 
@@ -380,7 +381,7 @@ MapLogAccessor::MapLogAccessor( LogAccessorDescriptor & descriptor )
 	m_Guid{ std::move( descriptor.m_Guid ) },
 	m_TextOffsetsFieldType{ ExpandFieldOffsetSize( descriptor.m_TextOffsetsSize ) },
 	m_FieldDescriptors{ ExpandFieldDescriptors( m_TextOffsetsFieldType, std::move( descriptor.m_FieldDescriptors ) ) },
-	m_MatchDesc{ std::move( descriptor.m_MatchDesc ) },
+	m_RegexText{ std::move( descriptor.m_RegexText ) },
 	m_LineFormatters{ std::move( descriptor.m_LineFormatters ) }
 {
 }
@@ -409,7 +410,7 @@ std::filesystem::path MapLogAccessor::CalcIndexPath( const std::filesystem::path
 }
 
 
-Error MapLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter * progress, size_t skip_lines )
+Error MapLogAccessor::Open( const std::filesystem::path & file_path, ProgressMeter * progress )
 {
 	// map logfile
 	const Error log_error{ m_Log.Map( file_path ) };
@@ -455,8 +456,8 @@ Error MapLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 	{
 		// write new index
 		m_Index = MakeLogIndexAccessor( m_TextOffsetsFieldType, m_FieldDescriptors );
-		LogIndexWriter indexer{ m_Log, m_FieldDescriptors, m_MatchDesc };
-		idx_error = indexer.Write( index_path, log_modified_time, m_Guid, progress, skip_lines );
+		LogIndexWriter indexer{ m_Log, m_FieldDescriptors, m_RegexText };
+		idx_error = indexer.Write( index_path, log_modified_time, m_Guid, progress );
 
 		// and attempt to load it
 		if( Ok( idx_error ) )
