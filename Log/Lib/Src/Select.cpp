@@ -222,7 +222,7 @@ selector_ptr_t Selector::MakeSelector( const Match & match, bool empty_selects_a
 
 		case Match::e_LogviewFilter:
 			if( schema == nullptr )
-				throw std::exception( "Nlog: Logfile schema missing" );
+				throw std::runtime_error( "Nlog: Logfile schema missing" );
 			return std::make_unique<SelectorLogviewFilter>( match, *schema );
 		}
 	}

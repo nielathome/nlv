@@ -162,10 +162,6 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 		return m_FieldValues[ field_id ];
 	}
 
-	NTimecode GetUtcTimecode( void ) const override {
-		return NTimecode{};
-	}
-
 	bool IsBookMarked( nlineno_t ) const override {
 		return false;
 	}

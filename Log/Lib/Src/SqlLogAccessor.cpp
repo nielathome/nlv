@@ -222,6 +222,7 @@ private:
 	// the SQLite database
 	SqlDb m_DB;
 
+// NIEL needed ?? e.g. for date filtering
 	NTimecodeBase m_TimecodeBase;
 	nlineno_t m_NumLines{ 0 };
 
@@ -509,11 +510,6 @@ public:
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
 		return m_Statement->GetAsInt64( field_id - 1 );
-	}
-
-	NTimecode GetUtcTimecode( void ) const override {
-		const int64_t offset{ m_Statement->GetAsInt64( m_TimecodeBase.GetFieldId() ) };
-		return NTimecode{ m_TimecodeBase.GetUtcDatum(), offset };
 	}
 };
 

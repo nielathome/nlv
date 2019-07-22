@@ -254,7 +254,6 @@ struct LineAccessor
 	virtual void GetNonFieldText( const char ** first, const char ** last ) const = 0;
 	virtual void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const = 0;
 	virtual fieldvalue_t GetFieldValue( unsigned field_id ) const = 0;
-	virtual NTimecode GetUtcTimecode( void ) const = 0;
 };
 
 
@@ -297,6 +296,9 @@ struct LogSchemaAccessor
 /*-----------------------------------------------------------------------
  * LogAccessor
  -----------------------------------------------------------------------*/
+
+struct ViewAccessor;
+using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
 
 struct LogAccessor
 {
@@ -376,6 +378,7 @@ struct LogAccessorDescriptor
 /*-----------------------------------------------------------------------
  * LogAccessorFactory
  -----------------------------------------------------------------------*/
+
 class LogAccessorFactory
 {
 public:
@@ -434,12 +437,20 @@ struct ViewMap
 	// this flag disambiguates the two cases
 	bool m_IsEmpty{ true };
 
-	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
-	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
-
 	virtual nlineno_t GetLineLength( nlineno_t line_no ) const = 0;
 	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const = 0;
-	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * ViewLineTranslation
+ -----------------------------------------------------------------------*/
+
+struct ViewLineTranslation
+{
+	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
+	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
 };
 
 
@@ -477,20 +488,26 @@ struct ViewAccessor
 	// basic line access
 	virtual nlineno_t GetNumLines( void ) const = 0;
 
-	// view configuration
-	virtual ViewProperties * GetProperties( void ) = 0;
-
-	// view map; optional (can return null)
-	virtual const ViewMap * GetMap( void ) {
-		return nullptr;
-	}
-	
 	// update the view to contain solely logfile lines which are matched by
 	// the given selector
 	virtual void Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) = 0;
 
 	// search the view
 	virtual std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider) = 0;
-};
 
-using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
+	// view configuration
+	virtual ViewProperties * GetProperties( void ) = 0;
+
+	// optional interfaces
+	virtual const ViewMap * GetMap( void ) {
+		return nullptr;
+	}
+
+	virtual const ViewLineTranslation * GetLineTranslation( void ) {
+		return nullptr;
+	}
+
+	virtual const ViewTimecode * GetTimecode( void ) {
+		return nullptr;
+	}
+};

@@ -43,7 +43,6 @@ private:
 	// the view converts logical positions/lines (as presented to the CellBuffer user)
 	// to actual positions/lines in an underlying logfile
 	const ViewMap * m_ViewMap{ nullptr };
-	viewaccessor_ptr_t m_ViewAccessor;
 
 protected:
 	// convert a view position into a view line number and an offset within that line
@@ -73,7 +72,11 @@ public:
 
 	SViewCellBuffer( void ) {}
 	SViewCellBuffer( viewaccessor_ptr_t accessor )
-		: m_ViewAccessor{ accessor }, m_ViewMap{ accessor->GetMap() } {}
+		: m_ViewMap{ accessor->GetMap() }
+	{
+		if( !m_ViewMap )
+			throw std::runtime_error{ "ViewAccessor has no ViewMap" };
+	}
 
 	const LineBuffer & GetLine( e_LineData type, vint_t view_line_no ) const {
 		return m_ViewMap->GetLine( type, view_line_no );

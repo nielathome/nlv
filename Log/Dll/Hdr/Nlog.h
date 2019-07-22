@@ -393,7 +393,6 @@ protected:
 
 	// our view accessor
 	viewaccessor_ptr_t m_ViewAccessor;
-	const ViewMap * m_ViewMap;
 
 protected:
 	void Filter( selector_ptr_a selector, bool add_irregular );
@@ -448,10 +447,35 @@ public:
 
 class NViewLineTranslation : public virtual NViewCore
 {
+private:
+	// line translation interface
+	const ViewLineTranslation * m_ViewLineTranslation;
+
 public:
+	NViewLineTranslation( void );
+
 	// line number translation between the view and the underlying logfile
 	vint_t ViewLineToLogLine( vint_t view_line_no ) const;
 	vint_t LogLineToViewLine( vint_t log_line_no ) const;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NViewTimecode
+ -----------------------------------------------------------------------*/
+
+class NViewTimecode : public virtual NViewCore
+{
+protected:
+	// line translation interface
+	const ViewTimecode * m_ViewTimecode;
+
+public:
+	NViewTimecode( void );
+
+	// numeric access to a line's timecode, timecode is referenced to UTC
+	NTimecode * GetUtcTimecode( vint_t line_no );
 };
 
 
@@ -486,25 +510,13 @@ public:
 
 
 /*-----------------------------------------------------------------------
- * NViewTimecode
- -----------------------------------------------------------------------*/
-
-class NViewTimecode : public virtual NViewCore
-{
-public:
-	// numeric access to a line's timecode, timecode is referenced to UTC
-	NTimecode * GetUtcTimecode( vint_t line_no );
-};
-
-
-
-/*-----------------------------------------------------------------------
  * NLineSet
  -----------------------------------------------------------------------*/
 
 class NLineSet
 	:
 	public NViewFieldAccess,
+	public NViewTimecode,
 	public NViewLineTranslation,
 	public NLifeTime
 {
@@ -544,11 +556,15 @@ public:
 class NLogView
 	:
 	public NViewFieldAccess,
-	public NViewHiliting,
 	public NViewTimecode,
+	public NViewHiliting,
 	public VContent
 {
 private:
+	// interfaces
+	const ViewMap * m_ViewMap;
+	const ViewLineTranslation * m_ViewLineTranslation;
+
 	// virtualised cell buffer
 	SViewCellBuffer m_CellBuffer;
 

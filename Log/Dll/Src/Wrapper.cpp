@@ -302,14 +302,14 @@ BOOST_PYTHON_MODULE( Nlog )
 		.def( "GetUtcTimecode", &NViewTimecode::GetUtcTimecode, return_value_policy<manage_new_object>() ) \
 		;
 
-	class_<NLineSet, lineset_ptr_t, bases<NViewFieldAccess, NViewLineTranslation>>( "LineSet", no_init )
+	class_<NLineSet, lineset_ptr_t, bases<NViewCore, NViewFieldAccess, NViewTimecode, NViewLineTranslation>>( "LineSet", no_init )
 		;
 
 	class_<NEventView, eventview_ptr_t, bases<NViewCore, NViewFieldAccess, NViewHiliting>>( "NEventView", no_init )
 		.def( "Filter", &NEventView::Filter )
 		;
 
-	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewHiliting, NViewTimecode>>( "LogView", no_init )
+	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewTimecode, NViewHiliting>>( "LogView", no_init )
 		.def( "Filter", &NLogView::Filter )
 		.def( "GetContent", &NLogView::GetContent )
 		.def( "ToggleBookmarks", &NLogView::ToggleBookmarks )

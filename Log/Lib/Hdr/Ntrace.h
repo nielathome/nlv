@@ -68,6 +68,9 @@ enum Error : unsigned
 	e_ParseUnexpectedText,
 	e_ReportLimit,
 	e_Locale,
+	e_CreateLineSet,
+	e_CreateEventView,
+	e_CreateLogView,
 
 	e_OsError = 0x20000,
 	e_OpenFileStream,

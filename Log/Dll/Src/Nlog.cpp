@@ -405,8 +405,7 @@ bool NHiliter::Hit( nlineno_t line_no )
 NViewCore::NViewCore( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	m_Logfile{ logfile },
-	m_ViewAccessor{ view_accessor },
-	m_ViewMap{ view_accessor ? view_accessor->GetMap() : nullptr }
+	m_ViewAccessor{ view_accessor }
 {
 	if( m_Logfile &&  m_ViewAccessor )
 	{
@@ -491,23 +490,51 @@ std::string NViewFieldAccess::GetFieldText( vint_t line_no, vint_t field_no )
  * NViewLineTranslation
  -----------------------------------------------------------------------*/
 
+NViewLineTranslation::NViewLineTranslation( void )
+	: m_ViewLineTranslation{ m_ViewAccessor->GetLineTranslation() }
+{
+	if( !m_ViewLineTranslation )
+		throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
+}
+
+
 // line number translation between the view and the underlying logfile
 vint_t NViewLineTranslation::ViewLineToLogLine( vint_t view_line_no ) const
 {
-	return m_ViewMap->ViewLineToLogLine( view_line_no );
+	return m_ViewLineTranslation->ViewLineToLogLine( view_line_no );
 }
 
 
 // return the view line at or after the supplied log line; otherwise -1
 vint_t NViewLineTranslation::LogLineToViewLine( vint_t log_line_no ) const
 {
-	vint_t view_line{ m_ViewMap->LogLineToViewLine( log_line_no ) };
+	vint_t view_line{ m_ViewLineTranslation->LogLineToViewLine( log_line_no ) };
 	const vint_t new_log_line{ ViewLineToLogLine( view_line ) };
 
 	if( new_log_line < log_line_no )
 		view_line += 1;
 
 	return (view_line >= GetNumLines()) ? -1 : view_line;
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * NViewTimecode
+ -----------------------------------------------------------------------*/
+
+
+NViewTimecode::NViewTimecode( void )
+	: m_ViewTimecode{ m_ViewAccessor->GetTimecode() }
+{
+	if( !m_ViewTimecode )
+		throw std::runtime_error{ "ViewAccessor has no ViewTimecode" };
+}
+
+
+NTimecode * NViewTimecode::GetUtcTimecode( vint_t line_no )
+{
+	return new NTimecode{ m_ViewTimecode->GetUtcTimecode( line_no ) };
 }
 
 
@@ -522,27 +549,6 @@ void NViewHiliting::SetNumHiliter( unsigned num_hiliter )
 	m_Hiliters.reserve( num_hiliter );
 	for( unsigned i = 0; i < num_hiliter; ++i )
 		m_Hiliters.emplace_back( hiliter_ptr_t{ new NHiliter{ i, m_Logfile, m_ViewAccessor } } );
-}
-
-
-
-/*-----------------------------------------------------------------------
- * NViewTimecode
- -----------------------------------------------------------------------*/
-
-
-NTimecode * NViewTimecode::GetUtcTimecode( vint_t line_no )
-{
-	// as elsewhere, field 0 is an internal (hidden) field, so the public field
-	// 0 is actually field 1
-
-	NTimecode * res{ new NTimecode };
-
-	m_ViewAccessor->VisitLine( line_no, [&res] ( const LineAccessor & line ) {
-		*res = line.GetUtcTimecode();
-	} );
-
-	return res;
 }
 
 
@@ -590,8 +596,14 @@ NLogView::NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	m_LineState{ new SLineState },
 	m_LineMargin{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
 	m_LineAnnotation{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
-	m_ContractionState{ new SContractionState{ m_LineAnnotation, view_accessor } }
+	m_ContractionState{ new SContractionState{ m_LineAnnotation, view_accessor } },
+	m_ViewMap{ view_accessor->GetMap() },
+	m_ViewLineTranslation{ view_accessor->GetLineTranslation() }
 {
+	if( !m_ViewMap )
+		throw std::runtime_error{ "ViewAccessor has no ViewMap" };
+	if( !m_ViewLineTranslation )
+		throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
 }
 
 
@@ -699,7 +711,7 @@ void NLogView::SetFieldMask( uint64_t field_mask )
 void NLogView::ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line )
 {
 	for( int line_no = view_fm_line; line_no <= view_to_line; ++line_no )
-		GetAdornments()->ToggleUsermark( m_ViewMap->ViewLineToLogLine( line_no ) );
+		GetAdornments()->ToggleUsermark( m_ViewLineTranslation->ViewLineToLogLine( line_no ) );
 }
 
 
@@ -712,14 +724,14 @@ adornments_ptr_t NLogView::GetAdornments( void )
 // find the next visible view line for the source "get_next_log_line"
 vint_t NLogView::GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) )
 {
-	vint_t log_line_no{ m_ViewMap->ViewLineToLogLine( view_line_no ) };
+	vint_t log_line_no{ m_ViewLineTranslation->ViewLineToLogLine( view_line_no ) };
 	while( true )
 	{
 		log_line_no = (GetAdornments().get()->*get_next_log_line)(log_line_no, forward);
 		if( log_line_no < 0 )
 			return log_line_no;
 
-		view_line_no = m_ViewMap->LogLineToViewLine( log_line_no, true );
+		view_line_no = m_ViewLineTranslation->LogLineToViewLine( log_line_no, true );
 		if( view_line_no >= 0 )
 			return view_line_no;
 	}
@@ -740,13 +752,13 @@ vint_t NLogView::GetNextAnnotation( vint_t view_line_no, bool forward )
 
 void NLogView::SetLocalTrackerLine( vint_t line_no )
 {
-	GetAdornments()->SetLocalTrackerLine( m_ViewMap->ViewLineToLogLine( line_no ) );
+	GetAdornments()->SetLocalTrackerLine( m_ViewLineTranslation->ViewLineToLogLine( line_no ) );
 }
 
 
 vint_t NLogView::GetLocalTrackerLine( void )
 {
-	return m_ViewMap->LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
+	return m_ViewLineTranslation->LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
 }
 
 
@@ -756,7 +768,6 @@ vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
 	if( !tracker.IsInUse() )
 		return -1;
 
-	ViewTimecodeAccessor accessor{ m_ViewAccessor };
 	const NTimecode & target{ tracker.GetUtcTimecode() };
 	const ViewMap * view_map{ m_ViewMap };
 
@@ -764,7 +775,7 @@ vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
 	do
 	{
 		const vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
-		const NTimecode value{ accessor.GetUtcTimecode( idx ) };
+		const NTimecode value{ m_ViewTimecode->GetUtcTimecode( idx ) };
 		if( target < value )
 			high_idx = idx - 1;
 		else
@@ -772,7 +783,7 @@ vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
 	} while( low_idx < high_idx );
 
 
-	if( tracker.IsNearest( low_idx, view_map->m_NumLinesOrOne, accessor ) )
+	if( tracker.IsNearest( low_idx, view_map->m_NumLinesOrOne, m_ViewTimecode ) )
 		return low_idx;
 	else
 		return low_idx + 1;
@@ -784,9 +795,9 @@ vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
  * GlobalTracker
  -----------------------------------------------------------------------*/
 
-bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAccessor & accessor ) const
+bool GlobalTracker::IsNearest( int line_no, int max_line_no, const ViewTimecode * timecode_accessor ) const
 {
-	const NTimecode timecode{ accessor.GetUtcTimecode( line_no ) };
+	const NTimecode timecode{ timecode_accessor->GetUtcTimecode( line_no ) };
 	const int64_t delta{ timecode - f_UtcTimecode };
 
 	const bool tracker_at_or_before{ delta >= 0 };
@@ -803,7 +814,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAcce
 	// tracker is at, or before, this line
 	if( tracker_at_or_before )
 	{
-		const NTimecode prev_timecode{ accessor.GetUtcTimecode( line_no - 1 ) };
+		const NTimecode prev_timecode{ timecode_accessor->GetUtcTimecode( line_no - 1 ) };
 		const int64_t prev_delta{ prev_timecode - f_UtcTimecode };
 		const bool tracker_at_or_before_prev{ prev_delta >= 0 };
 
@@ -816,7 +827,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAcce
 	// tracker is after this line
 	else
 	{
-		const NTimecode next_timecode{ accessor.GetUtcTimecode( line_no + 1 ) };
+		const NTimecode next_timecode{ timecode_accessor->GetUtcTimecode( line_no + 1 ) };
 		const int64_t next_delta{ next_timecode - f_UtcTimecode };
 		const bool tracker_at_or_after_next{ next_delta <= 0 };
 
@@ -844,23 +855,6 @@ void GlobalTrackers::SetGlobalTracker( unsigned tracker_idx, const NTimecode & u
 
 
 /*-----------------------------------------------------------------------
- * ViewTimecodeAccessor
- -----------------------------------------------------------------------*/
-
-ViewTimecodeAccessor::ViewTimecodeAccessor( viewaccessor_ptr_t accessor )
-	: f_ViewAccessor{ accessor }
-{
-}
-
-
-NTimecode ViewTimecodeAccessor::GetUtcTimecode( int line_no ) const
-{
-	return f_ViewAccessor->GetMap()->GetUtcTimecode( line_no );
-}
-
-
-
-/*-----------------------------------------------------------------------
  * NLogfile
  -----------------------------------------------------------------------*/
 
@@ -880,24 +874,51 @@ Error NLogfile::Open( const std::wstring &file_path, ProgressMeter * progress )
 
 lineset_ptr_t NLogfile::CreateLineSet( boost::python::object match )
 {
-	lineset_ptr_t res{ new NLineSet{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() } };
+	try
+	{
+		lineset_ptr_t res{ new NLineSet{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() } };
 
-	if( !res->Filter( match, false ) )
-		res.reset();
+		if( !res->Filter( match, false ) )
+			res.reset();
 
-	return res;
+		return res;
+	}
+	catch( const std::exception & ex )
+	{
+		TraceError( e_CreateLineSet, "Exception: '%s'", ex.what() );
+	}
+
+	return lineset_ptr_t{};
 }
 
 
 eventview_ptr_t NLogfile::CreateEventView( void )
 {
-	return new NEventView{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
+	try
+	{
+		return new NEventView{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
+	}
+	catch( const std::exception & ex )
+	{
+		TraceError( e_CreateEventView, "Exception: '%s'", ex.what() );
+	}
+
+	return eventview_ptr_t{};
 }
 
 
 logview_ptr_t NLogfile::CreateLogView( void )
 {
-	return new NLogView{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
+	try
+	{
+		return new NLogView{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
+	}
+	catch( const std::exception & ex )
+	{
+		TraceError( e_CreateLogView, "Exception: '%s'", ex.what() );
+	}
+
+	return logview_ptr_t{};
 }
 
 

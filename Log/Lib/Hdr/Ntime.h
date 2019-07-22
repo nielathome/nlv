@@ -115,6 +115,17 @@ public:
 
 
 /*-----------------------------------------------------------------------
+ * ViewTimecode
+ -----------------------------------------------------------------------*/
+
+struct ViewTimecode
+{
+	virtual NTimecode GetUtcTimecode( int line_no ) const = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
  * GlobalTracker
  -----------------------------------------------------------------------*/
 
@@ -125,11 +136,7 @@ private:
 	NTimecode f_UtcTimecode;
 
 public:
-	struct NTimecodeAccessor
-	{
-		virtual NTimecode GetUtcTimecode( int line_no ) const = 0;
-	};
-	bool IsNearest( int line_no, int max_line_no, const NTimecodeAccessor & accessor ) const;
+	bool IsNearest( int line_no, int max_line_no, const ViewTimecode * timecode_accessor ) const;
 
 	void SetUtcTimecode( const NTimecode & timecode ) {
 		f_InUse = true;
@@ -168,26 +175,3 @@ public:
 
 	static void SetGlobalTracker( unsigned tracker_idx, const NTimecode & utc_timecode );
 };
-
-
-
-/*-----------------------------------------------------------------------
- * ViewTimecodeAccessor
- -----------------------------------------------------------------------*/
-
-//forwards
-struct ViewAccessor;
-using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
-
-class ViewTimecodeAccessor : public GlobalTracker::NTimecodeAccessor
-{
-private:
-	viewaccessor_ptr_t f_ViewAccessor;
-
-public:
-	ViewTimecodeAccessor( viewaccessor_ptr_t accessor );
-	NTimecode GetUtcTimecode( int line_no ) const override;
-};
-
-
-

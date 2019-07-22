@@ -255,6 +255,8 @@ class MapViewAccessor
 	:
 	public ViewProperties,
 	public ViewMap,
+	public ViewLineTranslation,
+	public ViewTimecode,
 	public ViewAccessor
 {
 private:
@@ -277,18 +279,17 @@ public:
 public:
 	// ViewProperties interfaces
 
+	ViewProperties * GetProperties( void ) override {
+		return this;
+	}
+
 	void SetFieldMask( uint64_t field_mask ) override;
 
 public:
 	// ViewMap interfaces
 
-	// fetch nearest preceding view line number to the supplied log line
-	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
-		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
-	}
-
-	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
-		return m_LineMap[ view_line_no ];
+	const ViewMap * GetMap( void ) override {
+		return this;
 	}
 
 	nlineno_t GetLineLength( nlineno_t line_no ) const override {
@@ -299,9 +300,33 @@ public:
 		return m_LogAccessor->GetLine( type, ViewLineToLogLine( line_no ), m_FieldViewMask );
 	}
 
+public:
+	// ViewLineTranslation interface
+
+	const ViewLineTranslation * GetLineTranslation( void ) override	{
+		return this;
+	}
+
+	// fetch nearest preceding view line number to the supplied log line
+	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
+		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
+	}
+
+	nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const override {
+		return m_LineMap[ view_line_no ];
+	}
+
+public:
+	// ViewTimecode interface
+
+	const ViewTimecode * GetTimecode( void ) {
+		return this;
+	}
+
 	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
 		return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
 	}
+
 
 public:
 	// ViewAccessor interface
@@ -312,14 +337,6 @@ public:
 
 	nlineno_t GetNumLines( void ) const override {
 		return m_IsEmpty ? 0 : m_NumLinesOrOne;
-	}
-
-	ViewProperties * GetProperties( void ) override {
-		return this;
-	}
-
-	const ViewMap * GetMap( void ) override {
-		return this;
 	}
 
 public:
@@ -596,10 +613,6 @@ public:
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
 		return m_Accessor.GetFieldValue( m_LineNo, field_id );
-	}
-
-	NTimecode GetUtcTimecode( void ) const override {
-		return m_Accessor.GetUtcTimecode( m_LineNo );
 	}
 };
 
