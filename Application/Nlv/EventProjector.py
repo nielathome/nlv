@@ -351,7 +351,6 @@ class G_CoreProjectionSchemaCollector:
 
     #-------------------------------------------------------
     def Close(self):
-#        self._ProjectionSchema[-1].SetAsLastField()
         return self._ProjectionSchema
 
 

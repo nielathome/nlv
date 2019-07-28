@@ -90,8 +90,9 @@ enum Error : unsigned
 	e_SqlDbClose,
 	e_SqlStatementOpen,
 	e_SqlStatementBind,
-	e_SqlStatementStep,
-	e_SqlStatementClose
+	e_SqlStatementReset,
+	e_SqlStatementClose,
+	e_SqlStatementStep
 };
 
 

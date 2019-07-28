@@ -42,17 +42,19 @@ private:
 
 protected:
 	friend class SqlDb;
-	Error Open( sqlite3 * db, const char * sql_text );
+	Error Open( sqlite3 * db, const char * sql_text, const char ** tail = nullptr );
 
 public:
 	~SqlStatement( void );
 
 	Error Bind( int idx, int64_t value );
 	Error Step( void );
+	Error Reset( void );
+	Error Close( void );
+
 	int GetAsInt( unsigned field_id ) const;
 	int64_t GetAsInt64( unsigned field_id ) const;
 	void GetAsText( unsigned field_id, const char ** first, const char ** last ) const;
-	Error Close( void );
 };
 
 
@@ -62,16 +64,20 @@ SqlStatement::~SqlStatement( void )
 }
 
 
-Error SqlStatement::Open( sqlite3 * db, const char * sql_text )
+Error SqlStatement::Open( sqlite3 * db, const char * sql_text, const char ** tail )
 {
-	const char * tail{ nullptr };
+	const char * local_tail{ nullptr };
+	if( tail == nullptr )
+		tail = &local_tail;
+
 	Error res{ e_OK };
-	const int sql_ret{ sqlite3_prepare_v2( db, sql_text, -1, &m_Handle, &tail ) };
+	const int sql_ret{ sqlite3_prepare_v2( db, sql_text, -1, &m_Handle, tail ) };
 
 	if( sql_ret != SQLITE_OK )
 		res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] sql_text=[%s]", sql_ret, sqlite3_errstr( sql_ret ), sql_text );
-	else if( (tail != nullptr) && (*tail != '\0') )
-		res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] tail=[%s]", sql_ret, sqlite3_errstr( sql_ret ), tail );
+	
+	if( (local_tail != nullptr) && (*local_tail != '\0') )
+		res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] tail=[%s]", sql_ret, sqlite3_errstr( sql_ret ), *tail );
 
 	return res;
 }
@@ -107,22 +113,15 @@ Error SqlStatement::Step( void )
 }
 
 
-int SqlStatement::GetAsInt( unsigned field_id ) const
+Error SqlStatement::Reset( void )
 {
-	return sqlite3_column_int( m_Handle, field_id );
-}
+	Error res{ e_OK };
+	const int sql_ret{ sqlite3_reset( m_Handle ) };
 
+	if( sql_ret != SQLITE_OK )
+		res = TraceError( e_SqlStatementReset, "sql_res=[%d/%s]", sql_ret, sqlite3_errstr( sql_ret ) );
 
-int64_t SqlStatement::GetAsInt64( unsigned field_id ) const
-{
-	return sqlite3_column_int64( m_Handle, field_id );
-}
-
-
-void SqlStatement::GetAsText( unsigned field_id, const char ** first, const char ** last ) const
-{
-	*first = reinterpret_cast<const char *>(sqlite3_column_text( m_Handle, field_id ));
-	*last = *first + sqlite3_column_bytes( m_Handle, field_id );
+	return res;
 }
 
 
@@ -143,6 +142,25 @@ Error SqlStatement::Close( void )
 }
 
 
+int SqlStatement::GetAsInt( unsigned field_id ) const
+{
+	return sqlite3_column_int( m_Handle, field_id );
+}
+
+
+int64_t SqlStatement::GetAsInt64( unsigned field_id ) const
+{
+	return sqlite3_column_int64( m_Handle, field_id );
+}
+
+
+void SqlStatement::GetAsText( unsigned field_id, const char ** first, const char ** last ) const
+{
+	*first = reinterpret_cast<const char *>(sqlite3_column_text( m_Handle, field_id ));
+	*last = *first + sqlite3_column_bytes( m_Handle, field_id );
+}
+
+
 
 /*-----------------------------------------------------------------------
  * SqlDb
@@ -160,6 +178,7 @@ public:
 	Error Close( void );
 
 	Error MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const;
+	Error ExecuteStatements( const char * sql_text ) const;
 };
 
 
@@ -209,6 +228,22 @@ Error SqlDb::MakeStatement( const char * sql_text, bool step, statement_ptr_t & 
 
 	return res;
 }
+
+Error SqlDb::ExecuteStatements( const char * sql_text ) const
+{
+	Error res{ e_Success };
+	const char * tail{ sql_text };
+	while( tail && *tail != '\0' && Ok( res ) )
+	{
+		statement_ptr_t statement{ std::make_shared<SqlStatement>() };
+		res = statement->Open( m_Handle, tail, &tail );
+		if( Ok( res ) )
+			UpdateError( res, statement->Step() );
+	}
+
+	return res;
+}
+
 
 
 
@@ -288,6 +323,10 @@ public:
 		return m_DB.MakeStatement( sql_text, step, statement );
 	}
 
+	Error ExecuteStatements( const char * sql_text ) const {
+		return m_DB.ExecuteStatements( sql_text );
+	}
+
 	nlineno_t GetNumLines( void ) const {
 		return m_NumLines;
 	}
@@ -324,6 +363,8 @@ private:
 	// list of fields (columns) to display/search
 	uint64_t m_FieldViewMask{ 0 };
 
+	nlineno_t m_NumLines{ 0 };
+
 protected:
 	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider );
 
@@ -344,8 +385,11 @@ public:
 public:
 	// ViewAccessor interfaces
 
+	nlineno_t GetNumLines( void ) const override {
+		return m_NumLines;
+	}
+
 	void VisitLine( Task & task, nlineno_t visit_line_no ) const override;
-	nlineno_t GetNumLines( void ) const override;
 	void Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool ) override;
 	std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider ) override;
 
@@ -521,11 +565,24 @@ public:
 
 void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
+//	Error res{ m_LogAccessor->MakeStatement( "SELECT * FROM projection WHERE rowid = ?1", false, statement ) };
+
 	statement_ptr_t statement;
-	Error res{ m_LogAccessor->MakeStatement( "SELECT * FROM projection WHERE rowid = ?1", false, statement ) };
+	Error res{ m_LogAccessor->MakeStatement( R"__(
+		SELECT
+			*
+		FROM
+			projection
+			JOIN
+				filter
+			ON
+				projection.rowid = filter.log_row_no
+		LIMIT 1 OFFSET ?1
+		)__", false, statement
+	) };
 
 	if( Ok( res ) )
-		UpdateError( res, statement->Bind( 1, visit_line_no + 1 ) );
+		UpdateError( res, statement->Bind( 1, visit_line_no ) );
 
 	if( Ok( res ) )
 		UpdateError( res, statement->Step() );
@@ -535,13 +592,6 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 		SqlLineAccessor line{ m_LogAccessor, m_FieldViewMask, statement };
 		task.Action( line );
 	}
-}
-
-
-nlineno_t SqlViewAccessor::GetNumLines( void ) const
-{
-// NIEL ignores filter
-	return m_LogAccessor->GetNumLines();
 }
 
 
@@ -569,7 +619,7 @@ std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, n
 
 void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool )
 {
-	PerfTimer timer;
+	PerfTimer filter_timer;
 
 	const nlineno_t num_log_lines{ m_LogAccessor->GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
@@ -579,13 +629,38 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 		adornments_provider
 	) };
 
-//	write results to the filter table
+	m_NumLines = nlineno_cast(map.size());
+
+	TraceDebug( "filter_time:%.2fs per_line:%.3fus", filter_timer.Overall(), filter_timer.PerItem( num_log_lines ) );
+
+	PerfTimer sql_timer;
+
+	Error res{ m_LogAccessor->ExecuteStatements( "BEGIN TRANSACTION; DELETE FROM filter" ) };
+	if( !Ok( res ) )
+		return;
+
+	statement_ptr_t statement;
+	res = m_LogAccessor->MakeStatement( "INSERT INTO filter VALUES(?1)", false, statement );
+
+	for( nlineno_t line_no : map )
+	{
+		if( Ok( res ) )
+			UpdateError( res, statement->Bind( 1, line_no + 1 ) );
+
+		if( Ok( res ) )
+			UpdateError( res, statement->Step() );
+
+		if( Ok( res ) )
+			UpdateError( res, statement->Reset() );
+	}
+
+	m_LogAccessor->ExecuteStatements( Ok( res ) ? "COMMIT TRANSACTION" : "ROLLBACK TRANSACTION" );
+
+	TraceDebug( "sql_time:%.2fs per_line:%.3fus", sql_timer.Overall(), sql_timer.PerItem( map.size() ) );
 
 	// record the change
 	m_Tracker.RecordEvent();
 
-	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( num_log_lines ) );
 }
 
 
