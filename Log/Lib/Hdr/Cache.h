@@ -147,4 +147,9 @@ public:
 			return std::make_pair( false, & CreateEntry( key ).m_UserItem );
 		}
 	}
+
+	void Clear( void )
+	{
+		m_Map.clear();
+	}
 };

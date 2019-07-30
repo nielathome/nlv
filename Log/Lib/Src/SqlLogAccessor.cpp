@@ -601,6 +601,11 @@ private:
 protected:
 	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider );
 
+	void RecordEvent( void ) {
+		m_LineCache.Clear();
+		m_Tracker.RecordEvent();
+	}
+
 public:
 	SqlViewAccessor( SqlLogAccessor * accessor )
 		: m_LogAccessor{ accessor }
@@ -611,7 +616,7 @@ public:
 
 	void SetFieldMask( uint64_t field_mask ) override {
 		// record the change
-		m_Tracker.RecordEvent();
+		RecordEvent();
 		m_FieldViewMask = field_mask;
 	}
 
@@ -647,7 +652,7 @@ nlineno_t SqlLineAccessorCore::GetLength( void ) const
 
 void SqlLineAccessorCore::GetText( const char ** first, const char ** last ) const
 {
-	if( !m_LineBuffer.Empty() )
+	if( m_LineBuffer.Empty() )
 	{
 		uint64_t bit{ 0x1 };
 		for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, bit <<= 1 )
@@ -656,6 +661,7 @@ void SqlLineAccessorCore::GetText( const char ** first, const char ** last ) con
 				const char * f{ nullptr }; const char * l{ nullptr };
 				GetFieldText( field_id, &f, &l );
 				m_LineBuffer.Append( f, l );
+				m_LineBuffer.Append( '|' );
 			}
 	}
 
@@ -895,20 +901,26 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 	TraceDebug( "sql_time:%.2fs per_line:%.3fus", sql_timer.Overall(), sql_timer.PerItem( map.size() ) );
 
 	// record the change
-	m_Tracker.RecordEvent();
-
+	RecordEvent();
 }
 
 
 std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider )
 {
-// NIEL ignores filter
-
 	PerfTimer timer;
 
 	const nlineno_t num_view_lines{ GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
-		"SELECT * FROM projection",
+		R"__(
+			SELECT
+				*
+			FROM
+				projection
+				JOIN
+					filter
+				ON
+					projection.rowid = filter.log_row_no
+		)__",
 		num_view_lines,
 		selector,
 		adornments_provider
