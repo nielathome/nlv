@@ -51,7 +51,7 @@ def GetListIndex(list, name):
     for sublist in list:
         if sublist[0] == name:
             return idx
-        idx = idx + 1
+        idx += 1
 
     return 0
             

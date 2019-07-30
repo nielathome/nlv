@@ -84,6 +84,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\Deps\sqlite3.h" />
     <ClInclude Include="Hdr\Cache.h" />
+    <ClInclude Include="Hdr\Field.h" />
     <ClInclude Include="Hdr\FileMap.h" />
     <ClInclude Include="Hdr\LogAccessor.h" />
     <ClInclude Include="Hdr\Nfilesystem.h" />
@@ -93,6 +94,7 @@
     <ClInclude Include="Hdr\Ntime.h" />
     <ClInclude Include="Hdr\Ntrace.h" />
     <ClInclude Include="Hdr\Parser.h" />
+    <ClInclude Include="Src\FieldAccessor.h" />
     <ClInclude Include="Src\MapLogIndexAccessor.h" />
     <ClInclude Include="Src\MapLogIndexWriter.h" />
     <ClInclude Include="Src\StdAfx.h" />

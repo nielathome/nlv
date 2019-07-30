@@ -35,7 +35,7 @@ class FieldWriterTextOffsetsBase;
 struct WriteContext;
 
 // create a mapped index for a logfile, suitable for later access via LogIndexAccessor
-class LogIndexWriter : public LogIndexBase<FieldWriter>
+class LogIndexWriter : public FieldStore<FieldWriter>
 {
 private:
 	// logfile

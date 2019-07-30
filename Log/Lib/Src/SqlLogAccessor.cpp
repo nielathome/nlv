@@ -17,6 +17,8 @@
 #include "StdAfx.h"
 
 // Application includes
+#include "Cache.h"
+#include "FieldAccessor.h"
 #include "LogAccessor.h"
 #include "Nmisc.h"
 
@@ -54,6 +56,7 @@ public:
 
 	int GetAsInt( unsigned field_id ) const;
 	int64_t GetAsInt64( unsigned field_id ) const;
+	double GetAsReal( unsigned field_id ) const;
 	void GetAsText( unsigned field_id, const char ** first, const char ** last ) const;
 };
 
@@ -154,6 +157,12 @@ int64_t SqlStatement::GetAsInt64( unsigned field_id ) const
 }
 
 
+double SqlStatement::GetAsReal( unsigned field_id ) const
+{
+	return sqlite3_column_double( m_Handle, field_id );
+}
+
+
 void SqlStatement::GetAsText( unsigned field_id, const char ** first, const char ** last ) const
 {
 	*first = reinterpret_cast<const char *>(sqlite3_column_text( m_Handle, field_id ));
@@ -246,6 +255,224 @@ Error SqlDb::ExecuteStatements( const char * sql_text ) const
 
 
 
+/*-----------------------------------------------------------------------
+ * SqlLineAccessorCore
+ -----------------------------------------------------------------------*/
+
+class SqlLineAccessorCore : public LineAccessor
+{
+protected:
+	unsigned m_NumFields;
+	uint64_t m_FieldViewMask{ 0 };
+	nlineno_t m_LineNo{ 0 };
+
+	// transient store for line information
+	mutable LineBuffer m_LineBuffer;
+
+public:
+	SqlLineAccessorCore( unsigned num_fields = 0, uint64_t field_mask = 0 )
+		: m_NumFields{ num_fields }, m_FieldViewMask{ field_mask } {}
+
+public:
+	// LineAccessor interfaces
+
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
+	}
+
+	nlineno_t GetLength( void ) const override;
+	void GetText( const char ** first, const char ** last ) const override;
+
+	// irregular/continuation lines not supported
+	bool IsRegular( void ) const override {
+		return true;
+	}
+	nlineno_t NextIrregularLineLength( void ) const override {
+		return -1;
+	}
+
+	void GetNonFieldText( const char ** first, const char ** last ) const override {
+		static const char dummy{ '\0' };
+		*first = *last = &dummy;
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlLogLineAccessor, declarations
+ -----------------------------------------------------------------------*/
+
+class SqlLogAccessor;
+
+class SqlLogLineAccessor : public SqlLineAccessorCore
+{
+protected:
+	const NTimecodeBase m_TimecodeBase;
+	statement_ptr_t m_Statement;
+
+public:
+	SqlLogLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement );
+
+	void IncLineNo( void ) {
+		m_LineBuffer.Clear();
+		++m_LineNo;
+	}
+
+public:
+	// LineAccessor interfaces
+
+	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
+		m_Statement->GetAsText( field_id, first, last );
+	}
+
+	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
+		return m_Statement->GetAsInt64( field_id );
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * FieldAccessor
+ -----------------------------------------------------------------------*/
+
+ // forwards
+class FieldAccessor;
+
+using fieldaccessor_maker_t = FieldTraits<FieldAccessor>::field_ptr_t (*) (const FieldDescriptor & field_desc, unsigned field_id);
+
+class FieldAccessor : public FieldFactory<FieldAccessor, fieldaccessor_maker_t>
+{
+protected:
+	std::string m_Text;
+	fieldvalue_t m_Value;
+
+public:
+	FieldAccessor( unsigned field_id )
+		: c_FieldId { field_id } {}
+
+	// effectively, the index of this field within the parent index
+	const unsigned c_FieldId;
+
+	virtual void Update( statement_ptr_t statement ) = 0;
+
+	// fetch the field's current (text) value
+	void GetAsText( const char ** first, const char ** last ) const {
+		*first = m_Text.data();
+		*last = *first + m_Text.size();
+	}
+
+	// fetch the field's current (binary) value
+	fieldvalue_t GetValue( void ) const {
+		return m_Value;
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * FieldAccessorText
+ -----------------------------------------------------------------------*/
+
+class FieldAccessorText : public FieldAccessor
+{
+public:
+	FieldAccessorText( const FieldDescriptor &, unsigned field_id )
+		: FieldAccessor{ field_id } {}
+
+	void Update( statement_ptr_t statement ) {
+		const char * first{ nullptr }; const char * last{ nullptr };
+		statement->GetAsText( c_FieldId, &first, &last );
+		m_Text.assign( first, last );
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * FieldAccessorInt
+ -----------------------------------------------------------------------*/
+
+class FieldAccessorInt : public FieldAccessorText
+{
+public:
+	FieldAccessorInt( const FieldDescriptor & field_desc, unsigned field_id )
+		: FieldAccessorText{ field_desc, field_id } {}
+
+	void Update( statement_ptr_t statement ) {
+		m_Value = statement->GetAsInt64( c_FieldId );
+		FieldAccessorText::Update( statement );
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * FieldAccessorReal
+ -----------------------------------------------------------------------*/
+
+class FieldAccessorReal : public FieldAccessorText
+{
+public:
+	FieldAccessorReal( const FieldDescriptor & field_desc, unsigned field_id )
+		: FieldAccessorText{ field_desc, field_id } {}
+
+	void Update( statement_ptr_t statement ) {
+		m_Value = statement->GetAsReal( c_FieldId );
+		FieldAccessorText::Update( statement );
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * FieldAccessor Factory
+ -----------------------------------------------------------------------*/
+
+FieldAccessor::factory_t::map_t FieldAccessor::factory_t::m_Map
+{
+	{ c_Type_Bool, &MakeField<FieldAccessorInt> },
+	{ c_Type_Uint08, &MakeField<FieldAccessorInt> },
+	{ c_Type_Uint16, &MakeField<FieldAccessorInt> },
+	{ c_Type_Uint32, &MakeField<FieldAccessorInt> },
+	{ c_Type_Uint64, &MakeField<FieldAccessorInt> },
+	{ c_Type_Int08, &MakeField<FieldAccessorInt> },
+	{ c_Type_Int16, &MakeField<FieldAccessorInt> },
+	{ c_Type_Int32, &MakeField<FieldAccessorInt> },
+	{ c_Type_Int64, &MakeField<FieldAccessorInt> },
+	{ c_Type_Float32, &MakeField<FieldAccessorReal> },
+	{ c_Type_Float64, &MakeField<FieldAccessorReal> },
+	{ c_Type_Text, &MakeField<FieldAccessorText> }
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlViewLineAccessor, declarations
+ -----------------------------------------------------------------------*/
+
+class SqlViewLineAccessor
+	:
+	public SqlLineAccessorCore,
+	public FieldStore<FieldAccessor>
+{
+public:
+	void Update( const fielddescriptor_list_t & field_descs, uint64_t field_mask, statement_ptr_t statement );
+
+public:
+	// LineAccessor interfaces
+
+	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
+		m_Fields[field_id]->GetAsText( first, last );
+	}
+
+	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
+		return m_Fields[ field_id ]->GetValue();
+	}
+};
+
+
 
 /*-----------------------------------------------------------------------
  * SqlLogAccessor, declarations
@@ -313,8 +540,11 @@ public:
 public:
 	SqlLogAccessor( LogAccessorDescriptor & descriptor );
 
-	static logaccessor_ptr_t MakeSqlLogAccessor( LogAccessorDescriptor & descriptor )
-	{
+	const fielddescriptor_list_t & GetFieldDescriptors( void ) const {
+		return m_FieldDescriptors;
+	}
+
+	static logaccessor_ptr_t MakeSqlLogAccessor( LogAccessorDescriptor & descriptor ) {
 		return std::make_unique<SqlLogAccessor>( descriptor );
 	}
 
@@ -349,8 +579,6 @@ static OnEvent RegisterMapLogAccessor
  * SqlViewAccessor, declarations
  -----------------------------------------------------------------------*/
 
-class SqlLogAccessor;
-
 class SqlViewAccessor
 	:
 	public ViewProperties,
@@ -364,6 +592,11 @@ private:
 	uint64_t m_FieldViewMask{ 0 };
 
 	nlineno_t m_NumLines{ 0 };
+
+	// Line caching
+	using LineCache = Cache<SqlViewLineAccessor, LineKey>;
+	static CacheStatistics m_LineCacheStats;
+	mutable LineCache m_LineCache{ 128, m_LineCacheStats };
 
 protected:
 	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider );
@@ -397,6 +630,74 @@ public:
 		return this;
 	}
 };
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlLineAccessorCore, definitions
+ -----------------------------------------------------------------------*/
+
+nlineno_t SqlLineAccessorCore::GetLength( void ) const
+{
+	const char * first{ nullptr }; const char * last{ nullptr };
+	GetText( &first, &last );
+	return nlineno_cast( last - first + 1 );
+}
+
+
+void SqlLineAccessorCore::GetText( const char ** first, const char ** last ) const
+{
+	if( !m_LineBuffer.Empty() )
+	{
+		uint64_t bit{ 0x1 };
+		for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, bit <<= 1 )
+			if( m_FieldViewMask & bit )
+			{
+				const char * f{ nullptr }; const char * l{ nullptr };
+				GetFieldText( field_id, &f, &l );
+				m_LineBuffer.Append( f, l );
+			}
+	}
+
+	*first = m_LineBuffer.First();
+	*last = m_LineBuffer.Last();
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlLogLineAccessor, definitions
+ -----------------------------------------------------------------------*/
+
+SqlLogLineAccessor::SqlLogLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
+	:
+	SqlLineAccessorCore{ static_cast<unsigned>(log_accessor->GetNumFields()), field_mask },
+	m_TimecodeBase{ log_accessor->GetTimecodeBase() },
+	m_Statement{ statement }
+{
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlViewLineAccessor, definitions
+ -----------------------------------------------------------------------*/
+
+void SqlViewLineAccessor::Update( const fielddescriptor_list_t & field_descs, uint64_t field_mask, statement_ptr_t statement )
+{
+	SetupFields( field_descs,
+		[] ( const FieldDescriptor & field_desc, unsigned field_id ) -> field_ptr_t {
+			return field_t::CreateField( field_desc, field_id );
+		}
+	);
+
+	m_LineBuffer.Clear();
+	m_NumFields = static_cast<unsigned>(GetNumFields());
+	m_FieldViewMask = field_mask;
+
+	for( field_ptr_t field : m_Fields )
+		field->Update( statement );
+}
 
 
 
@@ -466,7 +767,7 @@ void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64
 	if( !Ok( res ) )
 		return;
 
-	SqlLineAccessor line{ this, field_mask, statement };
+	SqlLogLineAccessor line{ this, field_mask, statement };
 	while( statement->Step() == Error::e_SqlRow )
 	{
 		func( line );
@@ -477,121 +778,56 @@ void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64
 
 
 /*-----------------------------------------------------------------------
- * SqlLineAccessor
- -----------------------------------------------------------------------*/
-
-//template<typename T_ACCESSOR>
-class SqlLineAccessor : public LineAccessor
-{
-protected:
-	const unsigned m_NumFields;
-	const NTimecodeBase m_TimecodeBase;
-	const uint64_t m_FieldViewMask;
-	statement_ptr_t m_Statement;
-	nlineno_t m_LineNo{ 0 };
-
-	// transient store for line information
-	mutable LineBuffer m_LineBuffer;
-
-public:
-	SqlLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
-		:
-		m_NumFields{ static_cast<unsigned>(log_accessor->GetNumFields()) },
-		m_TimecodeBase{ log_accessor->GetTimecodeBase() },
-		m_FieldViewMask{ field_mask },
-		m_Statement{ statement }
-	{}
-
-	void IncLineNo( void ) {
-		m_LineBuffer.Clear();
-		++m_LineNo;
-	}
-
-public:
-	// LineAccessor interfaces
-
-	nlineno_t GetLineNo( void ) const override {
-		return m_LineNo;
-	}
-
-	nlineno_t GetLength( void ) const override {
-		const char * first{ nullptr }; const char * last{ nullptr };
-		GetText( &first, &last );
-		return nlineno_cast( last - first + 1 );
-	}
-
-	void GetText( const char ** first, const char ** last ) const override {
-		uint64_t bit{ 0x1 };
-		for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, bit <<= 1 )
-			if( m_FieldViewMask & bit )
-			{
-				const char * f{ nullptr }; const char * l{ nullptr };
-				GetFieldText( field_id + 1, &f, &l );
-// NIEL can we fix magix +- 1
-				m_LineBuffer.Append( f, l );
-			}
-
-		*first = m_LineBuffer.First();
-		*last = m_LineBuffer.Last();
-	}
-
-	// irregular/continuation lines not supported
-	bool IsRegular( void ) const override {
-		return true;
-	}
-	nlineno_t NextIrregularLineLength( void ) const override {
-		return -1;
-	}
-
-	void GetNonFieldText( const char ** first, const char ** last ) const override {
-		static const char dummy{ '\0' };
-		*first = *last = &dummy;
-	}
-
-	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
-		m_Statement->GetAsText( field_id - 1, first, last );
-	}
-
-	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
-		return m_Statement->GetAsInt64( field_id - 1 );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
  * SqlViewAccessor, definitions
  -----------------------------------------------------------------------*/
 
+CacheStatistics SqlViewAccessor::m_LineCacheStats{ "SqlLineCache" };
+
+
 void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
-//	Error res{ m_LogAccessor->MakeStatement( "SELECT * FROM projection WHERE rowid = ?1", false, statement ) };
+	LineCache::find_t found{ m_LineCache.Find( { visit_line_no, m_FieldViewMask } ) };
+	SqlViewLineAccessor * line{ found.second };
 
-	statement_ptr_t statement;
-	Error res{ m_LogAccessor->MakeStatement( R"__(
-		SELECT
-			*
-		FROM
-			projection
-			JOIN
-				filter
-			ON
-				projection.rowid = filter.log_row_no
-		LIMIT 1 OFFSET ?1
-		)__", false, statement
-	) };
-
-	if( Ok( res ) )
-		UpdateError( res, statement->Bind( 1, visit_line_no ) );
-
-	if( Ok( res ) )
-		UpdateError( res, statement->Step() );
-
-	if( Ok( res ) )
+	if( !found.first )
 	{
-		SqlLineAccessor line{ m_LogAccessor, m_FieldViewMask, statement };
-		task.Action( line );
+		statement_ptr_t statement;
+		Error res{ m_LogAccessor->MakeStatement( R"__(
+			SELECT
+				*
+			FROM
+				projection
+				JOIN
+					filter
+				ON
+					projection.rowid = filter.log_row_no
+			LIMIT 16 OFFSET ?1
+			)__", false, statement
+		) };
+
+		if( Ok( res ) )
+			UpdateError( res, statement->Bind( 1, visit_line_no ) );
+
+		for( int i = 0; i < 16 && Ok( res ); ++i )
+		{
+			res = statement->Step();
+
+			SqlViewLineAccessor * update;
+			if( i == 0 )
+				update = line;
+			else
+			{
+				LineCache::find_t f{ m_LineCache.Find( { visit_line_no + i, m_FieldViewMask } ) };
+				update = f.first ? nullptr : f.second;
+			}
+
+			if( update && Ok( res ) )
+				update->Update( m_LogAccessor->GetFieldDescriptors(), m_FieldViewMask, statement );
+
+		}
 	}
+
+	task.Action( *line );
 }
 
 

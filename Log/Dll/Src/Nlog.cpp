@@ -441,13 +441,11 @@ bool NViewCore::Filter( boost::python::object match, bool add_irregular )
 
 fieldvalue_t NViewFieldAccess::GetFieldValue( vint_t line_no, vint_t field_no )
 {
-	// as elsewhere, field 0 is an internal (hidden) field, so the public field
-	// 0 is actually field 1
-
 	fieldvalue_t res;
+	field_no += m_FieldNoOffset;
 
 	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
-		res = line.GetFieldValue( field_no + 1 );
+		res = line.GetFieldValue( field_no );
 	} );
 
 	return res;
@@ -470,14 +468,12 @@ std::string NViewFieldAccess::GetNonFieldText( vint_t line_no )
 
 std::string NViewFieldAccess::GetFieldText( vint_t line_no, vint_t field_no )
 {
-	// as elsewhere, field 0 is an internal (hidden) field, so the public field
-	// 0 is actually field 1
-
 	std::string res;
+	field_no += m_FieldNoOffset;
 
 	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		const char * first; const char * last;
-		line.GetFieldText( field_no + 1, &first, &last );
+		line.GetFieldText( field_no, &first, &last );
 		res.assign( first, last );
 	} );
 
@@ -587,9 +583,12 @@ bool NEventView::Filter( boost::python::object match )
  * NLogView
  -----------------------------------------------------------------------*/
 
+ // Note: field 0 is an internal (hidden) field, so the public field
+ // 0 is actually field 1
 NLogView::NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	NViewCore{ logfile, view_accessor },
+	NViewFieldAccess{ 1 },
 	m_CellBuffer{ view_accessor },
 	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), view_accessor } },
 	m_LineLevel{ new SLineLevels },

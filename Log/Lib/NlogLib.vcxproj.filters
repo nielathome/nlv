@@ -62,6 +62,12 @@
     <ClInclude Include="Hdr\Cache.h">
       <Filter>Header Files\Public</Filter>
     </ClInclude>
+    <ClInclude Include="Src\FieldAccessor.h">
+      <Filter>Header Files\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Hdr\Field.h">
+      <Filter>Header Files\Public</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Src\Parser.cpp">

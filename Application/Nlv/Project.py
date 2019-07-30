@@ -1490,7 +1490,7 @@ class G_TabContainerNode(G_ContainerNode, G_DeletableTreeNode):
                     art_id = node.GetArtID()
                     bitmap =  wx.ArtProvider.GetBitmap(art_id, wx.ART_TOOLBAR, self._ButtonSize)
                     gui.AddTool(id, node.GetNodeName(), bitmap, kind = wx.ITEM_RADIO)
-                    id = id + 1
+                    id += 1
 
             gui.Realize()
             gui.Bind(wx.EVT_TOOL_RANGE, self.OnSubpageSelect, id = 0, id2 = id - 1)
@@ -1636,7 +1636,7 @@ class G_Item:
             if child is _Item2Node(item):
                 return idx
             else:
-                idx = idx + 1
+                idx += 1
 
         return None
 

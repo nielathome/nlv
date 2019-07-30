@@ -127,7 +127,8 @@ public:
 	Cache( size_t limit, CacheStatistics & stats )
 		: m_Limit{ limit }, m_Stats{ stats } {}
 
-	std::pair<bool, item_t*> Find( const key_t & key )
+	using find_t = std::pair<bool, item_t*>;
+	find_t Find( const key_t & key )
 	{
 		m_Stats.Lookup();
 

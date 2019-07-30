@@ -104,19 +104,6 @@ private:
 	const std::string m_RegexText;
 
 	// Line/style caching
-	struct LineKey
-	{
-		nlineno_t f_LineNo;
-		uint64_t f_FieldMask;
-
-		bool operator < ( const LineKey & rhs ) const {
-			if( f_LineNo != rhs.f_LineNo )
-				return f_LineNo < rhs.f_LineNo;
-			else
-				return f_FieldMask < rhs.f_FieldMask;
-		}
-	};
-
 	using LineCache = Cache<LineBuffer, LineKey>;
 	static CacheStatistics m_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
 	mutable LineCache m_LineCache[ static_cast<int>(e_LineData::_Count) ]
@@ -510,7 +497,7 @@ void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t fiel
 const LineBuffer & MapLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
 {
 	LineCache & line_cache{ m_LineCache[ static_cast<int>(type) ] };
-	std::pair<bool, LineBuffer*> found{ line_cache.Find( { line_no, field_mask } ) };
+	LineCache::find_t found{ line_cache.Find( { line_no, field_mask } ) };
 
 	LineBuffer * line{ found.second };
 	if( !found.first )
