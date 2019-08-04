@@ -245,11 +245,21 @@ class G_ProjectionFieldSchema:
         # management data
         self.IsFirst = False
         self.ColumnColour = None
+        self.SortDirection = 0
+        self.SortColumn = None
 
 
     #-------------------------------------------------------
     def Display(self):
         return self.Available and self.Visible
+
+    def ToggleSortDirection(self):
+        if self.SortDirection == 0:
+            self.SortDirection = 1
+        else:
+            self.SortDirection *= -1
+
+        return (self.SortColumn, self.SortDirection)
 
 
     #-------------------------------------------------------
@@ -323,10 +333,12 @@ class G_ProjectionSchema(G_FieldSchemata):
     def AddStart(self, name, width, align, formatter):
         self.ColStart = self.MakeFieldSchema(name, "text", width, align, formatter)
         self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "uint64")
+        self[self.ColStart].SortColumn = self.ColStartOffset
 
     def AddFinish(self, name, width, align, formatter):
         self.ColFinish = self.MakeFieldSchema(name, "text", width, align, formatter)
         self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "uint64")
+        self[self.ColFinish].SortColumn = self.ColFinishOffset
 
     def AddDuration(self, scale, name, width, align, formatter):
         self.ColDuration = self.MakeFieldSchema(name, "int64", width, align, formatter)
@@ -912,21 +924,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
 
     def Compare(self, item_l, item_r, col_num, ascending):
-        def cmp(l, r):
-            if l < r:
-                return -1
-            elif l > r:
-               return 1
-            else:
-                return 0
-
-        l = self.GetFieldValue(self.ItemToKey(item_l), col_num)
-        r = self.GetFieldValue(self.ItemToKey(item_r), col_num)
-
-        if ascending:
-            return cmp(l, r)
-        else:
-            return cmp(r, l)
+        raise RuntimeError
 
 
     #-------------------------------------------------------
@@ -1032,6 +1030,21 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
 
     #-------------------------------------------------------
+    def UpdateSort(self, col_num_in):
+        (col_num, direction) = self._TableSchema[col_num_in].ToggleSortDirection()
+        if col_num is None:
+            col_num = col_num_in
+
+        if self._N_EventView is not None:
+            self._N_EventView.Sort(col_num, direction)
+            self.Cleared()
+            return True
+        else:
+            return False
+        
+
+
+    #-------------------------------------------------------
     def CalcLineSetFieldMask(self, in_mask):
         # need to "unpack" the UI/raw mask to allow for hidden fields
         # in the schema; the result returned and also applied to the
@@ -1132,6 +1145,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
         )
 
         self.AssociateModel(G_TableDataModel(permit_nesting))
+        self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
     #-------------------------------------------------------
@@ -1187,6 +1201,16 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
     def SetFieldMask(self, field_mask):
         self.GetModel().SetFieldMask(field_mask)
         self.UpdateColumns()
+
+
+    #-------------------------------------------------------
+    def OnColClick(self, evt):
+        col_pos = evt.GetColumn()
+        column = self.GetColumn(col_pos)
+        if column is not None:
+            col_num = column.GetModelColumn()
+            if self.GetModel().UpdateSort(col_num):
+                self.Refresh()        
 
 
 

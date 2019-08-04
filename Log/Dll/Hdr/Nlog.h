@@ -549,6 +549,9 @@ public:
 
 	// Select the lines to display in the lineset
 	bool Filter( boost::python::object match );
+
+	// determine how the event view is sorted
+	void Sort( unsigned col_num, int direction );
 };
 
 

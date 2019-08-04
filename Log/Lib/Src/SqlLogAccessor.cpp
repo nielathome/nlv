@@ -25,6 +25,9 @@
 // C includes
 #include "Deps/sqlite3.h"
 
+// C++ includes
+#include <sstream>
+
 // force link this module
 void force_link_sqlaccessor_module() {}
 
@@ -49,7 +52,7 @@ protected:
 public:
 	~SqlStatement( void );
 
-	Error Bind( int idx, int64_t value );
+	Error Bind( int idx, int value );
 	Error Step( void );
 	Error Reset( void );
 	Error Close( void );
@@ -86,10 +89,10 @@ Error SqlStatement::Open( sqlite3 * db, const char * sql_text, const char ** tai
 }
 
 
-Error SqlStatement::Bind( int idx, int64_t value )
+Error SqlStatement::Bind( int idx, int value )
 {
 	Error res{ e_OK };
-	const int sql_ret{ sqlite3_bind_int64( m_Handle, idx, value ) };
+	const int sql_ret{ sqlite3_bind_int( m_Handle, idx, value ) };
 
 	if( sql_ret != SQLITE_OK )
 		res = TraceError( e_SqlStatementBind, "sql_res=[%d/%s]", sql_ret, sqlite3_errstr( sql_ret ) );
@@ -582,7 +585,8 @@ static OnEvent RegisterMapLogAccessor
 class SqlViewAccessor
 	:
 	public ViewProperties,
-	public ViewAccessor
+	public ViewAccessor,
+	public SortControl
 {
 private:
 	// our substrate
@@ -598,8 +602,13 @@ private:
 	static CacheStatistics m_LineCacheStats;
 	mutable LineCache m_LineCache{ 128, m_LineCacheStats };
 
+	// Sorting
+	unsigned m_SortColumn{ 1 };
+	int m_SortDirection{ 1 };
+
 protected:
 	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider );
+	std::string MakeViewSql( bool with_limit = false ) const;
 
 	void RecordEvent( void ) {
 		m_LineCache.Clear();
@@ -608,7 +617,9 @@ protected:
 
 public:
 	SqlViewAccessor( SqlLogAccessor * accessor )
-		: m_LogAccessor{ accessor }
+		:
+		m_LogAccessor{ accessor },
+		m_SortColumn{ accessor->GetTimecodeBase().GetFieldId() }
 	{}
 
 public:
@@ -632,6 +643,22 @@ public:
 	std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider ) override;
 
 	ViewProperties * GetProperties( void ) override {
+		return this;
+	}
+
+public:
+	// SortControl interfaces
+
+	void SetSort( unsigned col_num, int direction ) override {
+		// record the change
+		RecordEvent();
+
+		m_SortColumn = col_num;
+		m_SortDirection = direction;
+		m_LineCache.Clear();
+	}
+
+	SortControl * GetSortControl( void ) override {
 		return this;
 	}
 };
@@ -789,6 +816,31 @@ void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64
 
 CacheStatistics SqlViewAccessor::m_LineCacheStats{ "SqlLineCache" };
 
+std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
+{
+	std::ostringstream strm;
+
+	// note SQL column numbers start counting at 1
+
+	strm << R"__(
+			SELECT
+				*
+			FROM
+				projection
+				JOIN
+					filter
+				ON
+					projection.rowid = filter.log_row_no
+			ORDER BY )__" << m_SortColumn + 1 << " " << (m_SortDirection > 0 ? "ASC" : "DESC");
+
+	if( with_limit )
+		strm << R"__(
+			LIMIT 16 OFFSET ?1
+		)__";
+
+	return strm.str();
+}
+
 
 void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
@@ -798,18 +850,7 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 	if( !found.first )
 	{
 		statement_ptr_t statement;
-		Error res{ m_LogAccessor->MakeStatement( R"__(
-			SELECT
-				*
-			FROM
-				projection
-				JOIN
-					filter
-				ON
-					projection.rowid = filter.log_row_no
-			LIMIT 16 OFFSET ?1
-			)__", false, statement
-		) };
+		Error res{ m_LogAccessor->MakeStatement( MakeViewSql( true ).c_str(), false, statement ) };
 
 		if( Ok( res ) )
 			UpdateError( res, statement->Bind( 1, visit_line_no ) );
@@ -911,16 +952,7 @@ std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdo
 
 	const nlineno_t num_view_lines{ GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
-		R"__(
-			SELECT
-				*
-			FROM
-				projection
-				JOIN
-					filter
-				ON
-					projection.rowid = filter.log_row_no
-		)__",
+		MakeViewSql().c_str(),
 		num_view_lines,
 		selector,
 		adornments_provider

@@ -578,6 +578,14 @@ bool NEventView::Filter( boost::python::object match )
 }
 
 
+void NEventView::Sort( unsigned col_num, int direction )
+{
+	SortControl * sort_control{ m_ViewAccessor->GetSortControl() };
+	if( sort_control )
+		sort_control->SetSort( col_num, direction );
+}
+
+
 
 /*-----------------------------------------------------------------------
  * NLogView

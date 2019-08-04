@@ -334,6 +334,17 @@ struct ViewLineTranslation
 
 
 /*-----------------------------------------------------------------------
+ * SortControl
+ -----------------------------------------------------------------------*/
+
+struct SortControl
+{
+	virtual void SetSort( unsigned col_num, int direction ) = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
  * ViewAccessor
  -----------------------------------------------------------------------*/
 
@@ -382,6 +393,10 @@ struct ViewAccessor
 	}
 
 	virtual const ViewLineTranslation * GetLineTranslation( void ) {
+		return nullptr;
+	}
+
+	virtual SortControl * GetSortControl( void ) {
 		return nullptr;
 	}
 
