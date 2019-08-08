@@ -184,10 +184,10 @@ protected:
  -----------------------------------------------------------------------*/
 
 // forwards
-class FieldAccessor;
+class MapFieldAccessor;
 
 // provide access to a logfile's index
-class LogIndexAccessor : public FieldStore<FieldAccessor>
+class LogIndexAccessor : public FieldStore<MapFieldAccessor>
 {
 private:
 	// the index data

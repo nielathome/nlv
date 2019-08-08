@@ -90,7 +90,7 @@ class G_Analyser:
     def __init__(self, connection, log_schema, logfile):
         self.Connection = connection
         self._LogFile = logfile
-        self._DateFieldId = logfile.GetTimecodeBase().GetFieldId() - 1
+        self._DateFieldId = logfile.GetTimecodeBase().GetFieldId()
 
         field_ids = dict()
         for (idx, name) in enumerate(log_schema.GetFieldNames()):

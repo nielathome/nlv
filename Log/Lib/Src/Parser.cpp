@@ -478,13 +478,14 @@ struct A_FieldName : public std::string
 	template<typename T_RESULT>
 	T_RESULT GetFieldId( const LogSchemaAccessor & log_schema ) const;
 
-	static std::string & ToUpper( std::string & str ) {
-		std::transform( str.begin(), str.end(), str.begin(),
+	static std::string ToUpper( const std::string & str ) {
+		std::string res{ str };
+		std::transform( res.begin(), res.end(), res.begin(),
 			[] ( char ch ) -> char {
 				return static_cast<char>(std::toupper( ch ));
 			}
 		);
-		return str;
+		return res;
 	}
 };
 
@@ -494,18 +495,21 @@ T_RESULT A_FieldName::GetFieldId( const LogSchemaAccessor & log_schema ) const
 {
 	// case-insensitive matching in here
 	const std::string & field_name{ *this };
-	std::string match{ field_name };
-	ToUpper( match );
+	std::string match{ ToUpper( field_name ) };
 
 	// look for field names matching field_name
 	unsigned field_id{ 0 }, count{ 0 };
 	const size_t num_fields{ log_schema.GetNumFields() };
 	for( unsigned i = 0; i < num_fields; ++i )
 	{
-		const std::string name{ ToUpper( log_schema.GetFieldName( i ) ) };
+		const FieldDescriptor & field_descriptor{ log_schema.GetFieldDescriptor( i ) };
+		if( !field_descriptor.f_Available )
+			continue;
+
+		const std::string name{ ToUpper( field_descriptor.f_Name ) };
 		if( std::search( name.begin(), name.end(), match.begin(), match.end() ) != name.end() )
 		{
-			field_id = i;
+			field_id = i + field_descriptor.f_DataColumnOffset;
 			count += 1;
 		}
 	}

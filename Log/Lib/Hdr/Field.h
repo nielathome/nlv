@@ -140,11 +140,14 @@ using fieldvalue_t = FieldValue;
 // describe a field; analog of Python's G_FieldSchema
 struct FieldDescriptor
 {
-	// field "type" (e.g. "enum16") - the key used by FieldFactory
-	std::string f_Type;
+	// is the field available to the end-user (else, it is hidden from them)
+	bool f_Available;
 
 	// arbitrary name - used LVF/LVA for selection/matching
 	std::string f_Name;
+
+	// field "type" (e.g. "enum16") - the key used by FieldFactory
+	std::string f_Type;
 
 	// field separator sequence
 	std::string f_Separator;
@@ -154,6 +157,9 @@ struct FieldDescriptor
 
 	// field minimum width; another solution for case where field contains f_Separator
 	unsigned f_MinWidth;
+
+	// offset to another field which holds the actual data to be used for sorting/filtering
+	unsigned f_DataColumnOffset;
 };
 
 using fielddescriptor_list_t = std::vector<FieldDescriptor>;

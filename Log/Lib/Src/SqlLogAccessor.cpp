@@ -61,6 +61,27 @@ public:
 	int64_t GetAsInt64( unsigned field_id ) const;
 	double GetAsReal( unsigned field_id ) const;
 	void GetAsText( unsigned field_id, const char ** first, const char ** last ) const;
+
+	template<FieldValueType TYPE>
+	fieldvalue_t GetValue( unsigned field_id ) const {}
+
+	template<>
+	fieldvalue_t GetValue<FieldValueType::unsigned64>( unsigned field_id ) const
+	{
+		return static_cast<uint64_t>(GetAsInt64( field_id ));
+	}
+
+	template<>
+	fieldvalue_t GetValue<FieldValueType::signed64>( unsigned field_id ) const
+	{
+		return GetAsInt64( field_id );
+	}
+
+	template<>
+	fieldvalue_t GetValue<FieldValueType::float64>( unsigned field_id ) const
+	{
+		return GetAsReal( field_id );
+	}
 };
 
 
@@ -259,6 +280,84 @@ Error SqlDb::ExecuteStatements( const char * sql_text ) const
 
 
 /*-----------------------------------------------------------------------
+ * SqlFieldAccessor
+ -----------------------------------------------------------------------*/
+
+// forwards
+struct SqlFieldAccessor;
+using sqlfieldaccessor_maker_t = FieldTraits<SqlFieldAccessor>::field_ptr_t (*) (const FieldDescriptor & field_desc, unsigned field_id);
+
+struct SqlFieldAccessor : public FieldFactory<SqlFieldAccessor, sqlfieldaccessor_maker_t>
+{
+	SqlFieldAccessor( const FieldDescriptor &, unsigned field_id )
+		: c_FieldId{ field_id } {}
+
+	SqlFieldAccessor( FieldValueType type, unsigned field_id )
+		: c_FieldType{ type }, c_FieldId{ field_id } {}
+
+	// the field's class
+	const FieldValueType c_FieldType{ FieldValueType::invalid };
+
+	// effectively, the index of this field within the parent index
+	const unsigned c_FieldId;
+
+	// fetch the field's current (text) value
+	void GetAsText( statement_ptr_t statement, const char ** first, const char ** last ) const {
+		statement->GetAsText( c_FieldId, first, last );
+	}
+
+	// fetch the field's current (binary) value
+	virtual fieldvalue_t GetValue( statement_ptr_t statement ) const {
+		return 0ULL;
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlFieldAccessorScalar
+ -----------------------------------------------------------------------*/
+
+template<FieldValueType TYPE>
+struct SqlFieldAccessorScalar : public SqlFieldAccessor
+{
+	SqlFieldAccessorScalar( const FieldDescriptor &, unsigned field_id )
+		: SqlFieldAccessor{ TYPE, field_id } {}
+
+	fieldvalue_t GetValue( statement_ptr_t statement ) const override {
+		return statement->GetValue<TYPE>( c_FieldId );
+	}
+};
+
+using SqlFieldAccessorUnsigned = SqlFieldAccessorScalar<FieldValueType::unsigned64>;
+using SqlFieldAccessorInt = SqlFieldAccessorScalar<FieldValueType::signed64>;
+using SqlFieldAccessorReal = SqlFieldAccessorScalar<FieldValueType::float64>;
+
+
+
+/*-----------------------------------------------------------------------
+ * SqlFieldAccessor Factory
+ -----------------------------------------------------------------------*/
+
+SqlFieldAccessor::factory_t::map_t SqlFieldAccessor::factory_t::m_Map
+{
+	{ c_Type_Bool, &MakeField<SqlFieldAccessorUnsigned> },
+	{ c_Type_Uint08, &MakeField<SqlFieldAccessorUnsigned> },
+	{ c_Type_Uint16, &MakeField<SqlFieldAccessorUnsigned> },
+	{ c_Type_Uint32, &MakeField<SqlFieldAccessorUnsigned> },
+	{ c_Type_Uint64, &MakeField<SqlFieldAccessorUnsigned> },
+	{ c_Type_Int08, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Int16, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Int32, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Int64, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Float32, &MakeField<SqlFieldAccessorReal> },
+	{ c_Type_Float64, &MakeField<SqlFieldAccessorReal> },
+	{ c_Type_Text, &MakeField<SqlFieldAccessor> }
+};
+
+
+
+/*-----------------------------------------------------------------------
  * SqlLineAccessorCore
  -----------------------------------------------------------------------*/
 
@@ -310,7 +409,8 @@ class SqlLogAccessor;
 
 class SqlLogLineAccessor : public SqlLineAccessorCore
 {
-protected:
+private:
+	const SqlLogAccessor * m_LogAccessor{ nullptr };
 	const NTimecodeBase m_TimecodeBase;
 	statement_ptr_t m_Statement;
 
@@ -325,128 +425,8 @@ public:
 public:
 	// LineAccessor interfaces
 
-	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
-		m_Statement->GetAsText( field_id, first, last );
-	}
-
-	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
-		return m_Statement->GetAsInt64( field_id );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * FieldAccessor
- -----------------------------------------------------------------------*/
-
- // forwards
-class FieldAccessor;
-
-using fieldaccessor_maker_t = FieldTraits<FieldAccessor>::field_ptr_t (*) (const FieldDescriptor & field_desc, unsigned field_id);
-
-class FieldAccessor : public FieldFactory<FieldAccessor, fieldaccessor_maker_t>
-{
-protected:
-	std::string m_Text;
-	fieldvalue_t m_Value;
-
-public:
-	FieldAccessor( unsigned field_id )
-		: c_FieldId { field_id } {}
-
-	// effectively, the index of this field within the parent index
-	const unsigned c_FieldId;
-
-	virtual void Update( statement_ptr_t statement ) = 0;
-
-	// fetch the field's current (text) value
-	void GetAsText( const char ** first, const char ** last ) const {
-		*first = m_Text.data();
-		*last = *first + m_Text.size();
-	}
-
-	// fetch the field's current (binary) value
-	fieldvalue_t GetValue( void ) const {
-		return m_Value;
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * FieldAccessorText
- -----------------------------------------------------------------------*/
-
-class FieldAccessorText : public FieldAccessor
-{
-public:
-	FieldAccessorText( const FieldDescriptor &, unsigned field_id )
-		: FieldAccessor{ field_id } {}
-
-	void Update( statement_ptr_t statement ) {
-		const char * first{ nullptr }; const char * last{ nullptr };
-		statement->GetAsText( c_FieldId, &first, &last );
-		m_Text.assign( first, last );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * FieldAccessorInt
- -----------------------------------------------------------------------*/
-
-class FieldAccessorInt : public FieldAccessorText
-{
-public:
-	FieldAccessorInt( const FieldDescriptor & field_desc, unsigned field_id )
-		: FieldAccessorText{ field_desc, field_id } {}
-
-	void Update( statement_ptr_t statement ) {
-		m_Value = statement->GetAsInt64( c_FieldId );
-		FieldAccessorText::Update( statement );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * FieldAccessorReal
- -----------------------------------------------------------------------*/
-
-class FieldAccessorReal : public FieldAccessorText
-{
-public:
-	FieldAccessorReal( const FieldDescriptor & field_desc, unsigned field_id )
-		: FieldAccessorText{ field_desc, field_id } {}
-
-	void Update( statement_ptr_t statement ) {
-		m_Value = statement->GetAsReal( c_FieldId );
-		FieldAccessorText::Update( statement );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * FieldAccessor Factory
- -----------------------------------------------------------------------*/
-
-FieldAccessor::factory_t::map_t FieldAccessor::factory_t::m_Map
-{
-	{ c_Type_Bool, &MakeField<FieldAccessorInt> },
-	{ c_Type_Uint08, &MakeField<FieldAccessorInt> },
-	{ c_Type_Uint16, &MakeField<FieldAccessorInt> },
-	{ c_Type_Uint32, &MakeField<FieldAccessorInt> },
-	{ c_Type_Uint64, &MakeField<FieldAccessorInt> },
-	{ c_Type_Int08, &MakeField<FieldAccessorInt> },
-	{ c_Type_Int16, &MakeField<FieldAccessorInt> },
-	{ c_Type_Int32, &MakeField<FieldAccessorInt> },
-	{ c_Type_Int64, &MakeField<FieldAccessorInt> },
-	{ c_Type_Float32, &MakeField<FieldAccessorReal> },
-	{ c_Type_Float64, &MakeField<FieldAccessorReal> },
-	{ c_Type_Text, &MakeField<FieldAccessorText> }
+	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override;
+	fieldvalue_t GetFieldValue( unsigned field_id ) const override;
 };
 
 
@@ -455,23 +435,26 @@ FieldAccessor::factory_t::map_t FieldAccessor::factory_t::m_Map
  * SqlViewLineAccessor, declarations
  -----------------------------------------------------------------------*/
 
-class SqlViewLineAccessor
-	:
-	public SqlLineAccessorCore,
-	public FieldStore<FieldAccessor>
+class SqlViewLineAccessor : public SqlLineAccessorCore
 {
+private:
+	using capture_t = std::pair<std::string, fieldvalue_t>;
+	std::vector<capture_t> m_Captures;
+
 public:
-	void Update( const fielddescriptor_list_t & field_descs, uint64_t field_mask, statement_ptr_t statement );
+	void Capture( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement );
 
 public:
 	// LineAccessor interfaces
 
 	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
-		m_Fields[field_id]->GetAsText( first, last );
+		const std::string & text = m_Captures[ field_id ].first;
+		*first = text.c_str();
+		*last = *first + text.size();
 	}
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
-		return m_Fields[ field_id ]->GetValue();
+		return m_Captures[ field_id ].second;
 	}
 };
 
@@ -481,13 +464,16 @@ public:
  * SqlLogAccessor, declarations
  -----------------------------------------------------------------------*/
 
-class SqlLogAccessor : public LogAccessor, public LogSchemaAccessor
+class SqlLogAccessor
+	:
+	public LogAccessor,
+	public LogSchemaAccessor,
+	public FieldStore<SqlFieldAccessor>
 {
 private:
 	// the SQLite database
 	SqlDb m_DB;
 
-// NIEL needed ?? e.g. for date filtering
 	NTimecodeBase m_TimecodeBase;
 	nlineno_t m_NumLines{ 0 };
 
@@ -520,12 +506,12 @@ public:
 		return m_FieldDescriptors.size();
 	}
 
-	std::string GetFieldName( unsigned field_id ) const override {
-		return m_FieldDescriptors[ field_id ].f_Name;
+	const FieldDescriptor & GetFieldDescriptor( unsigned field_id ) const override {
+		return m_FieldDescriptors[ field_id ];
 	}
 
 	FieldValueType GetFieldType( unsigned field_id ) const override {
-		return FieldValueType::unsigned64;
+		return m_Fields[ field_id ]->c_FieldType;
 	}
 
 	uint16_t GetFieldEnumCount( unsigned field_id ) const override {
@@ -543,10 +529,6 @@ public:
 public:
 	SqlLogAccessor( LogAccessorDescriptor & descriptor );
 
-	const fielddescriptor_list_t & GetFieldDescriptors( void ) const {
-		return m_FieldDescriptors;
-	}
-
 	static logaccessor_ptr_t MakeSqlLogAccessor( LogAccessorDescriptor & descriptor ) {
 		return std::make_unique<SqlLogAccessor>( descriptor );
 	}
@@ -562,6 +544,14 @@ public:
 
 	nlineno_t GetNumLines( void ) const {
 		return m_NumLines;
+	}
+
+	void GetFieldText( statement_ptr_t statement, unsigned field_id, const char ** first, const char ** last ) const {
+		m_Fields[ field_id ]->GetAsText( statement, first, last );
+	}
+
+	fieldvalue_t GetFieldValue( statement_ptr_t statement, unsigned field_id ) const {
+		return m_Fields[ field_id ]->GetValue( statement );
 	}
 
 	template<typename T_FUNCTOR>
@@ -705,9 +695,22 @@ void SqlLineAccessorCore::GetText( const char ** first, const char ** last ) con
 SqlLogLineAccessor::SqlLogLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
 	:
 	SqlLineAccessorCore{ static_cast<unsigned>(log_accessor->GetNumFields()), field_mask },
+	m_LogAccessor{ log_accessor },
 	m_TimecodeBase{ log_accessor->GetTimecodeBase() },
 	m_Statement{ statement }
 {
+}
+
+
+void SqlLogLineAccessor::GetFieldText( unsigned field_id, const char ** first, const char ** last ) const
+{
+	m_LogAccessor->GetFieldText( m_Statement, field_id, first, last );
+}
+
+
+fieldvalue_t SqlLogLineAccessor::GetFieldValue( unsigned field_id ) const
+{
+	return m_LogAccessor->GetFieldValue( m_Statement, field_id );
 }
 
 
@@ -716,20 +719,29 @@ SqlLogLineAccessor::SqlLogLineAccessor( const SqlLogAccessor * log_accessor, uin
  * SqlViewLineAccessor, definitions
  -----------------------------------------------------------------------*/
 
-void SqlViewLineAccessor::Update( const fielddescriptor_list_t & field_descs, uint64_t field_mask, statement_ptr_t statement )
+void SqlViewLineAccessor::Capture( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
 {
-	SetupFields( field_descs,
-		[] ( const FieldDescriptor & field_desc, unsigned field_id ) -> field_ptr_t {
-			return field_t::CreateField( field_desc, field_id );
-		}
-	);
-
+	m_NumFields = static_cast<unsigned>(log_accessor->GetNumFields());
+	m_Captures.reserve( m_NumFields );
+	m_Captures.clear();
 	m_LineBuffer.Clear();
-	m_NumFields = static_cast<unsigned>(GetNumFields());
 	m_FieldViewMask = field_mask;
 
-	for( field_ptr_t field : m_Fields )
-		field->Update( statement );
+	uint64_t mask{ 0x1 };
+	for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, mask <<= 1 )
+	{
+		std::string text;
+		if( mask & field_mask )
+		{
+			const char * first{ nullptr }; const char * last{ nullptr };
+			log_accessor->GetFieldText( statement, field_id, &first, &last );
+			text.assign( first, last );
+		}
+
+		const fieldvalue_t value{ log_accessor->GetFieldValue( statement, field_id ) };
+
+		m_Captures.push_back( std::move( std::make_pair( std::move( text ), value ) ) );
+	}
 }
 
 
@@ -741,6 +753,11 @@ void SqlViewLineAccessor::Update( const fielddescriptor_list_t & field_descs, ui
 SqlLogAccessor::SqlLogAccessor( LogAccessorDescriptor & descriptor )
 	: m_FieldDescriptors{ std::move( descriptor.m_FieldDescriptors ) }
 {
+	SetupFields( m_FieldDescriptors,
+		[] ( const FieldDescriptor & field_desc, unsigned field_id ) -> field_ptr_t {
+			return field_t::CreateField( field_desc, field_id );
+		}
+	);
 }
 
 
@@ -859,18 +876,17 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 		{
 			res = statement->Step();
 
-			SqlViewLineAccessor * update;
+			SqlViewLineAccessor * capture;
 			if( i == 0 )
-				update = line;
+				capture = line;
 			else
 			{
 				LineCache::find_t f{ m_LineCache.Find( { visit_line_no + i, m_FieldViewMask } ) };
-				update = f.first ? nullptr : f.second;
+				capture = f.first ? nullptr : f.second;
 			}
 
-			if( update && Ok( res ) )
-				update->Update( m_LogAccessor->GetFieldDescriptors(), m_FieldViewMask, statement );
-
+			if( capture && Ok( res ) )
+				capture->Capture( m_LogAccessor, m_FieldViewMask, statement );
 		}
 	}
 

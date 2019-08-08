@@ -187,7 +187,7 @@ using task_ptr_t = std::shared_ptr<Task>;
 struct LogSchemaAccessor
 {
 	virtual size_t GetNumFields( void ) const = 0;
-	virtual std::string GetFieldName( unsigned field_id ) const = 0;
+	virtual const FieldDescriptor & GetFieldDescriptor( unsigned field_id ) const = 0;
 	virtual FieldValueType GetFieldType( unsigned field_id ) const = 0;
 	virtual uint16_t GetFieldEnumCount( unsigned field_id ) const = 0;
 	virtual const char * GetFieldEnumName( unsigned field_id, uint16_t enum_id ) const = 0;

@@ -187,9 +187,12 @@ struct U_LogSchemaAccessor : public LogSchemaAccessor
 {
 	struct U_Field
 	{
-		std::string m_Name;
+		FieldDescriptor m_FieldDescriptor;
 		FieldValueType m_Type;
 		std::vector<std::string> m_EnumValues;
+
+		U_Field( const char * name, FieldValueType type )
+			: m_FieldDescriptor{ true, name }, m_Type{ type } {}
 	};
 	std::vector<U_Field> m_Fields;
 
@@ -213,8 +216,8 @@ struct U_LogSchemaAccessor : public LogSchemaAccessor
 		return m_Fields.size();
 	}
 
-	std::string GetFieldName( unsigned field_id ) const override {
-		return m_Fields[ field_id ].m_Name;
+	const FieldDescriptor & GetFieldDescriptor( unsigned field_id ) const override {
+		return m_Fields[ field_id ].m_FieldDescriptor;
 	}
 
 	FieldValueType GetFieldType( unsigned field_id ) const override {

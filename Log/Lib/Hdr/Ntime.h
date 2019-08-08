@@ -68,7 +68,7 @@ public:
 	int64_t CalcOffsetToDatum( time_t utc_datum ) const
 	{
 		// limit offfset to >= 0; i.e. we choose to not represent
-		// the case where our timecode is in te past (i.e. earlier than
+		// the case where our timecode is in the past (i.e. earlier than
 		// the alternate datum)
 		const int64_t offset{ (c_NanoSecond * (m_UtcDatum - utc_datum)) + m_OffsetNs };
 		return (offset >= 0) ? offset : 0;

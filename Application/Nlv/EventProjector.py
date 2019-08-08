@@ -225,7 +225,7 @@ class G_ProjectionFieldSchema:
     """Describe a single projector field (database 'colummn')"""
 
     #-------------------------------------------------------
-    def __init__(self, name, type, available, width = 0, align = None, formatter = None):
+    def __init__(self, name, type, available, width = 0, align = None, formatter = None, data_col_offset = 0):
         # user data
         if align is None:
             align = wx.ALIGN_CENTER
@@ -246,7 +246,7 @@ class G_ProjectionFieldSchema:
         self.IsFirst = False
         self.ColumnColour = None
         self.SortDirection = 0
-        self.SortColumn = None
+        self.DataColumnOffset = data_col_offset
 
 
     #-------------------------------------------------------
@@ -259,7 +259,7 @@ class G_ProjectionFieldSchema:
         else:
             self.SortDirection *= -1
 
-        return (self.SortColumn, self.SortDirection)
+        return (self.DataColumnOffset, self.SortDirection)
 
 
     #-------------------------------------------------------
@@ -286,9 +286,7 @@ class G_ProjectionSchema(G_FieldSchemata):
         self._SetTextOffsetSize(16)
         self.DurationScale = 1
         self.ColParentId = None
-        self.ColStart = None
         self.ColStartOffset = None
-        self.ColFinish = None
         self.ColFinishOffset = None
         self.ColDuration = None
 
@@ -317,10 +315,10 @@ class G_ProjectionSchema(G_FieldSchemata):
         return self.Append(G_ProjectionFieldSchema(name, type, False))
 
 
-    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None):
+    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None, data_col_offset = 0):
         G_ProjectionTypeManager.ValidateType(type)
         al = __class__._CalcAlign(align)
-        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter))
+        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter, data_col_offset))
 
 
     #-------------------------------------------------------
@@ -331,14 +329,12 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.MakeFieldSchema(name, type, width, align, formatter)
 
     def AddStart(self, name, width, align, formatter):
-        self.ColStart = self.MakeFieldSchema(name, "text", width, align, formatter)
-        self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "uint64")
-        self[self.ColStart].SortColumn = self.ColStartOffset
+        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
+        self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "int64")
 
     def AddFinish(self, name, width, align, formatter):
-        self.ColFinish = self.MakeFieldSchema(name, "text", width, align, formatter)
-        self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "uint64")
-        self[self.ColFinish].SortColumn = self.ColFinishOffset
+        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
+        self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "int64")
 
     def AddDuration(self, scale, name, width, align, formatter):
         self.ColDuration = self.MakeFieldSchema(name, "int64", width, align, formatter)
@@ -1030,18 +1026,14 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
 
     #-------------------------------------------------------
-    def UpdateSort(self, col_num_in):
-        (col_num, direction) = self._TableSchema[col_num_in].ToggleSortDirection()
-        if col_num is None:
-            col_num = col_num_in
-
+    def UpdateSort(self, col_num):
         if self._N_EventView is not None:
-            self._N_EventView.Sort(col_num, direction)
+            (data_col_offset, direction) = self._TableSchema[col_num].ToggleSortDirection()
+            self._N_EventView.Sort(col_num + data_col_offset, direction)
             self.Cleared()
             return True
         else:
             return False
-        
 
 
     #-------------------------------------------------------

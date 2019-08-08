@@ -72,13 +72,35 @@ logaccessor_ptr_t MakeLogAccessor( object log_schema )
 
 	for( auto ifield_schema = stl_input_iterator<object>{ log_schema }; ifield_schema != end; ++ifield_schema )
 	{
+		bool available{ true };
+		try
+		{
+			available = extract<bool>{ ifield_schema->attr( "Available" ) };
+		}
+		catch( error_already_set & )
+		{
+			PyErr_Clear();
+		}
+
+		unsigned data_col_offset{ 0 };
+		try
+		{
+			data_col_offset = extract<unsigned>{ ifield_schema->attr( "DataColumnOffset" ) };
+		}
+		catch( error_already_set & )
+		{
+			PyErr_Clear();
+		}
+
 		descriptor.m_FieldDescriptors.push_back( FieldDescriptor
 		{
-			extract<std::string>{ ifield_schema->attr( "Type" ) },
+			available,
 			extract<std::string>{ ifield_schema->attr( "Name" ) },
+			extract<std::string>{ ifield_schema->attr( "Type" ) },
 			extract<std::string>{ ifield_schema->attr( "Separator" ) },
 			extract<unsigned>{ ifield_schema->attr( "SeparatorCount" ) },
-			extract<unsigned>{ ifield_schema->attr( "MinWidth" ) }
+			extract<unsigned>{ ifield_schema->attr( "MinWidth" ) },
+			data_col_offset
 		} );
 	}
 

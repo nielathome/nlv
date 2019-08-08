@@ -147,8 +147,8 @@ public:
 		return m_FieldDescriptors.size();
 	}
 
-	std::string GetFieldName( unsigned field_id ) const override {
-		return m_FieldDescriptors[ field_id ].f_Name;
+	const FieldDescriptor & GetFieldDescriptor( unsigned field_id ) const override {
+		return m_FieldDescriptors[ field_id ];
 	}
 
 	FieldValueType GetFieldType( unsigned field_id ) const override {
@@ -374,8 +374,8 @@ fielddescriptor_list_t && ExpandFieldDescriptors( const std::string & text_offse
 	// expand the application defined field descriptor list with 2 "hidden" fields:
 	// - the first field is always the line position
 	// - and the last field is always the text offsets data
-	field_descs.insert( field_descs.begin(), FieldDescriptor{ "uint64", "LineOffset" } );
-	field_descs.push_back( FieldDescriptor{ text_offsets_field_type, "NoField" } );
+	field_descs.insert( field_descs.begin(), FieldDescriptor{ false, "", "uint64" } );
+	field_descs.push_back( FieldDescriptor{ false, "", text_offsets_field_type } );
 	return std::move(field_descs);
 }
 
