@@ -552,6 +552,18 @@ class G_ProjectionCollector:
                 log_row_no INT
             )""")
 
+        cursor.execute("""
+            CREATE VIEW IF NOT EXISTS filtered_projection AS
+			SELECT
+				*
+			FROM
+				projection
+				JOIN
+					filter
+				ON
+					projection.rowid = filter.log_row_no
+            """)
+
 #        cursor.execute("""
 #            CREATE VIEW IF NOT EXISTS filtered_projection
 #            (

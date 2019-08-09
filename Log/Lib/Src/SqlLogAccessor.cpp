@@ -47,7 +47,7 @@ private:
 
 protected:
 	friend class SqlDb;
-	Error Open( sqlite3 * db, const char * sql_text, const char ** tail = nullptr );
+	Error Open( sqlite3 * db, const char * sql_text, bool suppress_error_trace, const char ** tail = nullptr );
 
 public:
 	~SqlStatement( void );
@@ -91,7 +91,7 @@ SqlStatement::~SqlStatement( void )
 }
 
 
-Error SqlStatement::Open( sqlite3 * db, const char * sql_text, const char ** tail )
+Error SqlStatement::Open( sqlite3 * db, const char * sql_text, bool suppress_error_trace, const char ** tail )
 {
 	const char * local_tail{ nullptr };
 	if( tail == nullptr )
@@ -100,9 +100,16 @@ Error SqlStatement::Open( sqlite3 * db, const char * sql_text, const char ** tai
 	Error res{ e_OK };
 	const int sql_ret{ sqlite3_prepare_v2( db, sql_text, -1, &m_Handle, tail ) };
 
+	// ignore create error
 	if( sql_ret != SQLITE_OK )
-		res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] sql_text=[%s]", sql_ret, sqlite3_errstr( sql_ret ), sql_text );
+	{
+		if( suppress_error_trace )
+			res = e_SqlStatementOpen;
+		else
+			res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] sql_text=[%s]", sql_ret, sqlite3_errstr( sql_ret ), sql_text );
+	}
 	
+	// don't ignore parse related errors
 	if( (local_tail != nullptr) && (*local_tail != '\0') )
 		res = TraceError( e_SqlStatementOpen, "sql_res=[%d/%s] tail=[%s]", sql_ret, sqlite3_errstr( sql_ret ), *tail );
 
@@ -210,7 +217,7 @@ public:
 	Error Open( const std::filesystem::path & file_path );
 	Error Close( void );
 
-	Error MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const;
+	Error MakeStatement( const char * sql_text, bool step, bool suppress_error_trace, statement_ptr_t & statement ) const;
 	Error ExecuteStatements( const char * sql_text ) const;
 };
 
@@ -250,11 +257,11 @@ Error SqlDb::Close( void )
 }
 
 
-Error SqlDb::MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const
+Error SqlDb::MakeStatement( const char * sql_text, bool step, bool suppress_error_trace, statement_ptr_t & statement ) const
 {
 	statement = std::make_shared<SqlStatement>();
 
-	Error res{ statement->Open( m_Handle, sql_text ) };
+	Error res{ statement->Open( m_Handle, sql_text, suppress_error_trace ) };
 
 	if( step && Ok( res ) )
 		UpdateError( res, statement->Step() );
@@ -269,7 +276,7 @@ Error SqlDb::ExecuteStatements( const char * sql_text ) const
 	while( tail && *tail != '\0' && Ok( res ) )
 	{
 		statement_ptr_t statement{ std::make_shared<SqlStatement>() };
-		res = statement->Open( m_Handle, tail, &tail );
+		res = statement->Open( m_Handle, tail, false, &tail );
 		if( Ok( res ) )
 			UpdateError( res, statement->Step() );
 	}
@@ -534,8 +541,8 @@ public:
 	}
 
 public:
-	Error MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const {
-		return m_DB.MakeStatement( sql_text, step, statement );
+	Error MakeStatement( const char * sql_text, bool step, bool suppress_error_trace, statement_ptr_t & statement ) const {
+		return m_DB.MakeStatement( sql_text, step, suppress_error_trace, statement );
 	}
 
 	Error ExecuteStatements( const char * sql_text ) const {
@@ -784,7 +791,7 @@ Error SqlLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 Error SqlLogAccessor::GetDatum( void )
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( "SELECT * FROM projection_meta", true, statement ) };
+	Error res{ MakeStatement( "SELECT * FROM projection_meta", true, true, statement ) };
 
 	if( Ok( res ) )
 	{
@@ -793,14 +800,15 @@ Error SqlLogAccessor::GetDatum( void )
 		m_TimecodeBase = NTimecodeBase{ utc_datum, field_id };
 	}
 
-	return res;
+	// ignore datum errors - it is no required that a projection has any date/times
+	return e_Success;
 }
 
 
 Error SqlLogAccessor::CalcNumLines( void )
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( "SELECT count(*) FROM projection", true, statement ) };
+	Error res{ MakeStatement( "SELECT count(*) FROM projection", true, false, statement ) };
 
 	if( Ok( res ) )
 		m_NumLines = statement->GetAsInt( 0 );
@@ -813,7 +821,7 @@ template<typename T_FUNCTOR>
 void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( projection, false, statement ) };
+	Error res{ MakeStatement( projection, false, false, statement ) };
 	if( !Ok( res ) )
 		return;
 
@@ -843,11 +851,7 @@ std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
 			SELECT
 				*
 			FROM
-				projection
-				JOIN
-					filter
-				ON
-					projection.rowid = filter.log_row_no
+				filtered_projection
 			ORDER BY )__" << m_SortColumn + 1 << " " << (m_SortDirection > 0 ? "ASC" : "DESC");
 
 	if( with_limit )
@@ -867,7 +871,7 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 	if( !found.first )
 	{
 		statement_ptr_t statement;
-		Error res{ m_LogAccessor->MakeStatement( MakeViewSql( true ).c_str(), false, statement ) };
+		Error res{ m_LogAccessor->MakeStatement( MakeViewSql( true ).c_str(), false, false, statement ) };
 
 		if( Ok( res ) )
 			UpdateError( res, statement->Bind( 1, visit_line_no ) );
@@ -939,7 +943,7 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 		return;
 
 	statement_ptr_t statement;
-	res = m_LogAccessor->MakeStatement( "INSERT INTO filter VALUES(?1)", false, statement );
+	res = m_LogAccessor->MakeStatement( "INSERT INTO filter VALUES(?1)", false, false, statement );
 
 	for( nlineno_t line_no : map )
 	{

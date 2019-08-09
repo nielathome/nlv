@@ -67,6 +67,7 @@ class Analyser:
     #-----------------------------------------------------------
     def End(self, context):
         self.Cursor.close()
+        context.Connection.commit()
 
 
 
@@ -85,7 +86,10 @@ class Projector:
     @staticmethod
     def Project(connection, context):
         cursor = connection.cursor()
+        context.MakeProjectionTable(cursor)
+
         cursor.execute("""
+            INSERT INTO projection
             SELECT
                 title,
                 count(title) AS cnt
@@ -94,11 +98,8 @@ class Projector:
             ORDER BY cnt DESC
         """)
 
-        for event in cursor:
-            context.AddEvent([
-                event[0],
-                event[1]
-            ])
+        cursor.close()
+        connection.commit()
 
 
 
