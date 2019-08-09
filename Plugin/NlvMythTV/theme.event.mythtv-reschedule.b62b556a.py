@@ -123,18 +123,7 @@ class Projector:
     def Project(connection, context):
         cursor = connection.cursor()
 
-        cursor.execute("""
-            SELECT
-                start_utc
-            FROM
-                reschedule
-            LIMIT
-                1
-            """)
-
-        utc_datum = cursor.fetchone()[0]
-        context.MakeProjectionMetaTable(cursor, utc_datum)
-
+        utc_datum = context.MakeProjectionMetaTable(cursor, ["reschedule"])
         context.MakeProjectionTable(cursor)
 
         cursor.execute("""

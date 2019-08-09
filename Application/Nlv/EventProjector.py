@@ -508,7 +508,26 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def MakeProjectionMetaTable(self, cursor, utc_datum):
+    def MakeProjectionMetaTable(self, cursor, tables):
+        """Each table in tables must contain a 'start_utc' column"""
+
+        utc_datum = 0
+        for table in tables:
+            cursor.execute("""
+                SELECT
+                    start_utc
+                FROM
+                    {table}
+                ORDER BY
+                    start_utc ASC
+                LIMIT
+                    1
+                """.format(table = table))
+
+            datum = cursor.fetchone()[0]
+            if utc_datum == 0 or datum < utc_datum:
+                utc_datum = datum
+
         cursor.execute("DROP TABLE IF EXISTS projection_meta")
         cursor.execute("""
             CREATE TABLE projection_meta
@@ -532,6 +551,8 @@ class G_ProjectionCollector:
                 {utc_datum},
                 {field_id}
             )""".format(utc_datum = utc_datum, field_id = field_id))
+
+        return utc_datum
 
 
     #-------------------------------------------------------
