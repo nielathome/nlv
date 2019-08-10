@@ -21,10 +21,10 @@
 # text, referred to as an analyser script. Strictly, the analyser
 # script contains an event recogniser *and* a series of metric
 # quantifiers. The recogniser scans the log file and generates an
-# event table (CSV file), which in turn, is displayed in the UI via
+# event table (SQL DB), which in turn, is displayed in the UI via
 # the G_EventProjectorNode. The quantifiers scan the event table and
 # assemble (i.e. deduce) domain relevent metrics (e.g. a categorisation
-# of the events), also stored as CSV files. A quantifier can define
+# of the events), also stored as SQL DB files. A quantifier can define
 # any number of chart designers, which realise the assembled metric
 # data, arbitrary user supplied parameters and the current selection
 # into a displayable chart. Hence the metrics are projected in both
@@ -48,11 +48,11 @@ import wx
 
 # Application imports 
 from .Document import D_Document
-from .EventData import G_Analyser
+from .EventDisplay import G_MetricsViewCtrl
+from .EventDisplay import G_TableViewCtrl
+from .EventProjector import G_Analyser
 from .EventProjector import G_Projector
-from .EventProjector import G_MetricsViewCtrl
 from .EventProjector import G_ScriptGuard
-from .EventProjector import G_TableViewCtrl
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
 from .MatchNode import G_MatchItem
@@ -567,7 +567,10 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         guid = self._Field.Guid.Value
         for file in self.GetLogNode().MakeSessionDir().iterdir():
             if str(file).find(guid) >= 0:
-                file.unlink()
+                try:
+                    file.unlink()
+                except Exception as ex:
+                    logging.info("Unable to remove temporary: file=[{}] info=[{}]".format(str(file), str(ex)))
 
 
     #-------------------------------------------------------

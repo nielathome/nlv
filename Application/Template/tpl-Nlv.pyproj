@@ -27,7 +27,8 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="EventData.py" />
+    <Compile Include="EventDisplay.py" />
+    <Compile Include="EventProjector.py" />
     <Compile Include="EventView.py">
       <SubType>Code</SubType>
     </Compile>
