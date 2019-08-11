@@ -22,6 +22,7 @@
 
 // Boost includes
 #include <boost/lexical_cast.hpp>
+#include <boost/python/object.hpp>
 
 // C++ includes
 #include <string>
@@ -204,24 +205,24 @@ const NAnnotation * NAnnotations::GetAnnotation( vint_t log_line_no ) const
 }
 
 
-void NAnnotations::SetAnnotationText( vint_t line, const char * text )
+void NAnnotations::SetAnnotationText( vint_t log_line_no, const char * text )
 {
 	// assume empty text means "delete"
 	m_Tracker.RecordEvent();
 	if( (text == nullptr) || (text[ 0 ] == '\0') )
 	{
-		annotation_map_t::const_iterator iannotation{ m_AnnotationMap.find( line ) };
+		annotation_map_t::const_iterator iannotation{ m_AnnotationMap.find( log_line_no ) };
 		if( iannotation != m_AnnotationMap.end() )
 			m_AnnotationMap.erase( iannotation );
 	}
 	else
-		m_AnnotationMap[ line ] = NAnnotation{ text };
+		m_AnnotationMap[ log_line_no ] = NAnnotation{ text };
 }
 
 
-void NAnnotations::SetAnnotationStyle( vint_t line, vint_t style )
+void NAnnotations::SetAnnotationStyle( vint_t log_line_no, vint_t style )
 {
-	annotation_map_t::iterator iannotation{ m_AnnotationMap.find( line ) };
+	annotation_map_t::iterator iannotation{ m_AnnotationMap.find( log_line_no ) };
 	if( iannotation != m_AnnotationMap.end() )
 		iannotation->second.SetStyle( style );
 }
@@ -238,8 +239,7 @@ vint_t NAnnotations::GetNextAnnotation( nlineno_t current, bool forward )
  * NAdornments
  -----------------------------------------------------------------------*/
 
-NAdornments::NAdornments( logaccessor_ptr_t log_accessor )
-	: m_LogAccessor{ log_accessor }
+NAdornments::NAdornments( void )
 {
 	RegisterStateProvider( "0EF8EE4F-4402-40F5-A9F7-5E48BC8876A6",
 		MakeStateProvider( this, &NAdornments::GetState, &NAdornments::PutState )
@@ -261,25 +261,20 @@ void NAdornments::PutState( const json & store )
 }
 
 
-int NAdornments::LogMarkValue( vint_t log_line_no )
+int NAdornments::LogMarkValue( vint_t log_line_no, const LineAccessor & line )
 {
 	NLineAdornmentsProvider provider{ this };
 	LineAdornmentsAccessor adornments{ &provider, log_line_no };
 
 	int res{ 0 }, bit{ 0x1 << (int) NConstants::e_StyleBaseMarker };
 
-	GetLogAccessor()->VisitLine( log_line_no,
-		[this, &res, &bit, &adornments] ( const LineAccessor & line )
-		{
-			// process auto markers first (i.e. lowest precedence is first item)
-			for( const selector_ptr_t &selector : m_AutoMarkers )
-			{
-				if( selector && selector->GetImpl()->Hit( line, adornments ) )
-					res |= bit;
-				bit <<= 1;
-			}
-		}
-	);
+	// process auto markers first (i.e. lowest precedence is first item)
+	for( const selector_ptr_t & selector : m_AutoMarkers )
+	{
+		if( selector && selector->Hit( line, adornments ) )
+			res |= bit;
+		bit <<= 1;
+	}
 
 	// user marker is last - has highest precedence
 	if( m_UserMarkers.find( log_line_no ) != m_UserMarkers.end() )
@@ -292,26 +287,16 @@ int NAdornments::LogMarkValue( vint_t log_line_no )
 	return res;
 }
 
-
-int NAdornments::ViewMarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer )
+bool NAdornments::SetAutoMarker( unsigned marker, boost::python::object match, logfile_ptr_t logfile )
 {
-	const int marker_base{ 0x1 << (int) NConstants::e_StyleBaseTracker };
-	return cell_buffer.MarkValue( view_line_no, marker_base );
+	if( selector_ptr_t selector{ MakeSelector( match, false, logfile->GetSchema() ) } )
+	{
+		m_AutoMarkers[ marker ] = std::move(selector);
+		return true;
+	}
+	else
+		return false;
 }
-
-
-int NAdornments::MarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer )
-{
-	// most markers come from the logfile
-	const int log_markers{ LogMarkValue( cell_buffer.ViewLineToLogLine( view_line_no ) ) };
-
-	// the global timecode markers come from the cell buffer, as knowledge of the neighbouring
-	// lines is needed to perform the "nearest" time calculations
-	const int global_markers{ ViewMarkValue( view_line_no, cell_buffer ) };
-
-	return log_markers | global_markers;
-}
-
 
 bool NAdornments::HasUsermark( vint_t log_line_no ) const
 {
@@ -361,13 +346,26 @@ void NHiliter::Hilite( const vint_t start, const char *first, const char *last, 
 	};
 
 	if( m_Selector )
-		m_Selector->GetImpl()->Visit( first, last, HiliteVisitor{ start, first, m_Indicator, vcontrol } );
+		m_Selector->Visit( first, last, HiliteVisitor{ start, first, m_Indicator, vcontrol } );
+}
+
+
+bool NHiliter::SetMatch( boost::python::object match )
+{
+	if( selector_ptr_t selector{ MakeSelector( match, false, m_Logfile->GetSchema() ) } )
+	{
+		m_SelectorChanged = true;
+		m_Selector = std::move( selector );
+		return true;
+	}
+	else
+		return false;
 }
 
 
 void NHiliter::SetupMatchedLines( void )
 {
-	const bool buffer_changed{ m_CellBufferTracker.CompareTo( m_CellBuffer->GetTracker() ) };
+	const bool buffer_changed{ m_ViewTracker.CompareTo( m_ViewAccessor->GetProperties()->GetTracker() ) };
 	if( !m_SelectorChanged && !buffer_changed )
 		return;
 
@@ -375,10 +373,11 @@ void NHiliter::SetupMatchedLines( void )
 
 	if( !m_Selector )
 		m_MatchedLines.clear();
+
 	else
 	{
-		Selector * selector{ m_Selector->GetImpl() };
-		m_MatchedLines = m_CellBuffer->Search( selector );
+		NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
+		m_MatchedLines = m_ViewAccessor->Search( m_Selector, &adornments_provider );
 	}
 }
 
@@ -399,53 +398,65 @@ bool NHiliter::Hit( nlineno_t line_no )
 
 
 /*-----------------------------------------------------------------------
- * NLogAccessor
+ * NViewCore
  -----------------------------------------------------------------------*/
 
-NLogAccessor::NLogAccessor
-(
-	const std::string & accessor_name,
-	const std::string & guid,
-	unsigned text_offset_size,
-	fielddescriptor_list_t && field_descs,
-	const std::string & match_desc,
-	formatdescriptor_list_t && formatters
-)
+
+NViewCore::NViewCore( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
+	:
+	m_Logfile{ logfile },
+	m_ViewAccessor{ view_accessor }
 {
-	SetImpl( LogAccessor::MakeLogAccessor(
-		accessor_name,
-		guid,
-		text_offset_size,
-		std::move( field_descs ),
-		match_desc,
-		std::move( formatters )
-	) );
+	if( m_Logfile &&  m_ViewAccessor )
+	{
+		Match descriptor{ Match::Type::e_Literal, std::string{}, false };
+		Filter( Selector::MakeSelector( descriptor, true, nullptr ), true );
+	}
+}
+
+
+void NViewCore::Filter( selector_ptr_a selector, bool add_irregular )
+{
+	NLineAdornmentsProvider adornments_provider{ m_Logfile->GetAdornments() };
+	m_ViewAccessor->Filter( selector, &adornments_provider, add_irregular );
+}
+
+
+bool NViewCore::Filter( boost::python::object match, bool add_irregular )
+{
+	if( selector_ptr_t selector{ MakeSelector( match, true, m_Logfile->GetSchema() ) } )
+	{
+		Filter( selector, add_irregular );
+		return true;
+	}
+	else
+		return false;
 }
 
 
 
 /*-----------------------------------------------------------------------
- * NFilterView
+ * NViewFieldAccess
  -----------------------------------------------------------------------*/
 
-NFilterView::NFilterView( logfile_ptr_t logfile )
-	:
-	m_Logfile{ logfile },
-	m_Adornments{ logfile->GetAdornments() },
-	m_AdornmentsProvider{ logfile->GetAdornments().get() },
-	m_CellBuffer{ logfile->GetLogAccessor(), &m_AdornmentsProvider }
+fieldvalue_t NViewFieldAccess::GetFieldValue( vint_t line_no, vint_t field_no )
 {
-	Match descriptor{ Match::Type::e_Literal, std::string{}, false };
-	std::unique_ptr<Selector> selector{ Selector::MakeSelector( descriptor, true ) };
-	m_CellBuffer.Filter( selector.get(), true );
+	fieldvalue_t res;
+	field_no += m_FieldNoOffset;
+
+	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
+		res = line.GetFieldValue( field_no );
+	} );
+
+	return res;
 }
 
 
-std::string NFilterView::GetNonFieldText( vint_t line_no )
+std::string NViewFieldAccess::GetNonFieldText( vint_t line_no )
 {
 	std::string res;
 
-	m_CellBuffer.VisitLine( line_no, [&res] ( const LineAccessor & line ) {
+	m_ViewAccessor->VisitLine( line_no, [&res] ( const LineAccessor & line ) {
 		const char * first; const char * last;
 		line.GetNonFieldText( &first, &last );
 		res.assign( first, last );
@@ -455,16 +466,14 @@ std::string NFilterView::GetNonFieldText( vint_t line_no )
 }
 
 
-std::string NFilterView::GetFieldText( vint_t line_no, vint_t field_no )
+std::string NViewFieldAccess::GetFieldText( vint_t line_no, vint_t field_no )
 {
-	// as elsewhere, field 0 is an internal (hidden) field, so the public field
-	// 0 is actually field 1
-
 	std::string res;
+	field_no += m_FieldNoOffset;
 
-	m_CellBuffer.VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
+	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		const char * first; const char * last;
-		line.GetFieldText( field_no + 1, &first, &last );
+		line.GetFieldText( field_no, &first, &last );
 		res.assign( first, last );
 	} );
 
@@ -472,32 +481,30 @@ std::string NFilterView::GetFieldText( vint_t line_no, vint_t field_no )
 }
 
 
-fieldvalue_t NFilterView::GetFieldValue( vint_t line_no, vint_t field_no )
+
+/*-----------------------------------------------------------------------
+ * NViewLineTranslation
+ -----------------------------------------------------------------------*/
+
+NViewLineTranslation::NViewLineTranslation( void )
+	: m_ViewLineTranslation{ m_ViewAccessor->GetLineTranslation() }
 {
-	// as elsewhere, field 0 is an internal (hidden) field, so the public field
-	// 0 is actually field 1
-
-	fieldvalue_t res;
-
-	m_CellBuffer.VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
-		res = line.GetFieldValue( field_no + 1 );
-	} );
-
-	return res;
+	if( !m_ViewLineTranslation )
+		throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
 }
 
 
 // line number translation between the view and the underlying logfile
-vint_t NFilterView::ViewLineToLogLine( vint_t view_line_no ) const
+vint_t NViewLineTranslation::ViewLineToLogLine( vint_t view_line_no ) const
 {
-	return m_CellBuffer.ViewLineToLogLine( view_line_no );
+	return m_ViewLineTranslation->ViewLineToLogLine( view_line_no );
 }
 
 
 // return the view line at or after the supplied log line; otherwise -1
-vint_t NFilterView::LogLineToViewLine( vint_t log_line_no ) const
+vint_t NViewLineTranslation::LogLineToViewLine( vint_t log_line_no ) const
 {
-	vint_t view_line{ m_CellBuffer.LogLineToViewLine( log_line_no ) };
+	vint_t view_line{ m_ViewLineTranslation->LogLineToViewLine( log_line_no ) };
 	const vint_t new_log_line{ ViewLineToLogLine( view_line ) };
 
 	if( new_log_line < log_line_no )
@@ -507,114 +514,124 @@ vint_t NFilterView::LogLineToViewLine( vint_t log_line_no ) const
 }
 
 
-void NFilterView::SetNumHiliter( unsigned num_hiliter )
+
+/*-----------------------------------------------------------------------
+ * NViewTimecode
+ -----------------------------------------------------------------------*/
+
+
+NViewTimecode::NViewTimecode( void )
+	: m_ViewTimecode{ m_ViewAccessor->GetTimecode() }
 {
-	m_Hiliters.clear();
-	m_Hiliters.reserve( num_hiliter );
-	for( unsigned i = 0; i < num_hiliter; ++i )
-		m_Hiliters.emplace_back( hiliter_ptr_t{ new NHiliter{ i, &m_CellBuffer } } );
+	if( !m_ViewTimecode )
+		throw std::runtime_error{ "ViewAccessor has no ViewTimecode" };
 }
 
 
-void NFilterView::ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line )
+NTimecode * NViewTimecode::GetUtcTimecode( vint_t line_no )
 {
-	for( int line_no = view_fm_line; line_no <= view_to_line; ++line_no )
-		m_Adornments->ToggleUsermark( m_CellBuffer.ViewLineToLogLine( line_no) );
-}
-
-
-// find the next visible view line for the source "get_next_log_line"
-vint_t NFilterView::GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line)(vint_t, bool) )
-{
-	vint_t log_line_no{ m_CellBuffer.ViewLineToLogLine( view_line_no ) };
-	while( true )
-	{
-		log_line_no = (m_Adornments.get()->*get_next_log_line)(log_line_no, forward);
-		if( log_line_no < 0 )
-			return log_line_no;
-
-		view_line_no = m_CellBuffer.LogLineToViewLine( log_line_no, true );
-		if( view_line_no >= 0 )
-			return view_line_no;
-	}
-}
-
-
-vint_t NFilterView::GetNextBookmark( vint_t view_line_no, bool forward )
-{
-	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextUsermark );
-}
-
-
-vint_t NFilterView::GetNextAnnotation( vint_t view_line_no, bool forward )
-{
-	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextAnnotation );
-}
-
-
-void NFilterView::SetLocalTrackerLine( vint_t line_no )
-{
-	m_Adornments->SetLocalTrackerLine( m_CellBuffer.ViewLineToLogLine( line_no ) );
-}
-
-
-vint_t NFilterView::GetLocalTrackerLine( void )
-{
-	return m_CellBuffer.LogLineToViewLine( m_Adornments->GetLocalTrackerLine() );
-}
-
-
-NTimecode * NFilterView::GetUtcTimecode( vint_t line_no )
-{
-	// as elsewhere, field 0 is an internal (hidden) field, so the public field
-	// 0 is actually field 1
-
-	NTimecode * res{ new NTimecode };
-
-	m_CellBuffer.VisitLine( line_no, [&res] ( const LineAccessor & line ) {
-		*res = line.GetUtcTimecode();
-	} );
-
-	return res;
+	return new NTimecode{ m_ViewTimecode->GetUtcTimecode( line_no ) };
 }
 
 
 
 /*-----------------------------------------------------------------------
- * NView
+ * NViewHiliting
  -----------------------------------------------------------------------*/
 
-NView::NView( logfile_ptr_t logfile )
+void NViewHiliting::SetNumHiliter( unsigned num_hiliter )
+{
+	m_Hiliters.clear();
+	m_Hiliters.reserve( num_hiliter );
+	for( unsigned i = 0; i < num_hiliter; ++i )
+		m_Hiliters.emplace_back( hiliter_ptr_t{ new NHiliter{ i, m_Logfile, m_ViewAccessor } } );
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * NLineSet
+ -----------------------------------------------------------------------*/
+
+NLineSet::NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
-	NFilterView{ logfile },
-	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), m_CellBuffer } },
-	m_LineLevel{ new SLineLevels },
-	m_LineState{ new SLineState },
-	m_LineMargin{ new SLineAnnotation{ logfile->GetAdornments(), m_CellBuffer } },
-	m_LineAnnotation{ new SLineAnnotation{ logfile->GetAdornments(), m_CellBuffer } },
-	m_ContractionState{ new SContractionState{ m_LineAnnotation, m_CellBuffer} }
+	NViewCore{ logfile, view_accessor }
 {
 }
 
 
-void NView::Release( void )
+
+/*-----------------------------------------------------------------------
+ * NEventView
+ -----------------------------------------------------------------------*/
+
+NEventView::NEventView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
+	:
+	NViewCore{ logfile, view_accessor }
+{
+}
+
+
+bool NEventView::Filter( boost::python::object match )
+{
+	return NViewCore::Filter( match, true );
+}
+
+
+void NEventView::Sort( unsigned col_num, int direction )
+{
+	SortControl * sort_control{ m_ViewAccessor->GetSortControl() };
+	if( sort_control )
+		sort_control->SetSort( col_num, direction );
+}
+
+
+
+/*-----------------------------------------------------------------------
+ * NLogView
+ -----------------------------------------------------------------------*/
+
+ // Note: field 0 is an internal (hidden) field, so the public field
+ // 0 is actually field 1
+NLogView::NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
+	:
+	NViewCore{ logfile, view_accessor },
+	NViewFieldAccess{ 1 },
+	m_CellBuffer{ view_accessor },
+	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), view_accessor } },
+	m_LineLevel{ new SLineLevels },
+	m_LineState{ new SLineState },
+	m_LineMargin{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
+	m_LineAnnotation{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
+	m_ContractionState{ new SContractionState{ m_LineAnnotation, view_accessor } },
+	m_ViewMap{ view_accessor->GetMap() },
+	m_ViewLineTranslation{ view_accessor->GetLineTranslation() }
+{
+	if( !m_ViewMap )
+		throw std::runtime_error{ "ViewAccessor has no ViewMap" };
+	if( !m_ViewLineTranslation )
+		throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
+}
+
+
+void NLogView::Release( void )
 {
 	delete this;
 }
 
 
-SViewCellBuffer *__stdcall NView::GetCellBuffer()
+SViewCellBuffer *__stdcall NLogView::GetCellBuffer()
 {
 	return & m_CellBuffer;
 }
 
 
-void __stdcall NView::ReleaseCellBuffer( VCellBuffer * )
+void __stdcall NLogView::ReleaseCellBuffer( VCellBuffer * )
 {
 }
 
 
-VLineMarkers * __stdcall NView::GetLineMarkers( void )
+VLineMarkers * __stdcall NLogView::GetLineMarkers( void )
 {
 	auto ret{ m_LineMarker.get() };
 	intrusive_ptr_add_ref( ret );
@@ -622,7 +639,7 @@ VLineMarkers * __stdcall NView::GetLineMarkers( void )
 }
 
 
-VLineLevels * __stdcall NView::GetLineLevels( void )
+VLineLevels * __stdcall NLogView::GetLineLevels( void )
 {
 	auto ret{ m_LineLevel.get() };
 	intrusive_ptr_add_ref( ret );
@@ -630,7 +647,7 @@ VLineLevels * __stdcall NView::GetLineLevels( void )
 }
 
 
-VLineState * __stdcall NView::GetLineState( void )
+VLineState * __stdcall NLogView::GetLineState( void )
 {
 	auto ret{ m_LineState.get() };
 	intrusive_ptr_add_ref( ret );
@@ -638,7 +655,7 @@ VLineState * __stdcall NView::GetLineState( void )
 }
 
 
-VLineAnnotation * __stdcall NView::GetLineMargin( void )
+VLineAnnotation * __stdcall NLogView::GetLineMargin( void )
 {
 	auto ret{ m_LineMargin.get() };
 	intrusive_ptr_add_ref( ret );
@@ -646,7 +663,7 @@ VLineAnnotation * __stdcall NView::GetLineMargin( void )
 }
 
 
-VLineAnnotation * __stdcall NView::GetLineAnnotation( void )
+VLineAnnotation * __stdcall NLogView::GetLineAnnotation( void )
 {
 	auto ret{ m_LineAnnotation.get() };
 	intrusive_ptr_add_ref( ret );
@@ -654,7 +671,7 @@ VLineAnnotation * __stdcall NView::GetLineAnnotation( void )
 }
 
 
-VContractionState * __stdcall NView::GetContractionState( void )
+VContractionState * __stdcall NLogView::GetContractionState( void )
 {
 	auto ret{ m_ContractionState.get() };
 	intrusive_ptr_add_ref( ret );
@@ -662,7 +679,7 @@ VContractionState * __stdcall NView::GetContractionState( void )
 }
 
 
-void __stdcall NView::Notify_StartDrawLine( vint_t line_no )
+void __stdcall NLogView::Notify_StartDrawLine( vint_t line_no )
 {
 	VControl * vcontrol{ GetControl() };
 	const vint_t start{ m_CellBuffer.LineStart( line_no ) };
@@ -677,24 +694,106 @@ void __stdcall NView::Notify_StartDrawLine( vint_t line_no )
 }
 
 
-unsigned long long NView::GetContent( void )
+unsigned long long NLogView::GetContent( void )
 {
 	VContent *content{ this };
 	return reinterpret_cast<unsigned long long>( content );
 }
 
 
-void NView::Filter( selector_ptr_t selector, bool add_irregular )
+bool NLogView::Filter( boost::python::object match )
 {
 	NTextChanged handler{ m_CellBuffer, GetControl() };
-	NFilterView::Filter( selector, add_irregular );
+	return NViewCore::Filter( match, true );
 }
 
 
-void NView::SetFieldMask( uint64_t field_mask )
+void NLogView::SetFieldMask( uint64_t field_mask )
 {
 	NTextChanged handler{ m_CellBuffer, GetControl() };
-	NFilterView::SetFieldMask( field_mask );
+	NViewHiliting::SetFieldMask( field_mask );
+}
+
+
+void NLogView::ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line )
+{
+	for( int line_no = view_fm_line; line_no <= view_to_line; ++line_no )
+		GetAdornments()->ToggleUsermark( m_ViewLineTranslation->ViewLineToLogLine( line_no ) );
+}
+
+
+adornments_ptr_t NLogView::GetAdornments( void )
+{
+	return m_Logfile->GetAdornments();
+}
+
+
+// find the next visible view line for the source "get_next_log_line"
+vint_t NLogView::GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) )
+{
+	vint_t log_line_no{ m_ViewLineTranslation->ViewLineToLogLine( view_line_no ) };
+	while( true )
+	{
+		log_line_no = (GetAdornments().get()->*get_next_log_line)(log_line_no, forward);
+		if( log_line_no < 0 )
+			return log_line_no;
+
+		view_line_no = m_ViewLineTranslation->LogLineToViewLine( log_line_no, true );
+		if( view_line_no >= 0 )
+			return view_line_no;
+	}
+}
+
+
+vint_t NLogView::GetNextBookmark( vint_t view_line_no, bool forward )
+{
+	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextUsermark );
+}
+
+
+vint_t NLogView::GetNextAnnotation( vint_t view_line_no, bool forward )
+{
+	return GetNextVisibleLine( view_line_no, forward, &NAdornments::GetNextAnnotation );
+}
+
+
+void NLogView::SetLocalTrackerLine( vint_t line_no )
+{
+	GetAdornments()->SetLocalTrackerLine( m_ViewLineTranslation->ViewLineToLogLine( line_no ) );
+}
+
+
+vint_t NLogView::GetLocalTrackerLine( void )
+{
+	return m_ViewLineTranslation->LogLineToViewLine( GetAdornments()->GetLocalTrackerLine() );
+}
+
+
+vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
+{
+	const GlobalTracker & tracker{ GlobalTrackers::GetGlobalTracker( idx ) };
+	if( !tracker.IsInUse() )
+		return -1;
+
+	const NTimecode & target{ tracker.GetUtcTimecode() };
+	const ViewMap * view_map{ m_ViewMap };
+
+	vint_t low_idx{ 0 }, high_idx{ view_map->m_NumLinesOrOne - 1 };
+	do
+	{
+		const vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
+		const NTimecode value{ m_ViewTimecode->GetUtcTimecode( idx ) };
+		if( target < value )
+			high_idx = idx - 1;
+		else
+			low_idx = idx;
+	} while( low_idx < high_idx );
+
+
+	if( tracker.IsNearest( low_idx, view_map->m_NumLinesOrOne, m_ViewTimecode ) )
+		return low_idx;
+	else
+		return low_idx + 1;
 }
 
 
@@ -703,9 +802,9 @@ void NView::SetFieldMask( uint64_t field_mask )
  * GlobalTracker
  -----------------------------------------------------------------------*/
 
-bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAccessor * accessor ) const
+bool GlobalTracker::IsNearest( int line_no, int max_line_no, const ViewTimecode * timecode_accessor ) const
 {
-	const NTimecode timecode{ accessor->GetUtcTimecode( line_no ) };
+	const NTimecode timecode{ timecode_accessor->GetUtcTimecode( line_no ) };
 	const int64_t delta{ timecode - f_UtcTimecode };
 
 	const bool tracker_at_or_before{ delta >= 0 };
@@ -722,7 +821,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAcce
 	// tracker is at, or before, this line
 	if( tracker_at_or_before )
 	{
-		const NTimecode prev_timecode{ accessor->GetUtcTimecode( line_no - 1 ) };
+		const NTimecode prev_timecode{ timecode_accessor->GetUtcTimecode( line_no - 1 ) };
 		const int64_t prev_delta{ prev_timecode - f_UtcTimecode };
 		const bool tracker_at_or_before_prev{ prev_delta >= 0 };
 
@@ -735,7 +834,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const NTimecodeAcce
 	// tracker is after this line
 	else
 	{
-		const NTimecode next_timecode{ accessor->GetUtcTimecode( line_no + 1 ) };
+		const NTimecode next_timecode{ timecode_accessor->GetUtcTimecode( line_no + 1 ) };
 		const int64_t next_delta{ next_timecode - f_UtcTimecode };
 		const bool tracker_at_or_after_next{ next_delta <= 0 };
 
@@ -763,49 +862,74 @@ void GlobalTrackers::SetGlobalTracker( unsigned tracker_idx, const NTimecode & u
 
 
 /*-----------------------------------------------------------------------
- * LogfileTimecodeAccessor
- -----------------------------------------------------------------------*/
-
-LogfileTimecodeAccessor::LogfileTimecodeAccessor( LogAccessor * accessor )
-	: f_LogAccessor{ accessor }
-{
-}
-
-
-NTimecode LogfileTimecodeAccessor::GetUtcTimecode( int line_no ) const
-{
-	return f_LogAccessor->GetUtcTimecode( line_no );
-}
-
-
-
-/*-----------------------------------------------------------------------
  * NLogfile
  -----------------------------------------------------------------------*/
 
-NLogfile::NLogfile( logaccessor_ptr_t log_accessor )
+NLogfile::NLogfile( logaccessor_ptr_t && log_accessor )
 	:
-	m_LogAccessor{ log_accessor },
-	m_Adornments{ new NAdornments{ log_accessor } }
+	m_LogAccessor{ std::move(log_accessor) },
+	m_Adornments{ new NAdornments }
 {
 }
 
 
-Error NLogfile::Open( const std::wstring &file_path, ProgressMeter * progress, size_t skip_lines )
+Error NLogfile::Open( const std::wstring &file_path, ProgressMeter * progress )
 {
-	return GetLogAccessor()->Open( file_path, progress, skip_lines );
+	return GetLogAccessor()->Open( file_path, progress );
 }
 
 
-view_ptr_t NLogfile::CreateView( void )
+lineset_ptr_t NLogfile::CreateLineSet( boost::python::object match )
 {
-	return new NView{ logfile_ptr_t{ this } };
+	try
+	{
+		lineset_ptr_t res{ new NLineSet{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() } };
+
+		if( !res->Filter( match, false ) )
+			res.reset();
+
+		return res;
+	}
+	catch( const std::exception & ex )
+	{
+		TraceError( e_CreateLineSet, "Exception: '%s'", ex.what() );
+	}
+
+	return lineset_ptr_t{};
 }
 
 
-lineset_ptr_t NLogfile::CreateLineSet( void )
+eventview_ptr_t NLogfile::CreateEventView( void )
 {
-	return new NLineSet{ logfile_ptr_t{ this } };
+	try
+	{
+		return new NEventView{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
+	}
+	catch( const std::exception & ex )
+	{
+		TraceError( e_CreateEventView, "Exception: '%s'", ex.what() );
+	}
+
+	return eventview_ptr_t{};
 }
 
 
+logview_ptr_t NLogfile::CreateLogView( void )
+{
+	try
+	{
+		return new NLogView{ logfile_ptr_t{ this }, GetLogAccessor()->CreateViewAccessor() };
+	}
+	catch( const std::exception & ex )
+	{
+		TraceError( e_CreateLogView, "Exception: '%s'", ex.what() );
+	}
+
+	return logview_ptr_t{};
+}
+
+
+bool  NLogfile::SetAutoMarker( unsigned marker, boost::python::object match )
+{
+	return m_Adornments->SetAutoMarker( marker, match, logfile_ptr_t{ this } );
+}

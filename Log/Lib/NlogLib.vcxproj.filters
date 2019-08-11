@@ -35,12 +35,6 @@
     <ClInclude Include="Hdr\FileMap.h">
       <Filter>Header Files\Public</Filter>
     </ClInclude>
-    <ClInclude Include="Src\LogIndexAccessor.h">
-      <Filter>Header Files\Private</Filter>
-    </ClInclude>
-    <ClInclude Include="Src\LogIndexWriter.h">
-      <Filter>Header Files\Private</Filter>
-    </ClInclude>
     <ClInclude Include="Hdr\Ntime.h">
       <Filter>Header Files\Public</Filter>
     </ClInclude>
@@ -51,6 +45,27 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Hdr\Nfilesystem.h">
+      <Filter>Header Files\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\MapLogIndexAccessor.h">
+      <Filter>Header Files\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\MapLogIndexWriter.h">
+      <Filter>Header Files\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\sqlite3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Hdr\Nline.h">
+      <Filter>Header Files\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Hdr\Cache.h">
+      <Filter>Header Files\Public</Filter>
+    </ClInclude>
+    <ClInclude Include="Src\FieldAccessor.h">
+      <Filter>Header Files\Private</Filter>
+    </ClInclude>
+    <ClInclude Include="Hdr\Field.h">
       <Filter>Header Files\Public</Filter>
     </ClInclude>
   </ItemGroup>
@@ -70,16 +85,22 @@
     <ClCompile Include="Src\FileMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\LogIndexAccessor.cpp">
+    <ClCompile Include="Src\Misc.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\LogIndexWriter.cpp">
+    <ClCompile Include="Src\MapLogAccessor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\MapLogIndexAccessor.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Src\MapLogIndexWriter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Src\LogAccessor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Src\Misc.cpp">
+    <ClCompile Include="Src\SqlLogAccessor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

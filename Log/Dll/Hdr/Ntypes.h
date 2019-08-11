@@ -37,8 +37,9 @@
 class NAnnotations; using annotations_ptr_t = boost::intrusive_ptr<NAnnotations>;
 class NAdornments; using adornments_ptr_t = boost::intrusive_ptr<NAdornments>;
 class NLogfile; using logfile_ptr_t = boost::intrusive_ptr<NLogfile>;
-class NView; using view_ptr_t = boost::intrusive_ptr<NView>;
 class NLineSet;  using lineset_ptr_t = boost::intrusive_ptr<NLineSet>;
+class NEventView;  using eventview_ptr_t = boost::intrusive_ptr<NEventView>;
+class NLogView; using logview_ptr_t = boost::intrusive_ptr<NLogView>;
 
 
 

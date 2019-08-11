@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2017-2018 Niel Clausen. All rights reserved.
+// Copyright (C) 2017-2019 Niel Clausen. All rights reserved.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@
 
 // Boost includes
 #include <boost/python.hpp>
-namespace python = boost::python;
+using namespace boost::python;
 
 // Application includes
 #include "Nlog.h"
@@ -35,7 +35,7 @@ namespace python = boost::python;
 namespace
 {
 	// logger object to call-back into Python
-	python::object g_Logger;
+	object g_Logger;
 
 
 	// tracing can be sent to Python for distribution and storage
@@ -54,11 +54,110 @@ namespace
 
 
 /*-----------------------------------------------------------------------
+ * ADAPTERS
+ -----------------------------------------------------------------------*/
+
+// LogAccessor factory
+logaccessor_ptr_t MakeLogAccessor( object log_schema )
+{
+	LogAccessorDescriptor descriptor
+	{
+		extract<std::string>{ log_schema.attr( "AccessorName" ) },
+		extract<std::string>{ log_schema.attr( "Guid" ) },
+		extract<std::string>{ log_schema.attr( "RegexText" ) },
+		extract<unsigned>{ log_schema.attr( "TextOffsetSize" ) }
+	};
+
+	stl_input_iterator<object> end;
+
+	for( auto ifield_schema = stl_input_iterator<object>{ log_schema }; ifield_schema != end; ++ifield_schema )
+	{
+		bool available{ true };
+		try
+		{
+			available = extract<bool>{ ifield_schema->attr( "Available" ) };
+		}
+		catch( error_already_set & )
+		{
+			PyErr_Clear();
+		}
+
+		unsigned data_col_offset{ 0 };
+		try
+		{
+			data_col_offset = extract<unsigned>{ ifield_schema->attr( "DataColumnOffset" ) };
+		}
+		catch( error_already_set & )
+		{
+			PyErr_Clear();
+		}
+
+		descriptor.m_FieldDescriptors.push_back( FieldDescriptor
+		{
+			available,
+			extract<std::string>{ ifield_schema->attr( "Name" ) },
+			extract<std::string>{ ifield_schema->attr( "Type" ) },
+			extract<std::string>{ ifield_schema->attr( "Separator" ) },
+			extract<unsigned>{ ifield_schema->attr( "SeparatorCount" ) },
+			extract<unsigned>{ ifield_schema->attr( "MinWidth" ) },
+			data_col_offset
+		} );
+	}
+
+	object formatter{ log_schema.attr( "GetFormatter" )() };
+	for( auto iformat = stl_input_iterator<object>{ formatter }; iformat != end; ++iformat )
+	{
+		const std::string regex_text{ extract<std::string>{ iformat->attr( "RegexText" ) } };
+		std::regex_constants::syntax_option_type flags{
+			std::regex_constants::ECMAScript
+			| std::regex_constants::optimize
+		};
+
+		std::vector<unsigned> style_nos;
+		for( auto istyleno = stl_input_iterator<object>{ iformat->attr( "StyleNumbers" ) }; istyleno != end; ++istyleno )
+			style_nos.push_back( extract<unsigned>{ *istyleno } );
+
+		FormatDescriptor line_formatter{ std::regex{ regex_text, flags }, std::move( style_nos ) };
+		descriptor.m_LineFormatters.push_back( std::move( line_formatter ) );
+	}
+
+	TraceDebug( "name:'%s' match_desc:'%s' guid:'%s'",
+		descriptor.m_Name.c_str(),
+		descriptor.m_RegexText.c_str(),
+		descriptor.m_Guid.c_str()
+	);
+
+	logaccessor_ptr_t accessor{ LogAccessorFactory::Create( descriptor ) };
+	const Error error{ accessor ? e_OK : e_BadAccessorName };
+	if( !Ok( error ) )
+		accessor.reset();
+
+	return accessor;
+}
+
+
+// Selector factory
+selector_ptr_t MakeSelector( object match, bool empty_selects_all, const LogSchemaAccessor * log_schema )
+{
+	Match descriptor{
+		extract<Match::Type>{ match.attr( "GetSelectorId" )() },
+		extract<std::string>{ match.attr( "MatchText" ) },
+		extract<bool>{ match.attr( "MatchCase" ) }
+	};
+
+	selector_ptr_t selector{ Selector::MakeSelector( descriptor, empty_selects_all, log_schema ) };
+	const Error error{ selector ? e_OK : TraceError( e_BadSelectorDefinition, "'%s'", descriptor.m_Text.c_str() ) };
+	return selector;
+}
+
+
+
+/*-----------------------------------------------------------------------
  * MODULE
  -----------------------------------------------------------------------*/
 
 // Python initialisation
-void Setup( python::object logger )
+void Setup( object logger )
 {
 	// startup message
 	static OnEvent evt{ OnEvent::EventType::Startup,
@@ -88,15 +187,15 @@ void Setup( python::object logger )
 
 
 // Python access to logfile factory
-logfile_ptr_t MakeLogfile( const std::string & nlog_path, NLogAccessor * log_accessor, python::object progress, size_t skip_lines = 0 )
+logfile_ptr_t MakeLogfile( const std::string & nlog_path, object log_schema, object progress )
 {
 	using converter_t = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>;
 	std::wstring wnlog_path{ converter_t{}.from_bytes( nlog_path ) };
 
 	struct PythonProgress : public ProgressMeter
 	{
-		python::object & f_Progress;
-		PythonProgress( python::object & progress )
+		object & f_Progress;
+		PythonProgress( object & progress )
 			: f_Progress{ progress } {}
 
 		void SetRange( size_t range ) override {
@@ -113,102 +212,13 @@ logfile_ptr_t MakeLogfile( const std::string & nlog_path, NLogAccessor * log_acc
 
 	TraceDebug( "path:'%S'", wnlog_path.c_str() );
 
-	logfile_ptr_t logfile{ new NLogfile{ log_accessor } };
-	const Error error{ logfile->Open( wnlog_path, &meter, skip_lines ) };
+	logfile_ptr_t logfile{ new NLogfile{ std::move( MakeLogAccessor( log_schema ) ) } };
+	const Error error{ logfile->Open( wnlog_path, &meter ) };
 	if( !Ok( error ) )
 		logfile.reset();
 
 	return logfile;
 }
-BOOST_PYTHON_FUNCTION_OVERLOADS( MakeLogfileOverloads, MakeLogfile, 3, 4 )
-
-
-// Python access to LogAccessor factory
-logaccessor_ptr_t MakeLogAccessor( python::object log_schema, python::object formatter )
-{
-	using as_string = python::extract<std::string>;
-	using as_char = python::extract<char>;
-	using as_unsigned = python::extract<unsigned>;
-	using as_size = python::extract<size_t>;
-
-	const std::string accessor_name{ as_string{ log_schema.attr( "GetAccessorName" )() } };
-	const std::string guid{ as_string{ log_schema.attr( "GetGuid" )() } };
-	const std::string match_desc{ as_string{ log_schema.attr( "GetMatchDesc" )() } };
-	const size_t num_fields{ as_size{ log_schema.attr( "GetNumFields" )() } };
-	const unsigned text_offset_size{as_unsigned{ log_schema.attr( "GetTextOffsetSize" )() } };
-
-	fielddescriptor_list_t field_descs; field_descs.reserve( num_fields + 2 );
-	for( size_t i = 0; i < num_fields; ++i )
-	{
-		python::object field_schema{ log_schema.attr( "GetFieldSchema" )(i) };
-
-		const std::string field_type{ as_string{ field_schema.attr( "Type" ) } };
-		const std::string field_name{ as_string{ field_schema.attr( "Name" ) } };
-		const std::string separator{ as_string{ field_schema.attr( "Separator" ) } };
-		const unsigned separator_count{ as_unsigned{ field_schema.attr( "SeparatorCount" ) } };
-		const unsigned min_width{ as_unsigned{ field_schema.attr( "MinWidth" ) } };
-
-		// using emplace_back here results in compiler unable to find FieldDescriptor constructor ??
-		field_descs.push_back( FieldDescriptor{ field_type, field_name, separator, separator_count, min_width } );
-	}
-
-	const size_t num_formatters{ as_size{ formatter.attr( "GetNumFormats" )() } };
-	formatdescriptor_list_t formats;
-	for( size_t i = 0; i < num_formatters; ++i )
-	{
-		const std::string regex_text{ as_string{ formatter.attr( "GetFormatRegex" )( i ) } };
-		std::regex_constants::syntax_option_type flags{
-			std::regex_constants::ECMAScript
-			| std::regex_constants::optimize
-		};
-
-		FormatDescriptor line_formatter{ std::regex{ regex_text, flags} };
-
-		const size_t num_styles{ as_size{ formatter.attr( "GetFormatNumStyles" )( i ) } };
-		for( size_t j = 0; j < num_styles; ++j )
-			line_formatter.m_Styles.push_back( as_unsigned{ formatter.attr( "GetFormatStyle" )( i, j ) } );
-
-		formats.push_back( std::move( line_formatter ) );
-	}
-
-	TraceDebug( "name:'%s' match_desc:'%s' guid:'%s'", accessor_name.c_str(), match_desc.c_str(), guid.c_str() );
-
-	logaccessor_ptr_t accessor{ new NLogAccessor{
-		accessor_name,
-		guid,
-		text_offset_size,
-		std::move( field_descs ),
-		match_desc,
-		std::move( formats )
-	} };
-
-	const Error error{ accessor->Ok() ? e_OK : e_BadAccessorName };
-	if( !Ok( error ) )
-		accessor.reset();
-
-	return accessor;
-}
-
-
-// Python access to Selector factory
-selector_ptr_t MakeSelector( python::object match, bool empty_selects_all, const NLogfile * logfile = nullptr )
-{
-	Match descriptor{
-		python::extract<Match::Type>{ match.attr( "GetSelectorId" )() },
-		python::extract<std::string>{ match.attr( "MatchText" ) },
-		python::extract<bool>{ match.attr( "MatchCase" ) }
-	};
-
-	const LogSchemaAccessor * schema{ logfile ? logfile->GetSchema() : nullptr };
-
-	selector_ptr_t selector{ new NSelector{ descriptor, empty_selects_all, schema } };
-	const Error error{ selector->Ok() ? e_OK : TraceError( e_BadSelectorDefinition, "'%s'", descriptor.m_Text.c_str() ) };
-	if( !Ok( error ) )
-		selector.reset();
-
-	return selector;
-}
-BOOST_PYTHON_FUNCTION_OVERLOADS( MakeSelectorOverloads, MakeSelector, 2, 3 )
 
 
 // Python access to the global tracker array
@@ -236,7 +246,6 @@ namespace boost
 {
 	template <> NHiliter const volatile * get_pointer( NHiliter const volatile *n ) { return n; }
 	template <> NSelector const volatile * get_pointer( NSelector const volatile *n ) { return n; }
-	template <> NLogAccessor const volatile * get_pointer( NLogAccessor const volatile *n ) { return n;  }
 	template <> NView const volatile * get_pointer( NView const volatile *n ) { return n; }
 	template <> NLineSet const volatile * get_pointer( NLineSet const volatile *n ) { return n; }
 	template <> NLogfile const volatile * get_pointer( NLogfile const volatile *n ) { return n; }
@@ -249,20 +258,18 @@ namespace boost
 //  https://wiki.python.org/moin/boost.python/PointersAndSmartPointers
 BOOST_PYTHON_MODULE( Nlog )
 {
-	using namespace python;
-
 	// although boost::noncopyable is specified here, Boost still attempts
 	// to make use of a copy constructor, so the kludged default constructors
 	// are needed for the time being
-	class_<PerfTimer, boost::noncopyable>( "PerfTimer" )
+	class_<PerfTimer>( "PerfTimer" )
 		.def( "Overall", &PerfTimer::Overall )
 		.def( "PerItem", &PerfTimer::PerItem )
 		;
 
-	class_<NHiliter, hiliter_ptr_t, boost::noncopyable>( "Hiliter" )
+	class_<NHiliter, hiliter_ptr_t, boost::noncopyable>( "Hiliter", no_init )
 		.def( "Search", &NHiliter::Search )
 		.def( "Hit", &NHiliter::Hit )
-		.def( "SetSelector", &NHiliter::SetSelector )
+		.def( "SetMatch", &NHiliter::SetMatch )
 		;
 
 	enum_<Match::Type>( "EnumSelector" )
@@ -278,62 +285,70 @@ BOOST_PYTHON_MODULE( Nlog )
 		.export_values()
 		;
 
-	class_<NTimecodeBase, boost::noncopyable>( "NTimecodeBase", init<time_t, unsigned>() )
+	class_<NTimecodeBase, boost::noncopyable>( "TimecodeBase", init<time_t, unsigned>() )
 		.def( "GetUtcDatum", &NTimecodeBase::GetUtcDatum )
 		.def( "GetFieldId", &NTimecodeBase::GetFieldId )
 		;
 
-	class_<NTimecode, boost::noncopyable>( "NTimecode", init<time_t, int64_t>() )
+	class_<NTimecode, boost::noncopyable>( "Timecode", init<time_t, int64_t>() )
 		.def( "GetUtcDatum", &NTimecode::GetUtcDatum )
 		.def( "GetOffsetNs", &NTimecode::GetOffsetNs )
 		.def( "Normalise", &NTimecode::Normalise )
 		.def( "Subtract", &NTimecode::Subtract )
 		;
 
-	class_<NSelector, selector_ptr_t, boost::noncopyable>( "Selector" )
+	class_<NViewCore>( "ViewCore", no_init )
+		.def( "GetNumLines", &NViewCore::GetNumLines )
 		;
 
-	class_<NLogAccessor, logaccessor_ptr_t, boost::noncopyable>( "LogAccessor" )
+	class_<NViewFieldAccess>( "ViewFieldAccess", no_init )
+		.def( "GetNonFieldText", &NViewFieldAccess::GetNonFieldText ) \
+		.def( "GetFieldText", &NViewFieldAccess::GetFieldText ) \
+		.def( "GetFieldValueUnsigned", &NViewFieldAccess::GetFieldValueUnsigned ) \
+		.def( "GetFieldValueSigned", &NViewFieldAccess::GetFieldValueSigned ) \
+		.def( "GetFieldValueFloat", &NViewFieldAccess::GetFieldValueFloat ) \
 		;
 
-	// NLineSet and NView present similar interfaces to Pythin, but have
-	// incompatible inheritance structure; so using a macro to extract the
-	// commonality
-	#define NFilterView_Members(CLS) \
-		.def( "GetUtcTimecode", &CLS::GetUtcTimecode, return_value_policy<manage_new_object>() ) \
-		.def( "GetNonFieldText", &CLS::GetNonFieldText ) \
-		.def( "GetFieldText", &CLS::GetFieldText ) \
-		.def( "GetFieldValueUnsigned", &CLS::GetFieldValueUnsigned ) \
-		.def( "GetFieldValueSigned", &CLS::GetFieldValueSigned ) \
-		.def( "GetFieldValueFloat", &CLS::GetFieldValueFloat ) \
-		.def( "SetNumHiliter", &CLS::SetNumHiliter ) \
-		.def( "GetHiliter", &CLS::GetHiliter ) \
-		.def( "Filter", &CLS::Filter ) \
-		.def( "SetFieldMask", &CLS::SetFieldMask )
-
-	class_<NLineSet, lineset_ptr_t, boost::noncopyable>( "LineSet" )
-		NFilterView_Members( NLineSet )
-		.def( "GetNumLines", &NLineSet::GetNumLines )
-		.def( "ViewLineToLogLine", &NLineSet::ViewLineToLogLine )
-		.def( "LogLineToViewLine", &NLineSet::LogLineToViewLine )
+	class_<NViewLineTranslation>( "ViewLineTranslation", no_init )
+		.def( "ViewLineToLogLine", &NViewLineTranslation::ViewLineToLogLine )
+		.def( "LogLineToViewLine", &NViewLineTranslation::LogLineToViewLine )
 		;
 
-	class_<NView, view_ptr_t, boost::noncopyable>( "View" )
-		NFilterView_Members( NView )
-		.def( "GetContent", &NView::GetContent )
-		.def( "ToggleBookmarks", &NView::ToggleBookmarks )
-		.def( "GetNextBookmark", &NView::GetNextBookmark )
-		.def( "GetNextAnnotation", &NView::GetNextAnnotation )
-		.def( "SetLocalTrackerLine", &NView::SetLocalTrackerLine )
-		.def( "GetLocalTrackerLine", &NView::GetLocalTrackerLine )
-		.def( "GetGlobalTrackerLine", &NView::GetGlobalTrackerLine )
+	class_<NViewHiliting>( "ViewHiliting", no_init )
+		.def( "SetNumHiliter", &NViewHiliting::SetNumHiliter ) \
+		.def( "GetHiliter", &NViewHiliting::GetHiliter ) \
+		.def( "SetFieldMask", &NViewHiliting::SetFieldMask )
 		;
 
-	class_<NLogfile, logfile_ptr_t, boost::noncopyable>( "Logfile" )
+	class_<NViewTimecode>( "ViewTimecode", no_init )
+		.def( "GetUtcTimecode", &NViewTimecode::GetUtcTimecode, return_value_policy<manage_new_object>() ) \
+		;
+
+	class_<NLineSet, lineset_ptr_t, bases<NViewCore, NViewFieldAccess, NViewTimecode, NViewLineTranslation>>( "LineSet", no_init )
+		;
+
+	class_<NEventView, eventview_ptr_t, bases<NViewCore, NViewFieldAccess, NViewHiliting>>( "NEventView", no_init )
+		.def( "Filter", &NEventView::Filter )
+		.def( "Sort", &NEventView::Sort )
+		;
+
+	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewTimecode, NViewHiliting>>( "LogView", no_init )
+		.def( "Filter", &NLogView::Filter )
+		.def( "GetContent", &NLogView::GetContent )
+		.def( "ToggleBookmarks", &NLogView::ToggleBookmarks )
+		.def( "GetNextBookmark", &NLogView::GetNextBookmark )
+		.def( "GetNextAnnotation", &NLogView::GetNextAnnotation )
+		.def( "SetLocalTrackerLine", &NLogView::SetLocalTrackerLine )
+		.def( "GetLocalTrackerLine", &NLogView::GetLocalTrackerLine )
+		.def( "GetGlobalTrackerLine", &NLogView::GetGlobalTrackerLine )
+		;
+
+	class_<NLogfile, logfile_ptr_t, boost::noncopyable>( "Logfile", no_init )
 		.def( "GetState", &NLogfile::GetState )
 		.def( "PutState", &NLogfile::PutState )
-		.def( "CreateView", &NLogfile::CreateView )
 		.def( "CreateLineSet", &NLogfile::CreateLineSet )
+		.def( "CreateLogView", &NLogfile::CreateLogView )
+		.def( "CreateEventView", &NLogfile::CreateEventView )
 		.def( "SetNumAutoMarker", &NLogfile::SetNumAutoMarker )
 		.def( "SetAutoMarker", &NLogfile::SetAutoMarker )
 		.def( "ClearAutoMarker", &NLogfile::ClearAutoMarker )
@@ -342,8 +357,6 @@ BOOST_PYTHON_MODULE( Nlog )
 		;
 
 	def( "Setup", Setup );
-	def( "MakeLogfile", MakeLogfile, MakeLogfileOverloads{} );
-	def( "MakeLogAccessor", MakeLogAccessor );
-	def( "MakeSelector", MakeSelector, MakeSelectorOverloads{} );
+	def( "MakeLogfile", MakeLogfile );
 	def( "SetGlobalTracker", SetGlobalTracker );
 }

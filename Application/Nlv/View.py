@@ -621,7 +621,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self.InterceptKeys(editor)
         editor.Bind(wx.stc.EVT_STC_UPDATEUI, self.OnUpdateUI)
 
-        self._N_View = self.GetLogfile().CreateView()
+        self._N_View = self.GetLogfile().CreateLogView()
 
         # make a Scintilla document to display the view, and
         # add it to the Scintilla editor
@@ -972,7 +972,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         """A hiliter GUI page match field has been edited; update editor"""
 
         try:
-            self._N_View.GetHiliter(index).SetSelector(match.MakeSelector(empty_selects_all = False))
+            self._N_View.GetHiliter(index).SetMatch(match)
             self.RefreshView()
             return True
 
@@ -1007,13 +1007,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def UpdateFilter(self, match):
         """The filter GUI page has been altered; re-filter the logfile view"""
-
-        selector = match.MakeSelector(self.GetLogfile())
-        if selector is None:
-            return False
-
-        self._N_View.Filter(selector, True)
-        return True
+        return self._N_View.Filter(match)
 
 
 

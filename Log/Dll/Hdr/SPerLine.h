@@ -148,12 +148,27 @@ private:
 	// all markers are handled via the logfile
 	adornments_ptr_t m_Adornments;
 
-	// back reference to cell buffer in our owning view
-	const SViewCellBuffer & m_CellBuffer;
+	// view data
+	viewaccessor_ptr_t m_ViewAccessor;
+	const ViewMap * m_ViewMap;
+	const ViewLineTranslation * m_ViewLineTranslation;
+
+protected:
+	vint_t ViewMarkValue( vint_t line );
 
 public:
-	SLineMarkers( adornments_ptr_t adornments, const SViewCellBuffer & cell_buffer )
-		: m_Adornments{ adornments }, m_CellBuffer{ cell_buffer } {}
+	SLineMarkers( adornments_ptr_t adornments, viewaccessor_ptr_t view_accessor )
+		:
+		m_Adornments{ adornments },
+		m_ViewAccessor{ view_accessor },
+		m_ViewMap{ view_accessor->GetMap() },
+		m_ViewLineTranslation{ view_accessor->GetLineTranslation() }
+	{
+		if( !m_ViewMap )
+			throw std::runtime_error{ "ViewAccessor has no ViewMap" };
+		if( !m_ViewLineTranslation )
+			throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
+	}
 
 	vint_t MarkValue( vint_t line ) override;
 
@@ -257,20 +272,24 @@ private:
 	annotations_ptr_t m_LogAnnotations;
 	ChangeTracker m_LogAnnotationsTracker;
 
-	// back reference to cell buffer in our owning view
-	const SViewCellBuffer & m_CellBuffer;
-	ChangeTracker m_CellBufferTracker;
+	// view data
+	viewaccessor_ptr_t m_ViewAccessor;
+	const ViewLineTranslation * m_ViewLineTranslation;
+	ChangeTracker m_ViewTracker;
 
 protected:
 	const NAnnotation * GetAnnotation( vint_t line ) const;
 
-	vint_t ViewLineToLogLine( vint_t view_line_no ) const {
-		return m_CellBuffer.ViewLineToLogLine( view_line_no );
-	}
-
 public:
-	SLineAnnotation( annotations_ptr_t log_annotations, const SViewCellBuffer & cell_buffer )
-		: m_LogAnnotations{ log_annotations }, m_CellBuffer{ cell_buffer } {}
+	SLineAnnotation( annotations_ptr_t log_annotations, viewaccessor_ptr_t view_accessor )
+		:
+		m_LogAnnotations{ log_annotations },
+		m_ViewAccessor{ view_accessor },
+		m_ViewLineTranslation{ view_accessor->GetLineTranslation() }
+	{
+		if( !m_ViewLineTranslation )
+			throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
+	}
 
 	bool HasStateChanged( void ) const;
 	annotationsizes_list_t GetAnnotationSizes( void ) const;
@@ -327,9 +346,8 @@ private:
 	// interface to annotations we're tracking
 	lineannotation_ptr_t m_Annotations;
 
-	// back reference to cell buffer in our owning view
-	const SViewCellBuffer & m_CellBuffer;
-
+	// view data
+	viewaccessor_ptr_t m_ViewAccessor;
 
 	// cached annotation values
 	mutable annotationsizes_list_t m_AnnotationSizes;
@@ -346,8 +364,8 @@ protected:
 	void ValidateCache( void ) const ;
 
 public:
-	SContractionState( lineannotation_ptr_t annotations, const SViewCellBuffer & cell_buffer )
-		: m_Annotations{ annotations }, m_CellBuffer{ cell_buffer } {}
+	SContractionState( lineannotation_ptr_t annotations, viewaccessor_ptr_t view_accessor )
+		: m_Annotations{ annotations }, m_ViewAccessor{ view_accessor } {}
 
 	vint_t LinesInDoc() const override;
 	vint_t LinesDisplayed() const override;

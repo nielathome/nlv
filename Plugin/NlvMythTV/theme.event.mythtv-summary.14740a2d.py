@@ -43,8 +43,8 @@ class Analyser:
             (
                 start_text TEXT,
                 start_line_no INT,
-                finish_text TEXT,
-                finish_line_no INT,
+                start_utc INT,
+                start_offset_ns INT,
                 duration_ns INT,
                 process INT
             )""")
@@ -62,7 +62,7 @@ class Analyser:
 
         self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?)",
         [
-            ed[0], ed[1], ed[4], ed[5], ed[8],
+            ed[0], ed[1], ed[2], ed[3], ed[8],
             self.Process
         ])
 
@@ -72,6 +72,7 @@ class Analyser:
     #-----------------------------------------------------------
     def End(self, context):
         self.Cursor.close()
+        context.Connection.commit()
 
 
 
@@ -82,9 +83,8 @@ class Projector:
     #-----------------------------------------------------------
     @staticmethod
     def DefineSchema(schema):
-        schema.AddNesting()
+        #schema.AddNesting()
         schema.AddStart("Start", width = 100)
-        schema.AddFinish("Finish", 100)
         schema.AddDuration("Duration", scale = "s", width = 60)
         schema.AddField("Event Summary", "text", 150, "left")
 
@@ -113,52 +113,52 @@ class Projector:
     def Project(self, connection, context):
         cursor = connection.cursor()
 
+        tables = ["expire"]
+        db_file = context.FindDbFile("B62B556A-DABA-4886-A469-F739492750D3")
+
+        if db_file is not None:
+            cursor.execute("ATTACH DATABASE '{}' AS dbs".format(db_file))
+            tables.append("dbs.reschedule")
+
+        utc_datum = context.MakeProjectionMetaTable(cursor, tables)
+        context.MakeProjectionTable(cursor)
+
         select_expire = """
             SELECT
-                start_line_no,
-                finish_line_no,
-                process,
                 start_text,
-                finish_text,
+                start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
                 duration_ns,
-                'expire'
-            FROM expire"""
+                'expire' AS summary
+            FROM
+                expire
+            """.format(utc_datum = utc_datum)
 
         select_reschedule = """
             SELECT
-                start_line_no,
-                finish_line_no,
-                process,
                 start_text,
-                finish_text,
+                start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
                 duration_ns,
-                'P=[' || place || ']'
-            FROM dbs.reschedule"""
+                'P=[' || place || ']' AS summary
+            FROM
+                dbs.reschedule
+            """.format(utc_datum = utc_datum)
 
-        file = context.FindDbFile("B62B556A-DABA-4886-A469-F739492750D3")
-        if file is None:
-            select = """
-                {}
-                ORDER BY start_line_no ASC
-            """.format(select_expire)
+        if db_file is None:
+            select = select_expire
         else:
-            cursor.execute("ATTACH DATABASE '{}' AS dbs".format(file))
             select = """
                 {}
                 UNION ALL
                 {}
-                 ORDER BY start_line_no ASC
             """.format(select_expire, select_reschedule)
 
-        cursor.execute(select)
-        for event in cursor:
-            context.AddEvent([
-                context.CalcParentId(event[0], event[1], event[2], self.IsSameProcess),
-                event[3],
-                event[4],
-                context.CalcDuration(event[5]),
-                event[6]
-            ])
+        cursor.execute("""
+            INSERT INTO projection
+                {}
+            """.format(select))
+
+        cursor.close()
+        connection.commit()
 
 
 
@@ -446,5 +446,6 @@ class EventMetrics:
 ## GLOBAL ######################################################
 
 Analyse(Analyser())
-Project("Summary", Projector(), EventMetrics())
+#Project("Summary", Projector(), EventMetrics())
+Project("Summary", Projector())
 

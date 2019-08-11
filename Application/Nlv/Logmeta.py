@@ -85,38 +85,37 @@ class G_FieldSchema:
             self.MinWidth = int(mw)
 
 
+## G_FieldList ##############################################
+
+class G_FieldList(list):
+    """A list of field schemata"""
+
+    #-------------------------------------------------------
+    def Append(self, field_schema):
+        idx = len(self)
+        self.append(field_schema)
+        return idx
+
+
 
 ## G_FieldSchemata ##########################################
 
-class G_FieldSchemata:
+class G_FieldSchemata(G_FieldList):
     """
     A list of G_FieldSchema-like objects; with an Nlog compatible interface.
     """
 
     #-------------------------------------------------------
-    def __init__(self, guid = ""):
-        self._Guid = guid
-        self._RegexText = ""
+    def __init__(self, accessor_name, guid):
+        super().__init__()
+
+        self.AccessorName = accessor_name
+        self.Guid = guid
+        self.RegexText = ""
         self._FormatterGuid = None
-        self._FieldSchemata = []
 
     def _SetTextOffsetSize(self, size):
-        self._TextOffsetSize = size
-
-
-    #-------------------------------------------------------
-    def __len__(self):
-        return len(self._FieldSchemata)
-
-    def __getitem__(self, position):
-        return self._FieldSchemata[position]
-
-
-    #-------------------------------------------------------
-    def Append(self, field_schema):
-        idx = len(self._FieldSchemata)
-        self._FieldSchemata.append(field_schema)
-        return idx
+        self.TextOffsetSize = size
 
 
     #-------------------------------------------------------
@@ -126,37 +125,10 @@ class G_FieldSchemata:
         else:
             return GetFormatter(self._FormatterGuid)
 
-    def MakeLogAccessor(self):
-        """Make a LogAccessor, needed by NLog to read/interpret a logfile"""
-        return Nlog.MakeLogAccessor(self, self.GetFormatter())
-
 
     #-------------------------------------------------------
     def GetFieldNames(self):
-        return [fs.Name for fs in self._FieldSchemata if fs.Available]
-
-
-    #-------------------------------------------------------
-    # Nlog callback interface
-
-    def GetNumFields(self):
-        return len(self._FieldSchemata)
-
-    def GetFieldSchema(self, field_id):
-        return self._FieldSchemata[field_id]
-
-    def GetAccessorName(self):
-        # default is to use built in map accessor
-        return "map"
-
-    def GetGuid(self):
-        return self._Guid
-
-    def GetMatchDesc(self):
-        return self._RegexText
-
-    def GetTextOffsetSize(self):
-        return self._TextOffsetSize
+        return [fs.Name for fs in self if fs.Available]
 
 
     
@@ -209,10 +181,9 @@ class G_LogSchema(G_FieldSchemata):
 
     #-------------------------------------------------------
     def __init__(self, element):
-        super().__init__()
+        super().__init__("map", element.get("guid"))
 
         self._Name = element.get("name")
-        self._Guid = element.get("guid")
         self._Desc = element.find("description").text
         self._Ext = element.find("extension").text
 
@@ -242,16 +213,17 @@ class G_LogSchema(G_FieldSchemata):
             builders = self._Builders = G_XmlStore("builder", G_Builder)
             builders.AppendXml(elem)
 
-        self._RegexText = ""
+        self.RegexText = ""
         match = element.find("regex")
         if match is not None:
-            self._RegexText = match.text
+            self.RegexText = match.text
 
-        self._FieldSchemata = [G_FieldSchema(f) for f in element.iterfind("field")]
+        for f in element.iterfind("field"):
+            self.append(G_FieldSchema(f))
 
         # determine whether the schema includes emitter information
         self._EmitterId = -1
-        for (idx, field_schema) in enumerate(self._FieldSchemata):
+        for (idx, field_schema) in enumerate(self):
             if field_schema.Type == "emitter":
                 self._EmitterId = idx
                 break
@@ -417,59 +389,30 @@ class G_StyleSet:
 
 class G_Format:
     #-------------------------------------------------------
-    def __init__(self, element):
-        self._RegexText = element.find("regex").text
-        self._Styles = [e.text for e in element.findall("style")]
-
-
-    #-------------------------------------------------------
-    def GetRegex(self):
-        return self._RegexText
-
-    def GetNumStyles(self):
-        return len(self._Styles)
-
-    def GetStyleByIdx(self, idx):
-        return self._Styles[idx]
+    def __init__(self, element, styleset):
+        self.RegexText = element.find("regex").text
+        self.StyleNumbers = [styleset.GetStyleByName(e.text).GetStyleNumber() for e in element.findall("style")]
 
 
 
 ## G_Formatter ##############################################
 
-class G_Formatter:
+class G_Formatter(list):
+
     #-------------------------------------------------------
     def __init__(self, element = None):
         self._StyleSet = None
-        self._StyleSetGuid = None
-        self._Formats = []
+        if element is None:
+            return
 
-        if element is not None:
-            self._Formats = [G_Format(f) for f in element.iterfind("format")]
-            self._StyleSetGuid = element.find("styleset").text
+        styleset = self._StyleSet = GetStyleSet(element.find("styleset").text)
+        for f in element.iterfind("format"):
+            self.append(G_Format(f, styleset))
 
 
     #-------------------------------------------------------
     def GetStyleSet(self):
-        if self._StyleSet is None:
-            self._StyleSet = GetStyleSet(self._StyleSetGuid)
         return self._StyleSet
-
-
-    #-------------------------------------------------------
-    # Nlog callback interface
-
-    def GetNumFormats(self):
-        return len(self._Formats)
-
-    def GetFormatRegex(self, format_idx):
-        return self._Formats[format_idx].GetRegex()
-
-    def GetFormatNumStyles(self, format_idx):
-        return self._Formats[format_idx].GetNumStyles()
-
-    def GetFormatStyle(self, format_idx, style_idx):
-        style_name = self._Formats[format_idx].GetStyleByIdx(style_idx)
-        return self.GetStyleSet().GetStyleByName(style_name).GetStyleNumber()
 
 
 

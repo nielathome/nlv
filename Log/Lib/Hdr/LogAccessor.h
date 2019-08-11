@@ -17,16 +17,17 @@
 #pragma once
 
 // Nlog includes
+#include "Field.h"
+#include "Match.h"
 #include "Nfilesystem.h"
+#include "Nmisc.h"
 #include "Ntime.h"
 #include "Ntrace.h"
 
 // C++ includes
 #include <list>
-#include <memory>
+#include <map>
 #include <regex>
-#include <string>
-#include <vector>
 
 
 
@@ -44,115 +45,18 @@ nlineno_t nlineno_cast( T_VALUE value )
 }
 
 
-
-/*-----------------------------------------------------------------------
- * FieldValue
- -----------------------------------------------------------------------*/
-
-// support three basic field types
-enum class FieldValueType
+struct LineKey
 {
-	unsigned64,
-	signed64,
-	float64,
-	invalid
+	nlineno_t f_LineNo;
+	uint64_t f_FieldMask;
+
+	bool operator < ( const LineKey & rhs ) const {
+		if( f_LineNo != rhs.f_LineNo )
+			return f_LineNo < rhs.f_LineNo;
+		else
+			return f_FieldMask < rhs.f_FieldMask;
+	}
 };
-
-// convert a type to the matching field-value-type
-template<typename> struct TypeToFieldType {};
-
-template<> struct TypeToFieldType<uint64_t> {
-	static const FieldValueType type{ FieldValueType::unsigned64 };
-};
-
-template<> struct TypeToFieldType<int64_t> {
-	static const FieldValueType type{ FieldValueType::signed64 };
-};
-
-template<> struct TypeToFieldType<double> {
-	static const FieldValueType type{ FieldValueType::float64 };
-};
-
-// field value type
-class FieldValue
-{
-private:
-	FieldValueType m_Type{ FieldValueType::invalid };
-	uint64_t m_Payload{ 0 };
-
-public:
-	FieldValue( void ) {}
-
-	template<typename T_VALUE>
-	FieldValue( T_VALUE value )
-		:
-		m_Type{ TypeToFieldType<T_VALUE>::type },
-		m_Payload{ *reinterpret_cast<uint64_t *>(&value) }
-	{
-	}
-
-	FieldValue & operator = ( const FieldValue & rhs ) {
-		m_Type = rhs.m_Type;
-		m_Payload = rhs.m_Payload;
-		return *this;
-	}
-
-	template<typename T_RESULT>
-	T_RESULT As( void ) const
-	{
-		if( TypeToFieldType<T_RESULT>::type != m_Type )
-			throw std::runtime_error{ "Invalid FieldValue conversion" };
-
-		return *reinterpret_cast<const T_RESULT *>(&m_Payload);
-	}
-
-	template<typename T_RESULT>
-	T_RESULT Convert( void ) const
-	{
-		switch( m_Type )
-		{
-		case FieldValueType::unsigned64:
-			return static_cast<T_RESULT>(m_Payload);
-
-		case FieldValueType::signed64:
-			return static_cast<T_RESULT>(*reinterpret_cast<const int64_t *>(&m_Payload));
-
-		case FieldValueType::float64:
-			return static_cast<T_RESULT>(*reinterpret_cast<const double *>(&m_Payload));
-
-		default:
-			throw std::runtime_error{ "Invalid convert" };
-		}
-
-		return T_RESULT{};
-	}
-
-	FieldValue Convert( FieldValueType type ) const
-	{
-		switch( type )
-		{
-		case FieldValueType::unsigned64:
-			return FieldValue{ Convert<uint64_t>() };
-
-		case FieldValueType::signed64:
-			return FieldValue{ Convert<int64_t>() };
-
-		case FieldValueType::float64:
-			return FieldValue{ Convert<double>() };
-
-		default:
-			throw std::runtime_error{ "Invalid convert" };
-		}
-	}
-
-	FieldValueType GetType( void ) const {
-		return m_Type;
-	}
-
-	std::string AsString( void ) const;
-};
-
-using fieldvalue_t = FieldValue;
 
 
 
@@ -186,25 +90,38 @@ struct ProgressMeter
  * LineBuffer
  -----------------------------------------------------------------------*/
 
-// small class to hold a copy of a line's data
+// small class to hold a copy of a line's text
 class LineBuffer
 {
 private:
 	static const unsigned c_TypicalLineLength{ 2048 };
+	
+	bool m_Reserved{ false };
 	std::string m_Buffer;
 
-public:
-	LineBuffer( void ) {
-		// improve chance that Append does not have to re-allocate string
-		m_Buffer.reserve( c_TypicalLineLength );
+	void Reserve( void )
+	{
+		if( !m_Reserved )
+		{
+			// improve chance that Append does not have to re-allocate string
+			m_Buffer.reserve( c_TypicalLineLength );
+			m_Reserved = true;
+		}
 	}
 
+public:
 	void Append( char ch, size_t cnt = 1 ) {
+		Reserve();
 		m_Buffer.append( cnt, ch );
 	}
 
 	void Append( const char * first, const char * last ) {
+		Reserve();
 		m_Buffer.append( first, last );
+	}
+
+	bool Empty( void ) const {
+		return m_Buffer.empty();
 	}
 
 	void Clear( void ) {
@@ -231,101 +148,34 @@ public:
  * LineAccessor
  -----------------------------------------------------------------------*/
 
-// interface for accessing irregular log line data
-class LineAccessorIrregular
+// interface for accessing log line data and metadata
+struct LineAccessor
 {
-private:
-	nlineno_t m_LineNo{ 0 };
-
-protected:
-	void SetLineNo( nlineno_t line_no ) {
-		m_LineNo = line_no;
-	}
-
-public:
+	virtual nlineno_t GetLineNo( void ) const = 0;
 	virtual nlineno_t GetLength( void ) const = 0;
-
-	nlineno_t GetLineNo( void ) const {
-		return m_LineNo;
-	}
-};
-
-
-// interface for accessing regular log line data
-struct LineAccessor : public LineAccessorIrregular
-{
-	virtual bool IsRegular( void ) const = 0;
-	virtual const LineAccessorIrregular * NextIrregular( void ) const = 0;
 	virtual void GetText( const char ** first, const char ** last ) const = 0;
+	virtual bool IsRegular( void ) const = 0;
+	virtual nlineno_t NextIrregularLineLength( void ) const = 0;
 	virtual void GetNonFieldText( const char ** first, const char ** last ) const = 0;
 	virtual void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const = 0;
 	virtual fieldvalue_t GetFieldValue( unsigned field_id ) const = 0;
-	virtual NTimecode GetUtcTimecode( void ) const = 0;
 };
 
 
 
 /*-----------------------------------------------------------------------
- * LineVisitor
+ * Task
  -----------------------------------------------------------------------*/
 
-// interface to support visiting all lines in a set (e.g. a log file)
-struct LineVisitor
+// perform a task on a single log-file line
+struct Task
 {
-	// perform a task on a single log-file line; implemented by Visitor user
-	struct Task
-	{
-		// can be called from multiple threads; note that the visit_line_no and the
-		// log_line line number can be different - the visitor line numbers are mapped
-		// by the VisitLineToLogLine member
-		virtual void Action( const LineAccessor & log_line, nlineno_t visit_line_no ) = 0;
+	// can be called from multiple threads
+	virtual void Action( const LineAccessor & line ) = 0;
 
-		// map a view line number to a log file line number; by default, the
-		// two number spaces are the same
-		virtual nlineno_t VisitLineToLogLine( nlineno_t visit_line_no ) const {
-			return visit_line_no;
-		}
-	};
-	using task_t = std::shared_ptr<Task>;
-
-	// Visitor interface (callback); implemented by Visitor user
-	struct Visitor
-	{
-		// create a new Task for processing a subset of lines
-		virtual task_t MakeTask( nlineno_t num_lines ) = 0;
-
-		// combine the computed results from the Task into this Visitor
-		// guaranteed to be called in visitor line-number sequence
-		virtual void Join( task_t task ) = 0;
-	};
-
-	// "visit" a single line; use as a generalised line accessor
-	virtual void VisitLine( Task & task, nlineno_t visit_line_no, uint64_t field_mask = 0 ) const = 0;
-
-	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
-	template<typename T_FUNC>
-	void VisitLine( nlineno_t visit_line_no, T_FUNC & functor )
-	{
-		using functor_t = T_FUNC;
-
-		struct LocalTask : public Task
-		{
-			functor_t & f_Functor;
-			LocalTask( functor_t & functor )
-				: f_Functor{ functor } {}
-
-			void Action( const LineAccessor & line, nlineno_t visit_line_no ) override {
-				f_Functor( line );
-			}
-		};
-
-		LocalTask task{ functor };
-		VisitLine( task, visit_line_no );
-	}
-
-	// visit all lines in scope; use for searching/filtering
-	virtual void VisitLines( Visitor & visitor, uint64_t field_mask, bool include_irregular, nlineno_t num_lines = -1 ) const = 0;
 };
+
+using task_ptr_t = std::shared_ptr<Task>;
 
 
 
@@ -337,7 +187,7 @@ struct LineVisitor
 struct LogSchemaAccessor
 {
 	virtual size_t GetNumFields( void ) const = 0;
-	virtual std::string GetFieldName( unsigned field_id ) const = 0;
+	virtual const FieldDescriptor & GetFieldDescriptor( unsigned field_id ) const = 0;
 	virtual FieldValueType GetFieldType( unsigned field_id ) const = 0;
 	virtual uint16_t GetFieldEnumCount( unsigned field_id ) const = 0;
 	virtual const char * GetFieldEnumName( unsigned field_id, uint16_t enum_id ) const = 0;
@@ -349,29 +199,26 @@ struct LogSchemaAccessor
 
 
 /*-----------------------------------------------------------------------
- * FieldDescriptor
+ * LogAccessor
  -----------------------------------------------------------------------*/
 
-// describe a field; analog of Python's G_FieldSchema
-struct FieldDescriptor
+struct ViewAccessor;
+using viewaccessor_ptr_t = std::shared_ptr<ViewAccessor>;
+
+struct LogAccessor
 {
-	// field "type" (e.g. "enum16") - the key used by FieldFactory
-	std::string f_Type;
+	// core setup
+	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter * ) = 0;
+	virtual viewaccessor_ptr_t CreateViewAccessor( void ) = 0;
 
-	// arbitrary name - used LVF/LVA for selection/matching
-	std::string f_Name;
+	// field schema access
+	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
 
-	// field separator sequence
-	std::string f_Separator;
-
-	// count of separators; one solution for case where field contains f_Separator
-	unsigned f_SeparatorCount;
-
-	// field minimum width; another solution for case where field contains f_Separator
-	unsigned f_MinWidth;
+	// timezone control
+	virtual void SetTimezoneOffset( int offset_sec ) = 0;
 };
 
-using fielddescriptor_list_t = std::vector<FieldDescriptor>;
+using logaccessor_ptr_t = std::unique_ptr<LogAccessor>;
 
 
 
@@ -391,7 +238,61 @@ using formatdescriptor_list_t = std::list<FormatDescriptor>;
 
 
 /*-----------------------------------------------------------------------
- * LogAccessor
+ * LogAccessorDescriptor
+ -----------------------------------------------------------------------*/
+
+struct LogAccessorDescriptor
+{
+	std::string m_Name;
+	std::string m_Guid;
+	std::string m_RegexText;
+	unsigned m_TextOffsetsSize;
+	fielddescriptor_list_t m_FieldDescriptors;
+	formatdescriptor_list_t m_LineFormatters;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * LogAccessorFactory
+ -----------------------------------------------------------------------*/
+
+class LogAccessorFactory
+{
+public:
+	static void RegisterLogAccessor( const std::string & name, logaccessor_ptr_t (*creator)(LogAccessorDescriptor &) );
+
+	// factory for creating LogAccessor interfaces
+	static logaccessor_ptr_t Create( LogAccessorDescriptor & descriptor );
+
+protected:
+	static std::map<std::string, logaccessor_ptr_t (*)(LogAccessorDescriptor &)> m_Makers;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * ViewProperties
+ -----------------------------------------------------------------------*/
+
+class ViewProperties
+{
+protected:
+	ChangeTracker m_Tracker{ true };
+
+public:
+	const ChangeTracker & GetTracker( void ) const {
+		return m_Tracker;
+	}
+
+	// set the field mask and re-calculate line lengths
+	virtual void SetFieldMask( uint64_t field_mask ) = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * ViewMap
  -----------------------------------------------------------------------*/
 
 enum class e_LineData
@@ -401,41 +302,105 @@ enum class e_LineData
 	_Count
 };
 
-
-// all access to a log file (and its index) is abstracted behind this interface
-// logical equivalent to a CellBuffer for a logfile
-struct LogAccessor : public LineVisitor
+struct ViewMap
 {
-	// factory for creating LogAccessor interfaces
-	static LogAccessor * MakeLogAccessor
-	(
-		const std::string & accessor_name,
-		const std::string & guid,
-		unsigned text_offset_size,
-		fielddescriptor_list_t && field_descs,
-		const std::string & match_desc,
-		formatdescriptor_list_t && formatters
-	);
+	// line start locations in the view
+	std::vector<nlineno_t> m_Lines;
 
-	// lifetime management
-	virtual ~LogAccessor( void ) {}
-	virtual Error Open( const std::filesystem::path & file_path, ProgressMeter *, size_t skip_lines ) = 0;
+	// key text metrics
+	nlineno_t m_TextLen{ 0 };
+	nlineno_t m_NumLinesOrOne{ 0 };
 
-	// basic line access (for SViewCellBuffer)
-	virtual nlineno_t GetNumLines( void ) const = 0;
-	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const = 0;
-	virtual void CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * buffer ) const = 0;
+	// warning: an empty Scintilla document has a line count of 1
+	// this flag disambiguates the two cases
+	bool m_IsEmpty{ true };
 
-	// line/field access
-	virtual bool IsLineRegular( nlineno_t line_no ) const = 0;
-	virtual nlineno_t GetLineLength( nlineno_t line_no, uint64_t field_mask ) const = 0;
-	virtual fieldvalue_t GetFieldValue( nlineno_t line_no, unsigned field_id ) const = 0;
-	virtual NTimecode GetUtcTimecode( nlineno_t line_no ) const = 0;
-
-	// timezone control
-	virtual void SetTimezoneOffset( int offset_sec ) = 0;
-
-	// field schema access
-	virtual const LogSchemaAccessor * GetSchema( void ) const = 0;
+	virtual nlineno_t GetLineLength( nlineno_t line_no ) const = 0;
+	virtual const LineBuffer & GetLine( e_LineData type, nlineno_t line_no ) const = 0;
 };
 
+
+
+/*-----------------------------------------------------------------------
+ * ViewLineTranslation
+ -----------------------------------------------------------------------*/
+
+struct ViewLineTranslation
+{
+	virtual nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const = 0;
+	virtual nlineno_t ViewLineToLogLine( nlineno_t view_line_no ) const = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * SortControl
+ -----------------------------------------------------------------------*/
+
+struct SortControl
+{
+	virtual void SetSort( unsigned col_num, int direction ) = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * ViewAccessor
+ -----------------------------------------------------------------------*/
+
+struct ViewAccessor
+{
+	// "visit" a single line; use as a generalised line accessor
+	virtual void VisitLine( Task & task, nlineno_t visit_line_no ) const = 0;
+
+	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
+	template<typename T_FUNC>
+	void VisitLine( nlineno_t visit_line_no, T_FUNC & functor )
+	{
+		using functor_t = T_FUNC;
+
+		struct LocalTask : public Task
+		{
+			functor_t & f_Functor;
+			LocalTask( functor_t & functor )
+				: f_Functor{ functor } {}
+
+			void Action( const LineAccessor & line ) override {
+				f_Functor( line );
+			}
+		};
+
+		LocalTask task{ functor };
+		VisitLine( task, visit_line_no );
+	}
+
+	// basic line access
+	virtual nlineno_t GetNumLines( void ) const = 0;
+
+	// update the view to contain solely logfile lines which are matched by
+	// the given selector
+	virtual void Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool add_irregular ) = 0;
+
+	// search the view
+	virtual std::vector<nlineno_t> Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider) = 0;
+
+	// view configuration
+	virtual ViewProperties * GetProperties( void ) = 0;
+
+	// optional interfaces
+	virtual const ViewMap * GetMap( void ) {
+		return nullptr;
+	}
+
+	virtual const ViewLineTranslation * GetLineTranslation( void ) {
+		return nullptr;
+	}
+
+	virtual SortControl * GetSortControl( void ) {
+		return nullptr;
+	}
+
+	virtual const ViewTimecode * GetTimecode( void ) {
+		return nullptr;
+	}
+};

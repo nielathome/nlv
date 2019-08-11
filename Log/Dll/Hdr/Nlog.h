@@ -20,13 +20,13 @@
 #include <vector>
 #include <set>
 
-// Boost includes
-#include <boost/intrusive_ptr.hpp>
-
 // JSON includes
 #include "nlohmann/json.hpp"
-
 using json = nlohmann::json;
+
+// Boost includes; must be after JSON, otherwise the JSON headers don't compile (!)
+#include <boost/intrusive_ptr.hpp>
+#include <boost/python/object_fwd.hpp>
 
 // Application includes
 #include "FileMap.h"
@@ -35,6 +35,10 @@ using json = nlohmann::json;
 #include "Ntime.h"
 #include "SCellBuffer.h"
 #include "SPerLine.h"
+
+// forwards
+selector_ptr_t MakeSelector( boost::python::object match, bool empty_selects_all, const LogSchemaAccessor * schema = nullptr );
+
 
 
 /*-----------------------------------------------------------------------
@@ -59,97 +63,6 @@ class NLifeTime : public VLifeTime
 protected:
 	void Release( void ) override;
 };
-
-
-
-/*-----------------------------------------------------------------------
- * NHandle
- -----------------------------------------------------------------------*/
-
-// A number of Python objects are implemented as a lifetime managed wrapper
-// around a plain C++ object. This is effectively a handle idiom. Its benefit
-// is that it allows the behaviour of the Python object to be altered by
-// swapping the class type of the held inner object.
-
-template<typename T_IMPL>
-class NHandle : public NLifeTime
-{
-private:
-	using impl_t = T_IMPL;
-
-	impl_t * m_Impl{ nullptr };
-
-	void Clean( void ) {
-		if( m_Impl )
-			delete m_Impl;
-		m_Impl = nullptr;
-	}
-
-protected:
-	void SetImpl( impl_t * impl ) {
-		Clean();
-		m_Impl = impl;
-	}
-
-public:
-	~NHandle( void ) {
-		Clean();
-	}
-
-	impl_t *GetImpl( void ) const {
-		return m_Impl;
-	}
-
-	bool Ok( void ) const {
-		return m_Impl != nullptr;
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * NSelector
- -----------------------------------------------------------------------*/
-
-// Python interface to the line searching/filtering system
-class NSelector : public NHandle<Selector>
-{
-public:
-	NSelector( const Match & match, bool empty_selects_all, const LogSchemaAccessor * schema ) {
-		SetImpl( Selector::MakeSelector( match, empty_selects_all, schema ) );
-	}
-
-public:
-	// Python interfaces; note default constructor is non-functional
-	NSelector( void ) {}
-};
-using selector_ptr_t = boost::intrusive_ptr<NSelector>;
-
-
-
-/*-----------------------------------------------------------------------
- * NLogAccessor
- -----------------------------------------------------------------------*/
-
-// Python interface to the log accessor system
-class NLogAccessor : public NHandle<LogAccessor>
-{
-public:
-	NLogAccessor
-	(
-		const std::string & name,
-		const std::string & guid,
-		unsigned text_offset_size,
-		fielddescriptor_list_t && field_descs,
-		const std::string & match_desc,
-		formatdescriptor_list_t && formatters
-	);
-
-public:
-	// Python interfaces; note default constructor is non-functional
-	NLogAccessor( void ) {}
-};
-using logaccessor_ptr_t = boost::intrusive_ptr<NLogAccessor>;
 
 
 
@@ -304,8 +217,8 @@ protected:
 public:
 	annotationsizes_list_t GetAnnotationSizes( void ) const;
 	const NAnnotation * GetAnnotation( vint_t log_line_no ) const;
-	void SetAnnotationText( vint_t line, const char * text );
-	void SetAnnotationStyle( vint_t line, vint_t style );
+	void SetAnnotationText( vint_t log_line_no, const char * text );
+	void SetAnnotationStyle( vint_t log_line_no, vint_t style );
 
 	// find next annotated line in the given direction
 	vint_t GetNextAnnotation( nlineno_t current, bool forward );
@@ -325,9 +238,6 @@ public:
 class NAdornments : public NAnnotations
 {
 private:
-	// the logfile's data
-	logaccessor_ptr_t m_LogAccessor;
-
 	// auto-markers (derived via line selection)
 	std::vector<selector_ptr_t> m_AutoMarkers;
 
@@ -342,17 +252,8 @@ private:
 	void GetState( json & store ) const;
 	void PutState( const json & store );
 
-	// line markers
-	int LogMarkValue( vint_t log_line_no );
-	int ViewMarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer );
-
-protected:
-	LogAccessor * GetLogAccessor() const {
-		return m_LogAccessor->GetImpl();
-	}
-
 public:
-	NAdornments( logaccessor_ptr_t accessor );
+	NAdornments( void );
 
 	// tracked line
 	void SetLocalTrackerLine( vint_t log_line_no ) {
@@ -362,8 +263,8 @@ public:
 		return m_LocalTrackerLine;
 	}
 
-	// identify the set of markers to show at a given line
-	int MarkValue( vint_t view_line_no, const SViewCellBuffer & cell_buffer );
+	// identify the set of log markers to show at a given line
+	int LogMarkValue( vint_t log_line_no, const LineAccessor & line );
 
 public:
 	// Python interfaces
@@ -374,9 +275,7 @@ public:
 		m_AutoMarkers.resize( num_marker );
 	}
 
-	void SetAutoMarker( unsigned marker, selector_ptr_t selector ) {
-		m_AutoMarkers[ marker ] = selector;
-	}
+	bool SetAutoMarker( unsigned marker, boost::python::object match, logfile_ptr_t logfile );
 
 	void ClearAutoMarker( unsigned marker ) {
 		m_AutoMarkers[ marker ] = nullptr;
@@ -400,7 +299,7 @@ using adornments_ptr_t = boost::intrusive_ptr<NAdornments>;
 class NLineAdornmentsProvider : public LineAdornmentsProvider
 {
 private:
-	const NAdornments * m_Adornments;
+	adornments_ptr_t m_Adornments;
 
 protected:
 	// LogAdornmentsProvider interfaces
@@ -422,8 +321,12 @@ protected:
 	}
 
 public:
-	NLineAdornmentsProvider( const NAdornments * adornments )
+	NLineAdornmentsProvider( adornments_ptr_t adornments )
 		: m_Adornments{ adornments } {}
+
+	adornments_ptr_t GetAdornments( void ) {
+		return m_Adornments;
+	}
 };
 
 
@@ -441,15 +344,17 @@ private:
 	bool m_SelectorChanged{ true };
 	selector_ptr_t m_Selector;
 	
+	// the view to search within
+	logfile_ptr_t m_Logfile;
+	viewaccessor_ptr_t m_ViewAccessor;
+
+	// detect chnages in the underlying view accessor
+	ChangeTracker m_ViewTracker;
+
 private:
 	// list of lines matched
 	std::vector<nlineno_t> m_MatchedLines;
 	void SetupMatchedLines( void );
-
-	// associated cell buffer; we do not hold a lifetime reference as the NView does that
-	// for us
-	ChangeTracker m_CellBufferTracker;
-	const SViewCellBuffer * m_CellBuffer{ nullptr };
 
 public:
 	// the Scintilla "indicator" matching to this hiliter
@@ -459,85 +364,140 @@ public:
 	void Hilite( const vint_t start, const char * first, const char * last, VControl * vcontrol );
 
 public:
-	NHiliter( unsigned indicator, const SViewCellBuffer * cell_buffer )
-		: m_CellBuffer{ cell_buffer }, m_Indicator{ indicator } {}
+	NHiliter( unsigned indicator, logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
+		: m_Indicator{ indicator }, m_Logfile{ logfile }, m_ViewAccessor{ view_accessor } {}
 
 public:
-	// Python interfaces; note default constructor is non-functional
-	NHiliter( void )
-		: m_Indicator{ 0 } {}
+	// Python interfaces
 
 	// find next matched line in the given direction
+	bool SetMatch( boost::python::object match );
 	nlineno_t Search( nlineno_t current, bool forward );
 	bool Hit( nlineno_t line_no );
-
-	void SetSelector( selector_ptr_t selector ) {
-		m_SelectorChanged = true;
-		m_Selector = selector;
-	}
 };
 using hiliter_ptr_t = boost::intrusive_ptr<NHiliter>;
 
 
 
 /*-----------------------------------------------------------------------
- * NFilterView
+ * NViewCore
  -----------------------------------------------------------------------*/
 
-// An interface to a set of logfile lines.
-class NFilterView
+class NViewCore
 {
-private:
+protected:
+	NViewCore( logfile_ptr_t logfile = logfile_ptr_t{}, viewaccessor_ptr_t view_accessor = viewaccessor_ptr_t{} );
+
 	// We are a view onto this logfile
 	logfile_ptr_t m_Logfile;
 
-	// the logfile's adornments, and a provider
-	adornments_ptr_t m_Adornments;
-	NLineAdornmentsProvider m_AdornmentsProvider;
+	// our view accessor
+	viewaccessor_ptr_t m_ViewAccessor;
 
+protected:
+	void Filter( selector_ptr_a selector, bool add_irregular );
+
+public:
+	bool Filter( boost::python::object match, bool add_irregular );
+
+	// line count
+	vint_t GetNumLines( void ) const {
+		return m_ViewAccessor->GetNumLines();
+	}
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NViewFieldAccess
+ -----------------------------------------------------------------------*/
+
+class NViewFieldAccess : public virtual NViewCore
+{
+private:
 	// numeric access to defined fields
 	fieldvalue_t GetFieldValue( vint_t line_no, vint_t field_no );
 
-	vint_t GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) );
-
-protected:
-	// virtualised cell buffer
-	SViewCellBuffer m_CellBuffer{ nullptr, nullptr };
-
-	// array of hiliters
-	std::vector<hiliter_ptr_t> m_Hiliters;
+	// simple map of Python field numbers to internal field numbers
+	const vint_t m_FieldNoOffset;
 
 public:
-	NFilterView( logfile_ptr_t logfile );
-
-public:
-	// Python interfaces; note default constructor is non-functional
-	NFilterView( void )
-		: m_AdornmentsProvider{ nullptr } {}
+	NViewFieldAccess( vint_t field_no_offset = 0 )
+		: m_FieldNoOffset{ field_no_offset } {}
 
 	// raw text access to defined text/fields
+
 	std::string GetNonFieldText( vint_t line_no );
 	std::string GetFieldText( vint_t line_no, vint_t field_no );
 
 	// numeric access to defined fields
+
 	uint64_t GetFieldValueUnsigned( vint_t line_no, vint_t field_no ) {
 		return GetFieldValue( line_no, field_no ).Convert<uint64_t>();
 	}
+
 	int64_t GetFieldValueSigned( vint_t line_no, vint_t field_no ) {
 		return GetFieldValue( line_no, field_no ).Convert<int64_t>();
 	}
+
 	double GetFieldValueFloat( vint_t line_no, vint_t field_no ) {
 		return GetFieldValue( line_no, field_no ).Convert<double>();
 	}
+};
 
-	// line count
-	vint_t GetNumLines( void ) const {
-		return m_CellBuffer.GetNumLines();
-	}
+
+
+/*-----------------------------------------------------------------------
+ * NViewLineTranslation
+ -----------------------------------------------------------------------*/
+
+class NViewLineTranslation : public virtual NViewCore
+{
+private:
+	// line translation interface
+	const ViewLineTranslation * m_ViewLineTranslation;
+
+public:
+	NViewLineTranslation( void );
 
 	// line number translation between the view and the underlying logfile
 	vint_t ViewLineToLogLine( vint_t view_line_no ) const;
 	vint_t LogLineToViewLine( vint_t log_line_no ) const;
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NViewTimecode
+ -----------------------------------------------------------------------*/
+
+class NViewTimecode : public virtual NViewCore
+{
+protected:
+	// line translation interface
+	const ViewTimecode * m_ViewTimecode;
+
+public:
+	NViewTimecode( void );
+
+	// numeric access to a line's timecode, timecode is referenced to UTC
+	NTimecode * GetUtcTimecode( vint_t line_no );
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NViewHiliting
+ -----------------------------------------------------------------------*/
+
+class NViewHiliting : public virtual NViewCore
+{
+protected:
+	// array of hiliters
+	std::vector<hiliter_ptr_t> m_Hiliters;
+
+public:
+	// Python interfaces
 
 	// Hiliting control
 	void SetNumHiliter( unsigned num_hiliter );
@@ -545,32 +505,11 @@ public:
 		return m_Hiliters[ hiliter ];
 	}
 
-	// Bookmarks ("user" defined marker)
-	void ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line );
-	vint_t GetNextBookmark( vint_t view_line_no, bool forward );
-
-	// find next annotated line in this view in the given direction
-	vint_t GetNextAnnotation( nlineno_t current, bool forward );
-
-	// tracked line marker support
-	void SetLocalTrackerLine( vint_t line_no );
-	vint_t GetLocalTrackerLine( void );
-
-	vint_t GetGlobalTrackerLine( unsigned idx ) {
-		return m_CellBuffer.GetGlobalTrackerLine( idx );
-	}
-
-	// numeric access to a line's timecode, timecode is referenced to UTC
-	NTimecode * GetUtcTimecode( vint_t line_no );
-
-	// Select the lines to display in the view
-	virtual void Filter( selector_ptr_t selector, bool add_irregular ) {
-		m_CellBuffer.Filter( selector->GetImpl(), add_irregular );
-	}
-
 	// Field visibility
 	virtual void SetFieldMask( uint64_t field_mask ) {
-		m_CellBuffer.SetFieldMask( field_mask );
+		ViewProperties * view_props{ m_ViewAccessor->GetProperties() };
+		if( view_props != nullptr )
+			view_props->SetFieldMask( field_mask );
 	}
 };
 
@@ -580,33 +519,64 @@ public:
  * NLineSet
  -----------------------------------------------------------------------*/
 
-// Python interface to NFilterView
 class NLineSet
 	:
-	public NFilterView,
+	public NViewFieldAccess,
+	public NViewTimecode,
+	public NViewLineTranslation,
 	public NLifeTime
 {
 public:
-	NLineSet( void ) {}
-
-	NLineSet( logfile_ptr_t logfile )
-		: NFilterView{ logfile } {}
+	NLineSet( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 };
 
 
 
 /*-----------------------------------------------------------------------
- * NView
+ * NEventView
+ -----------------------------------------------------------------------*/
+
+class NEventView
+	:
+	public NViewFieldAccess,
+	public NViewHiliting,
+	public NLifeTime
+{
+public:
+	// Python interfaces
+
+	NEventView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
+
+	// Select the lines to display in the lineset
+	bool Filter( boost::python::object match );
+
+	// determine how the event view is sorted
+	void Sort( unsigned col_num, int direction );
+};
+
+
+
+/*-----------------------------------------------------------------------
+ * NLogView
  -----------------------------------------------------------------------*/
 
 // A particular view of a logfile. Provides a method to create a Scintilla
 // compatible (virtualised) content interface of the view.
-class NView
+class NLogView
 	:
-	public NFilterView,
+	public NViewFieldAccess,
+	public NViewTimecode,
+	public NViewHiliting,
 	public VContent
 {
 private:
+	// interfaces
+	const ViewMap * m_ViewMap;
+	const ViewLineTranslation * m_ViewLineTranslation;
+
+	// virtualised cell buffer
+	SViewCellBuffer m_CellBuffer;
+
 	// virtualised marker/annotation/etc data
 	linemarker_ptr_t m_LineMarker;
 	linelevel_ptr_t  m_LineLevel;
@@ -639,6 +609,10 @@ private:
 		}
 	};
 
+private:
+	adornments_ptr_t GetAdornments( void );
+	vint_t GetNextVisibleLine( vint_t view_line_no, bool forward, vint_t( NAdornments::*get_next_log_line )(vint_t, bool) );
+
 protected:
 	// VContent interfaces
 	void Release( void ) override;
@@ -655,20 +629,32 @@ protected:
 	void __stdcall Notify_StartDrawLine( vint_t line_no ) override;
 
 public:
-	NView( logfile_ptr_t logfile );
+	NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor );
 
 public:
-	// Python interfaces; note default constructor is non-functional
-	NView( void ) {}
+	// Python interfaces
 
 	// Create an interface Scintilla can use to acces this view of the logfile.
 	virtual unsigned long long GetContent( void );
 
 	// Select the lines to display in the view
-	void Filter( selector_ptr_t selector, bool add_irregular ) override;
+	bool Filter( boost::python::object match );
 
 	// Field visibility
 	void SetFieldMask( uint64_t field_mask ) override;
+
+	// Bookmarks ("user" defined marker)
+	void ToggleBookmarks( vint_t view_fm_line, vint_t view_to_line );
+	vint_t GetNextBookmark( vint_t view_line_no, bool forward );
+
+	// find next annotated line in this view in the given direction
+	vint_t GetNextAnnotation( nlineno_t current, bool forward );
+
+	// tracked line marker support
+	void SetLocalTrackerLine( vint_t line_no );
+	vint_t GetLocalTrackerLine( void );
+	vint_t GetGlobalTrackerLine( unsigned idx );
+
 };
 
 
@@ -689,13 +675,15 @@ private:
 
 
 public:
-	NLogfile( logaccessor_ptr_t log_accessor = nullptr );
-	Error Open( const std::wstring & file_path, ProgressMeter * progress, size_t skip_lines );
+	// Python interfaces
+
+	NLogfile( logaccessor_ptr_t && log_accessor );
+	Error Open( const std::wstring & file_path, ProgressMeter * progress );
 
 	// returns raw pointer, caller must hold ownership over this object
 	// for as long as the raw-pointer is needed
 	LogAccessor * GetLogAccessor( void ) const {
-		return m_LogAccessor->GetImpl();
+		return m_LogAccessor.get();
 	}
 
 	const LogSchemaAccessor * GetSchema( void ) const {
@@ -719,17 +707,16 @@ public:
 	}
 
 	// View management
-	view_ptr_t CreateView( void );
-	lineset_ptr_t CreateLineSet( void );
+	logview_ptr_t CreateLogView( void );
+	eventview_ptr_t CreateEventView( void );
+	lineset_ptr_t CreateLineSet( boost::python::object match );
 
 	// Marker control
 	void SetNumAutoMarker( unsigned num_marker ) {
 		m_Adornments->SetNumAutoMarker( num_marker );
 	}
 
-	void SetAutoMarker( unsigned marker, selector_ptr_t selector ) {
-		m_Adornments->SetAutoMarker( marker, selector );
-	}
+	bool SetAutoMarker( unsigned marker, boost::python::object match );
 
 	void ClearAutoMarker( unsigned marker ) {
 		m_Adornments->ClearAutoMarker( marker );

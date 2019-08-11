@@ -18,6 +18,7 @@
 
 // C++ includes
 #include <vector>
+#include <memory>
 
 
 
@@ -67,7 +68,7 @@ public:
 	int64_t CalcOffsetToDatum( time_t utc_datum ) const
 	{
 		// limit offfset to >= 0; i.e. we choose to not represent
-		// the case where our timecode is in te past (i.e. earlier than
+		// the case where our timecode is in the past (i.e. earlier than
 		// the alternate datum)
 		const int64_t offset{ (c_NanoSecond * (m_UtcDatum - utc_datum)) + m_OffsetNs };
 		return (offset >= 0) ? offset : 0;
@@ -114,6 +115,17 @@ public:
 
 
 /*-----------------------------------------------------------------------
+ * ViewTimecode
+ -----------------------------------------------------------------------*/
+
+struct ViewTimecode
+{
+	virtual NTimecode GetUtcTimecode( int line_no ) const = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
  * GlobalTracker
  -----------------------------------------------------------------------*/
 
@@ -124,11 +136,7 @@ private:
 	NTimecode f_UtcTimecode;
 
 public:
-	struct NTimecodeAccessor
-	{
-		virtual NTimecode GetUtcTimecode( int line_no ) const = 0;
-	};
-	bool IsNearest( int line_no, int max_line_no, const NTimecodeAccessor * accessor ) const;
+	bool IsNearest( int line_no, int max_line_no, const ViewTimecode * timecode_accessor ) const;
 
 	void SetUtcTimecode( const NTimecode & timecode ) {
 		f_InUse = true;
@@ -167,25 +175,3 @@ public:
 
 	static void SetGlobalTracker( unsigned tracker_idx, const NTimecode & utc_timecode );
 };
-
-
-
-/*-----------------------------------------------------------------------
- * LogfileTimecodeAccessor
- -----------------------------------------------------------------------*/
-
-struct LogAccessor;
-class LogfileTimecodeAccessor : public GlobalTracker::NTimecodeAccessor
-{
-private:
-	const LogAccessor * f_LogAccessor;
-
-protected:
-	NTimecode GetUtcTimecode( int line_no ) const override;
-
-public:
-	LogfileTimecodeAccessor( LogAccessor * accessor );
-};
-
-
-

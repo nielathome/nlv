@@ -100,6 +100,8 @@ const time_t c_RefUtcDatum{ 1514817582 };    // Mon, 1  Jan 2018 14:39:42 GMT+00
 // mock line accessor
 struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 {
+	nlineno_t m_LineNo{ 0 };
+
 	// non-field log line text
 	const std::string & m_LogText;
 	const std::string & m_AnnotationText;
@@ -110,7 +112,6 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 	U_LineAccessor( const std::string & log_text, const std::string & annotation_text )
 		: m_LogText{ log_text }, m_AnnotationText{ annotation_text }
 	{
-		SetLineNo( 0 );
 		/* 0 */ m_FieldValues.push_back( (uint64_t) 42 );
 				m_TextValues.push_back( "42" );
 		/* 1 */ m_FieldValues.push_back( (uint64_t) 100 );
@@ -124,16 +125,20 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 		/* 8 */ m_FieldValues.push_back( (double) 96.7 );
 	}
 
-	bool IsRegular( void ) const override {
-		return false;
-	}
-
-	const LineAccessorIrregular * NextIrregular( void ) const override {
-		return nullptr;
+	nlineno_t GetLineNo( void ) const override {
+		return m_LineNo;
 	}
 
 	nlineno_t GetLength( void ) const override {
 		return nlineno_cast( m_LogText.size() );
+	}
+
+	bool IsRegular( void ) const override {
+		return false;
+	}
+
+	nlineno_t NextIrregularLineLength( void ) const override {
+		return -1;
 	}
 
 	static void StrToChrPtr( const std::string & str, const char ** first, const char ** last ) {
@@ -155,10 +160,6 @@ struct U_LineAccessor : public LineAccessor, public LineAdornmentsProvider
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
 		return m_FieldValues[ field_id ];
-	}
-
-	NTimecode GetUtcTimecode( void ) const override {
-		return NTimecode{};
 	}
 
 	bool IsBookMarked( nlineno_t ) const override {
@@ -186,9 +187,12 @@ struct U_LogSchemaAccessor : public LogSchemaAccessor
 {
 	struct U_Field
 	{
-		std::string m_Name;
+		FieldDescriptor m_FieldDescriptor;
 		FieldValueType m_Type;
 		std::vector<std::string> m_EnumValues;
+
+		U_Field( const char * name, FieldValueType type )
+			: m_FieldDescriptor{ true, name }, m_Type{ type } {}
 	};
 	std::vector<U_Field> m_Fields;
 
@@ -212,8 +216,8 @@ struct U_LogSchemaAccessor : public LogSchemaAccessor
 		return m_Fields.size();
 	}
 
-	std::string GetFieldName( unsigned field_id ) const override {
-		return m_Fields[ field_id ].m_Name;
+	const FieldDescriptor & GetFieldDescriptor( unsigned field_id ) const override {
+		return m_Fields[ field_id ].m_FieldDescriptor;
 	}
 
 	FieldValueType GetFieldType( unsigned field_id ) const override {

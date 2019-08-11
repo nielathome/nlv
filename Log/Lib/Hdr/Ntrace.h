@@ -32,6 +32,8 @@ enum Error : unsigned
 	e_OK,
 	e_TraceInfo,
 	e_TraceDebug,
+	e_SqlRow,
+	e_SqlDone,
 
 	e_Error = 0x10000,
 	e_Unknown,
@@ -66,6 +68,9 @@ enum Error : unsigned
 	e_ParseUnexpectedText,
 	e_ReportLimit,
 	e_Locale,
+	e_CreateLineSet,
+	e_CreateEventView,
+	e_CreateLogView,
 
 	e_OsError = 0x20000,
 	e_OpenFileStream,
@@ -79,7 +84,15 @@ enum Error : unsigned
 	e_OpenFileHandle,
 	e_CreateFileHandle,
 	e_FileSize,
-	e_FileSystem
+	e_FileSystem,
+
+	e_SqlDbOpen,
+	e_SqlDbClose,
+	e_SqlStatementOpen,
+	e_SqlStatementBind,
+	e_SqlStatementReset,
+	e_SqlStatementClose,
+	e_SqlStatementStep
 };
 
 

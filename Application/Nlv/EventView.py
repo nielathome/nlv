@@ -21,10 +21,10 @@
 # text, referred to as an analyser script. Strictly, the analyser
 # script contains an event recogniser *and* a series of metric
 # quantifiers. The recogniser scans the log file and generates an
-# event table (CSV file), which in turn, is displayed in the UI via
+# event table (SQL DB), which in turn, is displayed in the UI via
 # the G_EventProjectorNode. The quantifiers scan the event table and
 # assemble (i.e. deduce) domain relevent metrics (e.g. a categorisation
-# of the events), also stored as CSV files. A quantifier can define
+# of the events), also stored as SQL DB files. A quantifier can define
 # any number of chart designers, which realise the assembled metric
 # data, arbitrary user supplied parameters and the current selection
 # into a displayable chart. Hence the metrics are projected in both
@@ -48,11 +48,11 @@ import wx
 
 # Application imports 
 from .Document import D_Document
-from .EventData import G_Analyser
+from .EventDisplay import G_MetricsViewCtrl
+from .EventDisplay import G_TableViewCtrl
+from .EventProjector import G_Analyser
 from .EventProjector import G_Projector
-from .EventProjector import G_MetricsViewCtrl
 from .EventProjector import G_ScriptGuard
-from .EventProjector import G_TableViewCtrl
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
 from .MatchNode import G_MatchItem
@@ -567,7 +567,10 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         guid = self._Field.Guid.Value
         for file in self.GetLogNode().MakeSessionDir().iterdir():
             if str(file).find(guid) >= 0:
-                file.unlink()
+                try:
+                    file.unlink()
+                except Exception as ex:
+                    logging.info("Unable to remove temporary: file=[{}] info=[{}]".format(str(file), str(ex)))
 
 
     #-------------------------------------------------------
@@ -650,6 +653,12 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
             connection = sqlite3.connect(self.MakeTemporaryFilename(".db"))
             connection.row_factory = sqlite3.Row
+            cursor = connection.cursor()
+            cursor.execute("PRAGMA synchronous = OFF")
+
+            # commented out, as it yields strange "sqlite3.OperationalError:
+            # database table is locked" errors on the first db execute
+            #cursor.execute("PRAGMA journal_mode = MEMORY")
 
             globals = dict()
 
@@ -660,9 +669,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
             globals.update(Analyse = analyser_api)
 
-            projector = G_Projector(connection, meta_only, self.MakeTemporaryFilename(".csv"),
-                log_schema, self.GetLogNode()
-            )
+            projector = G_Projector(connection, meta_only, self.GetLogNode())
             globals.update(Project = projector.Project)
 
             exec(code, globals)
@@ -703,7 +710,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         if self._EventMeta is None:
             return None
 
-        filename = self.MakeTemporaryFilename(".csv")
+        filename = self.MakeTemporaryFilename(".db")
         valid = self._Field.AnalysisIsValid.Value
         return self.AnalysisProperties(self, self._EventMeta, filename, valid)
 
@@ -1301,15 +1308,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def GetTimecodeBase(self):
         return self.GetLogfile().GetTimecodeBase()
 
-    def GetUtcTimecode(self, utcbase, offset):
-        billionths = 1000000000
-        whole_offset = int(offset / billionths)
-
-        utcbase += whole_offset
-        nsec = offset - (whole_offset * billionths)
-
-        return Nlog.NTimecode(utcbase, nsec)        
-
 
     #-------------------------------------------------------
     def OnDisplayKey(self, key_code, modifiers, view_node):
@@ -1394,7 +1392,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     @G_Global.TimeFunction
     def UpdateContent(self, analysis_props):
-        """Load CSV event data into the viewer"""
+        """Load event/feature data into the viewer"""
 
         # load events into event viewer data control
         events_view = self.GetTableViewCtrl()
@@ -1673,7 +1671,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     @G_Global.TimeFunction
     def UpdateContent(self, analysis_props):
         event_projector = self.GetLogAnalysisNode().FindChildNode(G_Project.NodeID_EventProjector, True)
-        events_to_quantify = event_projector.GetTableViewCtrl().GetLineSet()
+        events_to_quantify = event_projector.GetTableViewCtrl().GetEventView()
         self.GetMetricsViewCtrl().Assemble(events_to_quantify, analysis_props)
 
         self.GetMetricsViewCtrl().UpdateMetrics().Realise()

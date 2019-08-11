@@ -25,9 +25,36 @@
  * SLineMarkers
  -----------------------------------------------------------------------*/
 
-vint_t SLineMarkers::MarkValue( vint_t line )
+int SLineMarkers::ViewMarkValue( vint_t view_line_no )
 {
-	return m_Adornments->MarkValue( line, m_CellBuffer );
+	int res{ 0 }, bit{ 0x1 << (int) NConstants::e_StyleBaseTracker };
+
+	const ViewTimecode * timecode_accessor{ m_ViewAccessor->GetTimecode() };
+	const vint_t max_line_no{ m_ViewMap->m_NumLinesOrOne - 1 };
+
+	for( const GlobalTracker & tracker : GlobalTrackers::GetTrackers() )
+	{
+		bit <<= 1;
+		if( tracker.IsInUse() && tracker.IsNearest( view_line_no, max_line_no, timecode_accessor ) )
+			res |= bit;
+	}
+
+	return res;
+}
+
+vint_t SLineMarkers::MarkValue( vint_t view_line_no )
+{
+	// most markers come from the logfile
+	const vint_t log_line_no{ m_ViewLineTranslation->ViewLineToLogLine( view_line_no ) };
+	int log_markers{ 0 };
+	m_ViewAccessor->VisitLine( view_line_no, [&log_markers, log_line_no, this] ( const LineAccessor & line ) {
+		log_markers = m_Adornments->LogMarkValue( log_line_no, line );
+	} );
+	
+	// the global timecode markers
+	const int global_markers{ ViewMarkValue( view_line_no ) };
+	
+	return log_markers | global_markers;
 }
 
 
@@ -39,7 +66,7 @@ vint_t SLineMarkers::MarkValue( vint_t line )
 bool SLineAnnotation::HasStateChanged( void ) const
 {
 	const bool annotations_changed{ m_LogAnnotationsTracker.CompareTo( m_LogAnnotations->GetTracker() ) };
-	const bool cellbuffer_changed{ m_CellBufferTracker.CompareTo( m_CellBuffer.GetTracker() ) };
+	const bool cellbuffer_changed{ m_ViewTracker.CompareTo( m_ViewAccessor->GetProperties()->GetTracker() ) };
 	return annotations_changed || cellbuffer_changed;
 }
 
@@ -55,8 +82,8 @@ annotationsizes_list_t SLineAnnotation::GetAnnotationSizes( void ) const
 	for( const annotationsizes_list_t::value_type & elem : logfile_sizes )
 	{
 		const vint_t log_line{ elem.first };
-		const vint_t nearest_view_line{ m_CellBuffer.LogLineToViewLine( log_line ) };
-		const vint_t nearest_log_line{ m_CellBuffer.ViewLineToLogLine( nearest_view_line ) };
+		const vint_t nearest_view_line{ m_ViewLineTranslation->LogLineToViewLine( log_line ) };
+		const vint_t nearest_log_line{ m_ViewLineTranslation->ViewLineToLogLine( nearest_view_line ) };
 
 		if( nearest_log_line == log_line )
 			// the log file annotation is visible in this view
@@ -69,7 +96,7 @@ annotationsizes_list_t SLineAnnotation::GetAnnotationSizes( void ) const
 
 const NAnnotation * SLineAnnotation::GetAnnotation( vint_t line ) const
 {
-	return m_LogAnnotations->GetAnnotation( ViewLineToLogLine( line ) );
+	return m_LogAnnotations->GetAnnotation( m_ViewLineTranslation->ViewLineToLogLine( line ) );
 }
 
 
@@ -87,7 +114,7 @@ vint_t SLineAnnotation::Style( vint_t line ) const
 
 void SLineAnnotation::SetStyle( vint_t line, vint_t style )
 {
-	m_LogAnnotations->SetAnnotationStyle( ViewLineToLogLine( line ), style );
+	m_LogAnnotations->SetAnnotationStyle( m_ViewLineTranslation->ViewLineToLogLine( line ), style );
 }
 
 
@@ -105,7 +132,7 @@ const char *SLineAnnotation::Text( vint_t line ) const
 
 void SLineAnnotation::SetText( vint_t line, const char * text )
 {
-	m_LogAnnotations->SetAnnotationText( ViewLineToLogLine( line ), text );
+	m_LogAnnotations->SetAnnotationText( m_ViewLineTranslation->ViewLineToLogLine( line ), text );
 }
 
 
@@ -172,7 +199,7 @@ void SContractionState::ValidateCache( void ) const
 	m_DocFromDisplay.Clear();
 	m_Height.Clear();
 
-	m_LinesinDocument = m_CellBuffer.IsEmpty() ? 0 : m_CellBuffer.Lines();
+	m_LinesinDocument = m_ViewAccessor->GetNumLines();
 	const vint_t annotation_lines{ SumAnnotationSizes( m_LinesinDocument ) };
 	m_LinesDisplayed = m_LinesinDocument + annotation_lines;
 }

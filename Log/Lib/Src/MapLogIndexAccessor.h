@@ -18,6 +18,7 @@
 
 // Nlog includes
 #include "FileMap.h"
+#include "FieldAccessor.h"
 #include "LogAccessor.h"
 
 // C++ includes
@@ -25,19 +26,6 @@
 #include <map>
 #include <memory>
 #include <vector>
-
-
-
-/*-----------------------------------------------------------------------
- * FieldTraits
- -----------------------------------------------------------------------*/
-
-// simple traits to generate uniform types related to Field
-template<typename T_FIELD>
-struct FieldTraits
-{
-	using field_ptr_t = std::shared_ptr<T_FIELD>;
-};
 
 
 
@@ -149,79 +137,6 @@ struct FieldHeaderEnumV1 : public FieldHeaderV1
 
 
 /*-----------------------------------------------------------------------
- * FieldFactory
- -----------------------------------------------------------------------*/
-
-// effectively, the recognised field types; when extending, update the documentation
-// at group.rst as well
-const std::string c_Type_DateTime_Unix{ "datetime_unix" };
-const std::string c_Type_DateTime_UsStd{ "datetime_us_std" };
-const std::string c_Type_DateTime_TraceFmt_IntStd{ "datetime_tracefmt_int_std" };
-const std::string c_Type_DateTime_TraceFmt_UsStd{ "datetime_tracefmt_us_std" };
-const std::string c_Type_DateTime_TraceFmt_IntHires{ "datetime_tracefmt_int_hires" };
-const std::string c_Type_DateTime_TraceFmt_UsHires{ "datetime_tracefmt_us_hires" };
-const std::string c_Type_Bool{ "bool" };
-const std::string c_Type_Uint08{ "uint08" };
-const std::string c_Type_Uint16{ "uint16" };
-const std::string c_Type_Uint32{ "uint32" };
-const std::string c_Type_Uint64{ "uint64" };
-const std::string c_Type_Int08{ "int08" };
-const std::string c_Type_Int16{ "int16" };
-const std::string c_Type_Int32{ "int32" };
-const std::string c_Type_Int64{ "int64" };
-const std::string c_Type_Float32{ "float32" };
-const std::string c_Type_Float64{ "float64" };
-const std::string c_Type_Enum08{ "enum08" };
-const std::string c_Type_Enum16{ "enum16" };
-const std::string c_Type_Emitter{ "emitter" };
-const std::string c_Type_Text{ "text" };
-const std::string c_Type_TextOffsets08{ "text_offsets08" };
-const std::string c_Type_TextOffsets16{ "text_offsets16" };
-
-
-// field base class and factory
-template <typename T_FIELD, typename T_MAKER>
-class FieldFactory
-{
-public:
-	using field_t = T_FIELD;
-	using maker_t = T_MAKER;
-	using factory_t = FieldFactory;
-	using field_ptr_t = typename FieldTraits<field_t>::field_ptr_t;
-
-	// field factories; create a field given its type
-	template<typename ...T_ARGS>
-	static field_ptr_t CreateField( const FieldDescriptor & field_desc, T_ARGS ...args ) {
-		maker_t maker{ *GetFieldCreator( field_desc.f_Type ) };
-		return (*maker)(field_desc, args...);
-	}
-
-private:
-	// the map of field creators
-	using map_t = std::map<std::string, maker_t>;
-	static map_t m_Map;
-
-	// lookup field type in the map of creator functions
-	static maker_t GetFieldCreator( const std::string & type ) {
-		map_t::iterator imaker{ m_Map.find( type ) };
-		if( imaker == m_Map.end() )
-			throw std::domain_error{ "Nlog: Unknown field type: " + type};
-
-		return imaker->second;
-	}
-};
-
-
-// helper to create a new field
-template<typename T_FIELD, typename ...T_ARGS>
-typename T_FIELD::field_ptr_t MakeField( T_ARGS ...args )
-{
-	return std::make_shared<T_FIELD>( args... );
-}
-
-
-
-/*-----------------------------------------------------------------------
  * FieldTextOffsetsCommon
  -----------------------------------------------------------------------*/
 
@@ -265,52 +180,14 @@ protected:
 
 
 /*-----------------------------------------------------------------------
- * LogIndexBase
- -----------------------------------------------------------------------*/
-
-template<typename T_FIELD>
-class LogIndexBase
-{
-protected:
-	using field_t = T_FIELD;
-	using field_ptr_t = typename FieldTraits<field_t>::field_ptr_t;
-	using field_array_t = std::vector<field_ptr_t>;
-
-	// the fields
-	field_array_t m_Fields;
-
-	// iterate over a list of field descriptors; T_MAKER should accept (const FieldDescriptor &, unsigned, offset &)
-	template<typename T_MAKER>
-	void SetupFields( const fielddescriptor_list_t & field_descs, size_t & offset, T_MAKER maker )
-	{
-		unsigned field_id{ 0 };
-		for( const FieldDescriptor & field_desc : field_descs )
-		{
-			field_ptr_t field{ maker( field_desc, field_id, offset ) };
-			if( field )
-				m_Fields.push_back( field );
-
-			field_id += 1;
-		}
-	}
-
-public:
-	size_t GetNumFields( void ) const {
-		return m_Fields.size();
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
  * LogIndexAccessor
  -----------------------------------------------------------------------*/
 
 // forwards
-class FieldAccessor;
+class MapFieldAccessor;
 
 // provide access to a logfile's index
-class LogIndexAccessor : public LogIndexBase<FieldAccessor>
+class LogIndexAccessor : public FieldStore<MapFieldAccessor>
 {
 private:
 	// the index data

@@ -206,24 +206,24 @@ public:
  * Selector
  -----------------------------------------------------------------------*/
 
-Selector * Selector::MakeSelector( const Match & match, bool empty_selects_all, const LogSchemaAccessor * schema )
+selector_ptr_t Selector::MakeSelector( const Match & match, bool empty_selects_all, const LogSchemaAccessor * schema )
 {
 	try {
 		if( match.m_Text.empty() )
-			return new SelectUnconditional{ match, empty_selects_all };
+			return std::make_unique<SelectUnconditional>( match, empty_selects_all );
 
 		switch( match.m_Type )
 		{
 		case Match::e_Literal:
-			return new MatchLiteral{ match };
+			return std::make_unique<MatchLiteral>( match );
 
 		case Match::e_RegularExpression:
-			return new MatchRegularExpression{ match };
+			return std::make_unique<MatchRegularExpression>( match );
 
 		case Match::e_LogviewFilter:
 			if( schema == nullptr )
-				throw std::exception( "Nlog: Logfile schema missing" );
-			return new SelectorLogviewFilter{ match, *schema };
+				throw std::runtime_error( "Nlog: Logfile schema missing" );
+			return std::make_unique<SelectorLogviewFilter>( match, *schema );
 		}
 	}
 	catch( const std::exception & ex )

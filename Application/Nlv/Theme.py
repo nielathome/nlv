@@ -675,7 +675,7 @@ class G_ThemeGalleryNode(G_ThemeManagerNode):
             theme_list.InsertItem(idx, name)
             self._ThemeIds.append(theme_id)
 
-            idx = idx + 1
+            idx += 1
 
         theme_list.Select(select_idx)
 

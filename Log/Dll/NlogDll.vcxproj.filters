@@ -49,8 +49,5 @@
     <ClInclude Include="Hdr\SPerLine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Hdr\Nline.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
 </Project>

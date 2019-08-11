@@ -40,46 +40,18 @@ struct Selector;
 class SViewCellBuffer : public VCellBuffer
 {
 private:
-	ChangeTracker m_Tracker{ true };
-
-	// the lifetimes of the objects pointed-to here must be managed by this
-	// objects owner
-	LogAccessor * m_LogAccessor{ nullptr };
-	LineAdornmentsProvider * m_LineAdornmentsProvider{ nullptr };
-
-protected:
 	// the view converts logical positions/lines (as presented to the CellBuffer user)
 	// to actual positions/lines in an underlying logfile
+	const ViewMap * m_ViewMap{ nullptr };
 
-	// line start locations in the view
-	std::vector<vint_t> m_Lines;
-
-	// map a view line number (index) to a logfile line number (value)
-	std::vector<vint_t> m_LineMap;
-
-	// local copies of key metrics
-	vint_t m_TextLen{ 0 };
-	vint_t m_NumLinesOrOne{ 0 };
-
-	// warning: an empty Scintilla document has a line count of 1
-	// this flag disambiguates the two cases
-	bool m_IsEmpty{ false };
-
-	// list of fields to display
-	uint64_t m_FieldViewMask{ 0 };
-
-	// determine the number of characters in a view line
-	vint_t GetLineLength( vint_t view_line_no ) const {
-		return m_LogAccessor->GetLineLength( ViewLineToLogLine( view_line_no ), m_FieldViewMask );
-	}
-
+protected:
 	// convert a view position into a view line number and an offset within that line
 	void PositionToInfo( vint_t pos, vint_t *view_line_no, vint_t *offset ) const {
 		// identify the view's line number
 		*view_line_no = PositionToViewLine( pos );
 
 		// determine the offset within the view's line
-		*offset = pos - m_Lines[ *view_line_no ];
+		*offset = pos - m_ViewMap->m_Lines[ *view_line_no ];
 	}
 
 	// return true if out-of-range
@@ -88,7 +60,7 @@ protected:
 		// the variable has zero value
 		return (lengthRetrieve < 0)
 			|| (position < 0)
-			|| ((position + lengthRetrieve) > m_TextLen);
+			|| ((position + lengthRetrieve) > m_ViewMap->m_TextLen);
 	}
 
 	vint_t PositionToViewLine( vint_t pos ) const;
@@ -98,69 +70,16 @@ protected:
 public:
 	// non-Scintilla interfaces
 
-	SViewCellBuffer( LogAccessor * accessor, LineAdornmentsProvider * provider )
-		: m_LogAccessor{ accessor }, m_LineAdornmentsProvider{ provider } {}
-
-	LineAdornmentsProvider * GetLineAdornmentsProvider( void ) const {
-		return m_LineAdornmentsProvider;
-	}
-
-	const ChangeTracker & GetTracker( void ) const {
-		return m_Tracker;
-	}
-
-	vint_t GetGlobalTrackerLine( unsigned idx ) const;
-	vint_t LogLineToViewLine( vint_t log_line_no, bool exact = false ) const;
-	vint_t ViewLineToLogLine( vint_t view_line_no ) const {
-		return m_LineMap[ view_line_no ];
+	SViewCellBuffer( void ) {}
+	SViewCellBuffer( viewaccessor_ptr_t accessor )
+		: m_ViewMap{ accessor->GetMap() }
+	{
+		if( !m_ViewMap )
+			throw std::runtime_error{ "ViewAccessor has no ViewMap" };
 	}
 
 	const LineBuffer & GetLine( e_LineData type, vint_t view_line_no ) const {
-		return m_LogAccessor->GetLine( type, ViewLineToLogLine( view_line_no ), m_FieldViewMask );
-	}
-
-	bool IsEmpty( void ) const {
-		return m_IsEmpty;
-	}
-
-	vint_t GetNumLines( void ) const {
-		return IsEmpty() ? 0 : m_NumLinesOrOne;
-	}
-
-	// update the view to contain solely logfile lines which are matched by
-	// the given selector
-	void Filter( Selector * selector, bool add_irregular );
-
-	// set the field mask and re-calculate line lengths
-	void SetFieldMask( uint64_t field_mask );
-
-	std::vector<nlineno_t> Search( Selector * selector ) const;
-	int MarkValue( vint_t line_no, int marker_base ) const;
-
-	// apply callback to a single line; signature is void f(const LineAccessor & log_line)
-	template<typename T_FUNC>
-	void VisitLine( nlineno_t visit_line_no, T_FUNC & functor )
-	{
-		using functor_t = T_FUNC;
-
-		struct Task : public LineVisitor::Task
-		{
-			const SViewCellBuffer & f_CellBuffer;
-			functor_t & f_Functor;
-			Task( const SViewCellBuffer & cell_buffer, functor_t & functor )
-				: f_CellBuffer{ cell_buffer }, f_Functor{ functor } {}
-
-			nlineno_t VisitLineToLogLine( nlineno_t visit_line_no ) const override {
-				return f_CellBuffer.ViewLineToLogLine( visit_line_no );
-			}
-
-			void Action( const LineAccessor & line, nlineno_t visit_line_no ) override {
-				f_Functor( line );
-			}
-		};
-
-		Task task{ *this, functor };
-		m_LogAccessor->VisitLine( task, visit_line_no );
+		return m_ViewMap->GetLine( type, view_line_no );
 	}
 
 public:
@@ -308,25 +227,5 @@ public:
 	}
 	void PerformRedoStep( void ) override {
 		UnsupportedVoid( __FUNCTION__ );
-	}
-};
-
-
-
-/*-----------------------------------------------------------------------
- * ViewTimecodeAccessor
- -----------------------------------------------------------------------*/
-
-class ViewTimecodeAccessor : public LogfileTimecodeAccessor
-{
-private:
-	const SViewCellBuffer * f_CellBuffer;
-
-public:
-	ViewTimecodeAccessor( const SViewCellBuffer * cell_buffer, LogAccessor * accessor )
-		: LogfileTimecodeAccessor{ accessor }, f_CellBuffer{ cell_buffer } {}
-
-	NTimecode GetUtcTimecode( vint_t line_no ) const override {
-		return LogfileTimecodeAccessor::GetUtcTimecode( f_CellBuffer->ViewLineToLogLine( line_no ) );
 	}
 };
