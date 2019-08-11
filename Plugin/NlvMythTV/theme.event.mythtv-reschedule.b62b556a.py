@@ -18,7 +18,7 @@ import re
 
 
 
-## Analyser ####################################################
+## Analyse #####################################################
 
 class Analyser:
 
@@ -27,17 +27,10 @@ class Analyser:
 
 
     #-----------------------------------------------------------
-    @staticmethod
-    def DefineFilter():
-        return [
-            ('LogView Filter', 'function = "HandleReschedule" and log ~= "Reschedule"'),
-            ('LogView Filter', 'function = "HandleReschedule" and log ~= "Scheduled"')
-        ]
+    def Begin(self, connection, cursor):
+        self.Connection = connection
+        self.Cursor = cursor
 
-
-    #-----------------------------------------------------------
-    def Begin(self, context):
-        self.Cursor = cursor = context.Connection.cursor()
         cursor.execute("DROP TABLE IF EXISTS reschedule")
         cursor.execute("""
             CREATE TABLE reschedule
@@ -86,76 +79,63 @@ class Analyser:
 
 
     #-----------------------------------------------------------
-    def End(self, context):
-        self.Cursor.close()
-        context.Connection.commit()
+    def End(self):
+        pass
+
+
+Analyse(
+    Analyser(),
+    ('LogView Filter', 'function = "HandleReschedule" and log ~= "Reschedule"'),
+    ('LogView Filter', 'function = "HandleReschedule" and log ~= "Scheduled"')
+)
 
 
 
-## Projector ###################################################
+## Project #####################################################
 
-class Projector:
+def Projector(connection, cursor, context):
+    utc_datum = context.CalcUtcDatum(cursor, ["reschedule"])
 
-    """
-    A class which maps one or more raw analysed event tables ready
-    to be displayed in the UI.
-    """
+    cursor.execute("DROP TABLE IF EXISTS projection")
+    cursor.execute("""
+        CREATE TABLE projection
+        (
+            start_text TEXT,
+            start_offset_ns INT,
+            finish_text TEXT,
+            finish_offset_ns INT,
+            duration_ns INT,
+            place REAL,
+            abool INT
+        )""")
 
-    #-----------------------------------------------------------
-    @staticmethod
-    def SimpleFormatter(value, attr):
-        if value > 1:
-            attr.SetBold(True)
-
-
-    #-----------------------------------------------------------
-    @classmethod
-    def DefineSchema(cls, schema):
-        schema.AddStart("Start", width = 100)
-        schema.AddFinish("Finish", width = 100)
-        schema.AddDuration("Duration", scale = "s", width = 60, formatter = cls.SimpleFormatter)
-        schema.AddField("Place", "float32", 60)
-        schema.AddField("Abool", "bool", 60)
-
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def Project(connection, context):
-        cursor = connection.cursor()
-
-        utc_datum = context.MakeProjectionMetaTable(cursor, ["reschedule"])
-        context.MakeProjectionTable(cursor)
-
-        cursor.execute("""
-            INSERT INTO projection
-            SELECT
-                start_text,
-                start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
-                finish_text,
-                finish_offset_ns + (finish_utc - {utc_datum}) * 1000000000,
-                duration_ns,
-                place,
-                abool
-            FROM
-                reschedule
-            """.format(utc_datum = utc_datum))
-
-        cursor.close()
-        connection.commit()
+    cursor.execute("""
+        INSERT INTO projection
+        SELECT
+            start_text,
+            start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
+            finish_text,
+            finish_offset_ns + (finish_utc - {utc_datum}) * 1000000000,
+            duration_ns,
+            place,
+            abool
+        FROM
+            reschedule
+        """.format(utc_datum = utc_datum))
 
 
+def SimpleFormatter(value, attr):
+    if value > 1:
+        attr.SetBold(True)
 
-## GLOBAL ##################################################
 
-"""
-Recogniser configuration. Call the global Register function as
-follows:
-
-    Register(log_analyser)
-
-where:
-    * `log_analyser` is an object, behaving as per `LogfileAnalyser`
-"""
-
-Analyse(Analyser())
-Project("Reschedule", Projector())
+Project(
+    "Reschedule",
+    Projector,
+    MakeDisplaySchema() \
+        .AddStart("Start", width = 100) \
+        .AddFinish("Finish", width = 100) \
+        .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter) \
+        .AddField("Place", "real", 60) \
+        .AddField("Abool", "bool", 60)
+)

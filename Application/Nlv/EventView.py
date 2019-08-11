@@ -644,7 +644,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     @staticmethod
-    def NullAnalyser(analyser):
+    def NullAnalyser(analyser, start_match, finish_match = None):
         pass
 
     @G_Global.TimeFunction
@@ -671,6 +671,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
             projector = G_Projector(connection, meta_only, self.GetLogNode())
             globals.update(Project = projector.Project)
+            globals.update(MakeDisplaySchema = projector.MakeDisplaySchema)
 
             exec(code, globals)
 

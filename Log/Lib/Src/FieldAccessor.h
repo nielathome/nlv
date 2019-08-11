@@ -68,6 +68,9 @@ const std::string c_Type_Text{ "text" };
 const std::string c_Type_TextOffsets08{ "text_offsets08" };
 const std::string c_Type_TextOffsets16{ "text_offsets16" };
 
+const std::string c_Type_Int{ "int" };
+const std::string c_Type_Real{ "real" };
+
 
 // field base class and factory
 template <typename T_FIELD, typename T_MAKER>

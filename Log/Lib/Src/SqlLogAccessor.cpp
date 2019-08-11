@@ -66,12 +66,6 @@ public:
 	fieldvalue_t GetValue( unsigned field_id ) const {}
 
 	template<>
-	fieldvalue_t GetValue<FieldValueType::unsigned64>( unsigned field_id ) const
-	{
-		return static_cast<uint64_t>(GetAsInt64( field_id ));
-	}
-
-	template<>
 	fieldvalue_t GetValue<FieldValueType::signed64>( unsigned field_id ) const
 	{
 		return GetAsInt64( field_id );
@@ -348,17 +342,9 @@ using SqlFieldAccessorReal = SqlFieldAccessorScalar<FieldValueType::float64>;
 
 SqlFieldAccessor::factory_t::map_t SqlFieldAccessor::factory_t::m_Map
 {
-	{ c_Type_Bool, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint08, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint16, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint32, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint64, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Int08, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Int16, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Int32, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Int64, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Float32, &MakeField<SqlFieldAccessorReal> },
-	{ c_Type_Float64, &MakeField<SqlFieldAccessorReal> },
+	{ c_Type_Bool, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Int, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Real, &MakeField<SqlFieldAccessorReal> },
 	{ c_Type_Text, &MakeField<SqlFieldAccessor> }
 };
 

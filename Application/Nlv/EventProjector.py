@@ -125,7 +125,8 @@ class G_Analyser:
 
     #-------------------------------------------------------
     def __init__(self, connection, log_schema, logfile):
-        self.Connection = connection
+        self._Connection = connection
+        self._Cursor = connection.cursor()
         self._LogFile = logfile
         self._DateFieldId = logfile.GetTimecodeBase().GetFieldId()
 
@@ -178,15 +179,10 @@ class G_Analyser:
 
 
     @G_Global.TimeFunction
-    def BuildLineSets(self, user_analyser):
-        user_descs = user_analyser.DefineFilter()
-
-        start_desc = user_descs[0]
+    def BuildLineSets(self, start_desc, finish_desc):
         start_view = self.BuildLineSet(G_MatchItem(start_desc[0], start_desc[1]))
 
-        have_finish_desc = len(user_descs) > 1
-        if have_finish_desc:
-            finish_desc = user_descs[1]
+        if finish_desc is not None:
             finish_view = self.BuildLineSet(G_MatchItem(finish_desc[0], finish_desc[1]))
         else:
             finish_view = start_view
@@ -214,6 +210,7 @@ class G_Analyser:
         ]
 
 
+    #-------------------------------------------------------
     def GetEventDetails(self):
         """
         Return the following details about the event, as an array:
@@ -254,13 +251,13 @@ class G_Analyser:
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Analyse(self, user_analyser):
+    def Analyse(self, user_analyser, start_desc, finish_desc = None):
         """Implements user analyse script Analyse() function"""
         # observation: this could be made multithreaded
 
         field_ids = self._LogFieldIds
 
-        (start_view, finish_view) = self.BuildLineSets(user_analyser)
+        (start_view, finish_view) = self.BuildLineSets(start_desc, finish_desc)
 
         self._StartAccessor = start_accessor = G_LineAccessor(field_ids, start_view)
         start_line_count = start_view.GetNumLines()
@@ -268,7 +265,7 @@ class G_Analyser:
         self._FinishAccessor = finish_accessor = G_LineAccessor(field_ids, finish_view)
         finish_line_count = finish_view.GetNumLines()
 
-        user_analyser.Begin(self)
+        user_analyser.Begin(self._Connection, self._Cursor)
 
         for start_lineno in range(start_line_count):
             start_accessor.SetLineNo(start_lineno)
@@ -302,8 +299,11 @@ class G_Analyser:
             if not got_finish:
                 logging.info("Event close not found (performance warning)")
 
-        user_analyser.End(self)
+        user_analyser.End()
         user_analyser = None
+
+        self._Cursor.close()
+        self._Connection.commit()
 
 
 
@@ -315,8 +315,6 @@ class G_ProjectionTypeManager:
     #-------------------------------------------------------
     def _GetText(view, line_no, field_no):
         return view.GetFieldText(line_no, field_no)
-    def _GetUnsigned(view, line_no, field_no):
-        return view.GetFieldValueUnsigned(line_no, field_no)
     def _GetSigned(view, line_no, field_no):
         return view.GetFieldValueSigned(line_no, field_no)
     def _GetFloat(view, line_no, field_no):
@@ -329,10 +327,11 @@ class G_ProjectionTypeManager:
     def _DisplayValue(value, icon):
         return value
 
-    # model types
+    # model types - model info rows
     _c_without_icon = 0
     _c_with_icon = 1
 
+    # model info columns
     _c_variant_type = 0
     _c_displayvalue_to_display = 1
     _c_data_view_renderer = 2
@@ -348,10 +347,9 @@ class G_ProjectionTypeManager:
 
     # display types (_DisplayInfo rows)
     _c_text = 0
-    _c_unsigned = 1
-    _c_signed = 2
-    _c_float = 3
-    _c_bool = 4
+    _c_signed = 1
+    _c_float = 2
+    _c_bool = 3
 
     # _DisplayInfo columns
     _c_store_to_value = 0
@@ -361,34 +359,16 @@ class G_ProjectionTypeManager:
     # identify data accessor and display functors
     _DisplayInfo = [
         [_GetText, _GetText, _TextModelInfo], # _c_text
-        [_GetUnsigned, _GetText, _TextModelInfo], # _c_unsigned
         [_GetSigned, _GetText, _TextModelInfo], # _c_signed
         [_GetFloat, _GetText, _TextModelInfo], # _c_float
         [_GetBool, _GetBool, _BoolModelInfo] # _c_bool
     ]
 
-    # map Nlog indexer field-types to display info
+    # map display field-types to display info
     _FieldTypes = dict(
-        datetime_unix = _DisplayInfo[_c_signed],
-        datetime_us_std = _DisplayInfo[_c_signed],
-        datetime_tracefmt_int_std = _DisplayInfo[_c_signed],
-        datetime_tracefmt_us_std = _DisplayInfo[_c_signed],
-        datetime_tracefmt_int_hires = _DisplayInfo[_c_signed],
-        datetime_tracefmt_us_hires = _DisplayInfo[_c_signed],
         bool = _DisplayInfo[_c_bool],
-        uint08 = _DisplayInfo[_c_unsigned],
-        uint16 = _DisplayInfo[_c_unsigned],
-        uint32 = _DisplayInfo[_c_unsigned],
-        uint64 = _DisplayInfo[_c_unsigned],
-        int08 = _DisplayInfo[_c_signed],
-        int16 = _DisplayInfo[_c_signed],
-        int32 = _DisplayInfo[_c_signed],
-        int64 = _DisplayInfo[_c_signed],
-        float32 = _DisplayInfo[_c_float],
-        float64 = _DisplayInfo[_c_float],
-        enum08 = _DisplayInfo[_c_unsigned],
-        enum16 = _DisplayInfo[_c_unsigned],
-        emitter = _DisplayInfo[_c_text],
+        int = _DisplayInfo[_c_signed],
+        real = _DisplayInfo[_c_float],
         text = _DisplayInfo[_c_text]
     )
 
@@ -483,18 +463,6 @@ class G_ProjectionFieldSchema:
         return (self.DataColumnOffset, self.SortDirection)
 
 
-    #-------------------------------------------------------
-    def Update(self, name = "", width = 0, align = None, formatter = None):
-        if name != "":
-            self.Name = name
-        if width != 0:
-            self.Width = width
-        if align is not None:
-            self.Align = align
-        if formatter is not None:
-            self.Formatter = formatter
-
-
 
 ## G_ProjectionSchema ######################################
 
@@ -531,69 +499,6 @@ class G_ProjectionSchema(G_FieldSchemata):
 
 
     #-------------------------------------------------------
-    def MakeHiddenFieldSchema(self, name, type):
-        G_ProjectionTypeManager.ValidateType(type)
-        return self.Append(G_ProjectionFieldSchema(name, type, False))
-
-
-    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None, data_col_offset = 0):
-        G_ProjectionTypeManager.ValidateType(type)
-        al = __class__._CalcAlign(align)
-        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter, data_col_offset))
-
-
-    #-------------------------------------------------------
-    def AddNesting(self):
-        self.ColParentId = self.MakeHiddenFieldSchema("parent_id", "int32")
-
-    def AddField(self, name, type, width, align, formatter):
-        self.MakeFieldSchema(name, type, width, align, formatter)
-
-    def AddStart(self, name, width, align, formatter):
-        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
-        self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "int64")
-
-    def AddFinish(self, name, width, align, formatter):
-        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
-        self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "int64")
-
-    def AddDuration(self, scale, name, width, align, formatter):
-        self.ColDuration = self.MakeFieldSchema(name, "int64", width, align, formatter)
-        self.DurationScale = scale
-
-
-
-## G_CoreProjectionSchemaCollector #########################
-
-class G_CoreProjectionSchemaCollector:
-    """Collect schema data for a projector's table"""
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self._ProjectionSchema = G_ProjectionSchema("14C89CE3-E8A4-4F28-99EB-3EF5D5FD3B13")
-
-
-    #-------------------------------------------------------
-    def AddField(self, name, type, width = 30, align = "centre", formatter = None):
-        self._ProjectionSchema.AddField(name, type, width, align, formatter)
-
-
-    #-------------------------------------------------------
-    def Close(self):
-        return self._ProjectionSchema
-
-
-
-## G_ProjectionSchemaCollector #############################
-
-class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
-    
-    #-------------------------------------------------------
-    def __init__(self):
-        super().__init__()
-
-
-    #-------------------------------------------------------
     @staticmethod
     def _CalcScale(scale):
         if scale == "s":
@@ -609,21 +514,43 @@ class G_ProjectionSchemaCollector(G_CoreProjectionSchemaCollector):
 
 
     #-------------------------------------------------------
+    def MakeHiddenFieldSchema(self, name, type):
+        G_ProjectionTypeManager.ValidateType(type)
+        return self.Append(G_ProjectionFieldSchema(name, type, False))
+
+
+    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None, data_col_offset = 0):
+        G_ProjectionTypeManager.ValidateType(type)
+        al = __class__._CalcAlign(align)
+        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter, data_col_offset))
+
+
+    #-------------------------------------------------------
     def AddNesting(self):
-        self._ProjectionSchema.AddNesting(field_schema)
+        self.ColParentId = self.MakeHiddenFieldSchema("parent_id", "int")
+        return self
+
+    def AddField(self, name, type, width = 30, align = "centre", formatter = None):
+        self.MakeFieldSchema(name, type, width, align, formatter)
+        return self
 
     def AddStart(self, name, width = 30, align = "centre", formatter = None):
-        self._ProjectionSchema.AddStart(name, width, align, formatter)
+        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
+        self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "int")
+        return self
 
     def AddFinish(self, name, width = 30, align = "centre", formatter = None):
-        self._ProjectionSchema.AddFinish(name, width, align, formatter)
+        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
+        self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "int")
+        return self
 
     def AddDuration(self, name, scale = "us", width = 30, align = "centre", formatter = None):
         name = "{} ({})".format(name, scale)
-        scale_factor = self._CalcScale(scale)
-        self._ProjectionSchema.AddDuration(scale_factor, name, width, align, formatter)
+        self.DurationScale = self._CalcScale(scale)
+        self.ColDuration = self.MakeFieldSchema(name, "int", width, align, formatter)
+        return self
 
-        
+
 
 ## G_ProjectionItem ########################################
 
@@ -652,29 +579,10 @@ class G_ProjectionCollector:
     """Collect event data from any number of event analyses"""
 
     #-------------------------------------------------------
-    _SqlTypeMap = dict(
-        bool = "INT",
-        uint08 = "INT",
-        uint16 = "INT",
-        uint32 = "INT",
-        uint64 = "INT",
-        int08 = "INT",
-        int16 = "INT",
-        int32 = "INT",
-        int64 = "INT",
-        float32 = "REAL",
-        float64 = "REAL",
-        enum08 = "INT",
-        enum16 = "INT",
-        text = "TEXT"
-    )
-
-
-    #-------------------------------------------------------
-    def __init__(self, log_node, projection_schema):
+    def __init__(self, log_node, col_start):
         self._LogNode = log_node
         self._EventNo = 0
-        self._ProjectionSchema = projection_schema
+        self._ColStart = col_start
 
         # note, somewhat arbitrary limit (32-bit signed-int-max)
         max = 2147483647
@@ -724,12 +632,7 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def CalcDuration(self, duration):
-        return int(duration / self._ProjectionSchema.DurationScale)
-
-
-    #-------------------------------------------------------
-    def MakeProjectionMetaTable(self, cursor, tables):
+    def CalcUtcDatum(self, cursor, tables):
         """Each table in tables must contain a 'start_utc' column"""
 
         utc_datum = 0
@@ -757,7 +660,7 @@ class G_ProjectionCollector:
                 field_id INT
             )""")
 
-        field_id = self._ProjectionSchema.ColStartOffset
+        field_id = self._ColStart
         if field_id is None:
             field_id = 0
 
@@ -777,16 +680,28 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def MakeProjectionTable(self, cursor):
-        ct_columns = ["[{}] {}".format(field_schema.Name, self._SqlTypeMap[field_schema.Type]) for field_schema in self._ProjectionSchema]
+    def Close(self):
+        self._LogNode = None
 
-        cursor.execute("DROP TABLE IF EXISTS projection")
-        cursor.execute("""
-            CREATE TABLE projection
-            (
-                {}
-            )""".format(", ".join(ct_columns)))
 
+    
+## G_Projector #############################################
+
+class G_Projector:
+    """Project event analyses, creates an event view"""
+
+    #-------------------------------------------------------
+    def __init__(self, connection, meta_only, log_node):
+        self._Connection = connection
+        self._Cursor = connection.cursor()
+        self._MetaOnly = meta_only
+        self._ProjectionSchema = G_ProjectionSchema()
+        self._LogNode = log_node
+
+
+    #-------------------------------------------------------
+    def MakeProjectionTable(self):
+        cursor = self._Cursor
         cursor.execute("DROP TABLE IF EXISTS filter")
         cursor.execute("""
             CREATE TABLE filter
@@ -808,54 +723,35 @@ class G_ProjectionCollector:
 
 
     #-------------------------------------------------------
-    def Close(self):
-        self._LogNode = None
-
-
-    
-## G_Projector #############################################
-
-class G_Projector:
-    """Project event analyses, creates an event view"""
-
-    #-------------------------------------------------------
-    def __init__(self, connection, meta_only, log_node):
-        self._Connection = connection
-        self._MetaOnly = meta_only
-        self._ProjectionSchema = G_ProjectionSchema()
-        self._LogNode = log_node
-        self._EventMetrics = None
-
-
-    #-------------------------------------------------------
-    def CollectProjectionSchema(self, user_projector):
-        schema_collector = G_ProjectionSchemaCollector()
-        user_projector.DefineSchema(schema_collector)
-        return schema_collector.Close()
-
-
-    #-------------------------------------------------------
     def GetMeta(self):
-        return (self._ProjectionSchema, self._EventMetrics)
+        return (self._ProjectionSchema, None)
 
 
     #-------------------------------------------------------
-    def Project(self, name, user_projector, user_metrics = None):
+    def MakeDisplaySchema(self):
+        return G_ProjectionSchema("14C89CE3-E8A4-4F28-99EB-3EF5D5FD3B13")
+
+
+    #-------------------------------------------------------
+    def Project(self, name, user_projector, display_schema):
         """Implements user analyse script Project() function"""
 
-        self._ProjectionSchema = self.CollectProjectionSchema(user_projector)
-        self._EventMetrics = user_metrics
+        self._ProjectionSchema = display_schema
 
         if self._MetaOnly:
             return
 
-        event_collector = G_ProjectionCollector(self._LogNode, self._ProjectionSchema)
+        event_collector = G_ProjectionCollector(self._LogNode, self._ProjectionSchema.ColStartOffset)
         self._LogNode = None
 
         with G_PerfTimerScope("G_Projector.Project") as timer:
-            user_projector.Project(self._Connection, event_collector)
+            user_projector(self._Connection, self._Cursor, event_collector)
 
         event_collector.Close()
+
+        self.MakeProjectionTable()
+        self._Cursor.close()
+        self._Connection.commit()
 
 
 
