@@ -28,6 +28,8 @@ from pathlib import Path
 matplotlib.use('WXAgg')
 
 # Application imports 
+from .EventProjector import ConnectDb
+from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
 from .EventProjector import G_ScriptGuard
@@ -617,9 +619,6 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
         except FileNotFoundError as ex:
             pass
 
-        except BaseException as ex:
-            analysis_props.ErrorReporter("UpdateContent failed\n{}".format(G_Global.FormatLastTraceback()))
-
 
     #-------------------------------------------------------
     def UpdateDisplay(self, nesting = None, valid = None):
@@ -865,9 +864,10 @@ class G_ChangeTracker:
 class G_ChartViewCtrl(wx.Panel):
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_designer, table_view_ctrl, error_reporter):
+    def __init__(self, parent, chart_designer, metrics_db_path, table_view_ctrl, error_reporter):
         super().__init__(parent)
         self._ChartDesigner = chart_designer
+        self._MetricsDbPath = metrics_db_path
         self._TableViewCtrl = table_view_ctrl
         self._ErrorReporter = error_reporter
 
@@ -887,20 +887,14 @@ class G_ChartViewCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    def GetTableData(self):
-        metrics = self._TableViewCtrl.GetEventView()
-        num_metrics = metrics.GetNumLines()
-        selection = self._TableViewCtrl.GetSelectedItems()
-        return (metrics, num_metrics, selection)
-
-
-    #-------------------------------------------------------
     def DefineParameters(self):
         with G_ScriptGuard("DefineParameters", self._ErrorReporter):
             if self._ParameterChangeTracker.Changed(self._ChartDesigner.WantSelection):
-                (metrics, num_metrics, selection) = self.GetTableData()
+                selection = self._TableViewCtrl.GetSelectedItems()
+                connection = ConnectDb(self._MetricsDbPath)
+                cursor = connection.cursor()
                 collector = G_ParameterCollector()
-                self._ChartDesigner.DefineParameters(collector, metrics, num_metrics, selection)
+                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
                 self._Parameters = collector.Close()
 
         return self._Parameters
@@ -912,10 +906,12 @@ class G_ChartViewCtrl(wx.Panel):
         """Redraw the chart if needed"""
         with G_ScriptGuard("Realise", self._ErrorReporter):
             if not self._RealiseLock and self._RealiseChangeTracker.Changed(self._ChartDesigner.WantSelection):
-                (metrics, num_metrics, selection) = self.GetTableData()
+                selection = self._TableViewCtrl.GetSelectedItems()
+                connection = ConnectDb(self._MetricsDbPath)
+                cursor = connection.cursor()
                 self._Figure.clear()
                 with G_PerfTimerScope("Design"):
-                    self._ChartDesigner.Realise(self._Figure, metrics, num_metrics, self._ParamaterValues, selection)
+                    self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
 
                 with G_PerfTimerScope("Draw"):
                     self._Canvas.draw()
@@ -941,13 +937,11 @@ class G_ChartViewCtrl(wx.Panel):
 class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
-    def __init__(self, parent, quantifier_name, id):
+    def __init__(self, parent, quantifier_name):
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
 
         # the ID distinguishes different tables in the event,
         # but otherwise, has no real meaning
-        self._ID = id
-        self._Quantifier = None
         self._QuantifierName = quantifier_name
         self._CollectorLocked = True
 
@@ -964,17 +958,11 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     def GetChartViewCtrl(self, chart_no, activate):
-        if self._Quantifier is None:
-            return None
-
         pane = self._ChartPane
         pane_sizer = pane.GetSizer()
 
         if pane_sizer.IsEmpty():
-            activate = True
-            for chart_designer in self._Quantifier.Charts:
-                chart_view_ctrl = G_ChartViewCtrl(pane, chart_designer, self._TableViewCtrl, self._ErrorReporter)
-                pane_sizer.Add(chart_view_ctrl, flag = wx.EXPAND | wx.ALIGN_CENTER)
+            return
 
         sizer_items = pane_sizer.GetChildren()
 
@@ -997,33 +985,34 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Assemble(self, events, analysis_props):
-        self.ResetModel(analysis_props.ErrorReporter)
-        with G_ScriptGuard("Assemble", self._ErrorReporter):
-            self._Quantifier = analysis_props.GetQuantifier(self._QuantifierName)
+    def Quantify(self, quantifier_context):
+        self.ResetModel(quantifier_context.ErrorReporter)
+        with G_ScriptGuard("Quantify", self._ErrorReporter):
+            quantifier_info = quantifier_context.GetQuantifierInfo(self._QuantifierName)
+            events_db_path = quantifier_context.AnalysisResults.EventsDbPath
+            quantifier = G_Quantifier(quantifier_info, events_db_path)
+            quantifier.Run(self._CollectorLocked)
 
-            schema_collector = G_CoreProjectionSchemaCollector()
-            self._Quantifier.DefineSchema(schema_collector)
-            self._TableSchema = schema_collector.Close()
-
-            path = Path(analysis_props.FileName)
-            path = path.with_name("{}.{}.csv".format(path.stem, self._ID))
-            self._TableFileName = str(path)
-
-            if not self._CollectorLocked or not path.exists():
-                event_field_names = analysis_props.EventSchema.GetFieldNames()
-                collector = G_MetricsCollector(self._TableFileName, self._TableSchema, event_field_names)
-
-                self._Quantifier.Assemble(events, events.GetNumLines(), collector)
-                collector.Close()
-
-            self._TableViewCtrl.UpdateContent(False, self._TableSchema, self._TableFileName, analysis_props.Valid)
+            metrics_db_path = quantifier_info.MetricsDbPath
+            self._TableViewCtrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, quantifier_context.Valid)
             self._TableViewCtrl.SetFieldMask(-1)
+
+            pane = self._ChartPane
+            pane_sizer = pane.GetSizer()
+
+            if pane_sizer.IsEmpty():
+                for chart_info in quantifier_info.Charts:
+                    chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, self._TableViewCtrl, self._ErrorReporter)
+                    pane_sizer.Add(chart_view_ctrl, flag = wx.EXPAND | wx.ALIGN_CENTER)
+
+            return True
+
+        return False
 
 
     #-------------------------------------------------------
     def UpdateCharts(self, name):
-        active_chart = self.GetChartViewCtrl(0, False)
+        active_chart = self.GetChartViewCtrl(0, False) # niel - needed ?
 
         for chart_view in self._ChartPane.GetChildren():
             chart_view.Update(name = name)
@@ -1053,9 +1042,6 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     def ResetModel(self, error_reporter = None):
-        self._Quantifier = None
-        self._TableSchema = None
-        self._TableFileName = None
         self._ErrorReporter = error_reporter
 
         self._ChartPane.GetSizer().Clear(delete_windows = True)

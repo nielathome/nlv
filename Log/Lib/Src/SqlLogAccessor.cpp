@@ -441,13 +441,21 @@ public:
 	// LineAccessor interfaces
 
 	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
-		const std::string & text = m_Captures[ field_id ].first;
-		*first = text.c_str();
-		*last = *first + text.size();
+		if( field_id < m_Captures.size() )
+		{
+			const std::string & text = m_Captures[ field_id ].first;
+			*first = text.c_str();
+			*last = *first + text.size();
+		}
+		else
+			*first = *last = "";
 	}
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
-		return m_Captures[ field_id ].second;
+		if( field_id < m_Captures.size() )
+			return m_Captures[ field_id ].second;
+		else
+			return 0LL;
 	}
 };
 

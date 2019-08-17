@@ -18,6 +18,7 @@
 # Python imports
 import csv
 import logging
+from pathlib import Path
 import sqlite3
 
 # Application imports 
@@ -34,17 +35,55 @@ import wx
 import Nlog
 
 
+## Locals ##################################################
+
+#-----------------------------------------------------------
+def ConnectDb(path):
+    connection = sqlite3.connect(path)
+    connection.row_factory = sqlite3.Row
+    cursor = connection.cursor()
+    cursor.execute("PRAGMA synchronous = OFF")
+
+    # commented out, as it yields strange "sqlite3.OperationalError:
+    # database table is locked" errors on the first db execute
+    #cursor.execute("PRAGMA journal_mode = MEMORY")
+
+    return connection
+
+
+#-----------------------------------------------------------
+def MakeProjectionView(cursor):
+    cursor.execute("DROP TABLE IF EXISTS filter")
+    cursor.execute("""
+        CREATE TABLE filter
+        (
+            log_row_no INT
+        )""")
+
+    cursor.execute("""
+        CREATE VIEW IF NOT EXISTS filtered_projection AS
+		SELECT
+			*
+		FROM
+			projection
+			JOIN
+				filter
+			ON
+				projection.rowid = filter.log_row_no
+        """)
+
+
 
 ## G_ScriptGuard ###########################################
 
 class G_ScriptGuard:
-
     """
     All use of the user supplied recogniser script, and any
-    objects functions returned from the script, should be
+    objects/functions returned from the script, should be
     protected within a 'with' block, and any exceptions reported
     back to the UI
     """
+
     #-------------------------------------------------------
     def __init__(self, name, reporter):
         self._Name = name
@@ -118,10 +157,10 @@ class G_LineAccessor:
 
 
 
-## G_Analyser ##############################################
+## G_Recogniser ############################################
 
-class G_Analyser:
-    """Analyse a log, creates any number of event/feature tables"""
+class G_Recogniser:
+    """Assess a log, creates any number of event/feature tables"""
 
     #-------------------------------------------------------
     def __init__(self, connection, log_schema, logfile):
@@ -251,8 +290,8 @@ class G_Analyser:
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Analyse(self, user_analyser, start_desc, finish_desc = None):
-        """Implements user analyse script Analyse() function"""
+    def Recognise(self, user_analyser, start_desc, finish_desc = None):
+        """Implements user analyse script Recognise() function"""
         # observation: this could be made multithreaded
 
         field_ids = self._LogFieldIds
@@ -552,6 +591,60 @@ class G_ProjectionSchema(G_FieldSchemata):
 
 
 
+## G_ChartInfo #############################################
+
+class G_ChartInfo:
+
+    #-------------------------------------------------------
+    def __init__(self, name, want_selection, builder):
+        self.Name = name
+        self.WantSelection = want_selection
+        self.Builder = builder
+
+
+
+## G_QuantifierInfo ########################################
+
+class G_QuantifierInfo:
+
+    #-------------------------------------------------------
+    def __init__(self, name, quantifier, metrics_schema, metrics_db_path, charts):
+        self.Name = name
+        self.UserQuantifier = quantifier
+        self.MetricsSchema = metrics_schema
+        self.MetricsDbPath = str(metrics_db_path)
+
+        self.Charts = []
+        for chart in charts:
+            self.Charts.append(G_ChartInfo(chart[0], chart[1], chart[2]))
+
+
+
+## G_AnalysisResults #######################################
+
+class G_AnalysisResults:
+
+    #-------------------------------------------------------
+    def __init__(self, events_db_path):
+        self.EventsDbPath = events_db_path
+        self.EventSchema = G_ProjectionSchema()
+        self.Quantifiers = dict()
+
+
+    #-------------------------------------------------------
+    def AddQuantifierInfo(self, name, user_quantifier, metrics_schema, charts):
+        id = len(self.Quantifiers)
+        metrics_db_path = Path(self.EventsDbPath)
+        metrics_db_path = metrics_db_path.with_name("{}.{}.db".format(metrics_db_path.stem, id))
+        self.Quantifiers.update([(name, G_QuantifierInfo(name, user_quantifier, metrics_schema, metrics_db_path, charts))])
+
+
+    #-------------------------------------------------------
+    def GetQuantifierInfo(self, name):
+        return self.Quantifiers[name]
+
+
+
 ## G_ProjectionItem ########################################
 
 class G_ProjectionItem:
@@ -573,9 +666,9 @@ class G_ProjectionItem:
 
 
 
-## G_ProjectionCollector ###################################
+## G_ProjectionContext #####################################
 
-class G_ProjectionCollector:
+class G_ProjectionContext:
     """Collect event data from any number of event analyses"""
 
     #-------------------------------------------------------
@@ -688,43 +781,60 @@ class G_ProjectionCollector:
 ## G_Projector #############################################
 
 class G_Projector:
-    """Project event analyses, creates an event view"""
+    """
+    Project event analyses, creates an event view
+    Also collects metadata, including event quantifiers.
+    """
 
     #-------------------------------------------------------
-    def __init__(self, connection, meta_only, log_node):
+    def __init__(self, connection, schema_only, log_node, results):
         self._Connection = connection
-        self._Cursor = connection.cursor()
-        self._MetaOnly = meta_only
-        self._ProjectionSchema = G_ProjectionSchema()
+        self._SchemaOnly = schema_only
         self._LogNode = log_node
+        self._Results = results
 
 
     #-------------------------------------------------------
-    def MakeProjectionTable(self):
-        cursor = self._Cursor
-        cursor.execute("DROP TABLE IF EXISTS filter")
-        cursor.execute("""
-            CREATE TABLE filter
-            (
-                log_row_no INT
-            )""")
+    def Project(self, name, user_projector, event_schema):
+        """Implements user analyse script Project() function"""
 
-        cursor.execute("""
-            CREATE VIEW IF NOT EXISTS filtered_projection AS
-			SELECT
-				*
-			FROM
-				projection
-				JOIN
-					filter
-				ON
-					projection.rowid = filter.log_row_no
-            """)
+        self._Results.EventSchema = event_schema
+        if self._SchemaOnly:
+            return
+
+        projection_context = G_ProjectionContext(self._LogNode, event_schema.ColStartOffset)
+        self._LogNode = None
+
+        cursor = self._Connection.cursor()
+        with G_PerfTimerScope("G_Projector.Project") as timer:
+            user_projector(self._Connection, cursor, projection_context)
+
+        projection_context.Close()
+        MakeProjectionView(cursor)
+
+        cursor.close()
+        self._Connection.commit()
+
+
+
+## G_Analyser ##############################################
+
+class G_Analyser:
+    """
+    Analyse a logfile; combines event recognition, projection
+    and metrics collection
+    """
+
+    #-------------------------------------------------------
+    @staticmethod
+    def NullRecogniser(user_analyser, start_desc, finish_desc = None):
+        pass
 
 
     #-------------------------------------------------------
-    def GetMeta(self):
-        return (self._ProjectionSchema, None)
+    def __init__(self, events_db_path):
+        self._Results = G_AnalysisResults(events_db_path)
+        self._Connection = None
 
 
     #-------------------------------------------------------
@@ -733,63 +843,61 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def Project(self, name, user_projector, display_schema):
-        """Implements user analyse script Project() function"""
-
-        self._ProjectionSchema = display_schema
-
-        if self._MetaOnly:
-            return
-
-        event_collector = G_ProjectionCollector(self._LogNode, self._ProjectionSchema.ColStartOffset)
-        self._LogNode = None
-
-        with G_PerfTimerScope("G_Projector.Project") as timer:
-            user_projector(self._Connection, self._Cursor, event_collector)
-
-        event_collector.Close()
-
-        self.MakeProjectionTable()
-        self._Cursor.close()
-        self._Connection.commit()
-
-
-
-## G_MetricsCollector ######################################
-
-class G_MetricsCollector:
-    """Collect and save metrics data from an event quantifier"""
-
-    #-------------------------------------------------------
-    def __init__(self, filename, metric_schema, event_field_names):
-        self._CsvFile = open(filename, "w", newline = "")
-        self._CsvWriter = csv.writer(self._CsvFile)
-        self._FieldCount = len(metric_schema)
-
-        # row headers
-        self._CsvWriter.writerow(metric_schema.GetFieldNames())
-
-        # map event field names to their indexes
-        self._FieldIds = dict()
-        for (idx, name) in enumerate(event_field_names):
-            # allow for the "parent" hidden field
-            self._FieldIds.update([[name, idx + 1]])
+    def Quantify(self, name, user_quantifier, metrics_schema, charts):
+        self._Results.AddQuantifierInfo(name, user_quantifier, metrics_schema, charts)
 
 
     #-------------------------------------------------------
-    def GetFieldId(self, field_name):
-        return self._FieldIds[field_name]
+    def SetEntryPoints(self, meta_only, log_schema, log_file, log_node):
+        script_globals = dict()
 
+        if meta_only:
+            script_globals.update(Recognise = self.NullRecogniser)
+        else:
+            self._Connection = ConnectDb(self._Results.EventsDbPath)
+            self._Recogniser = G_Recogniser(self._Connection, log_schema, log_file)
+            script_globals.update(Recognise = self._Recogniser.Recognise)
 
-    #-------------------------------------------------------
-    def AddMetric(self, values):
-        if len(values) != self._FieldCount:
-            raise RuntimeError("Incorrect number of values: got:{} exp:{}".format(len(values), self._FieldCount))
+        self._Projector = G_Projector(self._Connection, meta_only, log_node, self._Results)
+        script_globals.update(Project = self._Projector.Project)
 
-        text_values = [str(v).replace(',', '_').replace('"', "'") for v in values]
-        self._CsvWriter.writerow(text_values)
+        script_globals.update(MakeDisplaySchema = self.MakeDisplaySchema)
+        script_globals.update(Quantify = self.Quantify)
+
+        return script_globals
 
 
     #-------------------------------------------------------
     def Close(self):
-        self._CsvFile.close()
+        if self._Connection is not None:
+            self._Connection.close()
+        return self._Results
+
+
+
+## G_Quantifier ############################################
+
+class G_Quantifier:
+
+    #-------------------------------------------------------
+    def __init__(self, quantifier_info, events_db_path):
+        self._QuantifierInfo = quantifier_info
+        self._EventsDbPath = events_db_path
+
+
+    #-------------------------------------------------------
+    def Run(self, locked):
+        if not  Path(self._EventsDbPath).exists():
+            return
+
+        if locked and Path(self._QuantifierInfo.MetricsDbPath).exists():
+            return
+
+        connection = ConnectDb(self._QuantifierInfo.MetricsDbPath)
+        cursor = connection.cursor()
+
+        self._QuantifierInfo.UserQuantifier(self._EventsDbPath, connection, cursor)
+        
+        MakeProjectionView(cursor)
+        cursor.close()
+        connection.commit()

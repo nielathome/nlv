@@ -37,7 +37,6 @@ import json
 import logging
 from pathlib import Path
 import pywintypes
-import sqlite3
 import time
 from uuid import uuid4
 import win32com.client as com
@@ -51,7 +50,6 @@ from .Document import D_Document
 from .EventDisplay import G_MetricsViewCtrl
 from .EventDisplay import G_TableViewCtrl
 from .EventProjector import G_Analyser
-from .EventProjector import G_Projector
 from .EventProjector import G_ScriptGuard
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
@@ -78,6 +76,23 @@ from .Theme import GetThemeSupportFile
 
 # Content provider interface
 import Nlog
+
+
+
+## G_QuantifierContext #####################################
+
+class G_QuantifierContext:
+
+    #-------------------------------------------------------
+    def __init__(self, error_reporter, analysis_results, valid):
+        self.ErrorReporter = error_reporter
+        self.AnalysisResults = analysis_results
+        self.Valid = valid
+
+
+    #-------------------------------------------------------
+    def GetQuantifierInfo(self, name):
+        return self.AnalysisResults.GetQuantifierInfo(name)
 
 
 
@@ -467,23 +482,6 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     """Master node for all logfile analysis and results viewing"""
 
     #-------------------------------------------------------
-    class AnalysisProperties:
-
-        def __init__(self, node, event_meta, filename, valid):
-            (self.EventSchema, self.Metrics) = event_meta
-            self.FileName = filename
-            self.Valid = valid
-            self.ErrorReporter = node.OnAnalyserError
-
-        def GetQuantifier(self, name):
-            for quantifier in self.Metrics.Tables:
-                if quantifier.Name == name:
-                    return quantifier
-
-            return None
-
-
-    #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         # track our position in the project tree
         G_DisplayNode.__init__(self)
@@ -530,12 +528,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                 self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, "Events")
                 self.AnalyseForAll()
 
-                (schema, metrics) = (None, None)
-                if self._EventMeta is not None:
-                    (schema, metrics) = self._EventMeta
-
-                if metrics is not None:
-                    for quantifier in metrics.Tables:
+                if self._AnalysisResults is not None:
+                    for quantifier in self._AnalysisResults.Quantifiers.values():
                         self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
 
             self.UpdateContent(unlock_charts = False)
@@ -643,57 +637,34 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    @staticmethod
-    def NullAnalyser(analyser, start_match, finish_match = None):
-        pass
-
     @G_Global.TimeFunction
     def RunAnalyser(self, code, log_schema, meta_only):
+        self._AnalysisResults = None
+        self._AnalysisRun = True
+
         self.SetErrorText("Analysing ...\n")
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
-            connection = sqlite3.connect(self.MakeTemporaryFilename(".db"))
-            connection.row_factory = sqlite3.Row
-            cursor = connection.cursor()
-            cursor.execute("PRAGMA synchronous = OFF")
-
-            # commented out, as it yields strange "sqlite3.OperationalError:
-            # database table is locked" errors on the first db execute
-            #cursor.execute("PRAGMA journal_mode = MEMORY")
-
-            globals = dict()
-
-            analyser_api = self.NullAnalyser
-            if not meta_only:
-                analyser = G_Analyser(connection, log_schema, self.GetLogfile())
-                analyser_api = analyser.Analyse
-
-            globals.update(Analyse = analyser_api)
-
-            projector = G_Projector(connection, meta_only, self.GetLogNode())
-            globals.update(Project = projector.Project)
-            globals.update(MakeDisplaySchema = projector.MakeDisplaySchema)
+            analyser = G_Analyser(self.MakeTemporaryFilename(".db"))
+            globals = analyser.SetEntryPoints(meta_only, log_schema, self.GetLogfile(), self.GetLogNode())
 
             exec(code, globals)
 
             self.SetErrorText("Analysed OK\n")
             self._Field.AnalysisIsValid.Value = True
-            connection.close()
 
-            return projector.GetMeta()
+            self._AnalysisResults = analyser.Close()
 
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
     def Analyse(self, source, meta_only = False):
-        self._EventMeta = None
-        self._AnalysisRun = True
 
         code = self.CompileAnalyser(source)
         if code is None:
             return None
 
         log_schema = self.GetLogNode().GetLogSchema()
-        self._EventMeta = self.RunAnalyser(code, log_schema, meta_only)
+        self.RunAnalyser(code, log_schema, meta_only)
 
     def AnalyseForMeta(self):
         self.Analyse(self.GetActiveScriptText(False), True)
@@ -704,16 +675,15 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def GetAnalysisProperties(self):
+    def MakeQuantifierContext(self):
         if not self._AnalysisRun:
             self.AnalyseForMeta()
 
-        if self._EventMeta is None:
+        if self._AnalysisResults is None:
             return None
 
-        filename = self.MakeTemporaryFilename(".db")
         valid = self._Field.AnalysisIsValid.Value
-        return self.AnalysisProperties(self, self._EventMeta, filename, valid)
+        return G_QuantifierContext(self.OnAnalyserError, self._AnalysisResults, valid)
 
 
     #-------------------------------------------------------
@@ -726,7 +696,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     def ReleaseFiles(self):
-        self._EventMeta = None
+        self._AnalysisResults = None
         self._AnalysisRun = False
         
         def Work(node):
@@ -744,12 +714,12 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
     @G_Global.TimeFunction
     def UpdateContent(self, event = True, metrics = True, unlock_charts = True):
-        analysis_props = self.GetAnalysisProperties()
-        if analysis_props is None:
+        quantifier_context = self.MakeQuantifierContext()
+        if quantifier_context is None:
             return
 
         def Work(node):
-            node.UpdateContent(analysis_props)
+            node.UpdateContent(quantifier_context)
             if unlock_charts:
                 node.UnlockCharts()
 
@@ -767,8 +737,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def UpdateAnalysis(self):
         """Analysis requested by user"""
         self.AnalyseForAll()
-        if self._EventMeta is not None:
-            self.UpdateContent()
+        self.UpdateContent()
 
 
     #-------------------------------------------------------
@@ -1392,12 +1361,14 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def UpdateContent(self, analysis_props):
+    def UpdateContent(self, quantifier_context):
         """Load event/feature data into the viewer"""
 
         # load events into event viewer data control
         events_view = self.GetTableViewCtrl()
-        events_view.UpdateContent(self.GetNesting(), analysis_props.EventSchema, analysis_props.FileName, analysis_props.Valid)
+        event_schema = quantifier_context.AnalysisResults.EventSchema
+        events_db_path = quantifier_context.AnalysisResults.EventsDbPath
+        events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, quantifier_context.Valid)
         self.GetLogAnalysisNode().ActivateSubTab(events_view)
 
 
@@ -1485,14 +1456,14 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
 
     #-------------------------------------------------------
     def ActivateSelectChart(self):
-        analysis_props = self.GetLogAnalysisNode().GetAnalysisProperties()
-        with G_ScriptGuard("ActivateSelectChart", analysis_props.ErrorReporter):
-            quantifier = analysis_props.GetQuantifier(self._QuantifierName)
+        quantifier_context = self.GetLogAnalysisNode().MakeQuantifierContext()
+        with G_ScriptGuard("ActivateSelectChart", quantifier_context.ErrorReporter):
+            quantifier_info = quantifier_context.GetQuantifierInfo(self._QuantifierName)
 
             num_charts = 0
 
-            if quantifier is not None:
-                chart_names = [c.Name for c in quantifier.Charts]
+            if quantifier_info is not None:
+                chart_names = [c.Name for c in quantifier_info.Charts]
                 num_charts = len(chart_names)
                 self._SelectChartCtl.Set(chart_names)
 
@@ -1596,7 +1567,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
         # setup UI
         panel_notebook = self.GetPanelNotebook()
-        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(panel_notebook, self._Name, self.GetIndex())
+        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(panel_notebook, self._Name)
         panel_notebook.AddPage(metrics_viewer, self._Name)
 
         table_ctrl = self.GetTableViewCtrl()
@@ -1670,12 +1641,9 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def UpdateContent(self, analysis_props):
-        event_projector = self.GetLogAnalysisNode().FindChildNode(G_Project.NodeID_EventProjector, True)
-        events_to_quantify = event_projector.GetTableViewCtrl().GetEventView()
-        self.GetMetricsViewCtrl().Assemble(events_to_quantify, analysis_props)
-
-        self.GetMetricsViewCtrl().UpdateMetrics().Realise()
+    def UpdateContent(self, metrics_context):
+        if self.GetMetricsViewCtrl().Quantify(metrics_context):
+            self.GetMetricsViewCtrl().UpdateMetrics().Realise()
 
     
     #-------------------------------------------------------
