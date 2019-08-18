@@ -935,7 +935,10 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
             self._InitCopyDefaults = kwargs["copy_defaults"]
 
 
+    @G_Global.TimeFunction
     def PostInitNode(self):
+        G_Global.GetCurrentTimer().AddArgument(self._OrigLogfileName)
+
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
 

@@ -32,11 +32,20 @@ import Nlv.EventView
 from Nlv.Extension import LoadExtensions
 from Nlv.Project import G_Project
 from Nlv.Project import G_Global
+from Nlv.Project import G_PerfTimerScope
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
 
 # System imports
 import logging
+
+# Enable/disable profiling (VisualStudio tools not working ...)
+_G_WantProfiling = False
+_G_Profiler = None
+
+if _G_WantProfiling:
+    import cProfile
+    _G_Profiler = cProfile.Profile()
 
 
 
@@ -157,6 +166,7 @@ class G_ConsoleLog(wx.Log):
 
 ## G_LogViewFrame ##########################################
 
+@G_Global.TimeFunction
 class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------
@@ -266,6 +276,12 @@ class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------
     def OnCloseWindow(self, event):
+        global _G_Profiler
+        if _G_Profiler is not None:
+            _G_Profiler.disable()
+            _G_Profiler.create_stats()
+            _G_Profiler.dump_stats("cprofile.dat")
+
         self.Freeze()
         self._ConsoleLog.Close()
         self._Project.Close()
@@ -279,6 +295,7 @@ class G_LogViewFrame(wx.Frame):
 class G_LogViewApp(wx.App):
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def OnInit(self):
         # have to manually set the Posix locale
         self._Locale = wx.Locale(wx.LANGUAGE_DEFAULT)
@@ -327,11 +344,14 @@ class G_LogViewApp(wx.App):
         # see G_ConsoleLog
 
         # load site specific extensions
-        LoadExtensions()
+        with G_PerfTimerScope("LoadExtensions"):
+            LoadExtensions()
 
         # startup the GUI window
         frame = G_LogViewFrame(None, appname)
-        frame.Show()
+
+        with G_PerfTimerScope("G_LogViewFrame.Show"):
+            frame.Show()
 
         return True
 
@@ -358,6 +378,9 @@ def main():
         G_Shell().SetupIntegration()
     else:
         G_LogViewApp().MainLoop()
+
+if _G_Profiler is not None:
+    _G_Profiler.enable()
 
 if __name__ == "__main__":
     main()

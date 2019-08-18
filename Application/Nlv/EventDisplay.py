@@ -419,6 +419,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         return True
 
 
+    @G_Global.TimeFunction
     def UpdateContent(self, nesting, table_schema, filename, valid):
         self.Reset(table_schema)
         self.UpdateNesting(nesting, False)
@@ -904,6 +905,7 @@ class G_ChartViewCtrl(wx.Panel):
     @G_Global.TimeFunction
     def Realise(self):
         """Redraw the chart if needed"""
+        G_Global.GetCurrentTimer().AddArgument(self._ChartDesigner.Name)
         with G_ScriptGuard("Realise", self._ErrorReporter):
             if not self._RealiseLock and self._RealiseChangeTracker.Changed(self._ChartDesigner.WantSelection):
                 selection = self._TableViewCtrl.GetSelectedItems()
@@ -986,6 +988,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
     #-------------------------------------------------------
     @G_Global.TimeFunction
     def Quantify(self, quantifier_context):
+        G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
         self.ResetModel(quantifier_context.ErrorReporter)
         with G_ScriptGuard("Quantify", self._ErrorReporter):
             quantifier_info = quantifier_context.GetQuantifierInfo(self._QuantifierName)

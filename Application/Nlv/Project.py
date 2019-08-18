@@ -1811,6 +1811,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def __init__(self, parent, frame):
         "Initialise the instance"
 
@@ -1903,6 +1904,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def _InitNodePages(self):
         """Ensure G_Nodes are notified to build their GUI pages"""
 

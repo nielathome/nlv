@@ -26,6 +26,7 @@ from .Logfile import G_DisplayChildNode
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_Const
+from .Project import G_Global
 from .Project import G_TabContainedNode
 from .Project import G_TabContainerNode
 from .Project import G_ListContainedNode
@@ -604,6 +605,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._OrigNameId = name.split("/")[-1]
 
 
+    @G_Global.TimeFunction
     def PostInitNode(self):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
@@ -948,6 +950,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def SetFieldMask(self, field_mask):
         """Set the list of visible fields for this view"""
 
