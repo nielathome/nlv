@@ -140,7 +140,7 @@ class G_ConsoleLog(wx.Log):
 
 
     #-------------------------------------------------------
-    def write( self, data ):
+    def write(self, data):
         """Python log interface"""
         self._LogMessage(data)
 
@@ -305,13 +305,20 @@ class G_LogViewApp(wx.App):
 
         # setup logging
         global _Logger
-        logfile = open( str(path / "nlv.log"), "a" )
+        logfile = open(str(path / "nlv.log"), "a")
 
         _Logger = logging.getLogger('')
         _Logger.setLevel(logging.DEBUG)
 
         # send debug and above to the logfile
-        logfile_handler = logging.StreamHandler( logfile )
+        def FilterNoisyChartFindFontLines(record):
+            if record.levelno == logging.DEBUG and record.msg.find("findfont: score") >= 0:
+                return False
+            else:
+                return True
+
+        logfile_handler = logging.StreamHandler(logfile)
+        logfile_handler.addFilter(FilterNoisyChartFindFontLines)
         logfile_handler.setLevel(logging.DEBUG)
         logfile_handler.setFormatter(logging.Formatter( "%(asctime)s: %(levelname)s: %(message)s" ))
         _Logger.addHandler(logfile_handler)
