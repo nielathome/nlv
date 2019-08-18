@@ -381,6 +381,7 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
 
 
     #-------------------------------------------------------
+    @G_Global.ProgressMeter
     def OnCmdAnalyse(self, event):
         self.GetLogAnalysisNode().UpdateAnalysis()
 

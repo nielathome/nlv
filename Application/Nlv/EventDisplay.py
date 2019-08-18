@@ -427,7 +427,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
         num_fields = self.GetColumnCount()
         if Path(filename).exists() and num_fields != 0:
-            self._N_Logfile = Nlog.MakeLogfile(filename, table_schema, None)
+            self._N_Logfile = Nlog.MakeLogfile(filename, table_schema, G_Global.PulseProgressMeter)
 
         # robustness, for broken logfiles ...
         if self._N_Logfile is not None:

@@ -49,31 +49,6 @@ from .Theme import GetThemeGallery
 import Nlog
 
 
-## G_ProgressMeter #########################################
-
-class G_ProgressMeter:
-    """Helper class to display progress information for long running activities"""
-
-    #-------------------------------------------------------
-    def __init__(self, title, message):
-        self._Title = title
-        self._Message = message
-
-
-    #-------------------------------------------------------
-    def SetRange(self, range):
-        """Display meter and start showing progress"""
-        self._Meter = wx.ProgressDialog(self._Title, self._Message, range,
-            style = wx.PD_APP_MODAL | wx.PD_AUTO_HIDE | wx.PD_ELAPSED_TIME
-        )
-
-
-    #-------------------------------------------------------
-    def SetProgress(self, value):
-        self._Meter.Update(value)
-
-
-
 ## G_LogChildNode ##########################################
 
 class G_LogChildNode(G_SessionChildNode):
@@ -952,17 +927,9 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         # set node title to current relative path
         self.SetTreeLabel(self.GetNodeLabel())
 
-        # when debugging C++ code directly, attempts to call-back into Python to upate
-        # the progress dialog trigger a crash; workaround here by setting want_progress
-        # to False as needed
-        want_progress = True
-        progress_dlg = None
-        if want_progress:
-            progress_dlg = G_ProgressMeter("NLV Indexing File", self.GetNodeLabel())
-
         # open the logfile
         self._FullPath = fullpath = Path().cwd().joinpath(self._Field.RelativeLogfilePath.Value)
-        self._N_Logfile = Nlog.MakeLogfile(str(fullpath), self.GetLogSchema(), progress_dlg)
+        self._N_Logfile = Nlog.MakeLogfile(str(fullpath), self.GetLogSchema(), G_Global.PulseProgressMeter)
 
         if self._N_Logfile is None:
             raise RuntimeError("Unable to index logfile {}".format(self._FullPath))

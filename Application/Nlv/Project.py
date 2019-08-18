@@ -23,6 +23,7 @@ from pathlib import Path
 import subprocess
 import sys
 import traceback
+import time
 from weakref import ref as MakeWeakRef
 import xml.etree.ElementTree as et
 
@@ -68,6 +69,79 @@ def _Item2Node(item):
 
 
 
+## G_ProgressMeter #########################################
+
+class G_ProgressMeter:
+    """Helper class to display progress information for long running activities"""
+
+    Meter = None
+    Count = 0
+
+
+    #-------------------------------------------------------
+    def __init__(self, title):
+        if G_ProgressMeter.Count == 0:
+            G_ProgressMeter.Meter = self
+            G_ProgressMeter.Count = 1
+        else:
+            G_ProgressMeter.Count += 1
+
+        self._StartTime = time.perf_counter()
+        self._Title = title
+        self._Dlg = None
+
+    @staticmethod
+    def Close():
+        G_ProgressMeter.Count -= 1
+        if G_ProgressMeter.Count == 0:
+            G_ProgressMeter.Meter = None
+
+
+    #-------------------------------------------------------
+    def DoPulse(self, message):
+        """After half a second, display meter and start showing progress"""
+
+        if self._Dlg is None:
+            now = time.perf_counter()
+            if now - self._StartTime > 0.5:
+                self._Dlg = wx.ProgressDialog(self._Title, message,
+                    style = wx.PD_APP_MODAL | wx.PD_AUTO_HIDE | wx.PD_ELAPSED_TIME
+                )
+
+        else:
+            self._Dlg.Pulse(message)
+
+    @classmethod
+    def Pulse(cls, message):
+        instance = cls.Meter
+        if instance is not None:
+            instance.DoPulse(message)
+
+
+
+## G_ProgressMeterScope ####################################
+
+class G_ProgressMeterScope:
+    """Context manager (use with "with")."""
+
+    #-------------------------------------------------------
+    def __init__(self, title):
+        self._Title = title
+
+
+    #-------------------------------------------------------
+    def __enter__(self):
+        self._Meter = G_ProgressMeter(self._Title)
+        return self
+
+
+    #-------------------------------------------------------
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._Meter.Close()
+
+
+
+
 ## G_PerfTimer #############################################
            
 class G_PerfTimer:
@@ -96,6 +170,8 @@ class G_PerfTimer:
             self._Parent._AddChild(self)
 
         __class__._Last = self
+
+        G_ProgressMeter.Pulse(description)
 
 
     #-------------------------------------------------------
@@ -334,6 +410,22 @@ class G_Global:
                 return func(*args, **kwargs)
 
         return TimeFunctionWrapper
+
+
+    #-------------------------------------------------------
+    def PulseProgressMeter(message):
+        G_ProgressMeter.Pulse(message)
+
+    def ProgressMeter(func):
+        """
+        Decorator to allow permit a progress meter to be
+        displayed if teh function runs for more than 0.5s
+        """
+        def ProgressMeterWrapper(*args, **kwargs):
+            with G_ProgressMeterScope("NLV is busy ..."):
+                return func(*args, **kwargs)
+
+        return ProgressMeterWrapper
 
 
     #-------------------------------------------------------

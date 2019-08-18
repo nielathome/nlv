@@ -295,6 +295,7 @@ class G_LogViewFrame(wx.Frame):
 class G_LogViewApp(wx.App):
 
     #-------------------------------------------------------
+    @G_Global.ProgressMeter
     @G_Global.TimeFunction
     def OnInit(self):
         # have to manually set the Posix locale

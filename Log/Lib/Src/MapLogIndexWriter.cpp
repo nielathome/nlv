@@ -24,6 +24,7 @@
 #include <fstream>
 #include <map>
 #include <set>
+#include <sstream>
 
 
 
@@ -1067,26 +1068,20 @@ Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, Pr
 	// progress notifications
 	struct NotifyProgress
 	{
-		// disable when running under the debugger, otherwise get strange crash in
-		// wxProgressDialogTaskRunner::Entry sometime after the callback to Python ...
-		const bool f_Enabled{ true };
-
 		const nlineno_t c_ProgressSize{ 1024 * 1024 };
 		nlineno_t f_NextProgress{ c_ProgressSize };
 		ProgressMeter * f_Progress;
 
 		NotifyProgress( ProgressMeter * progress, nlineno_t range )
-			: f_Progress{ progress }
-		{
-			if( f_Enabled )
-				f_Progress->SetRange( range );
-		}
+			: f_Progress{ progress } {}
 
-		void Update( nlineno_t value )
+		void Pulse( nlineno_t value )
 		{
-			if( f_Enabled && (value > f_NextProgress) )
+			if( value > f_NextProgress )
 			{
-				f_Progress->SetProgress( value );
+				std::ostringstream strm;
+				strm << "Creating index: " << (value / c_ProgressSize);
+				f_Progress->Pulse( strm.str() );
 				f_NextProgress += c_ProgressSize;
 			}
 		}
@@ -1127,7 +1122,7 @@ Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, Pr
 
 			start = end;
 
-			notifier.Update( i );
+			notifier.Pulse( i );
 		}
 	}
 

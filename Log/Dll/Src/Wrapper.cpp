@@ -194,18 +194,17 @@ logfile_ptr_t MakeLogfile( const std::string & nlog_path, object log_schema, obj
 
 	struct PythonProgress : public ProgressMeter
 	{
+		// disable when running under the debugger, otherwise get strange crash in
+		// wxProgressDialogTaskRunner::Entry sometime after the callback to Python ...
+		const bool f_Enabled{ true };
+
 		object & f_Progress;
 		PythonProgress( object & progress )
 			: f_Progress{ progress } {}
 
-		void SetRange( size_t range ) override {
-			if( !f_Progress.is_none() )
-				f_Progress.attr( "SetRange" )( range );
-		}
-
-		virtual void SetProgress( size_t value ) override {
-			if( !f_Progress.is_none() )
-				f_Progress.attr( "SetProgress" )( value );
+		void Pulse( const std::string & message ) override {
+			if( f_Enabled && !f_Progress.is_none() )
+				f_Progress( message );
 		}
 
 	} meter{ progress };
