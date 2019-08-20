@@ -889,14 +889,17 @@ class G_ChartViewCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def DefineParameters(self):
+        self._Parameters = None
+
         with G_ScriptGuard("DefineParameters", self._ErrorReporter):
             if self._ParameterChangeTracker.Changed(self._ChartDesigner.WantSelection):
-                selection = self._TableViewCtrl.GetSelectedItems()
-                connection = ConnectDb(self._MetricsDbPath)
-                cursor = connection.cursor()
-                collector = G_ParameterCollector()
-                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
-                self._Parameters = collector.Close()
+                connection = ConnectDb(self._MetricsDbPath, True)
+                if connection is not None:
+                    cursor = connection.cursor()
+                    selection = self._TableViewCtrl.GetSelectedItems()
+                    collector = G_ParameterCollector()
+                    self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
+                    self._Parameters = collector.Close()
 
         return self._Parameters
 
@@ -908,15 +911,17 @@ class G_ChartViewCtrl(wx.Panel):
         G_Global.GetCurrentTimer().AddArgument(self._ChartDesigner.Name)
         with G_ScriptGuard("Realise", self._ErrorReporter):
             if not self._RealiseLock and self._RealiseChangeTracker.Changed(self._ChartDesigner.WantSelection):
-                selection = self._TableViewCtrl.GetSelectedItems()
-                connection = ConnectDb(self._MetricsDbPath)
-                cursor = connection.cursor()
-                self._Figure.clear()
-                with G_PerfTimerScope("Design"):
-                    self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
+                connection = ConnectDb(self._MetricsDbPath, True)
+                if connection is not None:
+                    cursor = connection.cursor()
+                    selection = self._TableViewCtrl.GetSelectedItems()
+                    self._Figure.clear()
 
-                with G_PerfTimerScope("Draw"):
-                    self._Canvas.draw()
+                    with G_PerfTimerScope("Design"):
+                        self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
+
+                    with G_PerfTimerScope("Draw"):
+                        self._Canvas.draw()
 
 
     #-------------------------------------------------------

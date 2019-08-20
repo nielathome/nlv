@@ -18,9 +18,9 @@ import re
 
 
 
-## Analyse #####################################################
+## Recognise ###################################################
 
-class Analyser:
+class Recogniser:
 
     #-----------------------------------------------------------
     _RegexPlace = re.compile("([\d.]+)\splace")
@@ -28,10 +28,9 @@ class Analyser:
 
     #-----------------------------------------------------------
     def Begin(self, connection, cursor):
-        self.Connection = connection
         self.Cursor = cursor
 
-        cursor.execute("DROP TABLE IF EXISTS reschedule")
+        cursor.execute("DROP TABLE IF EXISTS main.reschedule")
         cursor.execute("""
             CREATE TABLE reschedule
             (
@@ -83,8 +82,8 @@ class Analyser:
         pass
 
 
-Analyse(
-    Analyser(),
+Recognise(
+    Recogniser(),
     ('LogView Filter', 'function = "HandleReschedule" and log ~= "Reschedule"'),
     ('LogView Filter', 'function = "HandleReschedule" and log ~= "Scheduled"')
 )
@@ -96,7 +95,7 @@ Analyse(
 def Projector(connection, cursor, context):
     utc_datum = context.CalcUtcDatum(cursor, ["reschedule"])
 
-    cursor.execute("DROP TABLE IF EXISTS projection")
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
         CREATE TABLE projection
         (
@@ -132,10 +131,10 @@ def SimpleFormatter(value, attr):
 Project(
     "Reschedule",
     Projector,
-    MakeDisplaySchema() \
-        .AddStart("Start", width = 100) \
-        .AddFinish("Finish", width = 100) \
-        .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter) \
-        .AddField("Place", "real", 60) \
+    MakeDisplaySchema()
+        .AddStart("Start", width = 100)
+        .AddFinish("Finish", width = 100)
+        .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)
+        .AddField("Place", "real", 60)
         .AddField("Abool", "bool", 60)
 )

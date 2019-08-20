@@ -38,7 +38,11 @@ import Nlog
 ## Locals ##################################################
 
 #-----------------------------------------------------------
-def ConnectDb(path):
+def ConnectDb(path, read_only = False):
+    # can't read from a non-existand database
+    if read_only and not Path(path).exists():
+        return None
+        
     connection = sqlite3.connect(path)
     connection.row_factory = sqlite3.Row
     cursor = connection.cursor()
@@ -53,15 +57,15 @@ def ConnectDb(path):
 
 #-----------------------------------------------------------
 def MakeProjectionView(cursor):
-    cursor.execute("DROP TABLE IF EXISTS filter")
+    cursor.execute("DROP TABLE IF EXISTS main.filter")
     cursor.execute("""
-        CREATE TABLE filter
+        CREATE TABLE main.filter
         (
             log_row_no INT
         )""")
 
     cursor.execute("""
-        CREATE VIEW IF NOT EXISTS filtered_projection AS
+        CREATE VIEW IF NOT EXISTS main.filtered_projection AS
 		SELECT
 			*
 		FROM
@@ -745,7 +749,7 @@ class G_ProjectionContext:
             if utc_datum == 0 or datum < utc_datum:
                 utc_datum = datum
 
-        cursor.execute("DROP TABLE IF EXISTS projection_meta")
+        cursor.execute("DROP TABLE IF EXISTS main.projection_meta")
         cursor.execute("""
             CREATE TABLE projection_meta
             (

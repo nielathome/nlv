@@ -28,7 +28,7 @@ class Recogniser:
     def Begin(self, connection, cursor):
         self.Cursor = cursor
 
-        cursor.execute("DROP TABLE IF EXISTS expire")
+        cursor.execute("DROP TABLE IF EXISTS main.expire")
         cursor.execute("""
             CREATE TABLE expire
             (
@@ -138,7 +138,7 @@ def Projector(connection, cursor, context):
             {}
         """.format(select_expire, select_reschedule)
 
-    cursor.execute("DROP TABLE IF EXISTS projection")
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
         CREATE TABLE projection
         (
@@ -157,9 +157,9 @@ def Projector(connection, cursor, context):
 Project(
     "Summary",
     Projector,
-    MakeDisplaySchema() \
-        .AddStart("Start", width = 100) \
-        .AddDuration("Duration", scale = "s", width = 60) \
+    MakeDisplaySchema()
+        .AddStart("Start", width = 100)
+        .AddDuration("Duration", scale = "s", width = 60)
         .AddField("Event Summary", "text", 150, "left")
 )
 
@@ -170,30 +170,38 @@ Project(
 class BarChart:
 
     #-----------------------------------------------------------
-    def __init__(self, category_field, value_field, std_field):
+    def __init__(self, category_field, value_field, std_field = None):
         self._CategoryField = category_field
         self._ValueField = value_field
         self._StdField = std_field
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection):
+    def DefineParameters(self, params, connection, cursor, selection):
         params.AddBool("show_std", "Show error bars", True)
 
 
     #-----------------------------------------------------------
-    def Realise(self, figure, connection, param_values, selection):
+    def Realise(self, name, figure, connection, cursor, param_values, selection):
         labels = []
         values = []
-        stds = []
+        stds = None
 
-        for i in range(num_metrics):
-            labels.append(metrics.GetFieldText(i, self._CategoryField))
-            values.append(metrics.GetFieldValueFloat(i, self._ValueField))
-            stds.append(metrics.GetFieldValueFloat(i, self._StdField))
+        cursor.execute("""
+            SELECT
+                {category},
+                {value}
+            FROM
+                filtered_projection
+            """.format(category = self._CategoryField, value = self._ValueField))
 
-        if not param_values.get("show_std", True):
-            stds = None
+        for row in cursor:
+            labels.append(row[0])
+            values.append(row[1])
+#            stds.append(metrics.GetFieldValueFloat(i, self._StdField))
+
+        #if not param_values.get("show_std", True):
+        #    stds = None
 
         x = np.arange(len(labels))
         axes = figure.add_subplot(111)
@@ -206,7 +214,7 @@ class BarChart:
         for event_no in selection:
             bars[event_no].set_edgecolor("black")
 
-        figure.subplots_adjust(bottom=0.25)
+        figure.subplots_adjust(bottom = 0.25)
 
 
 
@@ -358,7 +366,7 @@ class HistogramChart:
 def GeneralQuantifier(events_db_path, connection, cursor):
     cursor.execute("ATTACH DATABASE '{db}' AS db".format(db = events_db_path))
 
-    cursor.execute("DROP TABLE IF EXISTS projection")
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
         CREATE TABLE projection
         (
@@ -382,20 +390,20 @@ def GeneralQuantifier(events_db_path, connection, cursor):
         """)
 
 
-GeneralSchema = MakeDisplaySchema() \
-    .AddField("Summary", "text", 150, "left") \
-    .AddField("Count", "int", 80, "left") \
-    .AddField("Duration (s)", "int", 80, "left") \
-    .AddField("Average (s)", "real", 80, "left")
-
 Quantify(
     "General",
     GeneralQuantifier,
-    GeneralSchema,
+
+    MakeDisplaySchema()
+        .AddField("Summary", "text", 150, "left")
+        .AddField("Count", "int", 80, "left")
+        .AddField("Duration (s)", "int", 80, "left")
+        .AddField("Average (s)", "real", 80, "left"),
+
     [
-        ("Breakdown by Count", True, PieChart("summary", "count"))
-        #EventMetrics.PieChart("Breakdown by Duration", 1, 3),
-        #EventMetrics.BarChart("Durations", 1, 4, 5)
+        ("Breakdown by Count", True, PieChart("summary", "count")),
+        ("Breakdown by Duration", True, PieChart("summary", "sum")),
+        ("Durations", True, BarChart("summary", "average"))
     ]
 )
 

@@ -18,26 +18,18 @@ import re
 
 
 
-## Analyser ####################################################
+## Recognise ###################################################
 
-class Analyser:
+class Recogniser:
 
     #-----------------------------------------------------------
     _RegexProgram = re.compile("UpdateRecStatus2 \\| ([^\\|]+)")
 
 
     #-----------------------------------------------------------
-    @staticmethod
-    def DefineFilter():
-        return [
-            ('LogView Filter', 'function = "HandleReschedule" and log ~= "UpdateRecStatus2"')
-        ]
-
-
-    #-----------------------------------------------------------
-    def Begin(self, context):
-        self.Cursor = cursor = context.Connection.cursor()
-        cursor.execute("DROP TABLE IF EXISTS program")
+    def Begin(self, context, cursor):
+        self.Cursor = cursor
+        cursor.execute("DROP TABLE IF EXISTS main.program")
         cursor.execute("""
             CREATE TABLE program
             (
@@ -65,45 +57,44 @@ class Analyser:
 
 
     #-----------------------------------------------------------
-    def End(self, context):
-        self.Cursor.close()
-        context.Connection.commit()
+    def End(self):
+        pass
+
+
+Recognise(
+    Recogniser(),
+    ('LogView Filter', 'function = "HandleReschedule" and log ~= "UpdateRecStatus2"')
+)
 
 
 
 ## Projector ###################################################
 
-class Projector:
+def Projector(connection, cursor, context):
 
-    #-----------------------------------------------------------
-    @classmethod
-    def DefineSchema(cls, schema):
-        schema.AddField("Program", "text", 400)
-        schema.AddField("Count", "uint16", 60)
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
+    cursor.execute("""
+        CREATE TABLE projection
+        (
+            title TEXT,
+            count INT
+        )""")
 
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def Project(connection, context):
-        cursor = connection.cursor()
-        context.MakeProjectionTable(cursor)
-
-        cursor.execute("""
-            INSERT INTO projection
-            SELECT
-                title,
-                count(title) AS cnt
-            FROM program
-            GROUP BY title
-            ORDER BY cnt DESC
-        """)
-
-        cursor.close()
-        connection.commit()
+    cursor.execute("""
+        INSERT INTO projection
+        SELECT
+            title,
+            count(title) AS cnt
+        FROM program
+        GROUP BY title
+        ORDER BY cnt DESC
+    """)
 
 
-
-## GLOBAL ##################################################
-
-Analyse(Analyser())
-Project("Programs", Projector())
+Project(
+    "Programs",
+    Projector,
+    MakeDisplaySchema() \
+        .AddField("Program", "text", 400) \
+        .AddField("Count", "int", 60)
+)
