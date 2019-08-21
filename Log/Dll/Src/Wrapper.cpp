@@ -52,6 +52,46 @@ namespace
 }
 
 
+/*-------------------------------------------------------------------------
+ * Performance
+ ------------------------------------------------------------------------*/
+
+// performance timing integrated with Python G_PerfTimer
+namespace
+{
+	// timer factory object to call-back into Python
+	object g_PerfTimerFactory;
+
+	struct FullPerfTimer : public PythonPerfTimerImpl
+	{
+		object m_PythonPerfTimer;
+
+		FullPerfTimer( const char * description, size_t item_count ) {
+			m_PythonPerfTimer = g_PerfTimerFactory( description, item_count );
+		}
+
+		void AddArgument( const char * arg ) override {
+			m_PythonPerfTimer.attr( "AddArgument" )(arg);
+		}
+
+		void AddArgument( const wchar_t * arg ) override {
+			m_PythonPerfTimer.attr( "AddArgument" )(arg);
+		}
+
+		void Close( size_t item_count ) override {
+			m_PythonPerfTimer.attr( "Close" )(item_count);
+		}
+	};
+
+}
+
+std::unique_ptr<PythonPerfTimerImpl> PythonPerfTimerImpl::Create( const char * description, size_t item_count )
+{
+	return std::make_unique<FullPerfTimer>( description, item_count );
+};
+
+
+
 
 /*-----------------------------------------------------------------------
  * ADAPTERS
@@ -157,8 +197,11 @@ selector_ptr_t MakeSelector( object match, bool empty_selects_all, const LogSche
  -----------------------------------------------------------------------*/
 
 // Python initialisation
-void Setup( object logger )
+void Setup( object logger, object perf_timer_factory )
 {
+	// performance timing
+	g_PerfTimerFactory = perf_timer_factory;
+
 	// startup message
 	static OnEvent evt{ OnEvent::EventType::Startup,
 		[] () {

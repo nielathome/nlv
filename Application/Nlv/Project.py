@@ -184,8 +184,13 @@ class G_PerfTimer:
         if not self._Closed:
             raise RuntimeError("TimeFunction failed")
 
+        args = ", ".join(self._Arguments)
+
         inclusive = self._Elapsed
         exclusive = inclusive - sum([timer._Elapsed for timer in self._Children])
+
+        if indent == 0:
+            logging.info("{}({}) took {:.2f}s".format(self._Description, args, inclusive))
 
         per_item_text = ""
         if self._PerItem != 0:
@@ -196,7 +201,6 @@ class G_PerfTimer:
         else:
             dur_text = "elapsed:{:.2f}s".format(inclusive)
 
-        args = ", ".join(self._Arguments)
         logging.debug("G_PerfTimer: {}{}({}): {} {}".format("|--" * indent, self._Description, args, dur_text, per_item_text))
 
         for child in self._Children:
@@ -1914,9 +1918,13 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         self._Frame = frame
         self._BrowserPath = None
 
+        # integrate Python/C++ performance timing systems
+        def PerfTimerFactory(description, item_count):
+            return G_PerfTimer(description, item_count)
+
         # feed Nlog logging back to the application
         _LogForwarder = LogForwarder()
-        Nlog.Setup(_LogForwarder)
+        Nlog.Setup(_LogForwarder, PerfTimerFactory)
 
         # create a "public" list of the notfication channels for use by receivers
         root = et.Element("root")
@@ -2229,7 +2237,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
         root = self.GetRootNode()
         root.Close()
-        Nlog.Setup(None)
+        Nlog.Setup(None, None)
 
         # kill any notification channels
         for channel in self._Channels.values():

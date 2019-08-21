@@ -1146,7 +1146,8 @@ Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, Pr
 Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME modified_time, const std::string & guid, ProgressMeter * progress )
 {
 	// detect and ignore empty logfiles
-	PerfTimer timer;
+	PythonPerfTimer timer{ __FUNCTION__ };
+
 	if( m_Log.GetSize() == 0 )
 		return TraceError( e_Empty, "'%S'", index_path.c_str() );
 
@@ -1200,7 +1201,8 @@ Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME 
 		return TraceError( e_Stream, "unable to create index: '%S'", index_path.c_str() );
 
 	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus path:'%S'", timer.Overall(), timer.PerItem( num_lines ), index_path.c_str() );
+	timer.AddArgument( index_path.c_str() );
+	timer.Close( num_lines );
 	
 	return res;
 }

@@ -916,7 +916,7 @@ std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, n
 
 void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool )
 {
-	PerfTimer filter_timer;
+	PythonPerfTimer map_timer{"Nlog::SqlViewAccessor::Filter::Map"};
 
 	const nlineno_t num_log_lines{ m_LogAccessor->GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
@@ -927,10 +927,9 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 	) };
 
 	m_NumLines = nlineno_cast(map.size());
+	map_timer.Close( m_NumLines );
 
-	TraceDebug( "filter_time:%.2fs per_line:%.3fus", filter_timer.Overall(), filter_timer.PerItem( num_log_lines ) );
-
-	PerfTimer sql_timer;
+	PythonPerfTimer sql_timer{ "Nlog::SqlViewAccessor::Filter::Sql" };;
 
 	Error res{ m_LogAccessor->ExecuteStatements( "BEGIN TRANSACTION; DELETE FROM filter" ) };
 	if( !Ok( res ) )
@@ -953,7 +952,7 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 
 	m_LogAccessor->ExecuteStatements( Ok( res ) ? "COMMIT TRANSACTION" : "ROLLBACK TRANSACTION" );
 
-	TraceDebug( "sql_time:%.2fs per_line:%.3fus", sql_timer.Overall(), sql_timer.PerItem( map.size() ) );
+	sql_timer.Close( map.size() );
 
 	// record the change
 	RecordEvent();
@@ -962,7 +961,7 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 
 std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider )
 {
-	PerfTimer timer;
+	PythonPerfTimer timer{ __FUNCTION__ };
 
 	const nlineno_t num_view_lines{ GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
@@ -973,7 +972,7 @@ std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdo
 	) };
 
 	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( num_view_lines ) );
+	timer.Close( num_view_lines );
 
 	return map;
 }

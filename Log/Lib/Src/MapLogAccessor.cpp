@@ -520,7 +520,7 @@ void MapViewAccessor::SetFieldMask( uint64_t field_mask )
 
 	if( !m_IsEmpty )
 	{
-		PerfTimer timer;
+		PythonPerfTimer timer{ __FUNCTION__ };
 
 		// TODO: parallelise
 		nlineno_t pos{ 0 };
@@ -533,7 +533,7 @@ void MapViewAccessor::SetFieldMask( uint64_t field_mask )
 		m_TextLen = m_Lines[ m_NumLinesOrOne ] = pos;
 
 		// write out performance data
-		TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_NumLinesOrOne ) );
+		timer.Close( m_NumLinesOrOne );
 	}
 }
 
@@ -998,7 +998,7 @@ struct FilterVisitor : public Visitor
 
 void MapViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool add_irregular )
 {
-	PerfTimer timer;
+	PythonPerfTimer timer{ __FUNCTION__ };
 
 	FilterData filter_data
 	{
@@ -1026,7 +1026,7 @@ void MapViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 	m_Tracker.RecordEvent();
 
 	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( m_LogAccessor->GetNumLines() ) );
+	timer.Close(  m_LogAccessor->GetNumLines() );
 }
 
 
@@ -1096,9 +1096,9 @@ std::vector<nlineno_t> MapViewAccessor::Search( selector_ptr_a selector, LineAdo
 {
 	SearchVisitor visitor{ * adornments_provider, selector };
 
-	PerfTimer timer;
+	PythonPerfTimer timer{ __FUNCTION__ };
 	VisitLines( visitor );
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( GetNumLines() ) );
+	timer.Close( GetNumLines() );
 
 	return std::move( visitor.f_Map);
 }

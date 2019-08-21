@@ -460,6 +460,7 @@ class G_OpenViewNode(G_LogChildNode, G_TabContainedNode):
         self._BtnNewView.Enable(have_selection)
 
         
+    @G_Global.TimeFunction
     def OnCmdNewView(self, event):
         for item in self.GetSelectedItems(self._ViewThemeList):
             self.GetLogNode().OnNewView(self._ViewIds[item])
@@ -470,6 +471,7 @@ class G_OpenViewNode(G_LogChildNode, G_TabContainedNode):
         have_selection = self._EventThemeList.GetSelectedItemCount() != 0
         self._BtnNewEvent.Enable(have_selection)
 
+    @G_Global.TimeFunction
     def OnCmdNewEvent(self, event):
         for item in self.GetSelectedItems(self._EventThemeList):
             self.GetLogNode().OnNewEvents(self._EventIds[item], True)
