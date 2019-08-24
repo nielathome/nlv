@@ -193,14 +193,18 @@ class BarChart:
         cursor.execute("""
             SELECT
                 {category},
-                {value}
+                {value},
+                log_row_no
             FROM
                 filtered_projection
             """.format(category = self._CategoryField, value = self._ValueField))
 
-        for row in cursor:
+        hilites = []
+        for idx, row in enumerate(cursor):
             labels.append(row[0])
             values.append(row[1])
+            if row[2] in selection:
+                hilites.append(idx)
 #            stds.append(metrics.GetFieldValueFloat(i, self._StdField))
 
         #if not param_values.get("show_std", True):
@@ -214,8 +218,8 @@ class BarChart:
         axes.set_xticks(x)
         axes.set_xticklabels(labels, {"rotation": 75})
 
-        for event_no in selection:
-            bars[event_no].set_edgecolor("black")
+        for col in hilites:
+            bars[col].set_edgecolor("black")
 
         figure.subplots_adjust(bottom = 0.25)
 
@@ -254,9 +258,9 @@ class PieChart:
 
         cursor.execute("""
             SELECT
-                rowid,
                 {category},
-                {value}
+                {value},
+                log_row_no
             FROM
                 filtered_projection
             ORDER BY
@@ -273,17 +277,17 @@ class PieChart:
         other_explode = 0
 
         for row in cursor:
-            selected = row[0] in selection
+            selected = row[2] in selection
 
             if accum >= limit:
                 if selected:
                     other_explode = 0.1
 
             else:
-                value = row[2]
+                value = row[1]
                 accum += value
 
-                labels.append(row[1])
+                labels.append(row[0])
                 values.append(value)
             
                 explode = 0.0
@@ -293,7 +297,7 @@ class PieChart:
             
         other = sum - accum
         if other > 0:            
-            labels.append("Other ({})".format(self.c_OtherPcts[param]))
+            labels.append("Other")
             values.append(other)
             explodes.append(other_explode)
 

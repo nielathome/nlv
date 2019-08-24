@@ -64,6 +64,8 @@ def MakeProjectionView(cursor):
             log_row_no INT
         )""")
 
+    # note: the * here means the last column in the result
+    # will be the log_row_no
     cursor.execute("""
         CREATE VIEW IF NOT EXISTS main.filtered_projection AS
 		SELECT
@@ -583,6 +585,7 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.ColStartOffset = None
         self.ColFinishOffset = None
         self.ColDuration = None
+        self.ColProjectionNo = None
 
 
     #-------------------------------------------------------
@@ -637,6 +640,10 @@ class G_ProjectionSchema(G_FieldSchemata):
 
     def AddEventId(self):
         self.MakeHiddenFieldSchema("event_id", "int")
+        return self
+
+    def AddProjectionNo(self):
+        self.ColProjectionNo = self.MakeHiddenFieldSchema("log_row_id", "int")
         return self
 
     def AddField(self, name, type, width = 30, align = "centre", formatter = None):
@@ -909,6 +916,11 @@ class G_Analyser:
 
     #-------------------------------------------------------
     def Quantify(self, name, user_quantifier, metrics_schema, charts):
+        # the projection number is a side effect of the selection
+        # in the filtered_projection view, and is effectively a
+        # unique number in the view; it is used to map selections
+        # in the table to position independent IDs
+        metrics_schema.AddProjectionNo()
         self._Results.AddQuantifierInfo(name, user_quantifier, metrics_schema, charts)
 
 

@@ -223,6 +223,9 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if table_schema.ColStartOffset is None:
             return (None, None)
 
+        if item is None:
+            return (None, None)
+
         item_key = self.ItemToKey(item)
         start_offset = finish_offset = self.GetFieldValue(item_key, table_schema.ColStartOffset)
 
@@ -361,6 +364,12 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
     def Compare(self, item_l, item_r, col_num, ascending):
         raise RuntimeError
+
+
+    #-------------------------------------------------------
+    def MapSelectionToProjectionNo(self, selection):
+        col_num = self._TableSchema.ColProjectionNo
+        return [self.GetFieldValue(s, col_num) for s in selection]
 
 
     #-------------------------------------------------------
@@ -669,7 +678,8 @@ class G_TableViewCtrl(G_DataViewCtrl):
 
     #-------------------------------------------------------
     def GetSelectedItems(self):
-        return [G_TableDataModel.ItemToKey(item) for item in self.GetSelections()]
+        selection = [G_TableDataModel.ItemToKey(item) for item in self.GetSelections()]
+        return self.GetModel().MapSelectionToProjectionNo(selection)
 
 
     #-------------------------------------------------------
