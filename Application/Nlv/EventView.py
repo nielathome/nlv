@@ -645,7 +645,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         self.SetErrorText("Analysing ...\n")
         with G_ScriptGuard("Analysis", self.OnAnalyserError):
-            analyser = G_Analyser(self.MakeTemporaryFilename(".db"))
+            event_id = self.GetSessionNode().GetEventId()
+            analyser = G_Analyser(self.MakeTemporaryFilename(".db"), event_id)
             globals = analyser.SetEntryPoints(meta_only, log_schema, self.GetLogfile(), self.GetLogNode())
 
             exec(code, globals)
@@ -654,6 +655,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self._Field.AnalysisIsValid.Value = True
 
             self._AnalysisResults = analyser.Close()
+            self.GetSessionNode().UpdateEventId(self._AnalysisResults.EventId)
 
 
     #-------------------------------------------------------

@@ -1218,6 +1218,7 @@ class G_SessionNode(G_TabContainerNode):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
         self._Field.Add(str(uuid4()), "Guid", replace_existing = False)
+        self._Field.Add(1, "EventId", replace_existing = False)
 
     def PostInitLoad(self):
         # control/restore window layout; this should be last, as the
@@ -1260,6 +1261,14 @@ class G_SessionNode(G_TabContainerNode):
 
     def NewSessionGuid(self):
         self._Field.Guid.Value = str(uuid4())
+
+
+    #-------------------------------------------------------
+    def GetEventId(self):
+        return self._Field.EventId.Value
+
+    def UpdateEventId(self, event_id):
+        self._Field.EventId.Value = event_id
 
 
     #-------------------------------------------------------

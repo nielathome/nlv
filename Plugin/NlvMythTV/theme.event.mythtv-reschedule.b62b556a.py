@@ -34,6 +34,7 @@ class Recogniser:
         cursor.execute("""
             CREATE TABLE reschedule
             (
+                event_id INT,
                 start_text TEXT,
                 start_line_no INT,
                 start_utc INT,
@@ -57,22 +58,19 @@ class Recogniser:
 
     #-----------------------------------------------------------
     def MatchEventFinish(self, context, line):
-        ed = context.GetEventDetails()
-
         f_place = 0.0
         match = re.search(self._RegexPlace, line.GetNonFieldText())
         if match and match.lastindex == 1:
             f_place = float(match[1])
         f_bool = f_place > 0.16
 
-
-        self.Cursor.execute("INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            ed[0], ed[1], ed[2], ed[3], ed[4], ed[5], ed[6], ed[7], ed[8],
+        self.Cursor.execute("INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            *context.GetEventFullDetails(),
             self.Process,
             f_place,
             f_bool
-        ])
+        ))
 
         return True
 
@@ -99,6 +97,7 @@ def Projector(connection, cursor, context):
     cursor.execute("""
         CREATE TABLE projection
         (
+            event_id INT,
             start_text TEXT,
             start_offset_ns INT,
             finish_text TEXT,
@@ -111,6 +110,7 @@ def Projector(connection, cursor, context):
     cursor.execute("""
         INSERT INTO projection
         SELECT
+            event_id,
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
             finish_text,
@@ -132,6 +132,7 @@ Project(
     "Reschedule",
     Projector,
     MakeDisplaySchema()
+        .AddEventId()
         .AddStart("Start", width = 100)
         .AddFinish("Finish", width = 100)
         .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)

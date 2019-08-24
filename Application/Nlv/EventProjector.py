@@ -161,13 +161,35 @@ class G_LineAccessor:
 
 
 
+## G_NullRecogniser ########################################
+
+class G_NullRecogniser:
+    """Do nothing version of G_Recogniser"""
+
+    #-------------------------------------------------------
+    def __init__(self, event_id):
+        self._EventId = event_id
+
+
+    #-------------------------------------------------------
+    def Recognise(self, user_analyser, start_desc, finish_desc = None):
+        pass
+
+
+    #-------------------------------------------------------
+    def Close(self):
+        return self._EventId
+
+
+
 ## G_Recogniser ############################################
 
 class G_Recogniser:
     """Assess a log, creates any number of event/feature tables"""
 
     #-------------------------------------------------------
-    def __init__(self, connection, log_schema, logfile):
+    def __init__(self, event_id, connection, log_schema, logfile):
+        self._EventId = event_id
         self._Connection = connection
         self._Cursor = connection.cursor()
         self._LogFile = logfile
@@ -234,38 +256,71 @@ class G_Recogniser:
 
 
     #-------------------------------------------------------
+    def GetEventId(self):
+        next_id = self._EventId
+        self._EventId += 1
+        return next_id
+
+
+    def GetEventStartText(self):
+        return self._StartAccessor.GetFieldText(self._DateFieldId)
+
+
+    def GetEventStartTime(self):
+        """
+        Return the following details about the event, as a tuple:
+            0 (start_utc INT) - UTC date/time of event start, to previous whole second
+            1 (start_offset_ns INT) - offset from #2 to event start, in ns
+        """
+
+        start_timecode = self._StartAccessor.GetUtcTimecode()
+        start_timecode.Normalise()
+        return (start_timecode.GetUtcDatum(), start_timecode.GetOffsetNs())
+
+
     def GetEventStartDetails(self):
         """
-        Return the following details about the event, as an array:
-            0 (start_text TEXT) - start time as text; in the same format as the logfile
-            1 (start_utc INT) - UTC date/time of event start, to previous whole second
-            2 (start_offset_ns INT) - offset from #2 to event start, in ns
+        Return the following details about the event, as a tuple:
+            0 (event_id INT) - unique event number
+            1 (start_text TEXT) - start time as text; in the same format as the logfile
+            2 (start_line_no INT) - start line number
+            3 (start_utc INT) - UTC date/time of event start, to previous whole second
+            4 (start_offset_ns INT) - offset from #2 to event start, in ns
+            5 (duration_ns INT) - event duration, in ns
         """
 
         start_timecode = self._StartAccessor.GetUtcTimecode()
         start_timecode.Normalise()
 
-        return [
+        finish_timecode = self._FinishAccessor.GetUtcTimecode()
+
+        return (
+            self.GetEventId(),
+
             # event start details
             self._StartAccessor.GetFieldText(self._DateFieldId),
+            self._StartLine,
             start_timecode.GetUtcDatum(),
             start_timecode.GetOffsetNs(),
-        ]
+
+            # duration
+            finish_timecode.Subtract(start_timecode)
+        )
 
 
-    #-------------------------------------------------------
-    def GetEventDetails(self):
+    def GetEventFullDetails(self):
         """
-        Return the following details about the event, as an array:
-            0 (start_text TEXT) - start time as text; in the same format as the logfile
-            1 (start_line_no INT) - start line number
-            2 (start_utc INT) - UTC date/time of event start, to previous whole second
-            3 (start_offset_ns INT) - offset from #2 to event start, in ns
-            4 (finish_text TEXT) - finish time as text; in the same format as the logfile
-            5 (finish_line_no INT) - finish line number
-            6 (finish_utc" INT) - UTC date/time of event finish, to previous whole second
-            7 (finish_offset_ns INT) - offset from #6 to event finish, in ns
-            8 (duration_ns INT) - event duration, in ns
+        Return the following details about the event, as a tuple:
+            0 (event_id INT) - unique event number
+            1 (start_text TEXT) - start time as text; in the same format as the logfile
+            2 (start_line_no INT) - start line number
+            3 (start_utc INT) - UTC date/time of event start, to previous whole second
+            4 (start_offset_ns INT) - offset from #2 to event start, in ns
+            5 (finish_text TEXT) - finish time as text; in the same format as the logfile
+            6 (finish_line_no INT) - finish line number
+            7 (finish_utc" INT) - UTC date/time of event finish, to previous whole second
+            8 (finish_offset_ns INT) - offset from #6 to event finish, in ns
+            9 (duration_ns INT) - event duration, in ns
         """
 
         start_timecode = self._StartAccessor.GetUtcTimecode()
@@ -274,7 +329,9 @@ class G_Recogniser:
         finish_timecode = self._FinishAccessor.GetUtcTimecode()
         finish_timecode.Normalise()
 
-        return [
+        return (
+            self.GetEventId(),
+
             # event start details
             self._StartAccessor.GetFieldText(self._DateFieldId),
             self._StartLine,
@@ -289,7 +346,7 @@ class G_Recogniser:
 
             # other (duration)
             finish_timecode.Subtract(start_timecode)
-        ]
+        )
 
 
     #-------------------------------------------------------
@@ -347,6 +404,11 @@ class G_Recogniser:
 
         self._Cursor.close()
         self._Connection.commit()
+
+
+    #-------------------------------------------------------
+    def Close(self):
+        return self._EventId
 
 
 
@@ -573,6 +635,10 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.ColParentId = self.MakeHiddenFieldSchema("parent_id", "int")
         return self
 
+    def AddEventId(self):
+        self.MakeHiddenFieldSchema("event_id", "int")
+        return self
+
     def AddField(self, name, type, width = 30, align = "centre", formatter = None):
         self.MakeFieldSchema(name, type, width, align, formatter)
         return self
@@ -629,8 +695,9 @@ class G_QuantifierInfo:
 class G_AnalysisResults:
 
     #-------------------------------------------------------
-    def __init__(self, events_db_path):
+    def __init__(self, events_db_path, event_id):
         self.EventsDbPath = events_db_path
+        self.EventId = event_id
         self.EventSchema = G_ProjectionSchema()
         self.Quantifiers = dict()
 
@@ -830,14 +897,8 @@ class G_Analyser:
     """
 
     #-------------------------------------------------------
-    @staticmethod
-    def NullRecogniser(user_analyser, start_desc, finish_desc = None):
-        pass
-
-
-    #-------------------------------------------------------
-    def __init__(self, events_db_path):
-        self._Results = G_AnalysisResults(events_db_path)
+    def __init__(self, events_db_path, event_id):
+        self._Results = G_AnalysisResults(events_db_path, event_id)
         self._Connection = None
 
 
@@ -855,12 +916,14 @@ class G_Analyser:
     def SetEntryPoints(self, meta_only, log_schema, log_file, log_node):
         script_globals = dict()
 
+        event_id = self._Results.EventId
         if meta_only:
-            script_globals.update(Recognise = self.NullRecogniser)
+            self._Recogniser = G_NullRecogniser(event_id)
         else:
             self._Connection = ConnectDb(self._Results.EventsDbPath)
-            self._Recogniser = G_Recogniser(self._Connection, log_schema, log_file)
-            script_globals.update(Recognise = self._Recogniser.Recognise)
+            self._Recogniser = G_Recogniser(event_id, self._Connection, log_schema, log_file)
+        
+        script_globals.update(Recognise = self._Recogniser.Recognise)
 
         self._Projector = G_Projector(self._Connection, meta_only, log_node, self._Results)
         script_globals.update(Project = self._Projector.Project)
@@ -873,8 +936,11 @@ class G_Analyser:
 
     #-------------------------------------------------------
     def Close(self):
+        self._Results.EventId = self._Recogniser.Close()
+
         if self._Connection is not None:
             self._Connection.close()
+
         return self._Results
 
 

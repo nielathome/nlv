@@ -45,13 +45,11 @@ class Recogniser:
         if match and match.lastindex == 1:
             f_title = match[1]
 
-        ed = context.GetEventStartDetails()
-
         self.Cursor.execute("INSERT INTO program VALUES (?, ?)",
-        [
-            ed[0],
+        (
+            context.GetEventStartText(),
             f_title
-        ])
+        ))
 
         return True
 
@@ -94,7 +92,7 @@ def Projector(connection, cursor, context):
 Project(
     "Programs",
     Projector,
-    MakeDisplaySchema() \
-        .AddField("Program", "text", 400) \
+    MakeDisplaySchema()
+        .AddField("Program", "text", 400)
         .AddField("Count", "int", 60)
 )

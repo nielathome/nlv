@@ -32,6 +32,7 @@ class Recogniser:
         cursor.execute("""
             CREATE TABLE expire
             (
+                event_id INT,
                 start_text TEXT,
                 start_line_no INT,
                 start_utc INT,
@@ -49,13 +50,11 @@ class Recogniser:
 
     #-----------------------------------------------------------
     def MatchEventFinish(self, context, line):
-        ed = context.GetEventDetails()
-
-        self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?)",
-        [
-            ed[0], ed[1], ed[2], ed[3], ed[8],
+        self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            * context.GetEventStartDetails(),
             self.Process
-        ])
+        ))
 
         return True
 
@@ -111,6 +110,7 @@ def Projector(connection, cursor, context):
 
     select_expire = """
         SELECT
+            event_id INT,
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
             duration_ns,
@@ -121,6 +121,7 @@ def Projector(connection, cursor, context):
 
     select_reschedule = """
         SELECT
+            event_id,
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
             duration_ns,
@@ -142,6 +143,7 @@ def Projector(connection, cursor, context):
     cursor.execute("""
         CREATE TABLE projection
         (
+            event_id,
             start_text TEXT,
             start_offset_ns INT,
             duration_ns INT,
@@ -158,6 +160,7 @@ Project(
     "Summary",
     Projector,
     MakeDisplaySchema()
+        .AddEventId()
         .AddStart("Start", width = 100)
         .AddDuration("Duration", scale = "s", width = 60)
         .AddField("Event Summary", "text", 150, "left")

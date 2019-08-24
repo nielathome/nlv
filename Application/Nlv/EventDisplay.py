@@ -408,6 +408,8 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if not self._PermitNesting:
             return True
 
+        # temp
+        return True
         for child_key in self.GetRowKeys():
             parent_key = self.GetItemKeyParentKey(child_key)
             if parent_key >= 0:
