@@ -79,9 +79,78 @@ class G_LogChildNode(G_SessionChildNode):
 
 
 
+## G_DelayedSendFocus ######################################
+
+class G_DelayedSendFocus:
+
+    #-------------------------------------------------------
+    def SendFocusToCtrl(self, ctrl):
+        """Delayed forwarding of input focus; safe to use in any event context"""
+        self._DelayedFocusWindow = ctrl
+        self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
+
+
+    #-------------------------------------------------------
+    def OnSendFocusToWindow(self, event):
+        if self._DelayedFocusWindow is not None:
+            # one shot delayed event, so disconnect now
+            self._DelayedFocusWindow.Unbind(wx.EVT_IDLE)
+
+            # move the focus and drop the reference to the window
+            self._DelayedFocusWindow.SetFocus()
+            self._DelayedFocusWindow = None
+
+        # don't interfere with any use the editor has for idle events
+        event.Skip()
+
+
+
+## G_DisplayControl ########################################
+
+class G_DisplayControl:
+    """
+    Base class for controls conveying content to the user.
+    Will be a direct child of the main AUI tab. Works in
+    conjunction with a node ownder - G_DisplayNode
+    """
+
+    #-------------------------------------------------------
+    def ActivateSubTab(self, window):
+        """
+        Update UI appearance goven that 'window' has been
+        given input focus. Tab controls should use this to
+        ensure the tab for 'window' is the current selection
+        """
+        pass
+
+
+
+## G_TabDisplayControl #####################################
+
+class G_TabDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus):
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
+        wx.Notebook.__init__(self, parent, style = wx.NB_TOP)
+        self.Bind(wx.EVT_SET_FOCUS, self.OnSetFocus)
+
+
+    #-------------------------------------------------------
+    def ActivateSubTab(self, window):
+        idx = self.FindPage(window)
+        if idx != wx.NOT_FOUND:
+            self.SetSelection(idx)
+
+    def OnSetFocus(self, evt):
+        page = self.GetCurrentPage()
+        if page is not None:
+            self.SendFocusToCtrl(page)
+
+
+
 ## G_DisplayNode ###########################################
 
-class G_DisplayNode(G_LogChildNode):
+class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     """
     Base class for nodes associated with a display in the
     tabbed pane area, displaying 'content' to the user
@@ -89,13 +158,12 @@ class G_DisplayNode(G_LogChildNode):
 
     #-------------------------------------------------------
     def __init__(self):
-        # the window contained in the main UI tab
+        # the window contained in the AUI tab
         self._DisplayCtrl = None
         self._OwnsDisplayCtrl = False
 
         # either the same as _DisplayCtrl, or a child of it -
-        # the window which gains/looses input focus in sync with
-        # this node
+        # the window given input focus when this node is activated
         self._DisplayFocusCtrl = None
 
         # support bi-directional sync of tree node and notebook page
@@ -125,20 +193,12 @@ class G_DisplayNode(G_LogChildNode):
 
 
     #-------------------------------------------------------
-    def IsActiveInNotebook(self):
-        notebook = self.GetNotebook()
-        cur_tab_idx = notebook.GetSelection()
-        my_tab_index = notebook.GetPageIndex(self._DisplayCtrl)
+    def IsActiveInAuiNotebook(self):
+        aui_notebook = self.GetAuiNotebook()
+        cur_tab_idx = aui_notebook.GetSelection()
+        my_tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
         return cur_tab_idx == my_tab_index
     
-
-    #-------------------------------------------------------
-    def ActivateSubTab(self, window):
-        if self._DisplayCtrlIsSubtab:
-            idx = self._DisplayCtrl.FindPage(window)
-            if idx != wx.NOT_FOUND:
-                self._DisplayCtrl.SetSelection(idx)
-
 
     #-------------------------------------------------------
     def WithFocusLock(self, func):
@@ -150,15 +210,15 @@ class G_DisplayNode(G_LogChildNode):
 
 
     def ChildActivating(self, child, focus_window = None):
-        """A child node is activating; update the Notebook accordingly"""
+        """A child node is activating; update the AuiNotebook accordingly"""
 
         def Work():
-            # switch notebook page
+            # switch AUI notebook page
             nonlocal child, focus_window
-            self.GetNotebook().SetSelectionToWindow(self._DisplayCtrl)
+            self.GetAuiNotebook().SetSelectionToWindow(self._DisplayCtrl)
 
             # ensure any sub-tab is visible
-            self.ActivateSubTab(self._DisplayFocusCtrl)
+            self._DisplayCtrl.ActivateSubTab(self._DisplayFocusCtrl)
     
             # forward focus; unless otherwise specified, forward to the display control
             if focus_window is None:
@@ -175,13 +235,13 @@ class G_DisplayNode(G_LogChildNode):
             self.WithFocusLock(Work)
 
 
-    def OnDisplaySetFocus(self, event):
-        """The display control associated with this node has received input focus"""
+    def OnDisplayCtrlSetFocus(self, event):
+        """A display control associated with this node has received input focus"""
 
         def Work():
-            # where the notebook tab is not already current, switch to it
-            if not self.IsActiveInNotebook():
-                self.GetNotebook().SetSelectionToWindow(self._DisplayCtrl)
+            # where the AUI notebook tab is not already current, switch to it
+            if not self.IsActiveInAuiNotebook():
+                self.GetAuiNotebook().SetSelectionToWindow(self._DisplayCtrl)
 
             # switch node in the tree view
             node = self._WLastChild()
@@ -208,10 +268,10 @@ class G_DisplayNode(G_LogChildNode):
         """Remove display control from the UI"""
 
         if self._OwnsDisplayCtrl and self._DisplayCtrl is not None:
-            # delete the notebook tab (and its child window)
-            notebook = self.GetNotebook()
-            page_index = notebook.GetPageIndex(self._DisplayCtrl)
-            notebook.DeletePage(page_index)
+            # delete the AUI notebook tab (and its child window)
+            aui_notebook = self.GetAuiNotebook()
+            page_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
+            aui_notebook.DeletePage(page_index)
             self._DisplayFocusCtrl = self._DisplayCtrl = None
 
         super().DoClose(delete)
@@ -219,7 +279,7 @@ class G_DisplayNode(G_LogChildNode):
 
     #-------------------------------------------------------
     def OnDisplayKeyDown(self, event):
-        """Intercept key presses sent to the display control"""
+        """Intercept key presses sent to a display control"""
 
         # standard routing via child node
         handled = False
@@ -230,7 +290,7 @@ class G_DisplayNode(G_LogChildNode):
             if handled:
                 break;
 
-        # otherwise, pass to Scintilla
+        # otherwise, pass to the underlying control
         if not handled:
             event.Skip()
 
@@ -249,9 +309,9 @@ class G_DisplayNode(G_LogChildNode):
     def OnEndLabelEdit(self, label):
         # an empty label seems to mean "no change"
         if label != "":
-            notebook = self.GetNotebook()
-            tab_index = notebook.GetPageIndex(self._DisplayCtrl)
-            notebook.SetPageText(tab_index, label)
+            aui_notebook = self.GetAuiNotebook()
+            tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
+            aui_notebook.SetPageText(tab_index, label)
             self._Field.NodeUserLabel.Value = label
 
         return True
@@ -260,39 +320,25 @@ class G_DisplayNode(G_LogChildNode):
     #-------------------------------------------------------
     def SendFocusToWindow(self, focus_window):
         """Delayed forwarding of input focus; safe to use in any event context"""
-        self._DelayedFocusWindow = focus_window
-        self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
+        if self.IsNodeDisplayed():
+            self.SendFocusToCtrl(focus_window)
 
     def SendFocusToDisplayCtrl(self):
         self.SendFocusToWindow(self._DisplayFocusCtrl)
 
-    def OnSendFocusToWindow(self, event):
-        if self._DelayedFocusWindow is not None:
-            # one shot delayed event, so disconnect now
-            self._DelayedFocusWindow.Unbind(wx.EVT_IDLE)
-
-            # move the focus and drop the reference to the window
-            if self.IsNodeDisplayed():
-                self._DelayedFocusWindow.SetFocus()
-            self._DelayedFocusWindow = None
-
-        # don't interfere with any use the editor has for idle events
-        event.Skip()
-
 
     #-------------------------------------------------------
-    def SetDisplayCtrl(self, display_ctrl, display_focus_ctrl = None, owns_display_ctrl = True, display_ctrl_is_subtab = False):
+    def SetDisplayCtrl(self, display_ctrl, display_focus_ctrl = None, owns_display_ctrl = True):
         self._DisplayFocusCtrl = self._DisplayCtrl = display_ctrl
         self._OwnsDisplayCtrl = owns_display_ctrl
-        self._DisplayCtrlIsSubtab = display_ctrl_is_subtab
 
         if display_focus_ctrl is not None:
             self._DisplayFocusCtrl = display_focus_ctrl
 
-        if self._DisplayFocusCtrl is not None:
-            self._DisplayFocusCtrl.Bind(wx.EVT_SET_FOCUS, self.OnDisplaySetFocus)
-
         return display_ctrl
+
+    def InterceptSetFocus(self, ctrl):
+        ctrl.Bind(wx.EVT_SET_FOCUS, self.OnDisplayCtrlSetFocus)
 
 
     #-------------------------------------------------------
@@ -304,9 +350,9 @@ class G_DisplayNode(G_LogChildNode):
     #-------------------------------------------------------
     def UpdateNodeDisplay(self):
         show = self.IsNodeDisplayed()
-        notebook = self.GetNotebook()
-        tab_index = notebook.GetPageIndex(self._DisplayCtrl)
-        notebook.HidePage(tab_index, not show)
+        aui_notebook = self.GetAuiNotebook()
+        tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
+        aui_notebook.HidePage(tab_index, not show)
 
 
     #-------------------------------------------------------

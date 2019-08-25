@@ -698,8 +698,8 @@ class G_Node:
     def GetNodeName(self):
         return self.GetHrItem().GetText()
 
-    def GetNotebook(self):
-        return self.GetProject().GetNotebook()
+    def GetAuiNotebook(self):
+        return self.GetProject().GetAuiNotebook()
 
     def GetProject(self):
         return self._WProject()
@@ -1324,7 +1324,7 @@ class G_RootNode(G_TreeNode):
         as the currently selected AUI notebook tab. Can return None if no views exist.
         """
         for node in self.ListSubNodes(G_Project.NodeID_View, recursive = True):
-            if node.IsActiveInNotebook():
+            if node.IsActiveInAuiNotebook():
                 return node
 
         return None
@@ -2194,8 +2194,8 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
     def GetTree(self):
         return self._Tree
 
-    def GetNotebook(self):
-        return self.GetFrame().GetNotebook()
+    def GetAuiNotebook(self):
+        return self.GetFrame().GetAuiNotebook()
 
     def GetRootNode(self):
         return self._RootNode

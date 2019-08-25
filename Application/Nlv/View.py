@@ -23,6 +23,7 @@ import wx.stc
 from .Document import D_Document
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
+from .Logfile import G_DisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_Const
@@ -43,6 +44,18 @@ from .Theme import G_ThemeGalleryNode
 
 # Content provider interface
 import Nlog
+
+
+
+## G_ViewControl ###########################################
+
+class G_ViewControl(wx.stc.StyledTextCtrl, G_DisplayControl):
+    """STC editor displays the log data"""
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
+        wx.stc.StyledTextCtrl.__init__(self, parent, -1)
+
 
 
 ## G_ViewChildNode #########################################
@@ -618,9 +631,10 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._Field.Add(0, "CursorLine", replace_existing = False)
 
         # make a Scintilla editor and a Nlog logfile view
-        notebook = self.GetNotebook()
-        editor = self.SetDisplayCtrl(wx.stc.StyledTextCtrl(notebook, -1))
+        aui_notebook = self.GetAuiNotebook()
+        editor = self.SetDisplayCtrl(G_ViewControl(aui_notebook))
         self.InterceptKeys(editor)
+        self.InterceptSetFocus(editor)
         editor.Bind(wx.stc.EVT_STC_UPDATEUI, self.OnUpdateUI)
 
         self._N_View = self.GetLogfile().CreateLogView()
@@ -684,9 +698,9 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         # does not implement
         editor.SetReadOnly( True );
 
-        # and add the Scintilla editor to the main notebook, without altering focus
+        # and add the Scintilla editor to the AUI notebook, without altering focus
         def Work():
-            notebook.AddPage(editor, self.GetNodeLabel(), True)
+            aui_notebook.AddPage(editor, self.GetNodeLabel(), True)
         self.WithFocusLock(Work)
 
         # ensure markers are set correctly

@@ -203,14 +203,14 @@ class G_LogViewFrame(wx.Frame):
 
         # create and initialise child panels
 
-        self._NoteBook = aui.AuiNotebook(self._FramePanel,
+        self._AuiNoteBook = aui.AuiNotebook(self._FramePanel,
             agwStyle = aui.AUI_NB_TOP
              | aui.AUI_NB_TAB_SPLIT
              | aui.AUI_NB_TAB_MOVE
              | aui.AUI_NB_DRAW_DND_TAB
              | aui.AUI_NB_WINDOWLIST_BUTTON
         )
-        self._NoteBook.SetArtProvider(aui.tabart.VC8TabArt())
+        self._AuiNoteBook.SetArtProvider(aui.tabart.VC8TabArt())
 
         self._Project = G_Project(self._FramePanel, self)
 
@@ -219,7 +219,7 @@ class G_LogViewFrame(wx.Frame):
 
         # Use the aui manager to set up everything
         self._AuiManager.AddPane(
-            self._NoteBook,
+            self._AuiNoteBook,
             aui.AuiPaneInfo().CenterPane().Name("Notebook")
         )
         self._AuiManager.AddPane(
@@ -267,8 +267,8 @@ class G_LogViewFrame(wx.Frame):
     def GetAuiManager(self):
         return self._AuiManager
 
-    def GetNotebook(self):
-        return self._NoteBook
+    def GetAuiNotebook(self):
+        return self._AuiNoteBook
 
     def GetInfoPanel(self):
         return self._InfoPanel

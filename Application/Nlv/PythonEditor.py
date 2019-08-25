@@ -317,6 +317,9 @@ class G_AnalyserScriptCtrl(wx.SplitterWindow):
 
 
     #-------------------------------------------------------
+    def GetEditor(self):
+        return self._Editor
+
     def GetPythonText(self):
         return self._Editor.GetText()
 

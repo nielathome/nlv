@@ -1239,7 +1239,7 @@ class G_SessionNode(G_TabContainerNode):
             self._Field.Add("", "AuiNotebook", replace_existing = False)
             layout = self._Field.AuiNotebook.Value
             if len(layout) != 0:
-                self.GetNotebook().LoadPerspective(layout)
+                self.GetAuiNotebook().LoadPerspective(layout)
 
         except IndexError:
             logging.error("Unable to load AUI notebook perspective")
@@ -1307,7 +1307,7 @@ class G_SessionNode(G_TabContainerNode):
 
         layout = ""
         if self._StoreNotebookPerspective:
-            layout = self.GetNotebook().SavePerspective()
+            layout = self.GetAuiNotebook().SavePerspective()
         self._Field.AuiNotebook.Value = layout
 
         self._Field.Project.Value = self.GetProject().SavePerspective()

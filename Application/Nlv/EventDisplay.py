@@ -739,6 +739,16 @@ class G_TableViewCtrl(G_DataViewCtrl):
         self._SelectionHandlerNode.OnTableSelectionChanged(evt.GetItem())
 
 
+    #-------------------------------------------------------
+    def GetChildCtrl(self):
+        """Fetch the Windows control"""
+        for window in self.GetChildren():
+            if len(window.GetLabel()) != 0: # potentially fragile; but there is no API for this
+                return window
+
+        return None
+
+
 
 ## G_Param #################################################
 
@@ -874,11 +884,13 @@ class G_ChangeTracker:
 
 ## G_ChartViewCtrl #########################################
 
-class G_ChartViewCtrl(wx.Panel):
+class G_ChartViewCtrl(FigureCanvasWxAgg):
 
     #-------------------------------------------------------
     def __init__(self, parent, chart_designer, metrics_db_path, table_view_ctrl, error_reporter):
-        super().__init__(parent)
+        self._Figure = Figure(frameon = True)
+        super().__init__(parent, -1, self._Figure)
+
         self._ChartDesigner = chart_designer
         self._MetricsDbPath = metrics_db_path
         self._TableViewCtrl = table_view_ctrl
@@ -891,12 +903,6 @@ class G_ChartViewCtrl(wx.Panel):
         self._ParamaterValues = dict()
 
         self._RealiseLock = True
-
-        self._Figure = Figure(frameon = True)
-        self._Canvas = FigureCanvasWxAgg(self, -1, self._Figure)
-        self._Sizer = wx.BoxSizer(wx.VERTICAL)
-        self._Sizer.Add(self._Canvas, flag = wx.ALL | wx.EXPAND | wx.ALIGN_CENTER)
-        self.SetSizer(self._Sizer)
 
 
     #-------------------------------------------------------
@@ -933,7 +939,7 @@ class G_ChartViewCtrl(wx.Panel):
                         self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
 
                     with G_PerfTimerScope("Draw"):
-                        self._Canvas.draw()
+                        self.draw()
 
 
     #-------------------------------------------------------
@@ -1004,7 +1010,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Quantify(self, quantifier_context):
+    def Quantify(self, node, quantifier_context):
         G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
         self.ResetModel(quantifier_context.ErrorReporter)
         with G_ScriptGuard("Quantify", self._ErrorReporter):
@@ -1024,6 +1030,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
                 for chart_info in quantifier_info.Charts:
                     chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, self._TableViewCtrl, self._ErrorReporter)
                     pane_sizer.Add(chart_view_ctrl, flag = wx.EXPAND | wx.ALIGN_CENTER)
+                    node.InterceptSetFocus(chart_view_ctrl)
 
             return True
 

@@ -53,6 +53,7 @@ from .EventProjector import G_Analyser
 from .EventProjector import G_ScriptGuard
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
+from .Logfile import G_TabDisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_Const
@@ -504,13 +505,13 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._Field.Add(True, "AnalysisIsValid", replace_existing = False)
 
         # setup UI
-        aui_notebook = self.GetNotebook()
-        panel_notebook = self._Notebook = wx.Notebook(aui_notebook, style = wx.NB_TOP)
+        display_notebook = self._DisplayNotebook = G_TabDisplayControl(self.GetAuiNotebook())
+        script_ctrl = self._ScriptCtrl = G_AnalyserScriptCtrl(display_notebook)
+        display_notebook.AddPage(script_ctrl, "Script")
 
-        script_ctrl = self._ScriptCtrl = G_AnalyserScriptCtrl(panel_notebook)
-        panel_notebook.AddPage(script_ctrl, "Script")
+        self.SetDisplayCtrl(display_notebook, script_ctrl)
+        self.InterceptSetFocus(script_ctrl.GetEditor())
 
-        self.SetDisplayCtrl(panel_notebook, script_ctrl, display_ctrl_is_subtab = True)
 
     @G_Global.TimeFunction
     def PostInitChildren(self):
@@ -521,7 +522,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         # and add the viewer to the main notebook, without altering focus
         def Work():
-            self.GetNotebook().AddPage(self._Notebook, node_name, True)
+            self.GetAuiNotebook().AddPage(self._DisplayNotebook, node_name, True)
             if self._InitAnalysis:
 
                 # make sure hideable is setup before child is made
@@ -1221,6 +1222,20 @@ class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_H
         return False
 
 
+    #-------------------------------------------------------
+    def SetupTableViewIntercepts(self):
+        table_control = self.GetTableViewCtrl()
+        inner_ctrl = table_control.GetChildCtrl()
+        if inner_ctrl is not None:
+            self.InterceptKeys(inner_ctrl)            
+            self.InterceptSetFocus(inner_ctrl)            
+
+        # trying to include the table header control seems to
+        # destabilise the focus transfers, so leaving out for now
+        #for window in table_control.GetChildren():
+        #    self.InterceptSetFocus(window)            
+
+
 
 ## G_EventProjectorNode ####################################
 
@@ -1238,16 +1253,11 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        panel_notebook = self.GetPanelNotebook()
-        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(panel_notebook, self)
-        panel_notebook.AddPage(table_ctrl, self._Name)
-
-        for window in table_ctrl.GetChildren():
-            if len(window.GetLabel()) != 0: # potentially fragile; but there is no API for this
-                self.InterceptKeys(window)
-                break
-
-        self.SetDisplayCtrl(panel_notebook, table_ctrl, owns_display_ctrl = False, display_ctrl_is_subtab = True)
+        display_notebook = self.GetPanelNotebook()
+        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self)
+        display_notebook.AddPage(table_ctrl, self._Name)
+        self.SetDisplayCtrl(display_notebook, table_ctrl, owns_display_ctrl = False)
+        self.SetupTableViewIntercepts()
 
 
     #-------------------------------------------------------
@@ -1286,11 +1296,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def OnDisplayKey(self, key_code, modifiers, view_node):
         handled = False
         return handled
-
-    def OnDisplayFocus(self):
-        win = self._Notebook.GetCurrentPage()
-        if win is not None:
-            win.SetFocus()
 
 
     #-------------------------------------------------------
@@ -1372,7 +1377,8 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         event_schema = quantifier_context.AnalysisResults.EventSchema
         events_db_path = quantifier_context.AnalysisResults.EventsDbPath
         events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, quantifier_context.Valid)
-        self.GetLogAnalysisNode().ActivateSubTab(events_view)
+        
+        # self.GetLogAnalysisNode().ActivateSubTab(events_view)
 
 
     #-------------------------------------------------------
@@ -1569,17 +1575,11 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        panel_notebook = self.GetPanelNotebook()
-        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(panel_notebook, self._Name)
-        panel_notebook.AddPage(metrics_viewer, self._Name)
-
-        table_ctrl = self.GetTableViewCtrl()
-        for window in table_ctrl.GetChildren():
-            if len(window.GetLabel()) != 0: # potentially fragile; but there is no API for this
-                self.InterceptKeys(window)
-                break
-
-        self.SetDisplayCtrl(panel_notebook, metrics_viewer, owns_display_ctrl = False, display_ctrl_is_subtab = True)
+        display_notebook = self.GetPanelNotebook()
+        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(display_notebook, self._Name)
+        display_notebook.AddPage(metrics_viewer, self._Name)
+        self.SetDisplayCtrl(display_notebook, metrics_viewer, owns_display_ctrl = False)
+        self.SetupTableViewIntercepts()
 
 
     #-------------------------------------------------------
@@ -1615,14 +1615,6 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         handled = False
         return handled
 
-#    def OnDisplayFocus(self):
-## ?
-#        win = self._Notebook.GetCurrentPage()
-#        if win is not None:
-#            win.SetFocus()
-
-
-
 
     #-------------------------------------------------------
     def OnFilterMatch(self, match):
@@ -1645,7 +1637,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     #-------------------------------------------------------
     @G_Global.TimeFunction
     def UpdateContent(self, metrics_context):
-        if self.GetMetricsViewCtrl().Quantify(metrics_context):
+        if self.GetMetricsViewCtrl().Quantify(self, metrics_context):
             self.GetMetricsViewCtrl().UpdateMetrics().Realise()
 
     
