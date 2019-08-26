@@ -49,11 +49,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
       <field name="CurrentThemeId" type="Str">15D7907F-D322-46F8-996F-9D62E26489A5</field>
     </node>
 
-    <!-- Global Annotation node-->
-    <node factory="795850FA-628A-47CC-8EDB-B7340CBC7573" name="Annotate">
-      <field name="StyleName" type="Str">Note</field>
-    </node>
-
   </node>
 
 

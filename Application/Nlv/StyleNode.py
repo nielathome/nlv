@@ -603,26 +603,3 @@ class G_TrackerStyleNode(G_StyleNode):
         # class static function
         me._StyleCombo = G_StyleCombo(page.GetWindow(), __class__._Traits)
         me.BuildLabelledRow(page, "Style:", me._StyleCombo)
-
-
-
-## G_AnnotationStyleNode ###################################
-
-class G_AnnotationStyleNode(G_StyleNode):
-
-    #-------------------------------------------------------
-    # [ 0 = name, 1 = pen_style, 2 = index, 3 = background colour, 4 = text colour]
-    _Styles = [ [t[0], wx.PENSTYLE_TRANSPARENT, t[1], t[2], t[3] ] for t in G_AnnotationTraits.Get()]
-    _Traits = G_StyleTraits(_Styles)
-
-
-    #-------------------------------------------------------
-    def __init__(self):
-        super().__init__(__class__._Traits)
-
-
-    #-------------------------------------------------------
-    def BuildStyle(me, page):
-        # class static function
-        me._StyleCombo = G_StyleCombo(page.GetWindow(), __class__._Traits)
-        me.BuildLabelledRow(page, "Style:", me._StyleCombo)

@@ -778,8 +778,13 @@ class G_Node:
 
         node = None
         try:
-            # create and add the new child into the GUI
-            node = self.AttachNode(document.get("factory"), self, name, copy_defaults = copy_defaults, **kwargs)
+            # create and add the new child into the GUI ...
+            # ... except annotation nodes - they are no longer implemented
+            factory_id = document.get("factory")
+            if factory_id == G_Project.NodeID_Annotation:
+                return None
+
+            node = self.AttachNode(factory_id, self, name, copy_defaults = copy_defaults, **kwargs)
 
             # if building a new document tree (from a template), do so now
             if copy_defaults:
@@ -1315,19 +1320,6 @@ class G_RootNode(G_TreeNode):
     #-------------------------------------------------------
     def _IsKnownDocumentVersion(self):
         return self.GetDocument().get("version", 0) == str(G_Shell.NlvDocumentVersion)
-
-
-    #-------------------------------------------------------
-    def GetActiveViewNode(self):
-        """
-        Fetch the child view node whose editor last had keyboard focus. This is the same
-        as the currently selected AUI notebook tab. Can return None if no views exist.
-        """
-        for node in self.ListSubNodes(G_Project.NodeID_View, recursive = True):
-            if node.IsActiveInAuiNotebook():
-                return node
-
-        return None
 
 
     #-------------------------------------------------------
