@@ -420,23 +420,53 @@ class G_ProjectionTypeManager:
     """Type management and value conversion services for the data model"""
 
     #-------------------------------------------------------
-    def _GetText(view, line_no, field_no):
+    def _GetText(field_schema, view, line_no, field_no):
         return view.GetFieldText(line_no, field_no)
-    def _GetSigned(view, line_no, field_no):
-        return view.GetFieldValueSigned(line_no, field_no)
-    def _GetFloat(view, line_no, field_no):
-        return view.GetFieldValueFloat(line_no, field_no)
-    def _GetBool(view, line_no, field_no):
+
+    def _GetSignedText(field_schema, view, line_no, field_no):
+        scale_factor = field_schema.ScaleFactor
+        if scale_factor is not None:
+            return str(int(view.GetFieldValueSigned(line_no, field_no) / scale_factor))
+        else:
+            return view.GetFieldText(line_no, field_no)
+
+    def _GetFloatText(field_schema, view, line_no, field_no):
+        scale_factor = field_schema.ScaleFactor
+        if scale_factor is not None:
+            return str(view.GetFieldValueFloat(line_no, field_no) / scale_factor)
+        else:
+            return view.GetFieldText(line_no, field_no)
+
+
+    def _GetSigned(field_schema, view, line_no, field_no):
+        value = view.GetFieldValueSigned(line_no, field_no)
+        scale_factor = field_schema.ScaleFactor
+        if scale_factor is not None:
+            value = int(value / scale_factor)
+        return value
+
+    def _GetFloat(field_schema, view, line_no, field_no):
+        value = view.GetFieldValueFloat(line_no, field_no)
+        scale_factor = field_schema.ScaleFactor
+        if scale_factor is not None:
+            value = value / scale_factor
+        return value
+
+    def _GetBool(field_schema, view, line_no, field_no):
         return bool(view.GetFieldValueUnsigned(line_no, field_no))
+
 
     def _DisplayStringIcon(value, icon):
         return wx.dataview.DataViewIconText(value, icon)
+
     def _DisplayValue(value, icon):
         return value
+
 
     # model types - model info rows
     _c_without_icon = 0
     _c_with_icon = 1
+
 
     # model info columns
     _c_variant_type = 0
@@ -452,24 +482,28 @@ class G_ProjectionTypeManager:
         ["bool", _DisplayValue, wx.dataview.DataViewToggleRenderer] # _c_with_icon
     ]
 
+
     # display types (_DisplayInfo rows)
     _c_text = 0
     _c_signed = 1
     _c_float = 2
     _c_bool = 3
 
+
     # _DisplayInfo columns
     _c_store_to_value = 0
     _c_store_to_displayvalue = 1
     _c_model_types = 2
 
+
     # identify data accessor and display functors
     _DisplayInfo = [
         [_GetText, _GetText, _TextModelInfo], # _c_text
-        [_GetSigned, _GetText, _TextModelInfo], # _c_signed
-        [_GetFloat, _GetText, _TextModelInfo], # _c_float
+        [_GetSigned, _GetSignedText, _TextModelInfo], # _c_signed
+        [_GetFloat, _GetFloatText, _TextModelInfo], # _c_float
         [_GetBool, _GetBool, _BoolModelInfo] # _c_bool
     ]
+
 
     # map display field-types to display info
     _FieldTypes = dict(
@@ -487,18 +521,18 @@ class G_ProjectionTypeManager:
 
 
     #-------------------------------------------------------
-    def GetValue(type, view, line_no, field_no):
+    def GetValue(field_schema, view, line_no, field_no):
         """Fetch field's binary value"""
         me = __class__
-        return me._FieldTypes[type][me._c_store_to_value](view, line_no, field_no)
+        return me._FieldTypes[field_schema.Type][me._c_store_to_value](field_schema, view, line_no, field_no)
 
 
     #-------------------------------------------------------
-    def GetDisplayValue(type, icon, view, line_no, field_no):
+    def GetDisplayValue(field_schema, icon, view, line_no, field_no):
         """Fetch field's value converted to a type accepted by the display system"""
         me = __class__
-        display_info = me._FieldTypes[type]
-        display_value = display_info[me._c_store_to_displayvalue](view, line_no, field_no)
+        display_info = me._FieldTypes[field_schema.Type]
+        display_value = display_info[me._c_store_to_displayvalue](field_schema, view, line_no, field_no)
         with_icon = icon is not None
         return display_info[me._c_model_types][with_icon][me._c_displayvalue_to_display](display_value, icon)
 
@@ -533,7 +567,7 @@ class G_ProjectionFieldSchema:
     """Describe a single projector field (database 'colummn')"""
 
     #-------------------------------------------------------
-    def __init__(self, name, type, available, width = 0, align = None, formatter = None, data_col_offset = 0):
+    def __init__(self, name, type, available, width = 0, align = None, formatter = None, data_col_offset = 0, scale_factor = None):
         # user data
         if align is None:
             align = wx.ALIGN_CENTER
@@ -543,6 +577,7 @@ class G_ProjectionFieldSchema:
         self.Width = width
         self.Align = align
         self.Formatter = formatter
+        self.ScaleFactor = scale_factor
         self.Available = self.Visible = available
 
         # Nlog indexer info
@@ -608,17 +643,28 @@ class G_ProjectionSchema(G_FieldSchemata):
 
     #-------------------------------------------------------
     @staticmethod
-    def _CalcScale(scale):
-        if scale == "s":
-            return 1000000000
-        elif scale == "ms":
-            return 1000000
-        elif scale == "us":
-            return 1000
-        elif scale == "ns":
-            return 1
+    def _CalcScaleFactor(name, scale):
+        if scale is None:
+            sf = None
+
+        elif isinstance(scale, int):
+            sf = scale
+
         else:
-            raise RuntimeError("Invalid scale: {}".format(scale))
+            name = "{} ({})".format(name, scale)
+
+            if scale == "s":
+                sf = 1000000000
+            elif scale == "ms":
+                sf = 1000000
+            elif scale == "us":
+                sf = 1000
+            elif scale == "ns":
+                sf = 1
+            else:
+                raise RuntimeError("Invalid temporal scale: {}".format(scale))
+
+        return name, sf
 
 
     #-------------------------------------------------------
@@ -627,10 +673,10 @@ class G_ProjectionSchema(G_FieldSchemata):
         return self.Append(G_ProjectionFieldSchema(name, type, False))
 
 
-    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None, data_col_offset = 0):
+    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None, data_col_offset = 0, scale_factor = None):
         G_ProjectionTypeManager.ValidateType(type)
         al = __class__._CalcAlign(align)
-        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter, data_col_offset))
+        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter, data_col_offset, scale_factor))
 
 
     #-------------------------------------------------------
@@ -646,24 +692,24 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.ColProjectionNo = self.MakeHiddenFieldSchema("log_row_id", "int")
         return self
 
-    def AddField(self, name, type, width = 30, align = "centre", formatter = None):
-        self.MakeFieldSchema(name, type, width, align, formatter)
+    def AddField(self, name, type, width = 30, align = "centre", formatter = None, scale = None):
+        name, sf = self._CalcScaleFactor(name, scale)
+        self.MakeFieldSchema(name, type, width, align, formatter, scale_factor = sf)
         return self
 
     def AddStart(self, name, width = 30, align = "centre", formatter = None):
-        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
+        self.MakeFieldSchema(name, "text", width, align, formatter, data_col_offset = 1)
         self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "int")
         return self
 
     def AddFinish(self, name, width = 30, align = "centre", formatter = None):
-        self.MakeFieldSchema(name, "text", width, align, formatter, 1)
+        self.MakeFieldSchema(name, "text", width, align, formatter, data_col_offset = 1)
         self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "int")
         return self
 
-    def AddDuration(self, name, scale = "us", width = 30, align = "centre", formatter = None):
-        name = "{} ({})".format(name, scale)
-        self.DurationScale = self._CalcScale(scale)
-        self.ColDuration = self.MakeFieldSchema(name, "int", width, align, formatter)
+    def AddDuration(self, name, width = 30, align = "centre", formatter = None, scale = "us"):
+        name, sf = self._CalcScaleFactor(name, scale)
+        self.ColDuration = self.MakeFieldSchema(name, "int", width, align, formatter, scale_factor = sf)
         return self
 
 

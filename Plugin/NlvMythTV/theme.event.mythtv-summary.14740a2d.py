@@ -388,8 +388,8 @@ def GeneralQuantifier(events_db_path, connection, cursor):
         SELECT
             summary,
             count(duration_ns),
-            sum(duration_ns),
-            avg(duration_ns)
+            sum(duration_ns / 1000000000),
+            round(avg(duration_ns / 1000000000), 2)
         FROM
             db.filtered_projection
         GROUP BY
@@ -444,9 +444,3 @@ class TimingQuantifier:
             category = metrics.GetFieldText(evt_no, category_id)
             value = metrics.GetFieldValueUnsigned(evt_no, value_id)
             collector.AddMetric([category, value])
-
-
-
-## GLOBAL ######################################################
-
-

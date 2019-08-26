@@ -158,23 +158,16 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
 
     #-------------------------------------------------------
-    def GetFieldInfo(self, col_num):
-        field_schema = self._TableSchema[col_num]
-        return (field_schema.Type, field_schema.IsFirst)
-
-    def GetFieldType(self, col_num):
-        return self._TableSchema[col_num].Type
-
     def GetFieldValue(self, item_key, col_num):
-        type = self.GetFieldType(col_num)
-        return G_ProjectionTypeManager.GetValue(type, self._N_EventView, item_key, col_num)
+        field_schema = self._TableSchema[col_num]
+        return G_ProjectionTypeManager.GetValue(field_schema, self._N_EventView, item_key, col_num)
 
     def GetFieldDisplayValue(self, item_key, col_num):
+        field_schema = self._TableSchema[col_num]
         icon = None
-        (type, is_first) = self.GetFieldInfo(col_num)
-        if is_first:
+        if field_schema.IsFirst:
             icon = self._Icons[item_key in self._ParentKeyToChildKeys]
-        return G_ProjectionTypeManager.GetDisplayValue(type, icon, self._N_EventView, item_key, col_num)
+        return G_ProjectionTypeManager.GetDisplayValue(field_schema, icon, self._N_EventView, item_key, col_num)
 
 
     #-------------------------------------------------------
@@ -251,7 +244,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
     def GetColumnType(self, col_num):
         # Maintenance note: have never seen this called
-        return G_ProjectionTypeManager.GetVariantType(self.GetFieldType(col_num))
+        raise RuntimeError("GetColumnType is unimplemented")
 
 
     def GetChildren(self, parent_item, children):
