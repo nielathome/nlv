@@ -1911,10 +1911,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
     def __init__(self, parent, frame):
         "Initialise the instance"
 
-        super().__init__(
-            parent,
-            style = wx.TAB_TRAVERSAL | wx.CLIP_CHILDREN | wx.SP_LIVE_UPDATE
-        )
+        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
         self._Frame = frame
         self._BrowserPath = None
 

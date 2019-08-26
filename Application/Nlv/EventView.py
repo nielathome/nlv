@@ -548,6 +548,11 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    def GetDisplayNoteBook(self):
+        return self._DisplayNotebook
+
+
+    #-------------------------------------------------------
     def DoClose(self, delete):
         if delete:
             self.RemoveTemporaryFiles()
@@ -1209,8 +1214,8 @@ class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_H
 
 
     #-------------------------------------------------------
-    def GetPanelNotebook(self):
-        return self.GetLogAnalysisNode().GetDisplayCtrl()
+    def GetDisplayNoteBook(self):
+        return self.GetLogAnalysisNode().GetDisplayNoteBook()
 
 
     #-------------------------------------------------------
@@ -1253,7 +1258,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        display_notebook = self.GetPanelNotebook()
+        display_notebook = self.GetDisplayNoteBook()
         table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self)
         display_notebook.AddPage(table_ctrl, self._Name)
         self.SetDisplayCtrl(display_notebook, table_ctrl, owns_display_ctrl = False)
@@ -1575,7 +1580,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        display_notebook = self.GetPanelNotebook()
+        display_notebook = self.GetDisplayNoteBook()
         metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(display_notebook, self._Name)
         display_notebook.AddPage(metrics_viewer, self._Name)
         self.SetDisplayCtrl(display_notebook, metrics_viewer, owns_display_ctrl = False)

@@ -177,9 +177,6 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
 
     #-------------------------------------------------------
-    def GetDisplayCtrl(self):
-        return self._DisplayCtrl
-
     def GetDisplayNode(self):
         return self
 
