@@ -198,6 +198,9 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     
 
     #-------------------------------------------------------
+    def ActivateSubTab(self, window):
+            self._DisplayCtrl.ActivateSubTab(window)
+
     def WithFocusLock(self, func):
         """Execute 'func' while holding the focus recursion-lock"""
         if self._CanManageFocus:
@@ -215,7 +218,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
             self.GetAuiNotebook().SetSelectionToWindow(self._DisplayCtrl)
 
             # ensure any sub-tab is visible
-            self._DisplayCtrl.ActivateSubTab(self._DisplayFocusCtrl)
+            self.ActivateSubTab(self._DisplayFocusCtrl)
     
             # forward focus; unless otherwise specified, forward to the display control
             if focus_window is None:

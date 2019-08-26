@@ -1383,7 +1383,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         events_db_path = quantifier_context.AnalysisResults.EventsDbPath
         events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, quantifier_context.Valid)
         
-        # self.GetLogAnalysisNode().ActivateSubTab(events_view)
+        self.GetLogAnalysisNode().ActivateSubTab(events_view)
 
 
     #-------------------------------------------------------
