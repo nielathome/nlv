@@ -32,11 +32,20 @@ import Nlv.EventView
 from Nlv.Extension import LoadExtensions
 from Nlv.Project import G_Project
 from Nlv.Project import G_Global
+from Nlv.Project import G_PerfTimerScope
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
 
 # System imports
 import logging
+
+# Enable/disable profiling (VisualStudio tools not working ...)
+_G_WantProfiling = False
+_G_Profiler = None
+
+if _G_WantProfiling:
+    import cProfile
+    _G_Profiler = cProfile.Profile()
 
 
 
@@ -140,7 +149,7 @@ class G_ConsoleLog(wx.Log):
 
 
     #-------------------------------------------------------
-    def write( self, data ):
+    def write(self, data):
         """Python log interface"""
         self._LogMessage(data)
 
@@ -157,6 +166,7 @@ class G_ConsoleLog(wx.Log):
 
 ## G_LogViewFrame ##########################################
 
+@G_Global.TimeFunction
 class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------
@@ -193,14 +203,14 @@ class G_LogViewFrame(wx.Frame):
 
         # create and initialise child panels
 
-        self._NoteBook = aui.AuiNotebook(self._FramePanel,
+        self._AuiNoteBook = aui.AuiNotebook(self._FramePanel,
             agwStyle = aui.AUI_NB_TOP
              | aui.AUI_NB_TAB_SPLIT
              | aui.AUI_NB_TAB_MOVE
              | aui.AUI_NB_DRAW_DND_TAB
              | aui.AUI_NB_WINDOWLIST_BUTTON
         )
-        self._NoteBook.SetArtProvider(aui.tabart.VC8TabArt())
+        self._AuiNoteBook.SetArtProvider(aui.tabart.VC8TabArt())
 
         self._Project = G_Project(self._FramePanel, self)
 
@@ -209,7 +219,7 @@ class G_LogViewFrame(wx.Frame):
 
         # Use the aui manager to set up everything
         self._AuiManager.AddPane(
-            self._NoteBook,
+            self._AuiNoteBook,
             aui.AuiPaneInfo().CenterPane().Name("Notebook")
         )
         self._AuiManager.AddPane(
@@ -257,8 +267,8 @@ class G_LogViewFrame(wx.Frame):
     def GetAuiManager(self):
         return self._AuiManager
 
-    def GetNotebook(self):
-        return self._NoteBook
+    def GetAuiNotebook(self):
+        return self._AuiNoteBook
 
     def GetInfoPanel(self):
         return self._InfoPanel
@@ -266,6 +276,12 @@ class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------
     def OnCloseWindow(self, event):
+        global _G_Profiler
+        if _G_Profiler is not None:
+            _G_Profiler.disable()
+            _G_Profiler.create_stats()
+            _G_Profiler.dump_stats("cprofile.dat")
+
         self.Freeze()
         self._ConsoleLog.Close()
         self._Project.Close()
@@ -279,6 +295,8 @@ class G_LogViewFrame(wx.Frame):
 class G_LogViewApp(wx.App):
 
     #-------------------------------------------------------
+    @G_Global.ProgressMeter
+    @G_Global.TimeFunction
     def OnInit(self):
         # have to manually set the Posix locale
         self._Locale = wx.Locale(wx.LANGUAGE_DEFAULT)
@@ -305,13 +323,20 @@ class G_LogViewApp(wx.App):
 
         # setup logging
         global _Logger
-        logfile = open( str(path / "nlv.log"), "a" )
+        logfile = open(str(path / "nlv.log"), "a")
 
         _Logger = logging.getLogger('')
         _Logger.setLevel(logging.DEBUG)
 
         # send debug and above to the logfile
-        logfile_handler = logging.StreamHandler( logfile )
+        def FilterNoisyChartFindFontLines(record):
+            if record.levelno == logging.DEBUG and record.msg.find("findfont: score") >= 0:
+                return False
+            else:
+                return True
+
+        logfile_handler = logging.StreamHandler(logfile)
+        logfile_handler.addFilter(FilterNoisyChartFindFontLines)
         logfile_handler.setLevel(logging.DEBUG)
         logfile_handler.setFormatter(logging.Formatter( "%(asctime)s: %(levelname)s: %(message)s" ))
         _Logger.addHandler(logfile_handler)
@@ -320,11 +345,14 @@ class G_LogViewApp(wx.App):
         # see G_ConsoleLog
 
         # load site specific extensions
-        LoadExtensions()
+        with G_PerfTimerScope("LoadExtensions"):
+            LoadExtensions()
 
         # startup the GUI window
         frame = G_LogViewFrame(None, appname)
-        frame.Show()
+
+        with G_PerfTimerScope("G_LogViewFrame.Show"):
+            frame.Show()
 
         return True
 
@@ -351,6 +379,9 @@ def main():
         G_Shell().SetupIntegration()
     else:
         G_LogViewApp().MainLoop()
+
+if _G_Profiler is not None:
+    _G_Profiler.enable()
 
 if __name__ == "__main__":
     main()

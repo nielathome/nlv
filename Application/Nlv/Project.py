@@ -23,6 +23,7 @@ from pathlib import Path
 import subprocess
 import sys
 import traceback
+import time
 from weakref import ref as MakeWeakRef
 import xml.etree.ElementTree as et
 
@@ -68,6 +69,79 @@ def _Item2Node(item):
 
 
 
+## G_ProgressMeter #########################################
+
+class G_ProgressMeter:
+    """Helper class to display progress information for long running activities"""
+
+    Meter = None
+    Count = 0
+
+
+    #-------------------------------------------------------
+    def __init__(self, title):
+        if G_ProgressMeter.Count == 0:
+            G_ProgressMeter.Meter = self
+            G_ProgressMeter.Count = 1
+        else:
+            G_ProgressMeter.Count += 1
+
+        self._StartTime = time.perf_counter()
+        self._Title = title
+        self._Dlg = None
+
+    @staticmethod
+    def Close():
+        G_ProgressMeter.Count -= 1
+        if G_ProgressMeter.Count == 0:
+            G_ProgressMeter.Meter = None
+
+
+    #-------------------------------------------------------
+    def DoPulse(self, message):
+        """After half a second, display meter and start showing progress"""
+
+        if self._Dlg is None:
+            now = time.perf_counter()
+            if now - self._StartTime > 0.5:
+                self._Dlg = wx.ProgressDialog(self._Title, message,
+                    style = wx.PD_APP_MODAL | wx.PD_AUTO_HIDE | wx.PD_ELAPSED_TIME
+                )
+
+        else:
+            self._Dlg.Pulse(message)
+
+    @classmethod
+    def Pulse(cls, message):
+        instance = cls.Meter
+        if instance is not None:
+            instance.DoPulse(message)
+
+
+
+## G_ProgressMeterScope ####################################
+
+class G_ProgressMeterScope:
+    """Context manager (use with "with")."""
+
+    #-------------------------------------------------------
+    def __init__(self, title):
+        self._Title = title
+
+
+    #-------------------------------------------------------
+    def __enter__(self):
+        self._Meter = G_ProgressMeter(self._Title)
+        return self
+
+
+    #-------------------------------------------------------
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._Meter.Close()
+
+
+
+
 ## G_PerfTimer #############################################
            
 class G_PerfTimer:
@@ -97,6 +171,8 @@ class G_PerfTimer:
 
         __class__._Last = self
 
+        G_ProgressMeter.Pulse(description)
+
 
     #-------------------------------------------------------
     def _AddChild(self, child):
@@ -108,8 +184,13 @@ class G_PerfTimer:
         if not self._Closed:
             raise RuntimeError("TimeFunction failed")
 
+        args = ", ".join(self._Arguments)
+
         inclusive = self._Elapsed
         exclusive = inclusive - sum([timer._Elapsed for timer in self._Children])
+
+        if indent == 0:
+            logging.info("{}({}) took {:.2f}s".format(self._Description, args, inclusive))
 
         per_item_text = ""
         if self._PerItem != 0:
@@ -120,7 +201,6 @@ class G_PerfTimer:
         else:
             dur_text = "elapsed:{:.2f}s".format(inclusive)
 
-        args = ", ".join(self._Arguments)
         logging.debug("G_PerfTimer: {}{}({}): {} {}".format("|--" * indent, self._Description, args, dur_text, per_item_text))
 
         for child in self._Children:
@@ -334,6 +414,22 @@ class G_Global:
                 return func(*args, **kwargs)
 
         return TimeFunctionWrapper
+
+
+    #-------------------------------------------------------
+    def PulseProgressMeter(message):
+        G_ProgressMeter.Pulse(message)
+
+    def ProgressMeter(func):
+        """
+        Decorator to allow permit a progress meter to be
+        displayed if teh function runs for more than 0.5s
+        """
+        def ProgressMeterWrapper(*args, **kwargs):
+            with G_ProgressMeterScope("NLV is busy ..."):
+                return func(*args, **kwargs)
+
+        return ProgressMeterWrapper
 
 
     #-------------------------------------------------------
@@ -602,8 +698,8 @@ class G_Node:
     def GetNodeName(self):
         return self.GetHrItem().GetText()
 
-    def GetNotebook(self):
-        return self.GetProject().GetNotebook()
+    def GetAuiNotebook(self):
+        return self.GetProject().GetAuiNotebook()
 
     def GetProject(self):
         return self._WProject()
@@ -682,8 +778,13 @@ class G_Node:
 
         node = None
         try:
-            # create and add the new child into the GUI
-            node = self.AttachNode(document.get("factory"), self, name, copy_defaults = copy_defaults, **kwargs)
+            # create and add the new child into the GUI ...
+            # ... except annotation nodes - they are no longer implemented
+            factory_id = document.get("factory")
+            if factory_id == G_Project.NodeID_Annotation:
+                return None
+
+            node = self.AttachNode(factory_id, self, name, copy_defaults = copy_defaults, **kwargs)
 
             # if building a new document tree (from a template), do so now
             if copy_defaults:
@@ -1219,19 +1320,6 @@ class G_RootNode(G_TreeNode):
     #-------------------------------------------------------
     def _IsKnownDocumentVersion(self):
         return self.GetDocument().get("version", 0) == str(G_Shell.NlvDocumentVersion)
-
-
-    #-------------------------------------------------------
-    def GetActiveViewNode(self):
-        """
-        Fetch the child view node whose editor last had keyboard focus. This is the same
-        as the currently selected AUI notebook tab. Can return None if no views exist.
-        """
-        for node in self.ListSubNodes(G_Project.NodeID_View, recursive = True):
-            if node.IsActiveInNotebook():
-                return node
-
-        return None
 
 
     #-------------------------------------------------------
@@ -1811,19 +1899,21 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def __init__(self, parent, frame):
         "Initialise the instance"
 
-        super().__init__(
-            parent,
-            style = wx.TAB_TRAVERSAL | wx.CLIP_CHILDREN | wx.SP_LIVE_UPDATE
-        )
+        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
         self._Frame = frame
         self._BrowserPath = None
 
+        # integrate Python/C++ performance timing systems
+        def PerfTimerFactory(description, item_count):
+            return G_PerfTimer(description, item_count)
+
         # feed Nlog logging back to the application
         _LogForwarder = LogForwarder()
-        Nlog.Setup(_LogForwarder)
+        Nlog.Setup(_LogForwarder, PerfTimerFactory)
 
         # create a "public" list of the notfication channels for use by receivers
         root = et.Element("root")
@@ -1903,6 +1993,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def _InitNodePages(self):
         """Ensure G_Nodes are notified to build their GUI pages"""
 
@@ -2092,8 +2183,8 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
     def GetTree(self):
         return self._Tree
 
-    def GetNotebook(self):
-        return self.GetFrame().GetNotebook()
+    def GetAuiNotebook(self):
+        return self.GetFrame().GetAuiNotebook()
 
     def GetRootNode(self):
         return self._RootNode
@@ -2135,7 +2226,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
         root = self.GetRootNode()
         root.Close()
-        Nlog.Setup(None)
+        Nlog.Setup(None, None)
 
         # kill any notification channels
         for channel in self._Channels.values():

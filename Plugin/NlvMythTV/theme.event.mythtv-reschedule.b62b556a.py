@@ -18,30 +18,23 @@ import re
 
 
 
-## Analyser ####################################################
+## Recognise ###################################################
 
-class Analyser:
+class Recogniser:
 
     #-----------------------------------------------------------
     _RegexPlace = re.compile("([\d.]+)\splace")
 
 
     #-----------------------------------------------------------
-    @staticmethod
-    def DefineFilter():
-        return [
-            ('LogView Filter', 'function = "HandleReschedule" and log ~= "Reschedule"'),
-            ('LogView Filter', 'function = "HandleReschedule" and log ~= "Scheduled"')
-        ]
+    def Begin(self, connection, cursor):
+        self.Cursor = cursor
 
-
-    #-----------------------------------------------------------
-    def Begin(self, context):
-        self.Cursor = cursor = context.Connection.cursor()
-        cursor.execute("DROP TABLE IF EXISTS reschedule")
+        cursor.execute("DROP TABLE IF EXISTS main.reschedule")
         cursor.execute("""
             CREATE TABLE reschedule
             (
+                event_id INT,
                 start_text TEXT,
                 start_line_no INT,
                 start_utc INT,
@@ -65,97 +58,84 @@ class Analyser:
 
     #-----------------------------------------------------------
     def MatchEventFinish(self, context, line):
-        ed = context.GetEventDetails()
-
         f_place = 0.0
         match = re.search(self._RegexPlace, line.GetNonFieldText())
         if match and match.lastindex == 1:
             f_place = float(match[1])
         f_bool = f_place > 0.16
 
-
-        self.Cursor.execute("INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-        [
-            ed[0], ed[1], ed[2], ed[3], ed[4], ed[5], ed[6], ed[7], ed[8],
+        self.Cursor.execute("INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            *context.GetEventFullDetails(),
             self.Process,
             f_place,
             f_bool
-        ])
+        ))
 
         return True
 
 
     #-----------------------------------------------------------
-    def End(self, context):
-        self.Cursor.close()
-        context.Connection.commit()
+    def End(self):
+        pass
+
+
+Recognise(
+    Recogniser(),
+    ('LogView Filter', 'function = "HandleReschedule" and log ~= "Reschedule"'),
+    ('LogView Filter', 'function = "HandleReschedule" and log ~= "Scheduled"')
+)
 
 
 
-## Projector ###################################################
+## Project #####################################################
 
-class Projector:
+def Projector(connection, cursor, context):
+    utc_datum = context.CalcUtcDatum(cursor, ["reschedule"])
 
-    """
-    A class which maps one or more raw analysed event tables ready
-    to be displayed in the UI.
-    """
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
+    cursor.execute("""
+        CREATE TABLE projection
+        (
+            event_id INT,
+            start_text TEXT,
+            start_offset_ns INT,
+            finish_text TEXT,
+            finish_offset_ns INT,
+            duration_ns INT,
+            place REAL,
+            abool INT
+        )""")
 
-    #-----------------------------------------------------------
-    @staticmethod
-    def SimpleFormatter(value, attr):
-        if value > 1:
-            attr.SetBold(True)
-
-
-    #-----------------------------------------------------------
-    @classmethod
-    def DefineSchema(cls, schema):
-        schema.AddStart("Start", width = 100)
-        schema.AddFinish("Finish", width = 100)
-        schema.AddDuration("Duration", scale = "s", width = 60, formatter = cls.SimpleFormatter)
-        schema.AddField("Place", "float32", 60)
-        schema.AddField("Abool", "bool", 60)
-
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def Project(connection, context):
-        cursor = connection.cursor()
-
-        utc_datum = context.MakeProjectionMetaTable(cursor, ["reschedule"])
-        context.MakeProjectionTable(cursor)
-
-        cursor.execute("""
-            INSERT INTO projection
-            SELECT
-                start_text,
-                start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
-                finish_text,
-                finish_offset_ns + (finish_utc - {utc_datum}) * 1000000000,
-                duration_ns,
-                place,
-                abool
-            FROM
-                reschedule
-            """.format(utc_datum = utc_datum))
-
-        cursor.close()
-        connection.commit()
+    cursor.execute("""
+        INSERT INTO projection
+        SELECT
+            event_id,
+            start_text,
+            start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
+            finish_text,
+            finish_offset_ns + (finish_utc - {utc_datum}) * 1000000000,
+            duration_ns,
+            place,
+            abool
+        FROM
+            reschedule
+        """.format(utc_datum = utc_datum))
 
 
+def SimpleFormatter(value, attr):
+    if value > 1:
+        attr.SetBold(True)
 
-## GLOBAL ##################################################
 
-"""
-Recogniser configuration. Call the global Register function as
-follows:
-
-    Register(log_analyser)
-
-where:
-    * `log_analyser` is an object, behaving as per `LogfileAnalyser`
-"""
-
-Analyse(Analyser())
-Project("Reschedule", Projector())
+Project(
+    "Reschedule",
+    Projector,
+    MakeDisplaySchema()
+        .AddEventId()
+        .AddStart("Start", width = 100)
+        .AddFinish("Finish", width = 100)
+        .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)
+        .AddField("Place", "real", 60)
+        .AddField("Abool", "bool", 60)
+)

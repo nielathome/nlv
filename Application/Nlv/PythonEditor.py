@@ -256,7 +256,7 @@ class G_AnalyserScriptCtrl(wx.SplitterWindow):
     #-------------------------------------------------------
     def __init__(self, parent):
         # build a panel with the Python editor and a message window
-        wx.Panel.__init__(self, parent)
+        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
 
         panel = wx.Panel(self)
         sizer = self._Sizer = wx.BoxSizer(wx.VERTICAL)
@@ -317,6 +317,9 @@ class G_AnalyserScriptCtrl(wx.SplitterWindow):
 
 
     #-------------------------------------------------------
+    def GetEditor(self):
+        return self._Editor
+
     def GetPythonText(self):
         return self._Editor.GetText()
 

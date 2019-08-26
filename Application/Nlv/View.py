@@ -18,14 +18,17 @@
 # wxWidgets imports
 import wx
 import wx.stc
+from wx.lib.expando import ExpandoTextCtrl
 
 # Application imports 
 from .Document import D_Document
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
+from .Logfile import G_DisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_Const
+from .Project import G_Global
 from .Project import G_TabContainedNode
 from .Project import G_TabContainerNode
 from .Project import G_ListContainedNode
@@ -34,14 +37,185 @@ from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
 from .StyleNode import G_ColourNode
+from .StyleNode import G_ColourTraits
 from .StyleNode import G_EnabledColourNode
 from .StyleNode import G_HiliteStyleNode
+from .StyleNode import G_StyleCombo
+from .StyleNode import G_StyleTraits
 from .Theme import G_ThemeNode
 from .Theme import G_ThemeOverridesNode
 from .Theme import G_ThemeGalleryNode
 
 # Content provider interface
 import Nlog
+
+
+
+## G_ViewControl ###########################################
+
+class G_ViewControl(wx.Panel, G_DisplayControl):
+    """STC editor displays the log data"""
+
+    #-------------------------------------------------------
+    _Descs = [
+        # name, pen_style, scintilla style number, text colour, background
+        ("Note", wx.PENSTYLE_TRANSPARENT, 40, "BLACK", "LEMON CHIFFON"),
+        ("Good", wx.PENSTYLE_TRANSPARENT, 41, "NAVY", "LIGHT BLUE"),
+        ("Neutral", wx.PENSTYLE_TRANSPARENT, 42, "SADDLE BROWN", "KHAKI"),
+        ("Concern", wx.PENSTYLE_TRANSPARENT, 43, "FIREBRICK", "PINK")
+    ]
+
+    _Traits = [
+        [d[0], d[1], d[2], G_ColourTraits.GetColour(d[3]), G_ColourTraits.GetColour(d[4])]
+        for d in _Descs
+    ]
+
+    _StyleTraits = G_StyleTraits(_Traits)
+
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
+        wx.Panel.__init__(self, parent)
+        self.BuildPage()
+
+        # default style - "Note"
+        self._StyleCombo.SetSelection(0)
+
+        self._Annotation.Bind(wx.EVT_TEXT, self.OnAnnotationText)
+        self._Annotation.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self._Annotation.Bind(wx.EVT_KILL_FOCUS, self.OnKillFocus)
+
+        self._StyleCombo.Bind(wx.EVT_COMBOBOX, self.OnStyleCombo)
+        self._StyleCombo.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self._StyleCombo.Bind(wx.EVT_KILL_FOCUS, self.OnKillFocus)
+
+        self._ViewNode = None
+
+
+    #-------------------------------------------------------
+    def BuildPage(self):
+        # lhs vertical sizer contains label and combo
+        style_sizer = wx.BoxSizer(wx.VERTICAL)
+        style_label = wx.StaticText(self, label = "Style:")
+        style_sizer.Add(style_label, proportion = 0, flag = wx.LEFT | wx.TOP | wx.RIGHT, border = G_Const.Sizer_StdBorder)
+
+        self._StyleCombo = G_StyleCombo(self, self._StyleTraits)
+        style_sizer.Add(self._StyleCombo, proportion = 0, flag = wx.LEFT | wx.BOTTOM | wx.RIGHT, border = G_Const.Sizer_StdBorder)
+
+        # rhs vertical sizer contains label and annotation text
+        annotation_sizer = wx.BoxSizer(wx.VERTICAL)
+        annotation_label = wx.StaticText(self, label = "Annotation:")
+        annotation_sizer.Add(annotation_label, proportion = 0, flag = wx.LEFT | wx.TOP | wx.RIGHT, border = G_Const.Sizer_StdBorder)
+
+        self._Annotation = ExpandoTextCtrl(self)
+        annotation_sizer.Add(self._Annotation, proportion = 0, flag = wx.EXPAND | wx.LEFT | wx.BOTTOM | wx.RIGHT, border = G_Const.Sizer_StdBorder)
+
+        # horizontal sizer contains the lhs/rhs sizers
+        hsizer = self._AnnotationPane = wx.BoxSizer(wx.HORIZONTAL)
+        hsizer.Add(style_sizer)
+        hsizer.Add(annotation_sizer, proportion = 1)
+
+        # overall sizer contains the horizontal sizer and the STC editor
+        vsizer = wx.BoxSizer(wx.VERTICAL)
+        vsizer.Add(hsizer, proportion = 0, flag = wx.EXPAND)
+        vsizer.Show(hsizer, False, recursive = True)
+
+        self._Editor = wx.stc.StyledTextCtrl(self, -1)
+        vsizer.Add(self._Editor, proportion = 1, flag = wx.EXPAND)
+        
+        self.SetSizer(vsizer)
+
+
+    #-------------------------------------------------------
+    def GetEditor(self):
+        return self._Editor
+
+    def GetStyle(self):
+        return self._StyleTraits.GetData(self._StyleCombo.GetValue())
+
+
+    #-------------------------------------------------------
+    def ShowAnnotationPane(self, show):
+        sizer = self.GetSizer()
+        sizer.Show(self._AnnotationPane, show, recursive = True)
+        sizer.Layout()
+
+
+    #-------------------------------------------------------
+    def Activate(self, view_node):
+        editor = self.GetEditor()
+        line = editor.LineFromPosition(editor.GetSelectionEnd())
+
+        annotation_text = editor.AnnotationGetText(line)
+        self._Annotation.SetValue(annotation_text)
+
+        if annotation_text != "":
+            traits = self._StyleTraits
+            style_no = editor.AnnotationGetStyle(line)
+            self._StyleCombo.SetSelection(traits.GetIndexByData(style_no))
+
+        self.ShowAnnotationPane(True)
+        self._Annotation.SetFocus()
+
+        self._ViewNode = view_node
+
+
+    def DeActivate(self, focus_win = None):
+        self._ViewNode = None
+        self.ShowAnnotationPane(False)
+        if focus_win is not None:
+            focus_win.SetFocus()
+
+
+    #-------------------------------------------------------
+    def OnAnnotationText(self, event):
+        """The annotation has altered; flush the new text into the editor and refresh all views"""
+
+        view_node = self._ViewNode
+        if view_node is not None:
+            annotation_text = self._Annotation.GetValue()
+
+            editor = self.GetEditor()
+            line = editor.LineFromPosition(editor.GetSelectionEnd())
+            editor.AnnotationSetText(line, annotation_text)
+            editor.AnnotationSetStyle(line, self.GetStyle())
+
+            view_node.GetLogNode().RefreshViews()
+
+        # expando editor control uses this event to re-size
+        event.Skip()
+
+
+    #-------------------------------------------------------
+    def OnKeyDown(self, event):
+        """A key has been pressed in the annotation control"""
+
+        if event.GetKeyCode() == wx.WXK_ESCAPE:
+            self.DeActivate(self._Editor)
+        else:
+            event.Skip()
+
+
+    #-------------------------------------------------------
+    def OnStyleCombo(self, event):
+        """The style has altered; update annotation and refresh all Scintilla controls"""
+
+        view_node = self._ViewNode
+        if view_node is not None:
+            editor = self.GetEditor()
+            line = editor.LineFromPosition(editor.GetSelectionEnd())
+            editor.AnnotationSetStyle(line, self.GetStyle())
+            view_node.GetLogNode().RefreshViews()
+
+
+    #-------------------------------------------------------
+    def OnKillFocus(self, event):
+        next_focus = event.GetWindow()
+        if next_focus is not self._StyleCombo and next_focus is not self._Annotation:
+            self.DeActivate()
+
+        event.Skip()
+
 
 
 ## G_ViewChildNode #########################################
@@ -604,6 +778,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._OrigNameId = name.split("/")[-1]
 
 
+    @G_Global.TimeFunction
     def PostInitNode(self):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
@@ -616,9 +791,12 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._Field.Add(0, "CursorLine", replace_existing = False)
 
         # make a Scintilla editor and a Nlog logfile view
-        notebook = self.GetNotebook()
-        editor = self.SetDisplayCtrl(wx.stc.StyledTextCtrl(notebook, -1))
+        aui_notebook = self.GetAuiNotebook()
+        view_control = self._ViewControl = G_ViewControl(aui_notebook)
+        editor = view_control.GetEditor()
+        self.SetDisplayCtrl(view_control, editor)
         self.InterceptKeys(editor)
+        self.InterceptSetFocus(editor)
         editor.Bind(wx.stc.EVT_STC_UPDATEUI, self.OnUpdateUI)
 
         self._N_View = self.GetLogfile().CreateLogView()
@@ -682,9 +860,9 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         # does not implement
         editor.SetReadOnly( True );
 
-        # and add the Scintilla editor to the main notebook, without altering focus
+        # and add the Scintilla editor to the AUI notebook, without altering focus
         def Work():
-            notebook.AddPage(editor, self.GetNodeLabel(), True)
+            aui_notebook.AddPage(view_control, self.GetNodeLabel(), True)
         self.WithFocusLock(Work)
 
         # ensure markers are set correctly
@@ -739,20 +917,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def GetAnnotationNode(self):
-        return self.GetRootNode().FindChildNode(G_Project.NodeID_Annotation, recursive = True)
-
-    def UpdateAnnotation(self, line = None):
-        self.GetAnnotationNode().UpdateAnnotation(view_node = self, line = line)
-
-    def OnDisplayFocus(self):
-        # keep the annotation display synchronised with the active view
-        self.UpdateAnnotation()
-
-
-    #-------------------------------------------------------
     def GetEditor(self):
-        return self.GetDisplayCtrl()
+        return self._ViewControl.GetEditor()
 
     def GetSelectedText(self):
         """Fetch the selected text in the editor"""
@@ -878,9 +1044,6 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             # flush any changes through to the GUI
             self.RefreshTrackers(update_local, update_global, self)
 
-        # ensure annotation text is updated
-        self.UpdateAnnotation(line = cur_line)
-
         # and tell the world
         self.NotifyLine(cur_line)
 
@@ -894,7 +1057,14 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         editor = self.GetEditor()
         cur_line = editor.LineFromPosition(editor.GetSelectionStart())
-        if key_code == ord("B"):
+        if key_code == ord("A"):
+            handled = True
+            if modifiers ==  wx.MOD_CONTROL:
+                self._ViewControl.Activate(self)
+            else:
+                view_node.GotoNextLine("annotation", modifiers = modifiers)
+
+        elif key_code == ord("B"):
             handled = True
             if modifiers ==  wx.MOD_CONTROL:
                 # set a user bookmark on the current line(s)
@@ -932,10 +1102,6 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                 self.RefreshTrackers(False, True, self)
                 self.UpdateTrackers(False, tracker_idx, [timecode])
 
-        # special check with the annotation node
-        if not handled:
-            handled = self.GetAnnotationNode().OnDisplayKey(key_code, modifiers, self)
-
         return handled
 
 
@@ -948,6 +1114,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def SetFieldMask(self, field_mask):
         """Set the list of visible fields for this view"""
 

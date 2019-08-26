@@ -66,12 +66,6 @@ public:
 	fieldvalue_t GetValue( unsigned field_id ) const {}
 
 	template<>
-	fieldvalue_t GetValue<FieldValueType::unsigned64>( unsigned field_id ) const
-	{
-		return static_cast<uint64_t>(GetAsInt64( field_id ));
-	}
-
-	template<>
 	fieldvalue_t GetValue<FieldValueType::signed64>( unsigned field_id ) const
 	{
 		return GetAsInt64( field_id );
@@ -348,17 +342,9 @@ using SqlFieldAccessorReal = SqlFieldAccessorScalar<FieldValueType::float64>;
 
 SqlFieldAccessor::factory_t::map_t SqlFieldAccessor::factory_t::m_Map
 {
-	{ c_Type_Bool, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint08, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint16, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint32, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Uint64, &MakeField<SqlFieldAccessorUnsigned> },
-	{ c_Type_Int08, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Int16, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Int32, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Int64, &MakeField<SqlFieldAccessorInt> },
-	{ c_Type_Float32, &MakeField<SqlFieldAccessorReal> },
-	{ c_Type_Float64, &MakeField<SqlFieldAccessorReal> },
+	{ c_Type_Bool, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Int, &MakeField<SqlFieldAccessorInt> },
+	{ c_Type_Real, &MakeField<SqlFieldAccessorReal> },
 	{ c_Type_Text, &MakeField<SqlFieldAccessor> }
 };
 
@@ -455,13 +441,21 @@ public:
 	// LineAccessor interfaces
 
 	void GetFieldText( unsigned field_id, const char ** first, const char ** last ) const override {
-		const std::string & text = m_Captures[ field_id ].first;
-		*first = text.c_str();
-		*last = *first + text.size();
+		if( field_id < m_Captures.size() )
+		{
+			const std::string & text = m_Captures[ field_id ].first;
+			*first = text.c_str();
+			*last = *first + text.size();
+		}
+		else
+			*first = *last = "";
 	}
 
 	fieldvalue_t GetFieldValue( unsigned field_id ) const override {
-		return m_Captures[ field_id ].second;
+		if( field_id < m_Captures.size() )
+			return m_Captures[ field_id ].second;
+		else
+			return 0LL;
 	}
 };
 
@@ -922,7 +916,7 @@ std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, n
 
 void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool )
 {
-	PerfTimer filter_timer;
+	PythonPerfTimer map_timer{"Nlog::SqlViewAccessor::Filter::Map"};
 
 	const nlineno_t num_log_lines{ m_LogAccessor->GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
@@ -933,10 +927,9 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 	) };
 
 	m_NumLines = nlineno_cast(map.size());
+	map_timer.Close( m_NumLines );
 
-	TraceDebug( "filter_time:%.2fs per_line:%.3fus", filter_timer.Overall(), filter_timer.PerItem( num_log_lines ) );
-
-	PerfTimer sql_timer;
+	PythonPerfTimer sql_timer{ "Nlog::SqlViewAccessor::Filter::Sql" };;
 
 	Error res{ m_LogAccessor->ExecuteStatements( "BEGIN TRANSACTION; DELETE FROM filter" ) };
 	if( !Ok( res ) )
@@ -959,7 +952,7 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 
 	m_LogAccessor->ExecuteStatements( Ok( res ) ? "COMMIT TRANSACTION" : "ROLLBACK TRANSACTION" );
 
-	TraceDebug( "sql_time:%.2fs per_line:%.3fus", sql_timer.Overall(), sql_timer.PerItem( map.size() ) );
+	sql_timer.Close( map.size() );
 
 	// record the change
 	RecordEvent();
@@ -968,7 +961,7 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 
 std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdornmentsProvider * adornments_provider )
 {
-	PerfTimer timer;
+	PythonPerfTimer timer{ __FUNCTION__ };
 
 	const nlineno_t num_view_lines{ GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
@@ -979,7 +972,7 @@ std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdo
 	) };
 
 	// write out performance data
-	TraceDebug( "time:%.2fs per_line:%.3fus", timer.Overall(), timer.PerItem( num_view_lines ) );
+	timer.Close( num_view_lines );
 
 	return map;
 }

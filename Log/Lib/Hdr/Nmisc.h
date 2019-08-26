@@ -154,4 +154,37 @@ public:
 };
 
 
+struct PythonPerfTimerImpl
+{
+	static std::unique_ptr<PythonPerfTimerImpl> Create( const char * description, size_t item_count );
+	virtual void AddArgument( const char * arg ) = 0;
+	virtual void AddArgument( const wchar_t * arg ) = 0;
+	virtual void Close( size_t item_count ) = 0;
+};
 
+
+class PythonPerfTimer
+{
+private:
+	std::unique_ptr<PythonPerfTimerImpl> m_Impl;
+
+public:
+	PythonPerfTimer( const char * description, size_t item_count = 0 )
+		: m_Impl{ PythonPerfTimerImpl::Create( description, item_count ) } {}
+
+	~PythonPerfTimer( void ) {
+		Close();
+	}
+
+	void AddArgument( const char * arg ) {
+		m_Impl->AddArgument( arg );
+	}
+
+	void AddArgument( const wchar_t * arg ) {
+		m_Impl->AddArgument( arg );
+	}
+
+	void Close( size_t item_count = 0 ) {
+		m_Impl->Close( item_count );
+	}
+};

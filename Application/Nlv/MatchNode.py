@@ -917,6 +917,7 @@ class G_MatchNode:
 
 
     #-------------------------------------------------------
+    @G_Global.TimeFunction
     def OnMatchCmd(self, event = None, update_history = True, refocus = True):
         """Action the match; derived class must implement OnMatch"""
         match_item = self.MakeMatchItem()

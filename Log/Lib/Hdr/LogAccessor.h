@@ -80,8 +80,7 @@ enum Style : char
 // provide progress information back to the UI
 struct ProgressMeter
 {
-	virtual void SetRange( size_t /* range */ ) {}
-	virtual void SetProgress( size_t /* value */ ) {}
+	virtual void Pulse( const std::string & /* message */ ) {}
 };
 
 

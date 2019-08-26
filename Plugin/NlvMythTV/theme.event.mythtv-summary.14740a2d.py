@@ -15,32 +15,24 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 import collections
-from math import sqrt
 from matplotlib import cm
 import numpy as np
 import re
 
 
-## Analyser ####################################################
+## Recognise ###################################################
 
-class Analyser:
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def DefineFilter():
-        return [
-            ('LogView Filter', 'function = "CalcParams"'),
-            ('LogView Filter', 'function = "HandleAnnounce" and log ~= "adding"')
-        ]
-
+class Recogniser:
 
     #-----------------------------------------------------------
-    def Begin(self, context):
-        self.Cursor = cursor = context.Connection.cursor()
-        cursor.execute("DROP TABLE IF EXISTS expire")
+    def Begin(self, connection, cursor):
+        self.Cursor = cursor
+
+        cursor.execute("DROP TABLE IF EXISTS main.expire")
         cursor.execute("""
             CREATE TABLE expire
             (
+                event_id INT,
                 start_text TEXT,
                 start_line_no INT,
                 start_utc INT,
@@ -58,36 +50,31 @@ class Analyser:
 
     #-----------------------------------------------------------
     def MatchEventFinish(self, context, line):
-        ed = context.GetEventDetails()
-
-        self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?)",
-        [
-            ed[0], ed[1], ed[2], ed[3], ed[8],
+        self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?, ?)",
+        (
+            * context.GetEventStartDetails(),
             self.Process
-        ])
+        ))
 
         return True
 
 
     #-----------------------------------------------------------
-    def End(self, context):
-        self.Cursor.close()
-        context.Connection.commit()
+    def End(self):
+        pass
+
+
+Recognise(
+    Recogniser(),
+    ('LogView Filter', 'function = "CalcParams"'),
+    ('LogView Filter', 'function = "HandleAnnounce" and log ~= "adding"')
+)
 
 
 
-## Projector ###################################################
+## Project #####################################################
 
 class Projector:
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def DefineSchema(schema):
-        #schema.AddNesting()
-        schema.AddStart("Start", width = 100)
-        schema.AddDuration("Duration", scale = "s", width = 60)
-        schema.AddField("Event Summary", "text", 150, "left")
-
 
     #-----------------------------------------------------------
     @staticmethod
@@ -109,343 +96,351 @@ class Projector:
         return parent_process == child_process
 
 
+#---------------------------------------------------------------
+def Projector(connection, cursor, context):
+
+    tables = ["expire"]
+    db_file = context.FindDbFile("B62B556A-DABA-4886-A469-F739492750D3")
+
+    if db_file is not None:
+        cursor.execute("ATTACH DATABASE '{db}' AS db".format(db = db_file))
+        tables.append("db.reschedule")
+
+    utc_datum = context.CalcUtcDatum(cursor, tables)
+
+    select_expire = """
+        SELECT
+            event_id INT,
+            start_text,
+            start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
+            duration_ns,
+            'expire' AS summary
+        FROM
+            expire
+        """.format(utc_datum = utc_datum)
+
+    select_reschedule = """
+        SELECT
+            event_id,
+            start_text,
+            start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
+            duration_ns,
+            'P=[' || place || ']' AS summary
+        FROM
+            db.reschedule
+        """.format(utc_datum = utc_datum)
+
+    if db_file is None:
+        select = select_expire
+    else:
+        select = """
+            {}
+            UNION ALL
+            {}
+        """.format(select_expire, select_reschedule)
+
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
+    cursor.execute("""
+        CREATE TABLE projection
+        (
+            event_id,
+            start_text TEXT,
+            start_offset_ns INT,
+            duration_ns INT,
+            summary TEXT
+        )""")
+
+    cursor.execute("""
+        INSERT INTO projection
+            {}
+        """.format(select))
+
+
+Project(
+    "Summary",
+    Projector,
+    MakeDisplaySchema()
+        .AddEventId()
+        .AddStart("Start", width = 100)
+        .AddDuration("Duration", scale = "s", width = 60)
+        .AddField("Event Summary", "text", 150, "left")
+)
+
+
+
+## BarChart ####################################################
+
+class BarChart:
+
     #-----------------------------------------------------------
-    def Project(self, connection, context):
-        cursor = connection.cursor()
+    def __init__(self, category_field, value_field, std_field = None):
+        self._CategoryField = category_field
+        self._ValueField = value_field
+        self._StdField = std_field
 
-        tables = ["expire"]
-        db_file = context.FindDbFile("B62B556A-DABA-4886-A469-F739492750D3")
 
-        if db_file is not None:
-            cursor.execute("ATTACH DATABASE '{}' AS dbs".format(db_file))
-            tables.append("dbs.reschedule")
+    #-----------------------------------------------------------
+    def DefineParameters(self, params, connection, cursor, selection):
+        params.AddBool("show_std", "Show error bars", True)
 
-        utc_datum = context.MakeProjectionMetaTable(cursor, tables)
-        context.MakeProjectionTable(cursor)
 
-        select_expire = """
-            SELECT
-                start_text,
-                start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
-                duration_ns,
-                'expire' AS summary
-            FROM
-                expire
-            """.format(utc_datum = utc_datum)
-
-        select_reschedule = """
-            SELECT
-                start_text,
-                start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
-                duration_ns,
-                'P=[' || place || ']' AS summary
-            FROM
-                dbs.reschedule
-            """.format(utc_datum = utc_datum)
-
-        if db_file is None:
-            select = select_expire
-        else:
-            select = """
-                {}
-                UNION ALL
-                {}
-            """.format(select_expire, select_reschedule)
+    #-----------------------------------------------------------
+    def Realise(self, name, figure, connection, cursor, param_values, selection):
+        labels = []
+        values = []
+        stds = None
 
         cursor.execute("""
-            INSERT INTO projection
-                {}
-            """.format(select))
+            SELECT
+                {category},
+                {value},
+                log_row_no
+            FROM
+                filtered_projection
+            """.format(category = self._CategoryField, value = self._ValueField))
 
-        cursor.close()
-        connection.commit()
+        hilites = []
+        for idx, row in enumerate(cursor):
+            labels.append(row[0])
+            values.append(row[1])
+            if row[2] in selection:
+                hilites.append(idx)
+#            stds.append(metrics.GetFieldValueFloat(i, self._StdField))
+
+        #if not param_values.get("show_std", True):
+        #    stds = None
+
+        x = np.arange(len(labels))
+        axes = figure.add_subplot(111)
+        axes.tick_params(labelsize = "small")
+        bars = axes.bar(x, values, yerr = stds)
+        axes.set_ylabel('Average (s)')
+        axes.set_xticks(x)
+        axes.set_xticklabels(labels, {"rotation": 75})
+
+        for col in hilites:
+            bars[col].set_edgecolor("black")
+
+        figure.subplots_adjust(bottom = 0.25)
 
 
 
-## EventMetrics ################################################
+## PieChart ####################################################
 
-class EventMetrics:
+class PieChart:
 
     #-----------------------------------------------------------
-    def __init__(self):
-        self.Tables = [
-            __class__.CategoryTable(),
-            __class__.HistogramTable()
-        ]
+    c_OtherPcts = ["5%", "10%", "15%"]
+
+    def __init__(self, category_field, value_field):
+        self._CategoryField = category_field
+        self._ValueField = value_field
 
 
-
-    ## Chart ###################################################
-
-    class Chart:
-        #-------------------------------------------------------
-        def __init__(self, name, want_selection = False):
-            self.Name = name
-            self.WantSelection = want_selection
-
-        #-------------------------------------------------------
-        def DefineParameters(self, params, metrics, num_metrics, selection):
-            pass
+    #-----------------------------------------------------------
+    def DefineParameters(self, params, connection, cursor, selection):
+        params.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
 
 
+    #-----------------------------------------------------------
+    def Realise(self, name, figure, connection, cursor, param_values, selection):
+        cursor.execute("""
+            SELECT
+                count({value}),
+                sum({value})
+            FROM
+                filtered_projection
+            """.format(value = self._ValueField))
 
-    ## BarChart ################################################
+        (count, sum) = cursor.fetchone()
+        if count == 0:
+            return
 
-    class BarChart(Chart):
+        cursor.execute("""
+            SELECT
+                {category},
+                {value},
+                log_row_no
+            FROM
+                filtered_projection
+            ORDER BY
+                {value} DESC
+            """.format(category = self._CategoryField, value = self._ValueField))
 
-        #-------------------------------------------------------
-        def __init__(self, name, category_field, value_field, std_field):
-            super().__init__(name, want_selection = True)
-            self._CategoryField = category_field
-            self._ValueField = value_field
-            self._StdField = std_field
+        param = param_values.get("other_pct", 0)
+        accum = 0
+        limit = sum * (1 - (0.05 * (1 + param)))
 
-        #-------------------------------------------------------
-        def DefineParameters(self, params, metrics, num_metrics, selection):
-            params.AddBool("show_std", "Show error bars", True)
+        labels = []
+        values = []
+        explodes = []
+        other_explode = 0
 
+        for row in cursor:
+            selected = row[2] in selection
 
-        #-------------------------------------------------------
-        def Realise(self, figure, metrics, num_metrics, param_values, selection):
-            labels = []
-            values = []
-            stds = []
+            if accum >= limit:
+                if selected:
+                    other_explode = 0.1
 
-            for i in range(num_metrics):
-                labels.append(metrics.GetFieldText(i, self._CategoryField))
-                values.append(metrics.GetFieldValueFloat(i, self._ValueField))
-                stds.append(metrics.GetFieldValueFloat(i, self._StdField))
+            else:
+                value = row[1]
+                accum += value
 
-            if not param_values.get("show_std", True):
-                stds = None
-
-            x = np.arange(len(labels))
-            axes = figure.add_subplot(111)
-            axes.tick_params(labelsize = "small")
-            bars = axes.bar(x, values, yerr = stds)
-            axes.set_ylabel('Average (s)')
-            axes.set_xticks(x)
-            axes.set_xticklabels(labels, {"rotation": 75})
-
-            for event_no in selection:
-                bars[event_no].set_edgecolor("black")
-
-            figure.subplots_adjust(bottom=0.25)
-
-
-
-    ## PieChart ################################################
-
-    class PieChart(Chart):
-
-        #-------------------------------------------------------
-        c_OtherPcts = ["5%", "10%", "15%"]
-
-        def __init__(self, name, category_field, value_field):
-            super().__init__(name, want_selection = True)
-            self._CategoryField = category_field
-            self._ValueField = value_field
-
-
-        #-------------------------------------------------------
-        def DefineParameters(self, params, metrics, num_metrics, selection):
-            params.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
-
-
-        #-------------------------------------------------------
-        def Realise(self, figure, metrics, num_metrics, param_values, selection):
-            sum = 0
-            for i in range(num_metrics):
-                sum += metrics.GetFieldValueUnsigned(i, self._ValueField)
-
-            other = 0
-            param = param_values.get("other_pct", 0)
-            min = sum * 0.05 * (1 + param)
-            labels = []
-            values = []
-            explodes = []
-            other_explode = 0
-
-            for i in range(num_metrics):
-                selected = i in selection
-                value = metrics.GetFieldValueUnsigned(i, self._ValueField)
-
-                if value < min:
-                    other += value
-                    if selected:
-                        other_explode = 0.1
-
-                else:
-                    labels.append(metrics.GetFieldText(i, self._CategoryField))
-                    values.append(value)
+                labels.append(row[0])
+                values.append(value)
             
-                    explode = 0.0
-                    if selected:
-                        explode = 0.1
-                    explodes.append(explode)
+                explode = 0.0
+                if selected:
+                    explode = 0.1
+                explodes.append(explode)
             
-            labels.append("Other ({})".format(self.c_OtherPcts[param]))
+        other = sum - accum
+        if other > 0:            
+            labels.append("Other")
             values.append(other)
             explodes.append(other_explode)
 
-            cmap = cm.get_cmap('tab20c', len(values))
-            axes = figure.add_subplot(111)
-            axes.pie(values, labels = labels, autopct = '%1.1f%%', startangle = 90,
-                explode = explodes, colors = cmap.colors, shadow = True
-            )
+        cmap = cm.get_cmap('tab20c', len(values))
+        axes = figure.add_subplot(111)
+        axes.pie(values, labels = labels, autopct = '%1.1f%%', startangle = 90,
+            explode = explodes, colors = cmap.colors, shadow = True
+        )
 
-            figure.suptitle(self.Name, x = 0.02, y = 0.5,
-                horizontalalignment = 'left', verticalalignment = 'center'
-            )
-
-
-
-    ## HistogramChart ##########################################
-
-    class HistogramChart(Chart):
-
-        #-------------------------------------------------------
-        def __init__(self, name, category_field, value_field):
-            super().__init__(name)
-            self._CategoryField = category_field
-            self._ValueField = value_field
-            self._CachedCategoryLengths = None
+        figure.suptitle(name, x = 0.02, y = 0.5,
+            horizontalalignment = 'left', verticalalignment = 'center'
+        )
 
 
-        #-------------------------------------------------------
-        def _GetCategoryLengths(self, metrics, num_metrics, force = False):
-            if self._CachedCategoryLengths is not None and not force:
-                return self._CachedCategoryLengths
 
-            lengths = self._CachedCategoryLengths = collections.Counter()
-            for i in range(num_metrics):
-                category = metrics.GetFieldText(i, self._CategoryField)
-                lengths[category] += 1
+## HistogramChart ##############################################
 
-            return lengths
+class HistogramChart:
 
-
-        #-------------------------------------------------------
-        def DefineParameters(self, params, metrics, num_metrics, selection):
-            lengths = self._GetCategoryLengths(metrics, num_metrics)
-            for category in lengths.keys():
-                params.AddBool(category, category, True)
+    #-----------------------------------------------------------
+    def __init__(self, category_field, value_field):
+        self._CategoryField = category_field
+        self._ValueField = value_field
+        self._CachedCategoryLengths = None
 
 
-        #-------------------------------------------------------
-        def Realise(self, figure, metrics, num_metrics, param_values, selection):
-            lengths = self._GetCategoryLengths(metrics, num_metrics, True)
+    #-----------------------------------------------------------
+    def _GetCategoryLengths(self, metrics, num_metrics, force = False):
+        if self._CachedCategoryLengths is not None and not force:
+            return self._CachedCategoryLengths
 
-            data = dict()
-            for (category, length) in lengths.items():
-                if param_values.get(category, True):
-                    data[category] = [0, np.empty(length, dtype = np.uint32)]
+        lengths = self._CachedCategoryLengths = collections.Counter()
+        for i in range(num_metrics):
+            category = metrics.GetFieldText(i, self._CategoryField)
+            lengths[category] += 1
+
+        return lengths
+
+
+    #-----------------------------------------------------------
+    def DefineParameters(self, params, connection):
+        lengths = self._GetCategoryLengths(metrics, num_metrics)
+        for category in lengths.keys():
+            params.AddBool(category, category, True)
+
+
+    #-----------------------------------------------------------
+    def Realise(self, figure, connection, param_values, selection):
+        lengths = self._GetCategoryLengths(metrics, num_metrics, True)
+
+        data = dict()
+        for (category, length) in lengths.items():
+            if param_values.get(category, True):
+                data[category] = [0, np.empty(length, dtype = np.uint32)]
                 
-            for i in range(num_metrics):
-                category = metrics.GetFieldText(i, self._CategoryField)
-                entry = data.get(category, None)
-                if entry is not None:
-                    (idx, array) = entry
-                    array[idx] = metrics.GetFieldValueUnsigned(idx, self._ValueField)
-                    entry[0] += 1
+        for i in range(num_metrics):
+            category = metrics.GetFieldText(i, self._CategoryField)
+            entry = data.get(category, None)
+            if entry is not None:
+                (idx, array) = entry
+                array[idx] = metrics.GetFieldValueUnsigned(idx, self._ValueField)
+                entry[0] += 1
 
-            series = [a for (i, a) in data.values()]
-            axes = figure.add_subplot(111)
-            axes.hist(series, 20, histtype='bar', label = data.keys())
-            axes.legend()
-
-
-
-    ## CategoryTable ###########################################
-
-    class CategoryTable:
-
-        #-------------------------------------------------------
-        @staticmethod
-        def DefineSchema(schema):
-            schema.AddField("Category", "text", 150, "left")
-            schema.AddField("Count", "uint32", 80, "left")
-            schema.AddField("Duration (s)", "uint32", 80, "left")
-            schema.AddField("Average (s)", "float32", 80, "left")
-            schema.AddField("Stddev (s)", "float32", 80, "left")
-
-
-        #-------------------------------------------------------
-        def __init__(self):
-            self.Name = "Category"
-            self.Charts = [
-                EventMetrics.PieChart("Category by Count", 0, 1),
-                EventMetrics.PieChart("Category by Duration", 0, 2),
-                EventMetrics.BarChart("Durations", 0, 3, 4)
-            ]
-
-
-        #-------------------------------------------------------
-        # http://jonisalonen.com/2013/deriving-welfords-method-for-computing-variance/
-        # https://www.johndcook.com/blog/standard_deviation/
-        def Assemble(self, metrics, num_metrics, collector):
-            data = dict()
-            category_id = collector.GetFieldId("Event Summary")
-            value_id = collector.GetFieldId("Duration (s)")
-
-            for evt_no in range(num_metrics):
-                category = metrics.GetFieldText(evt_no, category_id)
-                value = metrics.GetFieldValueUnsigned(evt_no, value_id)
-
-                if category in data:
-                    (old_count, sum, old_M, old_S) = data[category]
-                    count = old_count + 1
-                    M = old_M + (value - old_M) / count
-                    S = old_S + (value - old_M) * (value - M)
-                    data[category]  = (count, sum + value, M, S)
-                else:
-                    data[category] = (1, value, value, 0)
-
-            for (category, values) in data.items():
-                (count, sum, mean, S) = data[category]
-                sigma = 0.0
-                if count > 1:
-                    sigma = sqrt(S / (count - 1))
-
-                values = [category, count, sum, round(mean, 2), round(sigma,2)]
-                collector.AddMetric(values)
+        series = [a for (i, a) in data.values()]
+        axes = figure.add_subplot(111)
+        axes.hist(series, 20, histtype='bar', label = data.keys())
+        axes.legend()
 
 
 
-    ## HistogramTable ##########################################
+## GeneralQuantifier ###########################################
 
-    class HistogramTable:
+def GeneralQuantifier(events_db_path, connection, cursor):
+    cursor.execute("ATTACH DATABASE '{db}' AS db".format(db = events_db_path))
 
-        #-------------------------------------------------------
-        @staticmethod
-        def DefineSchema(schema):
-            schema.AddField("Category", "text", 150, "left")
-            schema.AddField("Duration (s)", "uint32", 80, "left")
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
+    cursor.execute("""
+        CREATE TABLE projection
+        (
+            summary TEXT,
+            count INT,
+            sum INT,
+            average REAL
+        )""")
 
-
-        #-------------------------------------------------------
-        def __init__(self):
-            self.Name = "Histogram"
-            self.Charts = [
-                EventMetrics.HistogramChart("Histogram", 0, 1),
-            ]
-
-
-        #-------------------------------------------------------
-        def Assemble(self, metrics, num_metrics, collector):
-            category_id = collector.GetFieldId("Event Summary")
-            value_id = collector.GetFieldId("Duration (s)")
-
-            for evt_no in range(num_metrics):
-                category = metrics.GetFieldText(evt_no, category_id)
-                value = metrics.GetFieldValueUnsigned(evt_no, value_id)
-                collector.AddMetric([category, value])
-
+    cursor.execute("""
+        INSERT INTO projection
+        SELECT
+            summary,
+            count(duration_ns),
+            sum(duration_ns / 1000000000),
+            round(avg(duration_ns / 1000000000), 2)
+        FROM
+            db.filtered_projection
+        GROUP BY
+            summary
+        """)
 
 
-## GLOBAL ######################################################
+Quantify(
+    "General",
+    GeneralQuantifier,
 
-Analyse(Analyser())
-#Project("Summary", Projector(), EventMetrics())
-Project("Summary", Projector())
+    MakeDisplaySchema()
+        .AddField("Summary", "text", 150, "left")
+        .AddField("Count", "int", 80, "left")
+        .AddField("Duration (s)", "int", 80, "left")
+        .AddField("Average (s)", "real", 80, "left"),
 
+    [
+        ("Breakdown by Count", True, PieChart("summary", "count")),
+        ("Breakdown by Duration", True, PieChart("summary", "sum")),
+        ("Durations", True, BarChart("summary", "average"))
+    ]
+)
+
+
+
+## TimingQuantifier ############################################
+
+class TimingQuantifier:
+
+    #-----------------------------------------------------------
+    @staticmethod
+    def DefineSchema(schema):
+        schema.AddField("Category", "text", 150, "left")
+        schema.AddField("Duration (s)", "uint32", 80, "left")
+
+
+    #-----------------------------------------------------------
+    def __init__(self):
+        self.Name = "Histogram"
+        self.Charts = [
+            EventMetrics.HistogramChart("Histogram", 0, 1),
+        ]
+
+
+    #-----------------------------------------------------------
+    def Assemble(self, metrics, num_metrics, collector):
+        category_id = collector.GetFieldId("Event Summary")
+        value_id = collector.GetFieldId("Duration (s)")
+
+        for evt_no in range(num_metrics):
+            category = metrics.GetFieldText(evt_no, category_id)
+            value = metrics.GetFieldValueUnsigned(evt_no, value_id)
+            collector.AddMetric([category, value])

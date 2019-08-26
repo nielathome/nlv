@@ -39,7 +39,6 @@ from .Project import G_NodeFactory
 from .Project import G_Project
 from .Project import G_WindowInfo
 from .Shell import G_Shell
-from .StyleNode import G_AnnotationStyleNode
 from .Theme import G_ThemeGalleryNode
 from .Theme import GetThemeGallery
 
@@ -1057,146 +1056,6 @@ class G_GlobalThemeGalleryNode(G_SessionChildNode, G_ThemeGalleryNode, G_TabCont
 
 
 
-## G_AnnotationNode ########################################
-
-class G_AnnotationNode(G_TreeNode, G_AnnotationStyleNode):
-    """Interface to line annotations"""
-
-    #-------------------------------------------------------
-    def BuildPage(parent):
-        # class static function
-        me = __class__
-        me._Sizer = parent.GetSizer()
-        me._Page = parent
-
-        # the main part of the node consists of a single edit control in its own sizer
-        vsizer = wx.BoxSizer(wx.VERTICAL)
-        me._TxtAnnotation = wx.TextCtrl(me._Page.GetWindow(), style = wx.TE_MULTILINE)
-        vsizer.Add(me._TxtAnnotation, proportion = 1, flag = wx.EXPAND, border = G_Const.Sizer_StdBorder, userData = "AnnotationNode-annotation")
-
-        # add to parent sizer
-        me._Page.GetSizer().Add(vsizer, flag = wx.ALL | wx.EXPAND, border = G_Const.Sizer_StdBorder, proportion = 1, userData = "AnnotationNode-subsizer")
-
-        G_AnnotationStyleNode.BuildStyle(me, me._Page)
-
-
-    #-------------------------------------------------------
-    def __init__(self, factory, wproject, witem, name, **kwargs):
-        G_TreeNode.__init__(self, factory, wproject, witem)
-        G_AnnotationStyleNode.__init__(self)
-
-    def PostInitNode(self):
-        self._Field = D_Document(self.GetDocument(), self)
-        self.PostInitStyle()
-
-
-    #-------------------------------------------------------
-    def Activate(self):
-        self.SetNodeHelp("Annotation", "views.html", "annotation")
-
-        self.Rebind(self._TxtAnnotation, wx.EVT_TEXT, self.OnAnnotationText)
-        self.Rebind(self._TxtAnnotation, wx.EVT_KEY_DOWN, self.OnTextKeyDown)
-
-        view_node = self.GetActiveViewNode()
-        if view_node is not None:
-            view_node.SetLastChild(self)
-            self.UpdateAnnotation(view_node = view_node)
-            self.ActivateStyle()
-
-            self._TxtAnnotation.SetFocus()
-
-
-    #-------------------------------------------------------
-    def Annotate(self):
-        """Switch focus to this annotation node; allows annotation text to be edited"""
-
-        self.MakeActive()
-        self._TxtAnnotation.SetFocus()
-
-
-    #-------------------------------------------------------
-    def GetActiveViewNode(self):
-        return self.GetRootNode().GetActiveViewNode()
-
-
-    #-------------------------------------------------------
-    def UpdateAnnotation(self, line = None, view_node = None):
-        """The selection/caret has been moved in the logfile view, refresh the annotation text if needed"""
-        
-        if view_node is None:
-            view_node = self.GetActiveViewNode()
-
-        editor = view_node.GetEditor()
-        if line is None:
-            line = editor.LineFromPosition(editor.GetSelectionEnd())
-
-        annotation_text = editor.AnnotationGetText(line)
-        if annotation_text != self._TxtAnnotation.GetValue():
-            self._TxtAnnotation.ChangeValue(annotation_text)
-
-        if annotation_text != "":
-            style_no = editor.AnnotationGetStyle(line)
-            self.SetStyleByData(style_no)
-
-
-    #-------------------------------------------------------
-    def OnAnnotationText(self, event):
-        """The annotation has altered; flush the new text into the editor and refresh all views"""
-
-        view_node = self.GetActiveViewNode()
-        if view_node is not None:
-            editor = view_node.GetEditor()
-            line = editor.LineFromPosition(editor.GetSelectionEnd())
-
-            annotation_text = self._TxtAnnotation.GetValue()
-            editor.AnnotationSetText(line, annotation_text)
-            editor.AnnotationSetStyle(line, self.GetStyle())
-
-            view_node.GetLogNode().RefreshViews()
-
-
-    #-------------------------------------------------------
-    def OnDisplayKey(self, key_code, modifiers, view_node):
-        """A key has been pressed in a display control"""
-        if key_code != ord("A"):
-            return False
-
-        if modifiers ==  wx.MOD_CONTROL:
-            self.Annotate()
-        else:
-            view_node.GotoNextLine("annotation", modifiers = modifiers)
-
-        return True
-
-
-    #-------------------------------------------------------
-    def OnTextKeyDown(self, event):
-        """A key has been pressed in the annotation text control"""
-
-        handled = False
-        if event.GetKeyCode() == wx.WXK_ESCAPE:
-            view_node = self.GetActiveViewNode()
-            if view_node is not None:
-                view_node.GetEditor().SetFocus()
-                handled = True
-
-        if not handled:
-            event.Skip()
-
-
-    #-------------------------------------------------------
-    def OnStyle(self, refocus):
-        """The style has altered; update annotation and refresh all Scintilla controls"""
-
-        view_node = self.GetActiveViewNode()
-        if view_node is not None:
-            editor = view_node.GetEditor()
-            line = editor.LineFromPosition(editor.GetSelectionEnd())
-            editor.AnnotationSetStyle(line, self.GetStyle())
-            view_node.GetLogNode().RefreshViews()
-
-
-
 ## G_SessionNode ##########################################
 
 class G_SessionNode(G_TabContainerNode):
@@ -1218,6 +1077,7 @@ class G_SessionNode(G_TabContainerNode):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
         self._Field.Add(str(uuid4()), "Guid", replace_existing = False)
+        self._Field.Add(1, "EventId", replace_existing = False)
 
     def PostInitLoad(self):
         # control/restore window layout; this should be last, as the
@@ -1238,7 +1098,7 @@ class G_SessionNode(G_TabContainerNode):
             self._Field.Add("", "AuiNotebook", replace_existing = False)
             layout = self._Field.AuiNotebook.Value
             if len(layout) != 0:
-                self.GetNotebook().LoadPerspective(layout)
+                self.GetAuiNotebook().LoadPerspective(layout)
 
         except IndexError:
             logging.error("Unable to load AUI notebook perspective")
@@ -1260,6 +1120,14 @@ class G_SessionNode(G_TabContainerNode):
 
     def NewSessionGuid(self):
         self._Field.Guid.Value = str(uuid4())
+
+
+    #-------------------------------------------------------
+    def GetEventId(self):
+        return self._Field.EventId.Value
+
+    def UpdateEventId(self, event_id):
+        self._Field.EventId.Value = event_id
 
 
     #-------------------------------------------------------
@@ -1298,7 +1166,7 @@ class G_SessionNode(G_TabContainerNode):
 
         layout = ""
         if self._StoreNotebookPerspective:
-            layout = self.GetNotebook().SavePerspective()
+            layout = self.GetAuiNotebook().SavePerspective()
         self._Field.AuiNotebook.Value = layout
 
         self._Field.Project.Value = self.GetProject().SavePerspective()
@@ -1329,10 +1197,6 @@ G_Project.RegisterNodeFactory(
 
 G_Project.RegisterNodeFactory(
     G_NodeFactory(G_Project.NodeID_GlobalThemeGallery, G_Project.ArtCtrlId_Theme, G_GlobalThemeGalleryNode)
-)
-
-G_Project.RegisterNodeFactory(
-    G_NodeFactory(G_Project.NodeID_Annotation, G_Project.ArtDocID_Annotation, G_AnnotationNode)
 )
 
 G_Project.RegisterNodeFactory(
