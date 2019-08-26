@@ -14,10 +14,10 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
-import collections
-from matplotlib import cm
-import numpy as np
+
+import Nlv.Chart as ch
 import re
+
 
 
 ## Recognise ###################################################
@@ -168,206 +168,6 @@ Project(
 
 
 
-## BarChart ####################################################
-
-class BarChart:
-
-    #-----------------------------------------------------------
-    def __init__(self, category_field, value_field, std_field = None):
-        self._CategoryField = category_field
-        self._ValueField = value_field
-        self._StdField = std_field
-
-
-    #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
-        params.AddBool("show_std", "Show error bars", True)
-
-
-    #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
-        labels = []
-        values = []
-        stds = None
-
-        cursor.execute("""
-            SELECT
-                {category},
-                {value},
-                log_row_no
-            FROM
-                filtered_projection
-            """.format(category = self._CategoryField, value = self._ValueField))
-
-        hilites = []
-        for idx, row in enumerate(cursor):
-            labels.append(row[0])
-            values.append(row[1])
-            if row[2] in selection:
-                hilites.append(idx)
-#            stds.append(metrics.GetFieldValueFloat(i, self._StdField))
-
-        #if not param_values.get("show_std", True):
-        #    stds = None
-
-        x = np.arange(len(labels))
-        axes = figure.add_subplot(111)
-        axes.tick_params(labelsize = "small")
-        bars = axes.bar(x, values, yerr = stds)
-        axes.set_ylabel('Average (s)')
-        axes.set_xticks(x)
-        axes.set_xticklabels(labels, {"rotation": 75})
-
-        for col in hilites:
-            bars[col].set_edgecolor("black")
-
-        figure.subplots_adjust(bottom = 0.25)
-
-
-
-## PieChart ####################################################
-
-class PieChart:
-
-    #-----------------------------------------------------------
-    c_OtherPcts = ["5%", "10%", "15%"]
-
-    def __init__(self, category_field, value_field):
-        self._CategoryField = category_field
-        self._ValueField = value_field
-
-
-    #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
-        params.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
-
-
-    #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
-        cursor.execute("""
-            SELECT
-                count({value}),
-                sum({value})
-            FROM
-                filtered_projection
-            """.format(value = self._ValueField))
-
-        (count, sum) = cursor.fetchone()
-        if count == 0:
-            return
-
-        cursor.execute("""
-            SELECT
-                {category},
-                {value},
-                log_row_no
-            FROM
-                filtered_projection
-            ORDER BY
-                {value} DESC
-            """.format(category = self._CategoryField, value = self._ValueField))
-
-        param = param_values.get("other_pct", 0)
-        accum = 0
-        limit = sum * (1 - (0.05 * (1 + param)))
-
-        labels = []
-        values = []
-        explodes = []
-        other_explode = 0
-
-        for row in cursor:
-            selected = row[2] in selection
-
-            if accum >= limit:
-                if selected:
-                    other_explode = 0.1
-
-            else:
-                value = row[1]
-                accum += value
-
-                labels.append(row[0])
-                values.append(value)
-            
-                explode = 0.0
-                if selected:
-                    explode = 0.1
-                explodes.append(explode)
-            
-        other = sum - accum
-        if other > 0:            
-            labels.append("Other")
-            values.append(other)
-            explodes.append(other_explode)
-
-        cmap = cm.get_cmap('tab20c', len(values))
-        axes = figure.add_subplot(111)
-        axes.pie(values, labels = labels, autopct = '%1.1f%%', startangle = 90,
-            explode = explodes, colors = cmap.colors, shadow = True
-        )
-
-        figure.suptitle(name, x = 0.02, y = 0.5,
-            horizontalalignment = 'left', verticalalignment = 'center'
-        )
-
-
-
-## HistogramChart ##############################################
-
-class HistogramChart:
-
-    #-----------------------------------------------------------
-    def __init__(self, category_field, value_field):
-        self._CategoryField = category_field
-        self._ValueField = value_field
-        self._CachedCategoryLengths = None
-
-
-    #-----------------------------------------------------------
-    def _GetCategoryLengths(self, metrics, num_metrics, force = False):
-        if self._CachedCategoryLengths is not None and not force:
-            return self._CachedCategoryLengths
-
-        lengths = self._CachedCategoryLengths = collections.Counter()
-        for i in range(num_metrics):
-            category = metrics.GetFieldText(i, self._CategoryField)
-            lengths[category] += 1
-
-        return lengths
-
-
-    #-----------------------------------------------------------
-    def DefineParameters(self, params, connection):
-        lengths = self._GetCategoryLengths(metrics, num_metrics)
-        for category in lengths.keys():
-            params.AddBool(category, category, True)
-
-
-    #-----------------------------------------------------------
-    def Realise(self, figure, connection, param_values, selection):
-        lengths = self._GetCategoryLengths(metrics, num_metrics, True)
-
-        data = dict()
-        for (category, length) in lengths.items():
-            if param_values.get(category, True):
-                data[category] = [0, np.empty(length, dtype = np.uint32)]
-                
-        for i in range(num_metrics):
-            category = metrics.GetFieldText(i, self._CategoryField)
-            entry = data.get(category, None)
-            if entry is not None:
-                (idx, array) = entry
-                array[idx] = metrics.GetFieldValueUnsigned(idx, self._ValueField)
-                entry[0] += 1
-
-        series = [a for (i, a) in data.values()]
-        axes = figure.add_subplot(111)
-        axes.hist(series, 20, histtype='bar', label = data.keys())
-        axes.legend()
-
-
-
 ## GeneralQuantifier ###########################################
 
 def GeneralQuantifier(events_db_path, connection, cursor):
@@ -408,9 +208,9 @@ Quantify(
         .AddField("Average (s)", "real", 80, "left"),
 
     [
-        ("Breakdown by Count", True, PieChart("summary", "count")),
-        ("Breakdown by Duration", True, PieChart("summary", "sum")),
-        ("Durations", True, BarChart("summary", "average"))
+        ("Breakdown by Count", True, ch.PieChart("summary", "count")),
+        ("Breakdown by Duration", True, ch.PieChart("summary", "sum")),
+        ("Durations", True, ch.BarChart("summary", "average"))
     ]
 )
 
