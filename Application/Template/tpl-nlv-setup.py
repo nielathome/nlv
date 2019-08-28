@@ -63,8 +63,8 @@ def GetDir(var):
 
 if __name__ == '__main__':
 
-	#-----------------------------------------------------------------------
-	# Ensure all build dependencies are present
+    #-----------------------------------------------------------------------
+    # Ensure all build dependencies are present
 
     nlv_source = glob("../Log/Dll/Src/*cpp")
     nlv_source.extend(glob("../Log/Lib/Src/*cpp"))
@@ -73,14 +73,16 @@ if __name__ == '__main__':
     boost_dir = GetDir("BOOST")
     json_dir = GetDir("JSON")
     tbb_dir = GetDir("TBB")
+    sql_dir = GetDir("SQLITE")
+    sql_lib_dir = GetDir("SQLITE_LIB_DIR")
 
     wx_dir = phoenix_dir + "/ext/wxWidgets"
     boost_lib_dir = boost_dir + "/stage/x64/lib"
     boost_dll = glob(boost_lib_dir + "/*dll")
     tbb_dll = glob(tbb_dir + "/build/vs2013/x64/Release/*dll")
 
-	#-----------------------------------------------------------------------
-	# Define the extension
+    #-----------------------------------------------------------------------
+    # Define the extension
 
     nlog_extension = Extension(
         name = "Nlog",
@@ -93,7 +95,8 @@ if __name__ == '__main__':
             wx_dir + "/src/stc",
             boost_dir,
             json_dir + "/single_include",
-            tbb_dir + "/include"
+            tbb_dir + "/include",
+            sql_dir
         ],
     
         define_macros = [
@@ -106,8 +109,15 @@ if __name__ == '__main__':
 
         library_dirs = [
             boost_lib_dir,
-            tbb_dir + "/build/vs2013/x64/Release"
-        ]
+            tbb_dir + "/build/vs2013/x64/Release",
+            sql_lib_dir
+        ],
+
+        libraries = [
+            "sqlite3"
+        ],
+
+        extra_compile_args = ["/MD"]
     )
 
     setup(

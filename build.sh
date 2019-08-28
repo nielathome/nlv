@@ -368,6 +368,28 @@ fi
 
 
 ###############################################################################
+# SQLite Header
+###############################################################################
+
+sql_name="amalgamation-3140200"
+sql_file="sqlite-${sql_name}.zip"
+sql_url="https://www.sqlite.org/2016/${sql_file}"
+sql_path="$pkgdir/${sql_file}"
+sql_dir="$pkgdir/sqlite-${sql_name}"
+
+addenv SQLITE "${sql_dir}"
+
+if [ ! -d "$sql_dir" ]; then
+
+  getfile "$sql_url" "$sql_path"   
+
+  msg_line "Unpacking archive: $sql_file ..."
+  unzip -o -d "$pkgdir" "$sql_path"
+fi
+
+
+
+###############################################################################
 # Phoenix
 ###############################################################################
 
@@ -390,6 +412,10 @@ fi
 # NLV
 ###############################################################################
 
+# close the .props file now; its about to be used
+echo "  </PropertyGroup>" >> $envprops
+echo "</Project>" >> $envprops
+
 sqlite_lib=$wrkdir/sqlite3.lib
 
 if [ -n "$cfg_clean" ]; then
@@ -401,7 +427,8 @@ else
   fi
 fi
 
-  
+addenvvar SQLITE_LIB_DIR "$wrkdir"
+
 if [ -z "$cfg_clean" ]; then
   msg_header "Building NLV Release"
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/nlv.build.log"
@@ -435,9 +462,6 @@ fi
 ###############################################################################
 # Finish
 ###############################################################################
-
-echo "  </PropertyGroup>" >> $envprops
-echo "</Project>" >> $envprops
 
 # as a convenience, customise the Visual Studio Python project file to allow
 # debugging to work

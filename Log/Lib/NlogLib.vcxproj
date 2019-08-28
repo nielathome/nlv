@@ -58,7 +58,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;$(SQLITE)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -73,7 +73,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;..\..</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;$(SQLITE)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -82,7 +82,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\Deps\sqlite3.h" />
     <ClInclude Include="Hdr\Cache.h" />
     <ClInclude Include="Hdr\Field.h" />
     <ClInclude Include="Hdr\FileMap.h" />

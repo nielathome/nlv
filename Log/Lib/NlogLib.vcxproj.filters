@@ -53,9 +53,6 @@
     <ClInclude Include="Src\MapLogIndexWriter.h">
       <Filter>Header Files\Private</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\Deps\sqlite3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Hdr\Nline.h">
       <Filter>Header Files\Public</Filter>
     </ClInclude>
