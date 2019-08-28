@@ -6,7 +6,7 @@
     <ProjectGuid>5272b2ab-2437-43f5-a93c-c1190a6dfbf0</ProjectGuid>
     <ProjectHome>.</ProjectHome>
     <StartupFile>Main.py</StartupFile>
-    <WorkingDirectory>..\..\_Test</WorkingDirectory>
+    <WorkingDirectory>__TESTDIR__</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>Nlv</Name>
     <RootNamespace>Nlv</RootNamespace>

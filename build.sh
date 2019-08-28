@@ -252,8 +252,11 @@ echo "SET NUGET=`cygpath -w $nuget`" >> $envbat
 
 python=`which -a python | fgrep 36`
 checkf "$python" "Unable to locate Python 36"
+python_dir=`dirname $python`
+
 addenvvar PYTHON "$python"
-addenvprops PYTHON "`dirname $python`"
+addenvprops PYTHON "$python_dir"
+echo -n ";`cygpath -w $python_dir/DLLs`" >> $pathvar 
 
 cyg_vs2015env='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat'
 checkf "$cyg_vs2015env" "Unable to locate VisualStudio 2015"
@@ -477,8 +480,10 @@ if [ -n "$cfg_clean" ]; then
   rm $projfile
   
 elif [ ! -f "$projfile" ]; then 
+  wtestdir=`cygpath -a -m "$testdir"`
   subst=`cat $pathvar | sed -e 's|\\\\|\\\\\\\\|'g`
-  sed -e "s/__ENVIRONMENT__/PATH=$subst/" < $tplfile > $projfile 
+  sed -e "s@__ENVIRONMENT__@PATH=$subst@" < $tplfile \
+    | sed -e "s@__TESTDIR__@$wtestdir@" > $projfile 
 
 fi
 
