@@ -220,6 +220,8 @@ function runbat()
 {
   path=$1
   `cygpath -u $COMSPEC` /C `cygpath -w $path`
+
+  cd $blddir
 }
 
 
@@ -336,7 +338,18 @@ if [ ! -d "$tbb_dir" ]; then
 
   msg_line "Unpacking archive: $tbb_file ..."
   tar xfz $tbb_path -C $pkgdir
-  
+ 
+  # switch the toolchain in the Vs2013 (120) projects to Vs2015 (140)
+  for f in $tbb_dir/build/Vs2013/*vcxproj
+  do
+    sed \
+      -e 's/ToolsVersion="12.0"/ToolsVersion="14.0"/' \
+      -e 's/<PlatformToolset>v120/<PlatformToolset>v140/' \
+      < $f >t
+    
+    mv t $f 
+  done
+ 
 fi
 
 addenv TBB "${tbb_dir}"
