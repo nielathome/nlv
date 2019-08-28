@@ -144,7 +144,12 @@ wrkdir="$blddir/_Work"
 pkgdir="$blddir/Deps/Packages"
 instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
-mkdir -p "$logdir" "$pkgdir" "$instdir" 
+testdir="$wrkdir/Test"
+mkdir -p "$logdir" "$pkgdir" "$instdir" "$testdir"
+
+# initialise installer directory
+cp Scripts/install.bat "$instdir"
+echo "set VER=${ver}" > "$instdir/iver.bat" 
 
 # initialise debug time DLL path
 pathvar=$wrkdir/path.txt
