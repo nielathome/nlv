@@ -42,12 +42,14 @@ public:
 	};
 
 private:
-	// stored lists (of all) event callbacks
+	// stored lists (of all) event callbacks; must be simple list,
+    // as the linker does not guarantee the initialisation order of
+    // static variables, whereas zero'd values will be set beforehand
 	static constexpr size_t c_NumEvents{ static_cast<size_t>(EventType::_NumTypes) };
-	using EventList = std::list<OnEvent*>;
-	static EventList m_EventHandlers[ c_NumEvents ];
+	static OnEvent * m_EventHandlers[ c_NumEvents ];
+    OnEvent * m_Next{ nullptr };
 
-	static EventList & GetEventList( EventType type ) {
+	static OnEvent * & GetEventList( EventType type ) {
 		return m_EventHandlers[ static_cast<size_t>(type) ];
 	};
 
