@@ -362,6 +362,7 @@ fi
 
 addenv TBB "${tbb_dir}"
 echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Debug`" >> $pathvar 
+echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Release`" >> $pathvar 
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning TBB ${tbb_name}"
