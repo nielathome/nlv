@@ -117,7 +117,15 @@ if __name__ == '__main__':
             "sqlite3"
         ],
 
-        extra_compile_args = ["/MD"]
+        extra_compile_args = [
+            "/MD", # should not be needed ... used to override /MT added by Python
+            "/Zi"  # debug symbols are useful, even for release builds
+        ],
+
+        extra_link_args = [
+            "/DEBUG", # ensure debug symbols available to a debugger
+            "/OPT:REF,ICF" # fix up mess created by /DEBUG
+        ]
     )
 
     setup(

@@ -19,6 +19,16 @@ rem
 call _Work\env.bat
 set HOME=%CD%
 
+rem
+rem For the time being ... force Vs2015, as different Python environments
+rem choose different compilers. Should be able to drop this on switching
+rem to all Vs2015 build chain
+rem
+SET DISTUTILS_USE_SDK=1
+SET MSSdk=1
+call "%VS2015ENV%" x64
+
+
 rem Build NLV within the defined Python build virtual environment
 call %PYENVBLD%\Scripts\Activate.bat
 
