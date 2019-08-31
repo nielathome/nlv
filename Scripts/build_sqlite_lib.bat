@@ -17,7 +17,6 @@ rem along with this program. If not, see <https://www.gnu.org/licenses/>.
 rem
 
 call _Work\env.bat
-set HOME=%CD%
 
 call "%VS2015ENV%" x64
 
@@ -30,9 +29,9 @@ rem
 rem Taken from https://stackoverflow.com/questions/9946322/how-to-generate-an-import-library-lib-file-from-a-dll
 rem
 
-dumpbin /exports %PYTHON%\..\DLLs\sqlite3.dll > _Work\Bld\exports.txt
-echo LIBRARY SQLITE3 > _Work\Bld\sqlite3.def
-echo EXPORTS >> _Work\Bld\sqlite3.def
-for /f "skip=19 tokens=4" %%A in (_Work\Bld\exports.txt) do echo %%A >> _Work\Bld\sqlite3.def
+dumpbin /exports %PYTHON%\..\DLLs\sqlite3.dll > %ROOT_DIR%\_Work\Bld\exports.txt
+echo LIBRARY SQLITE3 > %ROOT_DIR%\_Work\Bld\sqlite3.def
+echo EXPORTS >> %ROOT_DIR%\_Work\Bld\sqlite3.def
+for /f "skip=19 tokens=4" %%A in (%ROOT_DIR%\_Work\Bld\exports.txt) do echo %%A >> %ROOT_DIR%\_Work\Bld\sqlite3.def
 
-lib /nologo /def:_Work\Bld\sqlite3.def /out:_Work\sqlite3.lib /machine:x64
+lib /nologo /def:%ROOT_DIR%\_Work\Bld\sqlite3.def /out:%ROOT_DIR%\_Work\sqlite3.lib /machine:x64

@@ -66,8 +66,9 @@ if __name__ == '__main__':
     #-----------------------------------------------------------------------
     # Ensure all build dependencies are present
 
-    nlv_source = glob("../Log/Dll/Src/*cpp")
-    nlv_source.extend(glob("../Log/Lib/Src/*cpp"))
+    root_dir = GetDir("ROOT_DIR")
+    nlv_source = glob(root_dir + "/Log/Dll/Src/*cpp")
+    nlv_source.extend(glob(root_dir + "/Log/Lib/Src/*cpp"))
     
     phoenix_dir = GetDir("PHOENIX")
     boost_dir = GetDir("BOOST")
@@ -90,8 +91,8 @@ if __name__ == '__main__':
         sources = nlv_source,
     
         include_dirs = [
-            "../Log/Dll/Hdr",
-            "../Log/Lib/Hdr",
+            root_dir + "/Log/Dll/Hdr",
+            root_dir + "/Log/Lib/Hdr",
             wx_dir + "/src/stc",
             boost_dir,
             json_dir + "/single_include",

@@ -17,7 +17,6 @@ rem along with this program. If not, see <https://www.gnu.org/licenses/>.
 rem
 
 call _Work\env.bat
-set HOME=%CD%
 
 rem
 rem For the time being ... force Vs2015, as different Python environments
@@ -38,18 +37,20 @@ echo.
 echo ==== Sphinx
 
 rem Build the documentation
-cd Sphinx
+cd %ROOT_DIR%\Sphinx
 call make html
-cd %HOME%
 
 
 
 echo.
 echo ==== NLV
 
-set PYBLD=%HOME%\_Work\Bld\Python\
+set PYBLD=%ROOT_DIR%\_Work\Bld\Python\
 set PYNLV=%PYBLD%\Nlv
-cd %HOME%\Application
+
+rem Setup staging area for build; contains NLV *and* built documentation
+xcopy /q /y %ROOT_DIR%\Application\Nlv\*.* %ROOT_DIR%\_Work\Stage\Nlv >NUL
+cd %ROOT_DIR%\_Work\Stage
 
 rem Build the distributable wheel
 python nlv-setup.py %PIP_ARGS% ^
@@ -58,7 +59,7 @@ python nlv-setup.py %PIP_ARGS% ^
   bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
 
 rem Copy the program icon(s) to the install directory
-xcopy /q /y nlv\*.ico %INSTDIR% >NUL
+xcopy /q /y Nlv\*.ico %INSTDIR% >NUL
 
 
 
@@ -66,7 +67,7 @@ echo.
 echo ==== MythTV
 
 set PYMYTHTV=%PYBLD%\MythTV
-cd %HOME%\Plugin
+cd %ROOT_DIR%\Plugin
 
 rem Build the distributable wheel
 python nlv.mythtv-setup.py %PIP_ARGS% ^

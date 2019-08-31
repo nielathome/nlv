@@ -17,6 +17,7 @@ rem along with this program. If not, see <https://www.gnu.org/licenses/>.
 rem
 
 call _Work\env.bat
+
 call "%VS2015ENV%" x64
 
 echo.

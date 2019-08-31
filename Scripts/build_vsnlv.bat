@@ -17,7 +17,6 @@ rem along with this program. If not, see <https://www.gnu.org/licenses/>.
 rem
 
 call _Work\env.bat
-set HOME=%CD%
 
 call "%VS2017ENV%"
 
@@ -36,7 +35,7 @@ if not exist %NUGET% (
   goto FINISH 
 )
 
-cd %HOME%\Extension\NlvVsExtension
+cd %ROOT_DIR%\Extension\NlvVsExtension
 
 %NUGET% restore packages.config
 

@@ -131,10 +131,6 @@ counter=ver.txt
 ver=`cat $counter`
 echo -n $(($ver + 1)) > $counter
 
-# create the Python setup files
-sed -e "s/__VER__/$ver/" < Application/Template/tpl-nlv-setup.py > Application/nlv-setup.py
-sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py 
-
 # make the application version available to the Python code
 sed -e "s/__DEV__/$ver/" < Application/Template/tpl-Version.py > Application/Nlv/Version.py
 
@@ -144,8 +140,9 @@ wrkdir="$blddir/_Work"
 pkgdir="$blddir/Deps/Packages"
 instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
+stagedir="$wrkdir/Stage"
 testdir="$wrkdir/Test"
-mkdir -p "$logdir" "$pkgdir" "$instdir" "$testdir"
+mkdir -p "$logdir" "$pkgdir" "$instdir" "$testdir" "$stagedir"
 
 # initialise installer directory
 cp Scripts/install.bat "$instdir"
@@ -162,6 +159,7 @@ echo "SET B2_ARGS=$b2_args" >> $envbat
 echo "SET MSBUILD_ARGS=$msbuild_args" >> $envbat
 echo "SET MSBUILD_TARGET=$msbuild_target" >> $envbat
 echo "SET PIP_ARGS=$pip_args" >> $envbat
+addenvvar ROOT_DIR "."
 addenvvar CYGWIN_BASE "/"
 addenvvar INSTDIR "$instdir"
 
@@ -421,9 +419,9 @@ fi
 # NLV
 ###############################################################################
 
-# close the .props file now; its about to be used
-echo "  </PropertyGroup>" >> $envprops
-echo "</Project>" >> $envprops
+# create the Python setup files
+sed -e "s/__VER__/$ver/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
+sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py
 
 sqlite_lib=$wrkdir/sqlite3.lib
 
@@ -471,6 +469,10 @@ fi
 ###############################################################################
 # Finish
 ###############################################################################
+
+# close the .props file now
+echo "  </PropertyGroup>" >> $envprops
+echo "</Project>" >> $envprops
 
 # as a convenience, customise the Visual Studio Python project file to allow
 # debugging to work
