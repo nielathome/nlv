@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,6 +19,12 @@
 import argparse
 from pathlib import Path
 import sys
+
+# the only *reliable* way for Nlog to find and link against the sqlite3.dll
+# is to import the Python module first; in particular, this works around the fact
+# that the DLL path varies depending on whether NLV is running from a venv or not
+import sqlite3
+ 
 
 # wxWidgets imports
 import wx

@@ -254,7 +254,6 @@ python_dir=`dirname $python`
 
 addenvvar PYTHON "$python"
 addenvprops PYTHON "$python_dir"
-echo -n ";`cygpath -w $python_dir/DLLs`" >> $pathvar 
 
 cyg_vs2015env='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat'
 checkf "$cyg_vs2015env" "Unable to locate VisualStudio 2015"
