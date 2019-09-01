@@ -162,9 +162,13 @@ if __name__ == '__main__':
         ],
 
         entry_points={
+            'console_scripts': [
+                'nlvc=Nlv.Main:main'
+            ],
             'gui_scripts': [
-                'nlv=Nlv.Main:main',
+                'nlvw=Nlv.Main:main'
             ]
+            
         },
         
         ext_modules = [ nlog_extension ],

@@ -58,7 +58,7 @@ for %%f in (plugin-*.bat) do (
 )
  
 rem Shell integration
-nlv -i
+nlvc -i
  
  
 echo.
