@@ -26,15 +26,15 @@ if not "%VIRTUAL_ENV%"=="" goto :INSTALL
 call .\iver.bat
 set ENVDIR=%1
 if "%1"=="" (
-  set ENVDIR=PyNlv.%VER%
+  set ENVDIR=C:\Nlv\%VER%
 )
 
 echo ===============================================================================
-echo Using %ENVDIR% as the Python virtual environment for NLV
+echo Installing NLV to %ENVDIR%
 
 if not exist %ENVDIR% (
   echo ===============================================================================
-  echo Unable to locate Python virtual environment directory %ENVDIR% ... creating
+  echo Unable to locate Python virtual environment ... creating
   python -m venv %ENVDIR%
 )
 
