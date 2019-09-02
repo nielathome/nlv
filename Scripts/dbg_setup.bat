@@ -23,7 +23,6 @@ rem up the debug versions of the supporting DLLs.
 rem
 
 call _Work\env.bat
-set HOME=%CD%
 set SITEDIR=%PYENVDBG%\Lib\site-packages
 
 
@@ -52,8 +51,8 @@ set NLV_PTH=%SITEDIR%\nlv.pth
 set NLV_EGG_LINK=%SITEDIR%\nlv.egg-link
 set NLOG_EGG_LINK=%SITEDIR%\nlog.egg-link
 
-set NLV_DIR=%HOME%\Application
-set NLOG_DIR=%HOME%\_Work\Bld\NlogDll\Bin\Debug
+set NLV_DIR=%ROOT_DIR%\Application
+set NLOG_DIR=%ROOT_DIR%\_Work\Bld\NlogDll\Bin
 
 rem sys.path extension
 echo # NLV developer paths > %NLV_PTH%
@@ -73,7 +72,7 @@ echo . >> %NLOG_EGG_LINK%
 echo.
 echo ==== Add MythTV to debug environment
 
-set MYTHTV_DIR=%HOME%\Plugin
+set MYTHTV_DIR=%ROOT_DIR%\Plugin
 set MYTHTV_EGG_LINK=%SITEDIR%\NlvMythTV.egg-link
 
 rem sys.path extension

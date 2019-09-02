@@ -131,10 +131,6 @@ counter=ver.txt
 ver=`cat $counter`
 echo -n $(($ver + 1)) > $counter
 
-# create the Python setup files
-sed -e "s/__VER__/$ver/" < Application/Template/tpl-nlv-setup.py > Application/nlv-setup.py
-sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py 
-
 # make the application version available to the Python code
 sed -e "s/__DEV__/$ver/" < Application/Template/tpl-Version.py > Application/Nlv/Version.py
 
@@ -144,7 +140,13 @@ wrkdir="$blddir/_Work"
 pkgdir="$blddir/Deps/Packages"
 instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
-mkdir -p "$logdir" "$pkgdir" "$instdir" 
+stagedir="$wrkdir/Stage"
+testdir="$wrkdir/Test"
+mkdir -p "$logdir" "$pkgdir" "$instdir" "$testdir" "$stagedir"
+
+# initialise installer directory
+cp Scripts/install.bat "$instdir"
+echo "set VER=${ver}" > "$instdir/iver.bat" 
 
 # initialise debug time DLL path
 pathvar=$wrkdir/path.txt
@@ -157,6 +159,7 @@ echo "SET B2_ARGS=$b2_args" >> $envbat
 echo "SET MSBUILD_ARGS=$msbuild_args" >> $envbat
 echo "SET MSBUILD_TARGET=$msbuild_target" >> $envbat
 echo "SET PIP_ARGS=$pip_args" >> $envbat
+addenvvar ROOT_DIR "."
 addenvvar CYGWIN_BASE "/"
 addenvvar INSTDIR "$instdir"
 
@@ -220,6 +223,8 @@ function runbat()
 {
   path=$1
   `cygpath -u $COMSPEC` /C `cygpath -w $path`
+
+  cd $blddir
 }
 
 
@@ -245,8 +250,10 @@ echo "SET NUGET=`cygpath -w $nuget`" >> $envbat
 
 python=`which -a python | fgrep 36`
 checkf "$python" "Unable to locate Python 36"
+python_dir=`dirname $python`
+
 addenvvar PYTHON "$python"
-addenvprops PYTHON "`dirname $python`"
+addenvprops PYTHON "$python_dir"
 
 cyg_vs2015env='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat'
 checkf "$cyg_vs2015env" "Unable to locate VisualStudio 2015"
@@ -336,11 +343,23 @@ if [ ! -d "$tbb_dir" ]; then
 
   msg_line "Unpacking archive: $tbb_file ..."
   tar xfz $tbb_path -C $pkgdir
-  
+ 
+  # switch the toolchain in the Vs2013 (120) projects to Vs2015 (140)
+  for f in $tbb_dir/build/Vs2013/*vcxproj
+  do
+    sed \
+      -e 's/ToolsVersion="12.0"/ToolsVersion="14.0"/' \
+      -e 's/<PlatformToolset>v120/<PlatformToolset>v140/' \
+      < $f >t
+    
+    mv t $f 
+  done
+ 
 fi
 
 addenv TBB "${tbb_dir}"
 echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Debug`" >> $pathvar 
+echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Release`" >> $pathvar 
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning TBB ${tbb_name}"
@@ -350,6 +369,28 @@ if [ -n "$cfg_clean" ]; then
 elif [ ! -f "$tbb_build" ]; then
   msg_header "Building TBB ${tbb_name}"
   time runbat Scripts/build_tbb.bat 2>&1 | tee "${tbb_build}"
+fi
+
+
+
+###############################################################################
+# SQLite Header
+###############################################################################
+
+sql_name="amalgamation-3140200"
+sql_file="sqlite-${sql_name}.zip"
+sql_url="https://www.sqlite.org/2016/${sql_file}"
+sql_path="$pkgdir/${sql_file}"
+sql_dir="$pkgdir/sqlite-${sql_name}"
+
+addenv SQLITE "${sql_dir}"
+
+if [ ! -d "$sql_dir" ]; then
+
+  getfile "$sql_url" "$sql_path"   
+
+  msg_line "Unpacking archive: $sql_file ..."
+  unzip -o -d "$pkgdir" "$sql_path"
 fi
 
 
@@ -377,6 +418,10 @@ fi
 # NLV
 ###############################################################################
 
+# create the Python setup files
+sed -e "s/__VER__/$ver/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
+sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py
+
 sqlite_lib=$wrkdir/sqlite3.lib
 
 if [ -n "$cfg_clean" ]; then
@@ -388,7 +433,8 @@ else
   fi
 fi
 
-  
+addenvvar SQLITE_LIB_DIR "$wrkdir"
+
 if [ -z "$cfg_clean" ]; then
   msg_header "Building NLV Release"
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/nlv.build.log"
@@ -423,6 +469,7 @@ fi
 # Finish
 ###############################################################################
 
+# close the .props file now
 echo "  </PropertyGroup>" >> $envprops
 echo "</Project>" >> $envprops
 
@@ -435,8 +482,10 @@ if [ -n "$cfg_clean" ]; then
   rm $projfile
   
 elif [ ! -f "$projfile" ]; then 
+  wtestdir=`cygpath -a -m "$testdir"`
   subst=`cat $pathvar | sed -e 's|\\\\|\\\\\\\\|'g`
-  sed -e "s/__ENVIRONMENT__/PATH=$subst/" < $tplfile > $projfile 
+  sed -e "s@__ENVIRONMENT__@PATH=$subst@" < $tplfile \
+    | sed -e "s@__TESTDIR__@$wtestdir@" > $projfile 
 
 fi
 

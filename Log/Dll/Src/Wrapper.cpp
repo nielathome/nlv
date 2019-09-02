@@ -286,11 +286,11 @@ void SetGlobalTracker( unsigned tracker_idx, const NTimecode & timecode )
 
 namespace boost
 {
-	template <> NHiliter const volatile * get_pointer( NHiliter const volatile *n ) { return n; }
-	template <> NSelector const volatile * get_pointer( NSelector const volatile *n ) { return n; }
-	template <> NView const volatile * get_pointer( NView const volatile *n ) { return n; }
-	template <> NLineSet const volatile * get_pointer( NLineSet const volatile *n ) { return n; }
 	template <> NLogfile const volatile * get_pointer( NLogfile const volatile *n ) { return n; }
+	template <> NLogView const volatile * get_pointer( NLogView const volatile *n ) { return n; }
+	template <> NEventView const volatile * get_pointer( NEventView const volatile *n ) { return n; }
+	template <> NLineSet const volatile * get_pointer( NLineSet const volatile *n ) { return n; }
+	template <> NHiliter const volatile * get_pointer( NHiliter const volatile *n ) { return n; }
 }
 #endif
 

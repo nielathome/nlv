@@ -99,7 +99,7 @@ class G_Shell:
 
 
     def GetScriptPath(self):
-        return self.GetPackageDir().parent.parent.parent / "Scripts" / "nlv.exe"
+        return self.GetPackageDir().parent.parent.parent / "Scripts" / "nlvw.exe"
 
 
     #-------------------------------------------------------

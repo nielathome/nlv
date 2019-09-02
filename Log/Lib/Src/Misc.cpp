@@ -30,12 +30,12 @@
 // initialisation and shutdown handlers are run when Python calls Setup()
 
 // event handlers
-OnEvent::EventList OnEvent::m_EventHandlers[ c_NumEvents ];
+OnEvent * OnEvent::m_EventHandlers[ c_NumEvents ];
 
 
 void OnEvent::RunEvents( EventType type )
 {
-	for( OnEvent * handler : GetEventList( type ) )
+	for( OnEvent * handler = GetEventList( type ); handler != nullptr; handler = handler->m_Next )
 		(handler->m_Function)();
 }
 
@@ -43,7 +43,9 @@ void OnEvent::RunEvents( EventType type )
 OnEvent::OnEvent( EventType type, function_t func )
 	: m_Function{ func }
 {
-	GetEventList( type ).push_back( this );
+    OnEvent * & head{ GetEventList(type) };
+    m_Next = head;
+    head = this;
 }
 
 

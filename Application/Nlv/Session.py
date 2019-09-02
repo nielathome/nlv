@@ -143,6 +143,10 @@ class G_SessionManager:
         return G_Global.MakeCacheDir(self._CurrentPath, guid)
 
     def CheckGuidCollision(self):
+        # no session implies no collision
+        if not self.IsValid():
+            return
+
         # no sentinel file implies no collision; claim
         # Guid for this document and finish
         sentinel_filename = "sentinel.txt"

@@ -23,7 +23,7 @@
 #include "Nmisc.h"
 
 // C includes
-#include "Deps/sqlite3.h"
+#include "sqlite3.h"
 
 // C++ includes
 #include <sstream>

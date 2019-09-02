@@ -49,7 +49,8 @@ python build.py -j 4 build
 
 echo.
 echo ==== wxPython - package
-python build.py bdist_wheel > wxbld.log
+rem Can't see how to stop verbose printout; so always capture to log file
+python build.py bdist_wheel > %ROOT_DIR%\_Work\Logs\phoenix.package.log
 
 rem Copy installer to install directory
 xcopy /q /y dist\*.* %INSTDIR% >NUL

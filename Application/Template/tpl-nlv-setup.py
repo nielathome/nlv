@@ -63,24 +63,27 @@ def GetDir(var):
 
 if __name__ == '__main__':
 
-	#-----------------------------------------------------------------------
-	# Ensure all build dependencies are present
+    #-----------------------------------------------------------------------
+    # Ensure all build dependencies are present
 
-    nlv_source = glob("../Log/Dll/Src/*cpp")
-    nlv_source.extend(glob("../Log/Lib/Src/*cpp"))
+    root_dir = GetDir("ROOT_DIR")
+    nlv_source = glob(root_dir + "/Log/Dll/Src/*cpp")
+    nlv_source.extend(glob(root_dir + "/Log/Lib/Src/*cpp"))
     
     phoenix_dir = GetDir("PHOENIX")
     boost_dir = GetDir("BOOST")
     json_dir = GetDir("JSON")
     tbb_dir = GetDir("TBB")
+    sql_dir = GetDir("SQLITE")
+    sql_lib_dir = GetDir("SQLITE_LIB_DIR")
 
     wx_dir = phoenix_dir + "/ext/wxWidgets"
     boost_lib_dir = boost_dir + "/stage/x64/lib"
     boost_dll = glob(boost_lib_dir + "/*dll")
     tbb_dll = glob(tbb_dir + "/build/vs2013/x64/Release/*dll")
 
-	#-----------------------------------------------------------------------
-	# Define the extension
+    #-----------------------------------------------------------------------
+    # Define the extension
 
     nlog_extension = Extension(
         name = "Nlog",
@@ -88,12 +91,13 @@ if __name__ == '__main__':
         sources = nlv_source,
     
         include_dirs = [
-            "../Log/Dll/Hdr",
-            "../Log/Lib/Hdr",
+            root_dir + "/Log/Dll/Hdr",
+            root_dir + "/Log/Lib/Hdr",
             wx_dir + "/src/stc",
             boost_dir,
             json_dir + "/single_include",
-            tbb_dir + "/include"
+            tbb_dir + "/include",
+            sql_dir
         ],
     
         define_macros = [
@@ -106,7 +110,22 @@ if __name__ == '__main__':
 
         library_dirs = [
             boost_lib_dir,
-            tbb_dir + "/build/vs2013/x64/Release"
+            tbb_dir + "/build/vs2013/x64/Release",
+            sql_lib_dir
+        ],
+
+        libraries = [
+            "sqlite3"
+        ],
+
+        extra_compile_args = [
+            "/MD", # should not be needed ... used to override /MT added by Python
+            "/Zi"  # debug symbols are useful, even for release builds
+        ],
+
+        extra_link_args = [
+            "/DEBUG", # ensure debug symbols available to a debugger
+            "/OPT:REF,ICF" # fix up mess created by /DEBUG
         ]
     )
 
@@ -143,9 +162,13 @@ if __name__ == '__main__':
         ],
 
         entry_points={
+            'console_scripts': [
+                'nlvc=Nlv.Main:main'
+            ],
             'gui_scripts': [
-                'nlv=Nlv.Main:main',
+                'nlvw=Nlv.Main:main'
             ]
+            
         },
         
         ext_modules = [ nlog_extension ],
