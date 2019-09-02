@@ -29,7 +29,7 @@ if not exist b2.exe (
 )
 
 set OPT=%B2_ARGS% -j 4 --stagedir=./stage/x64 address-model=64 --build-dir=bld threading=multi runtime-link=shared --with-python
-.\b2 %OPT% variant=release link=shared
+.\b2 %OPT% variant=release link=shared debug-symbols=on
 
 echo.
 echo ==== BOOST Debug %BOOST%
