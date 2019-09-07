@@ -280,7 +280,7 @@ class G_LogSchema(G_FieldSchemata):
     def GetUserDescription(self):
         """Fetch a human readable description of the log Schema"""
         desc = self._Desc + ". Field names and types are:\n"
-        for field in self._FieldSchemata:
+        for field in self:
             fld = ". " + field.Name + " (" + field.Type + ")\n"
             desc = desc + fld
         return desc
