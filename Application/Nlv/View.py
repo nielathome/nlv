@@ -15,6 +15,9 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
+# Python imports
+from math import log10
+
 # wxWidgets imports
 import wx
 import wx.stc
@@ -647,6 +650,61 @@ class G_ViewTrackingNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
 
 
 
+## G_ViewOptionsNode ########################################
+
+class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
+    """Define the view's general display"""
+
+    #-------------------------------------------------------
+    def BuildPage(parent):
+        # class static function
+        me = __class__
+        me._Sizer = parent.GetSizer()
+
+        window = parent.GetWindow()
+        me._CheckBoxes = []
+
+        # check: show line numbers
+        me._ShowLineNumbers = wx.CheckBox(window)
+        me.BuildLabelledRow(parent, "Show line numbers in margin", me._ShowLineNumbers)
+
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_TabContainedNode.__init__(self, factory, wproject, witem)
+        G_ThemeNode.__init__(self, G_ThemeNode.DomainView)
+
+    def PostInitNode(self):
+        self._Field = D_Document(self.GetDocument(), self)
+        self.UpdateLineNumbers()
+
+
+    #-------------------------------------------------------
+    def Activate(self):
+        self.ActivateCommon()
+
+        self._ShowLineNumbers.Unbind(wx.EVT_CHECKBOX)
+        self._ShowLineNumbers.SetValue(self._Field.ShowLineNumbers.Value)
+        self._ShowLineNumbers.Bind(wx.EVT_CHECKBOX, self.OnShowLineNumbers)
+
+#        self.SetNodeHelp("View Tracking", "views.html", "viewtracking")
+
+
+    #-------------------------------------------------------
+    def UpdateLineNumbers(self):
+        show = self._Field.ShowLineNumbers.Value
+        self.GetViewNode().UpdateLineNumbers(show)
+
+
+    #-------------------------------------------------------
+    def OnShowLineNumbers(self, event):
+        show = self._ShowLineNumbers.GetValue()
+        self._Field.ShowLineNumbers.Value = show
+        self.UpdateLineNumbers()
+        self.SendFocusToDisplayCtrl()
+
+
+
 ## G_ViewGlobalThemeOverrideNode ###########################
 
 class G_ViewGlobalThemeOverrideNode(G_ViewChildNode, G_ThemeOverridesNode, G_ListContainedNode):
@@ -768,6 +826,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         ord("K"): 3
     }
 
+
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         # track our position in the project tree
@@ -807,8 +866,12 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         editor.SetDocPointer(self._S_Document)
 
         # setup default text style
-        editor.StyleSetFont(wx.stc.STC_STYLE_DEFAULT, wx.Font(wx.FontInfo(9).FaceName("Segoe UI")))
+        face = "Segoe UI"
+        editor.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, "face:{face},size:9".format(face = face))
         editor.StyleClearAll()
+
+        # setup default style for margin text
+        editor.StyleSetSpec(wx.stc.STC_STYLE_LINENUMBER, "face:{face},size:8".format(face = face))
 
         # setup formatter styles
         styleset = None
@@ -1177,6 +1240,18 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         return self._N_View.Filter(match)
 
 
+    #-------------------------------------------------------
+    def UpdateLineNumbers(self, enable):
+        editor = self.GetEditor()
+        width = 0
+        
+        if enable:
+            digits = 1 + int(log10(editor.GetNumberOfLines()))
+            width = editor.TextWidth(wx.stc.STC_STYLE_LINENUMBER, "_" + "9" * digits)
+
+        editor.SetMarginWidth(0, width)
+
+
 
 ## MODULE ##################################################
 
@@ -1200,6 +1275,10 @@ G_Project.RegisterNodeFactory(
 
 G_Project.RegisterNodeFactory(
     G_NodeFactory(G_Project.NodeID_ViewField, G_Project.ArtCtrlId_Fields, G_ViewFieldNode)
+)
+
+G_Project.RegisterNodeFactory(
+    G_NodeFactory(G_Project.NodeID_ViewOptions, G_Project.ArtCtrlId_Options, G_ViewOptionsNode)
 )
 
 G_Project.RegisterNodeFactory(

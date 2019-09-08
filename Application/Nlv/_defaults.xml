@@ -2,7 +2,7 @@
 
 <!--
 
-Copyright (C) 2017-2018 Niel Clausen. All rights reserved.
+Copyright (C) 2017-2019 Niel Clausen. All rights reserved.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -234,6 +234,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     <node factory="6F3C11E5-3148-41C0-83C8-329BB94C6C0F" name="Fields">
       <field name="ColourNames" type="StrArray" field_id="A661E23B-882D-4B2B-8C24-5DA99F66BF24" theme_cls="view" override="0">LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE;LIGHT STEEL BLUE</field>
       <field name="Visibility" type="BoolArray" field_id="1DCC3CEA-5915-4D7D-A142-23DA290CEF5C" theme_cls="view" override="0">True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True</field>
+    </node>
+
+    <!-- Options node-->
+    <node factory="DA314384-660D-4B6C-8CBE-40196A30DA08" name="Setup">
+      <field name="ShowLineNumbers" type="Bool" field_id="C7545D43-159A-4864-9BD3-806C57E0640F" theme_cls="view" override="0">False</field>
     </node>
 
     <!-- View theme control (container)-->
