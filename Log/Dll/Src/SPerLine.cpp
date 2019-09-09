@@ -60,6 +60,200 @@ vint_t SLineMarkers::MarkValue( vint_t view_line_no )
 
 
 /*-----------------------------------------------------------------------
+ * SLineMarginText
+ -----------------------------------------------------------------------*/
+
+void SLineMarginText::CreateOffsetText_MsecDotNsec( int64_t sec, int64_t nsec, std::ostringstream & strm )
+{
+	constexpr int64_t c_Million{ 1'000'000 };
+	const int64_t msec{ nsec / c_Million };
+	nsec -= msec * c_Million;
+
+	strm << std::setfill( '0' ) << sec << '.'
+		<< std::setw( 3 ) << msec << '.'
+		<< std::setw( 6 ) << nsec;
+}
+
+
+void SLineMarginText::CreateOffsetText_Usec( int64_t sec, int64_t nsec, std::ostringstream & strm )
+{
+	const int64_t usec{ nsec / 1'000 };
+	strm << std::setfill( '0' ) << sec << '.'
+		<< std::setw( 6 ) << usec;
+}
+
+
+void SLineMarginText::CreateOffsetText_Msec( int64_t sec, int64_t nsec, std::ostringstream & strm )
+{
+	constexpr int64_t c_Million{ 1'000'000 };
+	const int64_t msec{ nsec / c_Million };
+	strm << std::setfill( '0' ) << sec << '.'
+		<< std::setw( 3 ) << msec;
+}
+
+
+void SLineMarginText::CreateOffsetText_Sec( int64_t sec, int64_t nsec, std::ostringstream & strm )
+{
+	strm << sec;
+}
+
+
+void SLineMarginText::CreateOffsetText_MinSec( int64_t sec, int64_t nsec, std::ostringstream & strm )
+{
+	const int64_t min{ sec / 60 };
+	sec -= min * 60;
+
+	strm << std::setfill( '0' ) << min << ':'
+		<< std::setw( 2 ) << sec;
+}
+
+
+void SLineMarginText::CreateOffsetText_HourMinSec( int64_t sec, int64_t nsec, std::ostringstream & strm )
+{
+	const int64_t hour{ sec / (60 * 60) };
+	sec -= hour * (60 * 60);
+
+	const int64_t min{ sec / 60 };
+	sec -= min * 60;
+
+	strm << std::setfill( '0' ) << hour << ':'
+		<< std::setw( 2 ) << min << ':'
+		<< std::setw( 2 ) << sec;
+}
+
+
+void SLineMarginText::CreateOffsetText_DayHourMinSec( int64_t sec, int64_t nsec, std::ostringstream & strm )
+{
+	const int64_t day{ sec / (24 * 60 * 60) };
+	sec -= day * (24 * 60 * 60);
+
+	const int64_t hour{ sec / (60 * 60) };
+	sec -= hour * (60 * 60);
+
+	const int64_t min{ sec / 60 };
+	sec -= min * 60;
+
+	strm << std::setfill( '0' ) << day << ':' 
+		<< std::setw( 2 ) << hour << ':'
+		<< std::setw( 2 ) << min << ':'
+		<< std::setw( 2 ) << sec;
+}
+
+
+void SLineMarginText::CreateLineNumberText( vint_t line, std::ostringstream & strm ) const
+{
+	strm << line;
+}
+
+
+void SLineMarginText::CreateOffsetText( vint_t line, std::ostringstream & strm ) const
+{
+	int64_t offset{ 0 };
+
+	m_ViewAccessor->VisitLine( line, [&offset, this] ( const LineAccessor & line ) {
+		offset = line.GetFieldValue( m_DateFieldId ).As<int64_t>();
+	} );
+
+	constexpr int64_t c_Billion{ 1'000'000'000 };
+	const int64_t sec{ offset / c_Billion };
+	const int64_t nsec{ offset - (sec * c_Billion) };
+
+	(*m_CreateOffsetTextFunc)(sec, nsec, strm);
+}
+
+
+void SLineMarginText::UpdateLineText( vint_t line ) const
+{
+	if( m_CreateTextFunc != nullptr )
+	{
+		std::ostringstream strm;
+		(this->*m_CreateTextFunc)(line, strm);
+		m_LineNumber = line;
+		m_LineText = strm.str();
+	}
+}
+
+
+void SLineMarginText::Setup( Type type, Precision prec )
+{
+	switch( type )
+	{
+	case Type::e_None:
+		m_CreateTextFunc = nullptr;
+		m_LineText = "";
+		break;
+
+	case Type::e_LineNumber:
+		m_CreateTextFunc = & SLineMarginText::CreateLineNumberText;
+		break;
+
+	case Type::e_Offset:
+		m_CreateTextFunc = &SLineMarginText::CreateOffsetText;
+
+		switch( prec )
+		{
+			case e_MsecDotNsec:
+				m_CreateOffsetTextFunc = &CreateOffsetText_MsecDotNsec;
+				break;
+
+			case e_Usec:
+				m_CreateOffsetTextFunc = &CreateOffsetText_Usec;
+				break;
+
+			case e_Msec:
+				m_CreateOffsetTextFunc = &CreateOffsetText_Msec;
+				break;
+
+			case e_Sec:
+				m_CreateOffsetTextFunc = &CreateOffsetText_Sec;
+				break;
+
+			case e_MinSec:
+				m_CreateOffsetTextFunc = &CreateOffsetText_MinSec;
+				break;
+
+			case e_HourMinSec:
+				m_CreateOffsetTextFunc = &CreateOffsetText_HourMinSec;
+				break;
+
+			case e_DayHourMinSec:
+				m_CreateOffsetTextFunc = &CreateOffsetText_DayHourMinSec;
+				break;
+		}
+		break;
+	}
+}
+
+
+const std::string & SLineMarginText::GetLineText( vint_t line ) const
+{
+	if( line != m_LineNumber )
+		UpdateLineText( line );
+	return m_LineText;
+}
+
+
+vint_t SLineMarginText::Style( vint_t line ) const
+{
+	// STYLE_LINENUMBER
+	return 33;
+}
+
+
+const char *SLineMarginText::Text( vint_t line ) const
+{
+	return GetLineText( line ).c_str();
+}
+
+
+vint_t SLineMarginText::Length( vint_t line ) const
+{
+	return vint_cast( GetLineText( line ).size() );
+}
+
+
+
+/*-----------------------------------------------------------------------
  * SLineAnnotation
  -----------------------------------------------------------------------*/
 
