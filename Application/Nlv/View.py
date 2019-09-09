@@ -652,7 +652,7 @@ class G_ViewTrackingNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
 
 ## G_ViewOptionsNode ########################################
 
-class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
+class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_ColourNode, G_TabContainedNode):
     """Define the view's general display"""
 
     _Type = [
@@ -690,6 +690,8 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
         me._MarginPrecisionCtl.Set(precision)
         me.BuildLabelledRow(parent, "Margin offset precision", me._MarginPrecisionCtl)
 
+        G_ColourNode.BuildColour(me, parent)
+
 
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
@@ -702,6 +704,7 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
     def PostInitLoad(self):
         # themes are setup now
         self.UpdateViewMargin()
+        self.PostInitColour()
 
 
     #-------------------------------------------------------
@@ -717,6 +720,8 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
         self.Rebind(self._MarginPrecisionCtl, wx.EVT_CHOICE, self.OnMarginPrecision)
         self._MarginPrecisionCtl.SetSelection(self._Field.MarginPrecisionIdx.Value)
         self.EnablePrecisionCtl()
+
+        self.ActivateColour()
 
 #        self.SetNodeHelp("View Tracking", "views.html", "viewtracking")
 
@@ -743,6 +748,13 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
         self._Field.MarginPrecisionIdx.Value = self._MarginPrecisionCtl.GetSelection()
         self.UpdateViewMargin()
         self.SendFocusToDisplayCtrl()
+
+
+    #-------------------------------------------------------
+    def OnColour(self, refocus):
+        """The margin text colour has altered; refresh the Scintilla control"""
+        self.GetViewNode().UpdateMarginTextColour(self.GetColour())
+        self.SendFocusToDisplayCtrl(refocus)
 
 
 
@@ -913,6 +925,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         # setup default style for margin text
         editor.StyleSetSpec(wx.stc.STC_STYLE_LINENUMBER, "face:{face},size:8".format(face = face))
+        editor.StyleSetBackground(wx.stc.STC_STYLE_LINENUMBER, wx.Colour(0xe8e8e8))
 
         # setup formatter styles
         styleset = None
@@ -934,10 +947,12 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         editor.SetMarginType(0, wx.stc.STC_MARGIN_RTEXT)
 
         marker_mask = (2 ** Nlog.EnumConstants.StyleBaseTracker) - 1
-        editor.SetMarginType(1, wx.stc.STC_MARGIN_SYMBOL)
+        editor.SetMarginBackground(1, wx.Colour(0xf0f0f0))
+        editor.SetMarginType(1, wx.stc.STC_MARGIN_COLOUR)
         editor.SetMarginWidth(1, 14)
         editor.SetMarginMask(1, marker_mask)
 
+        # can't figure out how to set background colour for second symbol margin
         tracker_mask = 0xffffffff & ~marker_mask
         editor.SetMarginType(2, wx.stc.STC_MARGIN_SYMBOL)
         editor.SetMarginWidth(2, 14)
@@ -1325,6 +1340,12 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self._N_View.SetupMarginText(type, precision)
 
         editor.SetMarginWidth(0, width)
+        self.RefreshView()
+
+
+    #-------------------------------------------------------
+    def UpdateMarginTextColour(self, colour):
+        self.GetEditor().StyleSetForeground(wx.stc.STC_STYLE_LINENUMBER, colour)
         self.RefreshView()
 
 
