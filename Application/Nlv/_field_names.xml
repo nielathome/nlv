@@ -103,7 +103,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
   <name field_id="B9ACE89C-3EA0-473A-A36F-D37EAB21D384">Filter.Type</name>
   <name field_id="A661E23B-882D-4B2B-8C24-5DA99F66BF24">Field.Colours</name>
   <name field_id="1DCC3CEA-5915-4D7D-A142-23DA290CEF5C">Field.Visibility</name>
-  <name field_id="C7545D43-159A-4864-9BD3-806C57E0640F">Options.Show line numbers</name>
+  <name field_id="C7545D43-159A-4864-9BD3-806C57E0640F">Options.Margin Type</name>
+  <name field_id="80626035-7636-4F3B-8EE3-E973CA36B527">Options.Margin Precision</name>
 
   <!-- Map of event theme field_id GUIDs to friendly names-->
   <name field_id="91F38F0D-3375-4005-935E-0CC7A738F74C">Event analyser.Description</name>

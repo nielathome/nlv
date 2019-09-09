@@ -64,7 +64,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     <item field_id="1DCC3CEA-5915-4D7D-A142-23DA290CEF5C">True;False;False;False;True;True;True;False;True;False;False;False;False;False;False;False;False;False;False;False</item>
 
     <!-- Options -->
-    <item field_id="C7545D43-159A-4864-9BD3-806C57E0640F">False</item>
+    <item field_id="C7545D43-159A-4864-9BD3-806C57E0640F">0</item>
+    <item field_id="80626035-7636-4F3B-8EE3-E973CA36B527">0</item>
 
   </theme>
   

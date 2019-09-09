@@ -655,6 +655,23 @@ class G_ViewTrackingNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
 class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
     """Define the view's general display"""
 
+    _Type = [
+        ["None", Nlog.EnumMarginType.Empty],
+        ["Line Numbers", Nlog.EnumMarginType.LineNumber],
+        ["Time Offset", Nlog.EnumMarginType.Offset]
+    ]
+
+    _Precision = [
+        ["sec.msec.nsec", Nlog.EnumMarginPrecision.MsecDotNsec],
+        ["sec.usec", Nlog.EnumMarginPrecision.Usec],
+        ["sec.msec", Nlog.EnumMarginPrecision.Msec],
+        ["sec", Nlog.EnumMarginPrecision.Sec],
+		["min:sec", Nlog.EnumMarginPrecision.MinSec],
+		["hour:min:sec", Nlog.EnumMarginPrecision.HourMinSec],
+		["day:hour:min:sec", Nlog.EnumMarginPrecision.DayHourMinSec]
+    ]
+
+
     #-------------------------------------------------------
     def BuildPage(parent):
         # class static function
@@ -662,11 +679,16 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
         me._Sizer = parent.GetSizer()
 
         window = parent.GetWindow()
-        me._CheckBoxes = []
 
-        # check: show line numbers
-        me._ShowLineNumbers = wx.CheckBox(window)
-        me.BuildLabelledRow(parent, "Show line numbers in margin", me._ShowLineNumbers)
+        type = [item[0] for item in me._Type]
+        me._MarginTypeCtl = wx.Choice(window)
+        me._MarginTypeCtl.Set(type)
+        me.BuildLabelledRow(parent, "Margin content", me._MarginTypeCtl)
+
+        precision = [item[0] for item in me._Precision]
+        me._MarginPrecisionCtl = wx.Choice(window)
+        me._MarginPrecisionCtl.Set(precision)
+        me.BuildLabelledRow(parent, "Margin offset precision", me._MarginPrecisionCtl)
 
 
     #-------------------------------------------------------
@@ -676,31 +698,50 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_TabContainedNode):
 
     def PostInitNode(self):
         self._Field = D_Document(self.GetDocument(), self)
-        self.UpdateLineNumbers()
+
+    def PostInitLoad(self):
+        # themes are setup now
+        self.UpdateViewMargin()
 
 
     #-------------------------------------------------------
+    def EnablePrecisionCtl(self):
+        self._MarginPrecisionCtl.Enable(self.GetMarginType() == Nlog.EnumMarginType.Offset)
+
     def Activate(self):
         self.ActivateCommon()
 
-        self._ShowLineNumbers.Unbind(wx.EVT_CHECKBOX)
-        self._ShowLineNumbers.SetValue(self._Field.ShowLineNumbers.Value)
-        self._ShowLineNumbers.Bind(wx.EVT_CHECKBOX, self.OnShowLineNumbers)
+        self.Rebind(self._MarginTypeCtl, wx.EVT_CHOICE, self.OnMarginType)
+        self._MarginTypeCtl.SetSelection(self._Field.MarginTypeIdx.Value)
+
+        self.Rebind(self._MarginPrecisionCtl, wx.EVT_CHOICE, self.OnMarginPrecision)
+        self._MarginPrecisionCtl.SetSelection(self._Field.MarginPrecisionIdx.Value)
+        self.EnablePrecisionCtl()
 
 #        self.SetNodeHelp("View Tracking", "views.html", "viewtracking")
 
 
     #-------------------------------------------------------
-    def UpdateLineNumbers(self):
-        show = self._Field.ShowLineNumbers.Value
-        self.GetViewNode().UpdateLineNumbers(show)
+    def GetMarginType(self):
+        return self._Type[self._Field.MarginTypeIdx.Value][1]
+
+    def GetMarginPrecision(self):
+        return self._Precision[self._Field.MarginPrecisionIdx.Value][1]
+
+    def UpdateViewMargin(self):
+        self.GetViewNode().UpdateMargin(self.GetMarginType(), self.GetMarginPrecision())
 
 
     #-------------------------------------------------------
-    def OnShowLineNumbers(self, event):
-        show = self._ShowLineNumbers.GetValue()
-        self._Field.ShowLineNumbers.Value = show
-        self.UpdateLineNumbers()
+    def OnMarginType(self, event):
+        self._Field.MarginTypeIdx.Value = self._MarginTypeCtl.GetSelection()
+        self.EnablePrecisionCtl()
+        self.UpdateViewMargin()
+        self.SendFocusToDisplayCtrl()
+
+    def OnMarginPrecision(self, event):
+        self._Field.MarginPrecisionIdx.Value = self._MarginPrecisionCtl.GetSelection()
+        self.UpdateViewMargin()
         self.SendFocusToDisplayCtrl()
 
 
@@ -890,6 +931,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         editor.IndicatorSetStyle(0, wx.stc.STC_INDIC_ROUNDBOX)
 
         # setup Scintilla editor margins
+        editor.SetMarginType(0, wx.stc.STC_MARGIN_RTEXT)
+
         marker_mask = (2 ** Nlog.EnumConstants.StyleBaseTracker) - 1
         editor.SetMarginType(1, wx.stc.STC_MARGIN_SYMBOL)
         editor.SetMarginWidth(1, 14)
@@ -1241,15 +1284,48 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def UpdateLineNumbers(self, enable):
+    def UpdateMargin(self, type, precision):
         editor = self.GetEditor()
         width = 0
         
-        if enable:
+        if type == Nlog.EnumMarginType.LineNumber:
             digits = 1 + int(log10(editor.GetNumberOfLines()))
             width = editor.TextWidth(wx.stc.STC_STYLE_LINENUMBER, "_" + "9" * digits)
 
+        elif type == Nlog.EnumMarginType.Offset:
+            begin_timecode = self.GetUtcTimecode(0)
+            end_timecode = self.GetUtcTimecode(editor.GetNumberOfLines() - 1)
+            duration = end_timecode.Subtract(begin_timecode) / 1000000000
+
+            if precision == Nlog.EnumMarginPrecision.MinSec:
+                duration /= 60
+            elif precision == Nlog.EnumMarginPrecision.HourMinSec:
+                duration /= (60 * 60)
+            elif precision == Nlog.EnumMarginPrecision.DayHourMinSec:
+                duration /= (24 * 60 * 60)
+
+            digits = 1 + int(log10(duration))
+
+            if precision == Nlog.EnumMarginPrecision.MsecDotNsec:
+                digits += 10
+            elif precision == Nlog.EnumMarginPrecision.Usec:
+                digits += 6
+            elif precision == Nlog.EnumMarginPrecision.Msec:
+                digits += 3
+            elif precision == Nlog.EnumMarginPrecision.MinSec:
+                digits += 3
+            elif precision == Nlog.EnumMarginPrecision.HourMinSec:
+                digits += 6
+            elif precision == Nlog.EnumMarginPrecision.DayHourMinSec:
+                digits += 9
+
+            width = editor.TextWidth(wx.stc.STC_STYLE_LINENUMBER, "__" + "9" * digits)
+
+        if type != Nlog.EnumMarginType.Empty:
+            self._N_View.SetupMarginText(type, precision)
+
         editor.SetMarginWidth(0, width)
+        self.RefreshView()
 
 
 

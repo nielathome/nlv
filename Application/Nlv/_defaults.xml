@@ -238,7 +238,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     <!-- Options node-->
     <node factory="DA314384-660D-4B6C-8CBE-40196A30DA08" name="Setup">
-      <field name="ShowLineNumbers" type="Bool" field_id="C7545D43-159A-4864-9BD3-806C57E0640F" theme_cls="view" override="0">False</field>
+      <field name="MarginTypeIdx" type="Int" field_id="C7545D43-159A-4864-9BD3-806C57E0640F" theme_cls="view" override="0">0</field>
+      <field name="MarginPrecisionIdx" type="Int" field_id="80626035-7636-4F3B-8EE3-E973CA36B527" theme_cls="view" override="0">0</field>
     </node>
 
     <!-- View theme control (container)-->
