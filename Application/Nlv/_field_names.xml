@@ -61,6 +61,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
   <name field_id="9C8DEE25-E84A-4F86-9636-E8C741A555EA">View search 5.Style</name>
   <name field_id="F770D255-E7C3-4376-BC79-40DD6EE67EC5">View search 6.Colour</name>
   <name field_id="32CDDF0D-CEE4-4E89-A27B-A2AD3B02F6BC">View search 6.Style</name>
+  <name field_id="0ACE781D-0C98-4FF9-8565-1588233AA774">View Margin.Colour</name>
   <name field_id="193032BE-30F7-40F0-80E7-0C75F1946F0A">Event search 1.Colour</name>
   <name field_id="7E9B028B-64C6-41E1-936D-AFB1D38C31BE">Event search 1.Colour</name>
   <name field_id="C24DAF4F-DB94-4D8A-BEDC-C9EED8F5C1C3">Event search 1.Colour</name>
@@ -103,6 +104,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
   <name field_id="B9ACE89C-3EA0-473A-A36F-D37EAB21D384">Filter.Type</name>
   <name field_id="A661E23B-882D-4B2B-8C24-5DA99F66BF24">Field.Colours</name>
   <name field_id="1DCC3CEA-5915-4D7D-A142-23DA290CEF5C">Field.Visibility</name>
+  <name field_id="C7545D43-159A-4864-9BD3-806C57E0640F">Options.Margin Type</name>
+  <name field_id="80626035-7636-4F3B-8EE3-E973CA36B527">Options.Margin Precision</name>
 
   <!-- Map of event theme field_id GUIDs to friendly names-->
   <name field_id="91F38F0D-3375-4005-935E-0CC7A738F74C">Event analyser.Description</name>

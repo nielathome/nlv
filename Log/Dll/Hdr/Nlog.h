@@ -581,7 +581,7 @@ private:
 	linemarker_ptr_t m_LineMarker;
 	linelevel_ptr_t  m_LineLevel;
 	linestate_ptr_t m_LineState;
-	lineannotation_ptr_t m_LineMargin;
+	linemargintext_ptr_t m_LineMargin;
 	lineannotation_ptr_t m_LineAnnotation;
 	contractionstate_ptr_t m_ContractionState;
 
@@ -655,6 +655,8 @@ public:
 	vint_t GetLocalTrackerLine( void );
 	vint_t GetGlobalTrackerLine( unsigned idx );
 
+	// margin type
+	void SetupMarginText( SLineMarginText::Type type, SLineMarginText::Precision prec );
 };
 
 

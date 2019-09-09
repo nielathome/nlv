@@ -601,7 +601,7 @@ NLogView::NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), view_accessor } },
 	m_LineLevel{ new SLineLevels },
 	m_LineState{ new SLineState },
-	m_LineMargin{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
+	m_LineMargin{ new SLineMarginText{ view_accessor, logfile->GetSchema()->GetTimecodeBase().GetFieldId() } },
 	m_LineAnnotation{ new SLineAnnotation{ logfile->GetAdornments(), view_accessor } },
 	m_ContractionState{ new SContractionState{ m_LineAnnotation, view_accessor } },
 	m_ViewMap{ view_accessor->GetMap() },
@@ -794,6 +794,12 @@ vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
 		return low_idx;
 	else
 		return low_idx + 1;
+}
+
+
+void NLogView::SetupMarginText( SLineMarginText::Type type, SLineMarginText::Precision prec )
+{
+	m_LineMargin->Setup( type, prec );
 }
 
 

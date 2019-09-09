@@ -258,6 +258,115 @@ using linestate_ptr_t = boost::intrusive_ptr<SLineState>;
 
 
 /*-----------------------------------------------------------------------
+ * SLineMarginText
+ -----------------------------------------------------------------------*/
+
+class SLineMarginText : public VLineAnnotation
+{
+public:
+	enum Type
+	{
+		e_None,
+		e_LineNumber,
+		e_Offset
+	};
+
+	enum Precision
+	{
+		e_MsecDotNsec,
+		e_Usec,
+		e_Msec,
+		e_Sec,
+		e_MinSec,
+		e_HourMinSec,
+		e_DayHourMinSec
+	};
+
+private:
+	// view data
+	viewaccessor_ptr_t m_ViewAccessor;
+	const ViewLineTranslation * m_ViewLineTranslation;
+	const unsigned m_DateFieldId;
+
+protected:
+	using create_offsettext_func = void (*)(int64_t sec, int64_t nsec, std::ostringstream & strm);
+	static void CreateOffsetText_MsecDotNsec( int64_t sec, int64_t nsec, std::ostringstream & strm );
+	static void CreateOffsetText_Usec( int64_t sec, int64_t nsec, std::ostringstream & strm );
+	static void CreateOffsetText_Msec( int64_t sec, int64_t nsec, std::ostringstream & strm );
+	static void CreateOffsetText_Sec( int64_t sec, int64_t nsec, std::ostringstream & strm );
+	static void CreateOffsetText_MinSec( int64_t sec, int64_t nsec, std::ostringstream & strm );
+	static void CreateOffsetText_HourMinSec( int64_t sec, int64_t nsec, std::ostringstream & strm );
+	static void CreateOffsetText_DayHourMinSec( int64_t sec, int64_t nsec, std::ostringstream & strm );
+	create_offsettext_func m_CreateOffsetTextFunc{ nullptr };
+
+	using create_text_func = void (SLineMarginText::*)(vint_t line, std::ostringstream & strm) const;
+	void CreateLineNumberText( vint_t line, std::ostringstream & strm ) const;
+	void CreateOffsetText( vint_t line, std::ostringstream & strm ) const;
+	create_text_func m_CreateTextFunc{ nullptr };
+
+protected:
+	// one line text cache
+	mutable vint_t m_LineNumber;
+	mutable std::string m_LineText;
+
+	void UpdateLineText( vint_t line ) const;
+	const std::string & GetLineText( vint_t line ) const;
+
+public:
+	SLineMarginText( viewaccessor_ptr_t view_accessor, unsigned date_field_id )
+		:
+		m_ViewAccessor{ view_accessor },
+		m_ViewLineTranslation{ view_accessor->GetLineTranslation() },
+		m_DateFieldId{ date_field_id }
+	{
+		if( !m_ViewLineTranslation )
+			throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
+	}
+
+	void Setup( Type type, Precision prec );
+
+	// Scintilla interfaces
+
+	vint_t Style( vint_t line ) const override;
+	const char *Text( vint_t line ) const override;
+	vint_t Length( vint_t line ) const override;
+
+	// disable standard Scintilla interfaces
+
+	bool MultipleStyles( vint_t /* line */ ) const override {
+		return false;
+	}
+
+	void SetText( vint_t /* line */, const char * /* text */ ) override {
+		UnsupportedVoid( __FUNCTION__ );
+	}
+
+	void ClearAll( void ) override {
+		UnsupportedVoid( __FUNCTION__ );
+	}
+
+	void SetStyle( vint_t /* line */, vint_t /* style */ ) override {
+		UnsupportedVoid( __FUNCTION__ );
+	}
+
+	void SetStyles( vint_t /* line */, const unsigned char * /* styles */ ) override {
+		UnsupportedVoid( __FUNCTION__ );
+	}
+
+	const unsigned char *Styles( vint_t /* line */ ) const override {
+		return nullptr;
+	}
+
+	vint_t Lines( vint_t line ) const override {
+		return 1;
+	}
+};
+
+using linemargintext_ptr_t = boost::intrusive_ptr<SLineMarginText>;
+
+
+
+/*-----------------------------------------------------------------------
  * SLineAnnotation
  -----------------------------------------------------------------------*/
 

@@ -327,6 +327,24 @@ BOOST_PYTHON_MODULE( Nlog )
 		.export_values()
 		;
 
+	enum_<SLineMarginText::Type>( "EnumMarginType" )
+		.value( "Empty", SLineMarginText::Type::e_None )
+		.value( "LineNumber", SLineMarginText::Type::e_LineNumber )
+		.value( "Offset", SLineMarginText::Type::e_Offset )
+		.export_values()
+		;
+
+	enum_<SLineMarginText::Precision>( "EnumMarginPrecision" )
+		.value( "MsecDotNsec", SLineMarginText::Precision::e_MsecDotNsec )
+		.value( "Usec", SLineMarginText::Precision::e_Usec )
+		.value( "Msec", SLineMarginText::Precision::e_Msec )
+		.value( "Sec", SLineMarginText::Precision::e_Sec )
+		.value( "MinSec", SLineMarginText::Precision::e_MinSec )
+		.value( "HourMinSec", SLineMarginText::Precision::e_HourMinSec )
+		.value( "DayHourMinSec", SLineMarginText::Precision::e_DayHourMinSec )
+		.export_values()
+		;
+
 	class_<NTimecodeBase, boost::noncopyable>( "TimecodeBase", init<time_t, unsigned>() )
 		.def( "GetUtcDatum", &NTimecodeBase::GetUtcDatum )
 		.def( "GetFieldId", &NTimecodeBase::GetFieldId )
@@ -383,6 +401,7 @@ BOOST_PYTHON_MODULE( Nlog )
 		.def( "SetLocalTrackerLine", &NLogView::SetLocalTrackerLine )
 		.def( "GetLocalTrackerLine", &NLogView::GetLocalTrackerLine )
 		.def( "GetGlobalTrackerLine", &NLogView::GetGlobalTrackerLine )
+		.def( "SetupMarginText", &NLogView::SetupMarginText )
 		;
 
 	class_<NLogfile, logfile_ptr_t, boost::noncopyable>( "Logfile", no_init )

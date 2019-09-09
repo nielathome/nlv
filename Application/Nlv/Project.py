@@ -1824,6 +1824,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
     NodeID_ViewFilter = "6968149A-D9DA-47AF-A742-2C75A1D16720"
     NodeID_ViewTracking = "8481271C-B31B-4C29-AEE5-2AED0905DFF5"
     NodeID_ViewField = "6F3C11E5-3148-41C0-83C8-329BB94C6C0F"
+    NodeID_ViewOptions = "DA314384-660D-4B6C-8CBE-40196A30DA08"
     NodeID_ViewGlobalThemeOverrides = "B6326018-3AF5-4E41-9BE3-1193811AF439"
     NodeID_ViewLocalThemeGallery = "6494365B-350F-4718-87AC-7DEB80F34340"
     NodeID_ViewLocalThemeOverrides = "9DD0FF9F-7BC5-4DD7-BAA4-4E9F76682795"
@@ -1859,7 +1860,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
     ArtCtrlId_Fields = wx.ART_NEW_DIR
     ArtCtrlId_Script = wx.ART_FIND_AND_REPLACE
     ArtCtrlId_Analyse = wx.ART_REDO
-    ArtCtrlId_Options = wx.ART_HELP_PAGE
+    ArtCtrlId_Options = wx.ART_FILE_SAVE
 
     ArtDocID_Home = 0
     ArtDocID_Annotation = 1
