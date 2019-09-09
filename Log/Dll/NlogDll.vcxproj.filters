@@ -9,6 +9,21 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
+    <Filter Include="_wxScintilla">
+      <UniqueIdentifier>{45a44716-5313-44de-be23-25423794072a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_wxScintilla\stc">
+      <UniqueIdentifier>{0b35f46e-dc4d-4321-9341-8582ca3763ea}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_wxScintilla\Scintilla">
+      <UniqueIdentifier>{e6f26071-d6a3-4059-bb61-aba051e0d39c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_wxScintilla\Scintilla\Headers Files">
+      <UniqueIdentifier>{8ceddb48-eb1d-43f9-a624-7b3acbe7c335}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="_wxScintilla\Scintilla\Source Files">
+      <UniqueIdentifier>{41a5aee1-7073-4af6-81f0-db73589b2988}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Src\Nlog.cpp">
@@ -29,6 +44,102 @@
     <ClCompile Include="Src\SPerLine.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CallTip.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\AutoComplete.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\XPM.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CaseConvert.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CaseFolder.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Catalogue.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CellBuffer.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CharClassify.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ContractionState.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Decoration.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Document.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\EditModel.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Editor.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\EditView.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ExternalLexer.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Indicator.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\KeyMap.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\LineMarker.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\MarginView.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\PerLine.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\PositionCache.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\RESearch.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\RunStyles.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ScintillaBase.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Selection.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Style.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\UniConversion.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ViewStyle.cxx">
+      <Filter>_wxScintilla\Scintilla\Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\VContent.cxx">
+      <Filter>_wxScintilla\Scintilla</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\stc.cpp">
+      <Filter>_wxScintilla\stc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\PlatWX.cpp">
+      <Filter>_wxScintilla\stc</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\ScintillaWX.cpp">
+      <Filter>_wxScintilla\stc</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Hdr\StdAfx.h">
@@ -48,6 +159,126 @@
     </ClInclude>
     <ClInclude Include="Hdr\SPerLine.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CellBuffer.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ContractionState.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\PerLine.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\include\Scintilla.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\include\Sci_Position.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ScintillaBase.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Selection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Style.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\AutoComplete.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CallTip.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CaseConvert.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CaseFolder.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Catalogue.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CharClassify.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Decoration.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Document.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\EditModel.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Editor.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\EditView.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ExternalLexer.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Indicator.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\KeyMap.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\LineMarker.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\MarginView.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\Partitioning.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\PositionCache.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\RESearch.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\RunStyles.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\SparseVector.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\SplitVector.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\UnicodeFromUTF8.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\UniConversion.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\ViewStyle.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\XPM.h">
+      <Filter>_wxScintilla\Scintilla\Headers Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CCellBuffer.h">
+      <Filter>_wxScintilla\Scintilla</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CContractionState.h">
+      <Filter>_wxScintilla\Scintilla</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\CPerLine.h">
+      <Filter>_wxScintilla\Scintilla</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\scintilla\src\VContent.h">
+      <Filter>_wxScintilla\Scintilla</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\PlatWX.h">
+      <Filter>_wxScintilla\stc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\Deps\Modules\Phoenix\ext\wxWidgets\src\stc\ScintillaWX.h">
+      <Filter>_wxScintilla\stc</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
