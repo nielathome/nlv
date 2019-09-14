@@ -287,6 +287,9 @@ class G_LogViewFrame(wx.Frame):
     def GetAuiNotebook(self):
         return self._AuiNoteBook
 
+    def GetProject(self):
+        return self._Project
+
     def GetInfoPanel(self):
         return self._InfoPanel
 

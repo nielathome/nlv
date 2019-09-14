@@ -102,14 +102,18 @@ class G_DataExplorer:
 
     #-------------------------------------------------------
     @classmethod
-    def Instance(cls, parent = None):
+    def Instance(cls, frame = None):
         if cls._DataExplorer == None:
-            cls._DataExplorer = cls(parent)
+            cls._DataExplorer = cls(frame)
         return cls._DataExplorer
 
 
     #-------------------------------------------------------
-    def __init__(self, parent):
+    def __init__(self, frame):
+        self._Frame = frame
+        self._LastUrl = None
+        parent = frame.GetDataExplorer()
+
         # create web control
         self._WebView = wx.html2.WebView.New(parent)
         self._WebView.EnableHistory(True)
@@ -153,6 +157,18 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
+    def GetRootNode(self):
+        return self._Frame.GetProject().GetRootNode()
+
+
+    def FindNode(self, factory_id, node_path):
+        for node in self.GetRootNode().ListSubNodes(factory_id, recursive = True):
+            if node.GetNodePath() == node_path:
+                return node
+        return None
+
+
+    #-------------------------------------------------------
     @staticmethod
     def SplitUri(uri):
         # here, "uri" is node-factory-id/node-path/location
@@ -167,16 +183,18 @@ class G_DataExplorer:
         return factory_id, node_path, location
 
 
-    def Update(self, uri, session_node):
+    def Update(self, uri):
         factory_id, node_path, location = self.SplitUri(uri)
+        node = self.FindNode(factory_id, node_path)
 
-        for node in session_node.ListSubNodes(factory_id, recursive = True):
-            if node.GetNodePath() == node_path:
-                page = G_DataExplorerPage()
-                node.CreateDataExplorerPage(page, location)
-                wx.MemoryFSHandler.AddFileWithMimeType(uri, page.Close(), "text/html")
-                self._WebView.LoadURL("memory:" + uri)
-                break
+        if node is not None:
+            page = G_DataExplorerPage()
+            node.CreateDataExplorerPage(page, location)
+
+            wx.MemoryFSHandler.AddFileWithMimeType(uri, page.Close(), "text/html")
+
+            url = self._LastUrl = "memory:" + uri
+            self._WebView.LoadURL(url)
 
 
     #-------------------------------------------------------
@@ -195,11 +213,21 @@ class G_DataExplorer:
         event.Enable(self._WebView.CanGoForward())
 
 
+    #-------------------------------------------------------
     def OnWebViewLoaded(self, event):
-        uri = self._WebView.GetCurrentURL()
-        #b = self._WebView.GetBackwardHistory()
-        #f = self._WebView.GetForwardHistory()
-        pass
+        url = self._WebView.GetCurrentURL()
+        if url.find("memory:") != 0 or self._LastUrl == url:
+            return
+
+        # user driven forwards/backwards navigation
+        scheme, uri = url.split(':')
+        factory_id, node_path, location = self.SplitUri(uri)
+        node = self.FindNode(factory_id, node_path)
+
+        if node is not None:
+            self._LastUrl = url
+            node.MakeActive()
+            node.ShowLocation(location)
 
 
 
@@ -572,8 +600,8 @@ class G_SessionChildNode():
 
 
     #-------------------------------------------------------
-    def UpdateDataExplorer(self, uri):
-        return self.GetSessionNode().UpdateDataExplorer(uri)
+    def GetDataExplorer(self):
+        return self.GetSessionNode().GetDataExplorer()
 
 
 
@@ -1246,7 +1274,7 @@ class G_SessionNode(G_TabContainerNode):
         self._Field.Add(str(uuid4()), "Guid", replace_existing = False)
         self._Field.Add(1, "EventId", replace_existing = False)
 
-        G_DataExplorer.Instance(self.GetFrame().GetDataExplorer())
+        G_DataExplorer.Instance(self.GetFrame())
 
             
     def PostInitLoad(self):
@@ -1290,9 +1318,6 @@ class G_SessionNode(G_TabContainerNode):
     #-------------------------------------------------------
     def GetDataExplorer(self):
         return G_DataExplorer.Instance()
-
-    def UpdateDataExplorer(self, uri):
-        self.GetDataExplorer().Update(uri, self)
 
 
     #-------------------------------------------------------

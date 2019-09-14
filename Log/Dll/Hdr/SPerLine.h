@@ -145,8 +145,11 @@ public:
 class SLineMarkers : public VLineMarkers
 {
 private:
-	// all markers are handled via the logfile
+	// most markers are handled via the logfile
 	adornments_ptr_t m_Adornments;
+
+	// the history line marker is handled locally
+	int m_HistoryLineNo{ -1 };
 
 	// view data
 	viewaccessor_ptr_t m_ViewAccessor;
@@ -154,6 +157,7 @@ private:
 	const ViewLineTranslation * m_ViewLineTranslation;
 
 protected:
+	vint_t HistoryLineMarkValue( vint_t view_line_no );
 	vint_t ViewMarkValue( vint_t line );
 
 public:
@@ -168,6 +172,10 @@ public:
 			throw std::runtime_error{ "ViewAccessor has no ViewMap" };
 		if( !m_ViewLineTranslation )
 			throw std::runtime_error{ "ViewAccessor has no ViewLineTranslation" };
+	}
+
+	void SetHistoryLine( vint_t line_no ) {
+		m_HistoryLineNo = line_no;
 	}
 
 	vint_t MarkValue( vint_t line ) override;

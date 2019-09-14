@@ -958,12 +958,18 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         editor.SetMarginWidth(2, 14)
         editor.SetMarginMask(2, tracker_mask)
 
+        # history line marker
+        from .StyleNode import G_ColourTraits
+        history_marker = Nlog.EnumConstants.StyleHistory
+        editor.MarkerDefine(history_marker, wx.stc.STC_MARK_BACKGROUND)
+        editor.MarkerSetBackground(history_marker, G_ColourTraits.GetColour("ORCHID"))
+        editor.MarkerSetAlpha(history_marker, 50)
+
         # setup cursor unwanted zone (UZ); keeps GotoLine away from the top/bottom
         # of the screen
         editor.SetYCaretPolicy(wx.stc.STC_CARET_SLOP | wx.stc.STC_CARET_EVEN, 10)
 
         # setup caret line hiliting
-        from .StyleNode import G_ColourTraits
         editor.SetCaretLineBackground(G_ColourTraits.GetColour("GOLDENROD"))
         editor.SetCaretLineBackAlpha(50)
         editor.SetCaretLineVisible(True)
@@ -1041,10 +1047,18 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def GetNodePath(self):
         return self.GetNodeLabel()
 
+    def ShowLocation(self, location):
+        line = int(location)
+        self.GetView().SetHistoryLine(line)
+        self.ScrollToLine(line)
+        self.RefreshView()
+
     def CreateDataExplorerPage(self, page, location):
-        #temp - current line
-        line = self._CursorLine
+        line = int(location)
         view = self.GetView()
+
+        page.AddHeading(1, "Line No")
+        page.AddParagraph(location)
 
         for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
             page.AddHeading(1, name)
@@ -1052,9 +1066,6 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         page.AddHeading(1, "Line")
         page.AddParagraph(view.GetNonFieldText(line))
-
-
-        #schema = self.GetLogNode().GetLogSchema()
 
 
     #-------------------------------------------------------
@@ -1186,7 +1197,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self.RefreshTrackers(update_local, update_global, self)
 
         # tell the data explorer
-        self.UpdateDataExplorer("{factory}/{path}/{location}".format(factory = self._Factory.GetFactoryID(), path = self.GetNodePath(), location = cur_line))
+        self.GetDataExplorer().Update("{factory}/{path}/{location}".format(factory = self._Factory.GetFactoryID(), path = self.GetNodePath(), location = cur_line))
 
         # tell the world
         self.NotifyLine(cur_line)

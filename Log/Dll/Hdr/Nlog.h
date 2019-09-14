@@ -45,10 +45,11 @@ selector_ptr_t MakeSelector( boost::python::object match, bool empty_selects_all
  * NConstants
  -----------------------------------------------------------------------*/
 
-enum class NConstants
+enum NConstants
 {
 	e_StyleBaseMarker = 0,
-	e_StyleBaseTracker = 8
+	e_StyleBaseTracker = 8,
+	e_StyleHistory = 16
 };
 
 
@@ -655,7 +656,8 @@ public:
 	vint_t GetLocalTrackerLine( void );
 	vint_t GetGlobalTrackerLine( unsigned idx );
 
-	// margin type
+	// margin setup
+	void SetHistoryLine( vint_t line_no );
 	void SetupMarginText( SLineMarginText::Type type, SLineMarginText::Precision prec );
 };
 
