@@ -16,6 +16,8 @@
 #
 
 # Python imports
+import html
+import io
 import logging
 from pathlib import Path
 import time
@@ -25,6 +27,7 @@ import xml.etree.ElementTree as et
 
 # wxWidgets imports
 import wx
+import wx.html2
 
 # Application imports
 from .Document import D_Document
@@ -44,6 +47,133 @@ from .Theme import GetThemeGallery
 
 # Content provider interface
 import Nlog
+
+
+
+## G_DataExplorerPage ######################################
+
+class G_DataExplorerPage:
+    """Support building pages to display in the data explorer"""
+
+    #-------------------------------------------------------
+    def __init__(self):
+        self._HtmlStream = io.StringIO()
+        self.AddText("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <link rel="stylesheet" type="text/css" href="memory:style.css">
+            </head>
+            <body>
+        """)
+
+
+    #-------------------------------------------------------
+    def AddText(self, text):
+        self._HtmlStream.write(text + "\n")
+
+    def AddElement(self, tag, text):
+        self.AddText("<{tag}>{text}</{tag}>".format(tag = tag, text = html.escape(text)))
+
+
+    #-------------------------------------------------------
+    def AddHeading(self, level, text):
+        tag = "h{}".format(level)
+        self.AddElement(tag, text)
+
+    def AddParagraph(self, text):
+        self.AddElement("p", text)
+
+
+    #-------------------------------------------------------
+    def Close(self):
+        self.AddText("</body></html>")
+        return self._HtmlStream.getvalue()
+
+
+
+## G_DataExplorer ##########################################
+
+class G_DataExplorer(wx.Panel):
+    """Class that implements the project data explorer panel"""
+
+    _DataExplorer = None
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def Instance(cls, parent = None):
+        if cls._DataExplorer == None:
+            cls._DataExplorer = cls(parent)
+        return cls._DataExplorer
+
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        # create web control
+        self._WebView = wx.html2.WebView.New(parent)
+
+        # setup virtual filesystem: "memory:"
+        wx.FileSystem.AddHandler(wx.MemoryFSHandler())
+        self._WebView.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
+
+        # can't seem to access local files from HTML; so workaround
+        with open(str(Path( __file__ ).parent.joinpath("data.css"))) as css_file:
+            css_str = css_file.read();
+            wx.MemoryFSHandler.AddFile("style.css", css_str)
+
+        eg = """
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <link rel="stylesheet" type="text/css" href="memory:style.css">
+            </head>
+            <body>
+
+            <h1>This is a heading</h1>
+            <p>This is a paragraph.</p>
+
+            </body>
+            </html> 
+        """
+
+        wx.MemoryFSHandler.AddFile("home.htm", eg)
+
+        # layout
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(self._WebView, 1, wx.EXPAND)
+        parent.SetSizer(sizer)
+
+        self._WebView.LoadURL("memory:home.htm")
+
+
+    #-------------------------------------------------------
+    def ClearHistory(self):
+        self._WebView.ClearHistory()
+
+    #-------------------------------------------------------
+    def NewPage(self, node, location):
+        page = G_DataExplorerPage()
+        node.CreateDataExplorerPage(page, location)
+
+        wx.MemoryFSHandler.RemoveFile("home.htm")
+        text = page.Close()
+        wx.MemoryFSHandler.AddFile("home.htm", text)
+        self._WebView.LoadURL("memory:home.htm")
+
+
+    def Update(self, uri, session_node):
+        # here, "uri" is node-factory-id:node-path@location
+        path, location = uri.split('@')
+        factory_id, node_path = path.split(':')
+
+        for node in session_node.ListSubNodes(factory_id, recursive = True):
+            if node.GetNodePath() == node_path:
+                self.NewPage(node, location)
+                break
+
 
 
 ## G_SessionManager ########################################
@@ -412,6 +542,11 @@ class G_SessionChildNode():
     #-------------------------------------------------------
     def GetSessionNode(self):
         return self.GetParentNode(G_Project.NodeID_Session)
+
+
+    #-------------------------------------------------------
+    def UpdateDataExplorer(self, uri):
+        return self.GetSessionNode().UpdateDataExplorer(uri)
 
 
 
@@ -1077,12 +1212,16 @@ class G_SessionNode(G_TabContainerNode):
         self._StoreManagerPerspective = True
         self._StoreNotebookPerspective = True
 
+
     def PostInitNode(self):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
         self._Field.Add(str(uuid4()), "Guid", replace_existing = False)
         self._Field.Add(1, "EventId", replace_existing = False)
 
+        G_DataExplorer.Instance(self.GetFrame().GetDataExplorer())
+
+            
     def PostInitLoad(self):
         # control/restore window layout; this should be last, as the
         # UI changes can result in tab window focus changes, which drives
@@ -1115,7 +1254,18 @@ class G_SessionNode(G_TabContainerNode):
         else:
             self.GetProject().LoadPerspective(layout)
 
+        # backwards compatibility; make sure the data explorer is shown
+        self.GetAuiManager().ShowPane(self.GetFrame().GetDataExplorer(), True)
+
         self.CheckGuidCollision()
+
+
+    #-------------------------------------------------------
+    def GetDataExplorer(self):
+        return G_DataExplorer.Instance()
+
+    def UpdateDataExplorer(self, uri):
+        self.GetDataExplorer().Update(uri, self)
 
 
     #-------------------------------------------------------
@@ -1174,6 +1324,8 @@ class G_SessionNode(G_TabContainerNode):
         self._Field.AuiNotebook.Value = layout
 
         self._Field.Project.Value = self.GetProject().SavePerspective()
+
+        self.GetDataExplorer().ClearHistory()
 
 
     #-------------------------------------------------------

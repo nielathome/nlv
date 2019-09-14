@@ -1,0 +1,24 @@
+html, body, h1, h2, h3, h4, h5, h6 {
+  font-family: "Segoe UI", Verdana, Arial
+}
+
+h1 {
+  font-size: medium;
+  color: darkcyan;
+  border: solid;
+  border-color: grey;
+  border-width: thin;
+  padding-left: 1em;
+  margin-top: 1em;
+  margin-bottom: 0.25em;
+}
+
+p {
+  font-size: small;
+  margin-top: 0.5em;
+  margin-bottom: 0.5em;
+}
+
+a {
+  text-decoration: none;
+}

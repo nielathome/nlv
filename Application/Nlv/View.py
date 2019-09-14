@@ -1038,6 +1038,26 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    def GetNodePath(self):
+        return self.GetNodeLabel()
+
+    def CreateDataExplorerPage(self, page, location):
+        #temp - current line
+        line = self._CursorLine
+        view = self.GetView()
+
+        for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
+            page.AddHeading(1, name)
+            page.AddParagraph(view.GetFieldText(line, field_id))
+
+        page.AddHeading(1, "Line")
+        page.AddParagraph(view.GetNonFieldText(line))
+
+
+        #schema = self.GetLogNode().GetLogSchema()
+
+
+    #-------------------------------------------------------
     def GetEditor(self):
         return self._ViewControl.GetEditor()
 
@@ -1167,6 +1187,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         # and tell the world
         self.NotifyLine(cur_line)
+        self.UpdateDataExplorer("{factory}:{path}@location".format(factory = self._Factory.GetFactoryID(), path = self.GetNodePath()))
 
         # maintanance note - do not add any more random stuff to this function,
         # implement a proper notification system

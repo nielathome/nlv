@@ -36,8 +36,8 @@ import Nlv.Logfile
 import Nlv.View
 import Nlv.EventView
 from Nlv.Extension import LoadExtensions
-from Nlv.Project import G_Project
 from Nlv.Project import G_Global
+from Nlv.Project import G_Project
 from Nlv.Project import G_PerfTimerScope
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
@@ -197,14 +197,29 @@ class G_LogViewFrame(wx.Frame):
 
         # fill the frame with a panel - needed for sizers to work
         self._FramePanel = wx.Panel(self)
-        self._InfoPanel = wx.Notebook(self._FramePanel, style = wx.NB_TOP)
 
         # initialise console logger display
+        self._InfoPanel = wx.Notebook(self._FramePanel, style = wx.NB_TOP)
         self._ConsoleLog = G_ConsoleLog(self._InfoPanel)
         self._InfoPanel.AddPage(self._ConsoleLog.TextCtrl, "Console")
 
         # frame panel is entirely managed by an AuiManager
         self._AuiManager = aui.AuiManager()
+        self._AuiManager.SetAGWFlags(
+            aui.AUI_MGR_ALLOW_FLOATING
+            | aui.AUI_MGR_ALLOW_ACTIVE_PANE
+            | aui.AUI_MGR_TRANSPARENT_DRAG
+            | aui.AUI_MGR_TRANSPARENT_HINT
+            | aui.AUI_MGR_HINT_FADE
+            | aui.AUI_MGR_NO_VENETIAN_BLINDS_FADE
+            | aui.AUI_MGR_LIVE_RESIZE
+            | aui.AUI_MGR_WHIDBEY_DOCKING_GUIDES
+            | aui.AUI_MGR_SMOOTH_DOCKING
+        )
+        self._AuiManager.SetAutoNotebookStyle(
+            aui.AUI_NB_SUB_NOTEBOOK
+            | aui.AUI_NB_HIDE_ON_SINGLE_TAB
+        )
         self._AuiManager.SetManagedWindow(self._FramePanel)
 
         # create and initialise child panels
@@ -217,49 +232,45 @@ class G_LogViewFrame(wx.Frame):
              | aui.AUI_NB_WINDOWLIST_BUTTON
         )
         self._AuiNoteBook.SetArtProvider(aui.tabart.VC8TabArt())
-
-        self._Project = G_Project(self._FramePanel, self)
-
-        # event handlers
-        self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
-
-        # Use the aui manager to set up everything
         self._AuiManager.AddPane(
             self._AuiNoteBook,
             aui.AuiPaneInfo().CenterPane().Name("Notebook")
         )
+
+        self._Project = G_Project(self._FramePanel, self)
         self._AuiManager.AddPane(
             self._Project,
             aui.AuiPaneInfo().
-                Left().Layer(2).BestSize((300, 700)).
-                MinSize((240, -1)).
+                Left().Layer(1).BestSize((300, 700)).MinSize((240, -1)).
                 Floatable(True).FloatingSize((300, 700)).
                 Gripper(True).GripperTop(True).
-                CaptionVisible(False).
+                CaptionVisible(False).CloseButton(False).
                 Name("Control")
         )
+
         self._AuiManager.AddPane(
             self._InfoPanel,
             aui.AuiPaneInfo().
-                Left().Layer(2).BestSize((-1, 150)).
-                MinSize((-1, 140)).
+                Left().Layer(1).BestSize((-1, 150)).MinSize((-1, 140)).
                 Floatable(True).FloatingSize((500, 160)).
                 Gripper(True).GripperTop(True).
-                CaptionVisible(False).
+                CaptionVisible(False).CloseButton(False).
                 Name("Info")
         )
 
-        self._AuiManager.SetAGWFlags(
-            aui.AUI_MGR_ALLOW_FLOATING
-            | aui.AUI_MGR_ALLOW_ACTIVE_PANE
-            | aui.AUI_MGR_TRANSPARENT_DRAG
-            | aui.AUI_MGR_TRANSPARENT_HINT
-            | aui.AUI_MGR_HINT_FADE
-            | aui.AUI_MGR_NO_VENETIAN_BLINDS_FADE
-            | aui.AUI_MGR_LIVE_RESIZE
-            | aui.AUI_MGR_WHIDBEY_DOCKING_GUIDES
-            | aui.AUI_MGR_SMOOTH_DOCKING
+        self._DataExplorer = wx.Panel(self._FramePanel)
+        self._AuiManager.AddPane(
+            self._DataExplorer,
+            aui.AuiPaneInfo().
+                Right().Layer(2).BestSize((300, 700)).MinSize((240, -1)).
+                Floatable(True).FloatingSize((300, 700)).
+                Gripper(True).GripperTop(True).
+                CaptionVisible(False).CloseButton(False).
+                Name("Data")
         )
+
+        # event handlers
+        self.Bind(wx.EVT_CLOSE, self.OnCloseWindow)
 
         # open session document
         global _Args
@@ -278,6 +289,9 @@ class G_LogViewFrame(wx.Frame):
 
     def GetInfoPanel(self):
         return self._InfoPanel
+
+    def GetDataExplorer(self):
+        return self._DataExplorer
 
 
     #-------------------------------------------------------
