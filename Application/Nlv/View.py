@@ -1185,9 +1185,11 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             # flush any changes through to the GUI
             self.RefreshTrackers(update_local, update_global, self)
 
-        # and tell the world
+        # tell the data explorer
+        self.UpdateDataExplorer("{factory}/{path}/{location}".format(factory = self._Factory.GetFactoryID(), path = self.GetNodePath(), location = cur_line))
+
+        # tell the world
         self.NotifyLine(cur_line)
-        self.UpdateDataExplorer("{factory}:{path}@location".format(factory = self._Factory.GetFactoryID(), path = self.GetNodePath()))
 
         # maintanance note - do not add any more random stuff to this function,
         # implement a proper notification system

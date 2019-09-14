@@ -94,7 +94,7 @@ class G_DataExplorerPage:
 
 ## G_DataExplorer ##########################################
 
-class G_DataExplorer(wx.Panel):
+class G_DataExplorer:
     """Class that implements the project data explorer panel"""
 
     _DataExplorer = None
@@ -110,10 +110,9 @@ class G_DataExplorer(wx.Panel):
 
     #-------------------------------------------------------
     def __init__(self, parent):
-        super().__init__(parent)
-
         # create web control
         self._WebView = wx.html2.WebView.New(parent)
+        self._WebView.EnableHistory(True)
 
         # setup virtual filesystem: "memory:"
         wx.FileSystem.AddHandler(wx.MemoryFSHandler())
@@ -124,55 +123,83 @@ class G_DataExplorer(wx.Panel):
             css_str = css_file.read();
             wx.MemoryFSHandler.AddFile("style.css", css_str)
 
-        eg = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <link rel="stylesheet" type="text/css" href="memory:style.css">
-            </head>
-            <body>
-
-            <h1>This is a heading</h1>
-            <p>This is a paragraph.</p>
-
-            </body>
-            </html> 
-        """
-
-        wx.MemoryFSHandler.AddFile("home.htm", eg)
-
         # layout
-        sizer = wx.BoxSizer(wx.VERTICAL)
-        sizer.Add(self._WebView, 1, wx.EXPAND)
-        parent.SetSizer(sizer)
+        vsizer = wx.BoxSizer(wx.VERTICAL)
 
-        self._WebView.LoadURL("memory:home.htm")
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        #self.Bind(wx.html2.EVT_WEBVIEW_NAVIGATING, self.OnWebViewNavigating, self._WebView)
+        parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnWebViewLoaded)
+
+        button = wx.Button(parent, style = wx.BU_NOTEXT)
+        button.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_GO_BACK, wx.ART_TOOLBAR, (16, 16)))
+        parent.Bind(wx.EVT_BUTTON, self.OnPrevPageButton, button)
+        hsizer.Add(button, proportion = 0, flag = wx.EXPAND)
+        parent.Bind(wx.EVT_UPDATE_UI, self.OnCheckCanGoBack, button)
+
+        button = wx.Button(parent, style = wx.BU_NOTEXT)
+        button.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_GO_FORWARD, wx.ART_TOOLBAR, (16, 16)))
+        parent.Bind(wx.EVT_BUTTON, self.OnNextPageButton, button)
+        hsizer.Add(button, proportion = 0, flag = wx.EXPAND)
+        parent.Bind(wx.EVT_UPDATE_UI, self.OnCheckCanGoForward, button)
+
+        vsizer.Add(hsizer, proportion = 0, flag = wx.EXPAND | wx.ALL, border = G_Const.Sizer_StdBorder)
+        vsizer.Add(self._WebView, proportion = 1, flag = wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, border = G_Const.Sizer_StdBorder)
+        parent.SetSizer(vsizer)
 
 
     #-------------------------------------------------------
     def ClearHistory(self):
         self._WebView.ClearHistory()
 
-    #-------------------------------------------------------
-    def NewPage(self, node, location):
-        page = G_DataExplorerPage()
-        node.CreateDataExplorerPage(page, location)
 
-        wx.MemoryFSHandler.RemoveFile("home.htm")
-        text = page.Close()
-        wx.MemoryFSHandler.AddFile("home.htm", text)
-        self._WebView.LoadURL("memory:home.htm")
+    #-------------------------------------------------------
+    @staticmethod
+    def SplitUri(uri):
+        # here, "uri" is node-factory-id/node-path/location
+        idx = uri.find('/')
+        factory_id = uri[0:idx]
+        remainder = uri[idx+1:]
+
+        idx = remainder.rfind('/')
+        node_path = remainder[0:idx]
+        location = remainder[idx+1:]
+
+        return factory_id, node_path, location
 
 
     def Update(self, uri, session_node):
-        # here, "uri" is node-factory-id:node-path@location
-        path, location = uri.split('@')
-        factory_id, node_path = path.split(':')
+        factory_id, node_path, location = self.SplitUri(uri)
 
         for node in session_node.ListSubNodes(factory_id, recursive = True):
             if node.GetNodePath() == node_path:
-                self.NewPage(node, location)
+                page = G_DataExplorerPage()
+                node.CreateDataExplorerPage(page, location)
+                wx.MemoryFSHandler.AddFileWithMimeType(uri, page.Close(), "text/html")
+                self._WebView.LoadURL("memory:" + uri)
                 break
+
+
+    #-------------------------------------------------------
+    def OnPrevPageButton(self, event):
+        self._WebView.GoBack()
+        self._WebView.SetFocus()
+
+    def OnNextPageButton(self, event):
+        self._WebView.GoForward()
+        self._WebView.SetFocus()
+
+    def OnCheckCanGoBack(self, event):
+        event.Enable(self._WebView.CanGoBack())
+
+    def OnCheckCanGoForward(self, event):
+        event.Enable(self._WebView.CanGoForward())
+
+
+    def OnWebViewLoaded(self, event):
+        uri = self._WebView.GetCurrentURL()
+        #b = self._WebView.GetBackwardHistory()
+        #f = self._WebView.GetForwardHistory()
+        pass
 
 
 
