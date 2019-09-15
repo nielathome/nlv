@@ -7,16 +7,24 @@ h1 {
   color: steelblue;
   border: solid;
   border-color: grey;
-  border-width: thin;
+  border-width: 1px;
   padding-left: 0.25em;
   margin-top: 1em;
-  margin-bottom: 0.25em;
+  margin-bottom: 1em;
+}
+
+h2 {
+  font-size: medium;
+  color: steelblue;
+  border-bottom: 1px solid grey;
+  margin-top: 0.5em;
+  margin-bottom: 0.2em;
 }
 
 p {
   font-size: small;
-  margin-top: 0.5em;
-  margin-bottom: 0.5em;
+  margin-top: 0.1em;
+  margin-bottom: 0.1em;
 }
 
 a {

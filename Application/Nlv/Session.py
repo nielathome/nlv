@@ -50,13 +50,17 @@ import Nlog
 
 
 
-## G_DataExplorerPage ######################################
+## G_DataExplorerPageBuilder ###############################
 
-class G_DataExplorerPage:
+def MakeWebUrl(data_url):
+    return "memory:" + data_url
+
+class G_DataExplorerPageBuilder:
     """Support building pages to display in the data explorer"""
 
     #-------------------------------------------------------
-    def __init__(self):
+    def __init__(self, data_explorer):
+        self._DataExplorer = data_explorer
         self._HtmlStream = io.StringIO()
         self.AddText("""
             <!DOCTYPE html>
@@ -77,12 +81,18 @@ class G_DataExplorerPage:
 
 
     #-------------------------------------------------------
-    def AddHeading(self, level, text):
-        tag = "h{}".format(level)
-        self.AddElement(tag, text)
+    def AddPageHeading(self, text):
+        self.AddElement("h1", text)
 
-    def AddParagraph(self, text):
+    def AddFieldHeading(self, text):
+        self.AddElement("h2", text)
+
+    def AddFieldValue(self, text):
         self.AddElement("p", text)
+
+    def AddLink(self, data_url, text):
+        if self._DataExplorer.CreatePage(data_url):
+            self.AddText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = MakeWebUrl(data_url), text = html.escape(text)))
 
 
     #-------------------------------------------------------
@@ -98,6 +108,30 @@ class G_DataExplorer:
     """Class that implements the project data explorer panel"""
 
     _DataExplorer = None
+    _NodePathSplit = "__node_path__"
+    _LocationSplit = "__at__"
+    _PageSplit = "__page__"
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def SplitDataUrl(cls, url):
+        # url is node-factory-id<path-split>node-path<loc-split>location<page-split>page
+        factory_id, rem = url.split(cls._NodePathSplit)
+        node_path, rem = rem.split(cls._LocationSplit)
+        location, page = rem.split(cls._PageSplit)
+
+        return factory_id, node_path, location, page
+
+
+    @classmethod
+    def MakeDataUrl(cls, factory_id, node_path, location, page):
+        return "{factory_id}{node_split}{node_path}{loc_split}{location}{page_split}{page}".format(
+            factory_id = factory_id,
+            node_split = cls._NodePathSplit, node_path = node_path,
+            loc_split = cls._LocationSplit, location = location,
+            page_split = cls._PageSplit, page = page
+        )
 
 
     #-------------------------------------------------------
@@ -169,47 +203,32 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
-    @staticmethod
-    def SplitUri(uri):
-        # here, "uri" is node-factory-id/node-path/location
-        idx = uri.find('/')
-        factory_id = uri[0:idx]
-        remainder = uri[idx+1:]
-
-        idx = remainder.rfind('/')
-        node_path = remainder[0:idx]
-        location = remainder[idx+1:]
-
-        return factory_id, node_path, location
-
-
-    @staticmethod
-    def MakeUri(factory_id, node_path, location):
-        return "{factory_id}/{node_path}/{location}".format(factory_id = factory_id, node_path = node_path, location = location)
-
-
-    def Update(self, factory_id, node_path, location):
+    def CreatePage(self, data_url):
+        factory_id, node_path, location, page = self.SplitDataUrl(data_url)
         node = self.FindNode(factory_id, node_path)
 
         if node is not None:
-            page = G_DataExplorerPage()
-            node.CreateDataExplorerPage(page, location)
+            page_builder = G_DataExplorerPageBuilder(self)
+            node.CreateDataExplorerPage(page_builder, location, page)
+            wx.MemoryFSHandler.AddFileWithMimeType(data_url, page_builder.Close(), "text/html")
+            return True
 
-            uri = self.MakeUri(factory_id, node_path, location)
-            wx.MemoryFSHandler.AddFileWithMimeType(uri, page.Close(), "text/html")
+        else:
+            return False
 
-            url = self._LastUrl = "memory:" + uri
-            self._WebView.LoadURL(url)
+
+    def Update(self, data_url):
+        if self.CreatePage(data_url):
+            web_url = self._LastUrl = web_url = MakeWebUrl(data_url)
+            self._WebView.LoadURL(web_url)
 
 
     #-------------------------------------------------------
     def OnPrevPageButton(self, event):
         self._WebView.GoBack()
-        self._WebView.SetFocus()
 
     def OnNextPageButton(self, event):
         self._WebView.GoForward()
-        self._WebView.SetFocus()
 
     def OnCheckCanGoBack(self, event):
         event.Enable(self._WebView.CanGoBack())
@@ -226,13 +245,43 @@ class G_DataExplorer:
 
         # user driven forwards/backwards navigation
         scheme, uri = url.split(':')
-        factory_id, node_path, location = self.SplitUri(uri)
+        factory_id, node_path, location, page = self.SplitDataUrl(uri)
         node = self.FindNode(factory_id, node_path)
 
         if node is not None:
-            self._LastUrl = url
-            node.MakeActive()
-            node.ShowLocation(location)
+            if node.ShowLocation(location):
+                node.MakeActive()
+                self._LastUrl = url
+
+
+
+## G_DataExplorerChildNode #################################
+
+class G_DataExplorerChildNode():
+
+    """
+    G_DataExplorer integration/support. Nodes will need to
+    implement:
+        GetNodePath()
+        GetFactoryID()
+        ShowLocation(location)
+        CreateDataExplorerPage(builder, location, page)
+    """
+
+    #-------------------------------------------------------
+    def GetDataExplorer(self):
+        return self.GetSessionNode().GetDataExplorer()
+
+
+    #-------------------------------------------------------
+    def MakeDataUrl(self, location = "any", page = "0"):
+        return G_DataExplorer.MakeDataUrl(self.GetFactoryID(), self.GetNodePath(), location, page)
+
+
+    #-------------------------------------------------------
+    def ShowLocation(self, location):
+        # default is to do nothing
+        return False
 
 
 
@@ -596,17 +645,12 @@ class G_SessionManager:
 
 ## G_SessionChildNode ######################################
 
-class G_SessionChildNode():
+class G_SessionChildNode(G_DataExplorerChildNode):
     """Mixin class to extend child nodes of a session node with common behaviour"""
 
     #-------------------------------------------------------
     def GetSessionNode(self):
         return self.GetParentNode(G_Project.NodeID_Session)
-
-
-    #-------------------------------------------------------
-    def GetDataExplorer(self):
-        return self.GetSessionNode().GetDataExplorer()
 
 
 

@@ -1053,21 +1053,25 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self.GetView().SetHistoryLine(line)
         self.ScrollToLine(line)
         self.RefreshView()
+        return True
 
 
-    def CreateDataExplorerPage(self, page, location):
+    def CreateDataExplorerPage(self, builder, location, page):
+        builder.AddPageHeading("View")
+        builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
+
         line = int(location)
         view = self.GetView()
 
-        page.AddHeading(1, "Line No")
-        page.AddParagraph(location)
+        builder.AddFieldHeading("Line No")
+        builder.AddFieldValue(location)
 
         for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
-            page.AddHeading(1, name)
-            page.AddParagraph(view.GetFieldText(line, field_id))
+            builder.AddFieldHeading(name)
+            builder.AddFieldValue(view.GetFieldText(line, field_id))
 
-        page.AddHeading(1, "Line")
-        page.AddParagraph(view.GetNonFieldText(line))
+        builder.AddFieldHeading("Line")
+        builder.AddFieldValue(view.GetNonFieldText(line))
 
 
     #-------------------------------------------------------
@@ -1199,7 +1203,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self.RefreshTrackers(update_local, update_global, self)
 
         # tell the data explorer
-        self.GetDataExplorer().Update(self._Factory.GetFactoryID(), self.GetNodePath(), str(cur_line))
+        self.GetDataExplorer().Update(self.MakeDataUrl(str(cur_line)))
 
         # tell the world
         self.NotifyLine(cur_line)

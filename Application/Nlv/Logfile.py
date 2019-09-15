@@ -16,6 +16,7 @@
 #
 
 # Python imports
+import datetime
 from pathlib import Path
 from weakref import ref as MakeWeakRef
 
@@ -1076,6 +1077,28 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     def MakeSessionDir(self):
         session_guid = self.GetSessionNode().GetSessionGuid()
         return G_Global.MakeCacheDir(self._FullPath, session_guid)
+
+
+    #-------------------------------------------------------
+    def GetNodePath(self):
+        return self.GetNodeLabel()
+
+
+    def CreateDataExplorerPage(self, builder, location, page):
+        builder.AddPageHeading("Log")
+
+        builder.AddFieldHeading("Path")
+        builder.AddFieldValue(str(self._FullPath))
+
+        stat = self._FullPath.stat()
+
+        builder.AddFieldHeading("Size")
+        size = int(stat.st_size / 1024)
+        builder.AddFieldValue("{size} K".format(size = size))
+
+        mtime = datetime.datetime.fromtimestamp(stat.st_mtime)
+        builder.AddFieldHeading("Modified")
+        builder.AddFieldValue(mtime.strftime("%A %d %B %Y %H:%M:%S"))
 
 
     #-------------------------------------------------------

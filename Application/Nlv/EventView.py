@@ -1308,10 +1308,13 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         return "{log_id}/{name}".format(log_id = self.GetLogNode().GetNodeLabel(), name = self._Name)
 
     def ShowLocation(self, location):
-        self.GetTableViewCtrl().ShowLocation(location)
+        return self.GetTableViewCtrl().ShowLocation(location)
 
-    def CreateDataExplorerPage(self, page, location):
-        self.GetTableViewCtrl().CreateDataExplorerPage(page, location)
+    def CreateDataExplorerPage(self, builder, location, page):
+        builder.AddPageHeading("Event")
+        builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
+
+        self.GetTableViewCtrl().CreateDataExplorerPage(builder, location, page)
 
 
     #-------------------------------------------------------
@@ -1328,7 +1331,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
             return
 
         # tell the data explorer
-        self.GetDataExplorer().Update(self._Factory.GetFactoryID(), self.GetNodePath(), self.GetTableViewCtrl().GetLocation(item))
+        self.GetDataExplorer().Update(self.MakeDataUrl(self.GetTableViewCtrl().GetLocation(item)))
 
         # identify tracking options
         info = self.GetTrackInfo()

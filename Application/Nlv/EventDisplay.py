@@ -216,11 +216,11 @@ class G_TableDataModel(wx.dataview.DataViewModel):
     def GetLocation(self, item):
         return str(self.ItemToKey(item))
 
-    def SetHistoryLKey(self, key):
+    def SetHistoryKey(self, key):
         self._HistoryKey = key
         return self.KeyToItem(key)
 
-    def CreateDataExplorerPage(self, page, location):
+    def CreateDataExplorerPage(self, builder, location, page):
         item_key = int(location)
         table_schema = self._TableSchema
 
@@ -237,8 +237,8 @@ class G_TableDataModel(wx.dataview.DataViewModel):
                 else:
                     text = display_value.Text
 
-                page.AddHeading(1, field.Name)
-                page.AddParagraph(text)
+                builder.AddFieldHeading(field.Name)
+                builder.AddFieldValue(text)
 
 
     #-------------------------------------------------------
@@ -763,11 +763,12 @@ class G_TableViewCtrl(G_DataViewCtrl):
         return self.GetModel().GetLocation(item)
 
     def ShowLocation(self, location):
-        item = self.GetModel().SetHistoryLKey(int(location))
+        item = self.GetModel().SetHistoryKey(int(location))
         self.EnsureVisible(item)
+        return True
 
-    def CreateDataExplorerPage(self, page, location):
-        return self.GetModel().CreateDataExplorerPage(page, location)
+    def CreateDataExplorerPage(self, builder, location, page):
+        return self.GetModel().CreateDataExplorerPage(builder, location, page)
 
 
     #-------------------------------------------------------
