@@ -962,7 +962,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         from .StyleNode import G_ColourTraits
         history_marker = Nlog.EnumConstants.StyleHistory
         editor.MarkerDefine(history_marker, wx.stc.STC_MARK_BACKGROUND)
-        editor.MarkerSetBackground(history_marker, G_ColourTraits.GetColour("ORCHID"))
+        editor.MarkerSetBackground(history_marker, G_ColourTraits.GetColour("MEDIUM SLATE BLUE"))
         editor.MarkerSetAlpha(history_marker, 50)
 
         # setup cursor unwanted zone (UZ); keeps GotoLine away from the top/bottom
@@ -1047,11 +1047,13 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def GetNodePath(self):
         return self.GetNodeLabel()
 
+
     def ShowLocation(self, location):
         line = int(location)
         self.GetView().SetHistoryLine(line)
         self.ScrollToLine(line)
         self.RefreshView()
+
 
     def CreateDataExplorerPage(self, page, location):
         line = int(location)
@@ -1197,7 +1199,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self.RefreshTrackers(update_local, update_global, self)
 
         # tell the data explorer
-        self.GetDataExplorer().Update("{factory}/{path}/{location}".format(factory = self._Factory.GetFactoryID(), path = self.GetNodePath(), location = cur_line))
+        self.GetDataExplorer().Update(self._Factory.GetFactoryID(), self.GetNodePath(), str(cur_line))
 
         # tell the world
         self.NotifyLine(cur_line)

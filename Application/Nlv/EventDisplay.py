@@ -112,9 +112,11 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
+        self._HistoryColour = G_ColourTraits.MakeColour("LIGHT SLATE BLUE")
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
+        self._HistoryKey = None
         self.Reset()
 
         self._Icons = [
@@ -208,6 +210,35 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             return candidate_parent_key
 
         return -1
+
+
+    #-------------------------------------------------------
+    def GetLocation(self, item):
+        return str(self.ItemToKey(item))
+
+    def SetHistoryLKey(self, key):
+        self._HistoryKey = key
+        return self.KeyToItem(key)
+
+    def CreateDataExplorerPage(self, page, location):
+        item_key = int(location)
+        table_schema = self._TableSchema
+
+        for col_num, field in enumerate(self._TableSchema):
+            if field.Available:
+                display_value = self.GetFieldDisplayValue(item_key, col_num)
+                if isinstance(display_value, str):
+                    text = display_value
+                elif isinstance(display_value, bool):
+                    if display_value:
+                        text = "True"
+                    else:
+                        text = "False"
+                else:
+                    text = display_value.Text
+
+                page.AddHeading(1, field.Name)
+                page.AddParagraph(text)
 
 
     #-------------------------------------------------------
@@ -337,6 +368,9 @@ class G_TableDataModel(wx.dataview.DataViewModel):
                 wrapped_attr.SetFgColour(self._ColumnColours[field_id])
 
         item_key = self.ItemToKey(item)
+        if item_key == self._HistoryKey:
+            wrapped_attr.SetBgColour(self._HistoryColour, True)
+
         for hiliter in self._Hiliters:
             if self._N_EventView.GetHiliter(hiliter._Id).Hit(item_key):
                 wrapped_attr.SetBgColour(hiliter._Colour)
@@ -722,6 +756,18 @@ class G_TableViewCtrl(G_DataViewCtrl):
     def UpdateFieldColour(self, field_id, colour_id):
         self.GetModel().UpdateFieldColour(field_id, colour_id)
         self.Refresh()
+
+
+    #-------------------------------------------------------
+    def GetLocation(self, item):
+        return self.GetModel().GetLocation(item)
+
+    def ShowLocation(self, location):
+        item = self.GetModel().SetHistoryLKey(int(location))
+        self.EnsureVisible(item)
+
+    def CreateDataExplorerPage(self, page, location):
+        return self.GetModel().CreateDataExplorerPage(page, location)
 
 
     #-------------------------------------------------------

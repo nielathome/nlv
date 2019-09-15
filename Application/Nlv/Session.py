@@ -183,14 +183,19 @@ class G_DataExplorer:
         return factory_id, node_path, location
 
 
-    def Update(self, uri):
-        factory_id, node_path, location = self.SplitUri(uri)
+    @staticmethod
+    def MakeUri(factory_id, node_path, location):
+        return "{factory_id}/{node_path}/{location}".format(factory_id = factory_id, node_path = node_path, location = location)
+
+
+    def Update(self, factory_id, node_path, location):
         node = self.FindNode(factory_id, node_path)
 
         if node is not None:
             page = G_DataExplorerPage()
             node.CreateDataExplorerPage(page, location)
 
+            uri = self.MakeUri(factory_id, node_path, location)
             wx.MemoryFSHandler.AddFileWithMimeType(uri, page.Close(), "text/html")
 
             url = self._LastUrl = "memory:" + uri

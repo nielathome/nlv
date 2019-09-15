@@ -1304,6 +1304,17 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    def GetNodePath(self):
+        return "{log_id}/{name}".format(log_id = self.GetLogNode().GetNodeLabel(), name = self._Name)
+
+    def ShowLocation(self, location):
+        self.GetTableViewCtrl().ShowLocation(location)
+
+    def CreateDataExplorerPage(self, page, location):
+        self.GetTableViewCtrl().CreateDataExplorerPage(page, location)
+
+
+    #-------------------------------------------------------
     def TimecodeText(self, timecode):
         # not entirely clear this will work for all locales
         timecode.Normalise()
@@ -1315,6 +1326,9 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         if item is None:
             # ignore de-selection events
             return
+
+        # tell the data explorer
+        self.GetDataExplorer().Update(self._Factory.GetFactoryID(), self.GetNodePath(), self.GetTableViewCtrl().GetLocation(item))
 
         # identify tracking options
         info = self.GetTrackInfo()
@@ -1352,6 +1366,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
             # flush any changes through to the GUI
             self.RefreshTrackers(False, True, None)
+
 
 
     #-------------------------------------------------------
