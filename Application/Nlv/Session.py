@@ -104,12 +104,17 @@ class G_DataExplorerPageCache:
 
 
     #-------------------------------------------------------
-    def Valid(self, key, ref_date):
+    def Valid(self, key, ref_validity):
         # returns a tuple of validity and navigability; a
         # valid is key where the cache entry was created after
         # the reference date
+        ref_date, invalidity_reason = ref_validity
         cache_date, navigable = self._Keys[key]
-        return (ref_date < cache_date, navigable)
+
+        if ref_date < cache_date:
+            invalidity_reason = None
+
+        return (invalidity_reason, navigable)
 
 
     #-------------------------------------------------------
@@ -244,6 +249,7 @@ class G_DataExplorer:
         # create web control
         self._WebView = wx.html2.WebView.New(parent)
         self._WebView.EnableHistory(True)
+        self._WebView.EnableContextMenu(False)
 
         # setup virtual filesystem: "memory:"
         wx.FileSystem.AddHandler(wx.MemoryFSHandler())
@@ -302,7 +308,7 @@ class G_DataExplorer:
         if node is not None:
             if not self._PageCache.Contains(data_url):
                 page_builder = G_DataExplorerPageBuilder(self)
-                node.CreateDataExplorerPage(page_builder, location, page)
+                node.GetDataExplorerProvider().CreateDataExplorerPage(page_builder, location, page)
                 self._PageCache.Add(data_url, page_builder.Close())
             return True
 
@@ -317,10 +323,13 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
-    def MakeErrorPage(self, title, text, data_url):
+    def MakeErrorPage(self, title, text, data_url, field_name = None, field_value = None):
         builder = G_DataExplorerPageBuilder(self)
         builder.AddPageHeading(title, "color:darkred")
         builder.AddFieldValue(text)
+
+        if field_name is not None:
+            builder.AddField(field_name, field_value)
 
         factory_id, node_path, location, page = self.SplitDataUrl(data_url)
         builder.AddField("Path", node_path)
@@ -361,16 +370,55 @@ class G_DataExplorer:
             self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
             return
 
-        valid, navigable = self._PageCache.Valid(data_url, node.GetDataExplorerValidDate())
-        if not valid:
-            self.MakeErrorPage("Outdated View", "The view has been modified, and has not been synchronised to the data explorer.", data_url)
+        ref_validity = node.GetDataExplorerProvider().GetDataValidity()
+        invalidity_reason, navigable = self._PageCache.Valid(data_url, ref_validity)
+        if invalidity_reason is not None:
+            self.MakeErrorPage("Modified View", "The view has been modified, and has not been synchronised to the data explorer.", data_url, "Modification", invalidity_reason)
             return
 
-        if navigable and self._LastWebUrl != web_url and node.ShowLocation(location):
+        if navigable and self._LastWebUrl != web_url and node.GetDataExplorerSync().ShowLocation(location):
             node.MakeActive()
             self._LastWebUrl = web_url
 
         
+
+## G_DataExplorerProvider #################################
+
+class G_DataExplorerProvider:
+    """
+    Abstract base class for data providers. Concrete classes
+    will need to implement:
+        
+        def CreateDataExplorerPage(self, builder, location, page):
+            # create HTML text for the given location
+            pass
+    """
+
+    #-------------------------------------------------------
+    def SetDataValidity(self, reason = "Initialisation"):
+        self._Validity = (datetime.datetime.now(), reason)
+
+
+    #-------------------------------------------------------
+    def GetDataValidity(self):
+        return self._Validity
+
+
+
+## G_DataExplorerSync #####################################
+
+class G_DataExplorerSync:
+    """
+    Abstract base class for display views synchronised to the
+    data provider
+    """
+        
+    def ShowLocation(self, location):
+        # switch UI to ensure 'location' is visible on
+        # the screen
+        return False
+
+
 
 ## G_DataExplorerChildNode #################################
 
@@ -381,8 +429,12 @@ class G_DataExplorerChildNode():
     implement:
         GetNodePath()
         GetFactoryID()
-        ShowLocation(location)
+
+    and if the default provider is used:
         CreateDataExplorerPage(builder, location, page)
+
+    and if the default sync is used:
+        ShowLocation(location)
     """
 
     #-------------------------------------------------------
@@ -396,17 +448,27 @@ class G_DataExplorerChildNode():
 
 
     #-------------------------------------------------------
-    def ShowLocation(self, location):
-        # default is to do nothing
-        return False
+    def SetupDataExplorer(self, provider = None, sync = None):
+        self._DataExplorerProvider = provider
+        self._DataExplorerSync = sync
+        self.SetDataExplorerValidity("Initialisation")
+
+    def GetDataExplorerProvider(self):
+        if self._DataExplorerProvider is None:
+            return self
+        else:
+            return self._DataExplorerProvider
+
+    def GetDataExplorerSync(self):
+        if self._DataExplorerSync is None:
+            return self
+        else:
+            return self._DataExplorerSync
 
 
     #-------------------------------------------------------
-    def SetDataExplorerValid(self):
-        self._DataExplorerValid = datetime.datetime.now()
-
-    def GetDataExplorerValidDate(self):
-        return self._DataExplorerValid
+    def SetDataExplorerValidity(self, reason):
+        self.GetDataExplorerProvider().SetDataValidity(reason)
 
 
 

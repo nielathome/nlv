@@ -36,6 +36,8 @@ from .EventProjector import G_ScriptGuard
 from .Project import G_Global
 from .Project import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
+from .Session import G_DataExplorerProvider
+from .Session import G_DataExplorerSync
 
 # wxWidgets imports
 import wx
@@ -101,13 +103,14 @@ class G_TableFieldFormatter:
 
 ## G_TableDataModel ########################################
 
-class G_TableDataModel(wx.dataview.DataViewModel):
+class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
-    def __init__(self, permit_nesting):
+    def __init__(self, permit_nesting, doc_url):
         super().__init__()
 
         self._PermitNesting = permit_nesting
+        self._DocumentUrl = doc_url
         self._ViewFlat = True
         self._RawFieldMask = 0
         self._IsValid = True
@@ -137,6 +140,10 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
 
     #-------------------------------------------------------
+    def ClearDataValidity(self, reason):
+        self._HistoryKey = None
+        self.SetDataValidity(reason)
+
     def Reset(self, table_schema = None):
         self._N_Logfile = None
         self._N_EventView = None
@@ -157,6 +164,8 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             self._ModelColumnToFieldId.append(fid)
 
         self._ParentKeyToChildKeys = dict()
+
+        self.ClearDataValidity("Model reset")
 
 
     #-------------------------------------------------------
@@ -221,6 +230,9 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         return self.KeyToItem(key)
 
     def CreateDataExplorerPage(self, builder, location, page):
+        builder.AddPageHeading("Event")
+        builder.AddLink(self._DocumentUrl, "Show log ...")
+
         item_key = int(location)
         table_schema = self._TableSchema
 
@@ -499,6 +511,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if not self.FilterLineSet(match):
             return False
         
+        self.ClearDataValidity("Filter: {match}".format(match = match.GetDescription()))
         self.Cleared()
         return True
 
@@ -508,6 +521,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if self._N_EventView is not None:
             (data_col_offset, direction) = self._TableSchema[col_num].ToggleSortDirection()
             self._N_EventView.Sort(col_num + data_col_offset, direction)
+            self.ClearDataValidity("Sorting")
             self.Cleared()
             return True
         else:
@@ -579,6 +593,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
         self._ViewFlat = view_flat
         if do_rebuild:
+            self.ClearDataValidity("Nesting level")
             self.Cleared()
 
 
@@ -606,7 +621,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, permit_nesting, flags):
+    def __init__(self, parent, permit_nesting, flags, doc_url):
         super().__init__(
             parent,
             style = wx.dataview.DV_ROW_LINES
@@ -614,7 +629,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
             | flags
         )
 
-        self.AssociateModel(G_TableDataModel(permit_nesting))
+        self.AssociateModel(G_TableDataModel(permit_nesting, doc_url))
         self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
@@ -683,7 +698,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 ## G_TableViewCtrl #########################################
 
-class G_TableViewCtrl(G_DataViewCtrl):
+class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
     #-------------------------------------------------------
     def __init__(self, parent, node, permit_nesting = True, multiple_selection = False):
@@ -691,7 +706,8 @@ class G_TableViewCtrl(G_DataViewCtrl):
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        super().__init__(parent, permit_nesting, flags)
+        doc_url = node.GetLogNode().MakeDataUrl()
+        super().__init__(parent, permit_nesting, flags, doc_url)
 
         self._SelectionHandlerNode = node
         self.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED, self.OnItemActivated)
@@ -765,9 +781,6 @@ class G_TableViewCtrl(G_DataViewCtrl):
         item = self.GetModel().SetHistoryKey(int(location))
         self.EnsureVisible(item)
         return True
-
-    def CreateDataExplorerPage(self, builder, location, page):
-        return self.GetModel().CreateDataExplorerPage(builder, location, page)
 
 
     #-------------------------------------------------------

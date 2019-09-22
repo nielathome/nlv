@@ -1207,7 +1207,7 @@ class G_HideableTreeNode:
         show = not self._Field.ShowThisNodeDisplay.Value
 
         # if hiding, clear any pending display window refocus events
-        # as they arrive after the AUI tab is hiddent, causing it to re-display
+        # as they arrive after the AUI tab is hidden, causing it to re-display
         if not show:
             self.ClearSendFocusToCtrl()
 

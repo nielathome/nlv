@@ -1251,7 +1251,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_LogAnalysisChildProjectorNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
-        self.SetDataExplorerValid()
         self._Name = name
 
     def PostInitNode(self):
@@ -1264,6 +1263,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         display_notebook.AddPage(table_ctrl, self._Name)
         self.SetDisplayCtrl(display_notebook, table_ctrl, owns_display_ctrl = False)
         self.SetupTableViewIntercepts()
+        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
 
 
     #-------------------------------------------------------
@@ -1307,15 +1307,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     def GetNodePath(self):
         return "{log_id}/{name}".format(log_id = self.GetLogNode().GetNodeLabel(), name = self._Name)
-
-    def ShowLocation(self, location):
-        return self.GetTableViewCtrl().ShowLocation(location)
-
-    def CreateDataExplorerPage(self, builder, location, page):
-        builder.AddPageHeading("Event")
-        builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
-
-        self.GetTableViewCtrl().CreateDataExplorerPage(builder, location, page)
 
 
     #-------------------------------------------------------
@@ -1377,10 +1368,9 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def OnFilterMatch(self, match):
         """The filter has changed"""
         ok = self.GetTableViewCtrl().UpdateFilter(match)
-        self.SetDataExplorerValid()
 
         # propagate new event list to all metrics
-        if not self._Initialising:
+        if ok and not self._Initialising:
             self.GetLogAnalysisNode().UpdateContent(event = False)
 
         return ok
@@ -1593,7 +1583,6 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_LogAnalysisChildProjectorNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
-        self.SetDataExplorerValid()
         self._Name = name
 
     def PostInitNode(self):
@@ -1606,6 +1595,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         display_notebook.AddPage(metrics_viewer, self._Name)
         self.SetDisplayCtrl(display_notebook, metrics_viewer, owns_display_ctrl = False)
         self.SetupTableViewIntercepts()
+        self.SetupDataExplorer(metrics_viewer.GetModel(),metrics_viewer)
 
 
     #-------------------------------------------------------
@@ -1646,7 +1636,6 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.SetDataExplorerValid()
             self.GetMetricsViewCtrl().UpdateMetrics().Realise()
             return True
         else:

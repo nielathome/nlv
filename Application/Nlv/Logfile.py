@@ -37,6 +37,8 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
+from .Session import G_DataExplorerProvider
+from .Session import G_DataExplorerSync
 from .Session import G_SessionChildNode
 from .StyleNode import G_ColourNode
 from .StyleNode import G_MarkerStyleNode
@@ -938,7 +940,7 @@ class G_LogThemeContainerNode(G_LogChildNode, G_ListContainerNode):
 
 ## G_LogNode ##############################################
 
-class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
+class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider, G_DataExplorerSync):
     """
     Class that implements a logfile.
     Instances are attached to the logfile nodes in the project tree.
@@ -947,7 +949,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         super().__init__(factory, wproject, witem)
-        self.SetDataExplorerValid()
+        self.SetupDataExplorer()
 
         self._ViewCount = 0
         self._N_Logfile = None

@@ -39,6 +39,8 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
+from .Session import G_DataExplorerProvider
+from .Session import G_DataExplorerSync
 from .StyleNode import G_ColourNode
 from .StyleNode import G_ColourTraits
 from .StyleNode import G_EnabledColourNode
@@ -491,7 +493,6 @@ class G_ViewFilterNode(G_ViewChildNode, G_ThemeNode, G_MatchNode, G_TabContained
     #-------------------------------------------------------
     def OnMatch(self, match, refocus = None):
         if self.GetViewNode().UpdateFilter(match):
-            self.GetViewNode().SetDataExplorerValid()
             self.SetMetrics()
             self.SendFocusToDisplayCtrl(refocus)
             return True
@@ -869,7 +870,7 @@ class G_ViewThemeContainerNode(G_ViewChildNode, G_ListContainerNode):
 
 ## G_ViewNode ##############################################
 
-class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
+class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider, G_DataExplorerSync):
     """Class that implements a view onto a logfile"""
 
     # global tracker key binding map to tracker index
@@ -886,7 +887,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         # track our position in the project tree
         G_DisplayNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
-        self.SetDataExplorerValid()
+        self.SetupDataExplorer()
 
         self._CursorLine = -1
         self._AutoHiliteText = ""
@@ -1335,8 +1336,11 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def UpdateFilter(self, match):
         """The filter GUI page has been altered; re-filter the logfile view"""
-        return self._N_View.Filter(match)
-
+        ok = self._N_View.Filter(match)
+        if ok:
+            self.SetDataExplorerValidity("Filter: {match}".format(match = match.GetDescription()))
+        return ok
+            
 
     #-------------------------------------------------------
     def UpdateMargin(self, type, precision):
