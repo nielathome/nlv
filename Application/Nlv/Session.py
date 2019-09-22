@@ -62,7 +62,11 @@ class G_DataExplorerPageCache:
     def __init__(self):
         # both containers have the same contents, but are used
         # for different purposes
+
+        # order list of keys, first entry is oldest, last is newest
         self._MRU = []
+
+        # tuples of validity (date/time) and navigability of a page
         self._Keys = dict()
 
 
@@ -101,16 +105,19 @@ class G_DataExplorerPageCache:
 
     #-------------------------------------------------------
     def Valid(self, key, ref_date):
-        # valid id the cache entry was created after the reference date
-        return ref_date < self._Keys[key]
+        # returns a tuple of validity and navigability; a
+        # valid is key where the cache entry was created after
+        # the reference date
+        cache_date, navigable = self._Keys[key]
+        return (ref_date < cache_date, navigable)
 
 
     #-------------------------------------------------------
-    def Add(self, key, data):
+    def Add(self, key, data, navigable = True):
         if key in self._Keys:
             self.Remove(key)
 
-        self._Keys[key] = datetime.datetime.now()
+        self._Keys[key] = (datetime.datetime.now(), navigable)
         self._MRU.append(key)
         wx.MemoryFSHandler.AddFileWithMimeType(key, data, "text/html")
         self.Prune()
@@ -252,16 +259,17 @@ class G_DataExplorer:
 
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         parent.Bind(wx.html2.EVT_WEBVIEW_NAVIGATING, self.OnWebViewNavigating)
-        parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnWebViewLoaded)
 
         button = wx.Button(parent, style = wx.BU_NOTEXT)
         button.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_GO_BACK, wx.ART_TOOLBAR, (16, 16)))
+        button.SetToolTip("Navigate to previous location in history")
         parent.Bind(wx.EVT_BUTTON, self.OnPrevPageButton, button)
         hsizer.Add(button, proportion = 0, flag = wx.EXPAND)
         parent.Bind(wx.EVT_UPDATE_UI, self.OnCheckCanGoBack, button)
 
         button = wx.Button(parent, style = wx.BU_NOTEXT)
         button.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_GO_FORWARD, wx.ART_TOOLBAR, (16, 16)))
+        button.SetToolTip("Navigate to next location in history")
         parent.Bind(wx.EVT_BUTTON, self.OnNextPageButton, button)
         hsizer.Add(button, proportion = 0, flag = wx.EXPAND)
         parent.Bind(wx.EVT_UPDATE_UI, self.OnCheckCanGoForward, button)
@@ -319,7 +327,7 @@ class G_DataExplorer:
         builder.AddField("Location", location)
         builder.AddField("Page", page)
 
-        self._PageCache.Add(data_url, builder.Close())
+        self._PageCache.Add(data_url, builder.Close(), False)
 
 
     #-------------------------------------------------------
@@ -353,33 +361,16 @@ class G_DataExplorer:
             self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
             return
 
-        if not self._PageCache.Valid(data_url, node.GetDataExplorerValidDate()):
+        valid, navigable = self._PageCache.Valid(data_url, node.GetDataExplorerValidDate())
+        if not valid:
             self.MakeErrorPage("Outdated View", "The view has been modified, and has not been synchronised to the data explorer.", data_url)
             return
 
-        if self._LastWebUrl != web_url and node.ShowLocation(location):
+        if navigable and self._LastWebUrl != web_url and node.ShowLocation(location):
             node.MakeActive()
             self._LastWebUrl = web_url
 
         
-    #-------------------------------------------------------
-    def OnWebViewLoaded(self, event):
-        pass
-        #web_url = event.GetURL()
-        #if web_url.find("memory:") != 0 or self._LastWebUrl == web_url:
-        #    return
-
-        ## user driven forwards/backwards navigation
-        #scheme, data_url = web_url.split(':')
-        #factory_id, node_path, location, page = self.SplitDataUrl(data_url)
-        #node = self.FindNode(factory_id, node_path)
-
-        #if node is not None:
-        #    if node.ShowLocation(location):
-        #        node.MakeActive()
-        #        self._LastWebUrl = web_url
-
-
 
 ## G_DataExplorerChildNode #################################
 
