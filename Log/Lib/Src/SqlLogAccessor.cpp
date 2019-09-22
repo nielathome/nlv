@@ -358,14 +358,14 @@ class SqlLineAccessorCore : public LineAccessor
 {
 protected:
 	unsigned m_NumFields;
-	uint64_t m_FieldViewMask{ 0 };
+	const uint64_t * m_FieldViewMask;
 	nlineno_t m_LineNo{ 0 };
 
 	// transient store for line information
 	mutable LineBuffer m_LineBuffer;
 
 public:
-	SqlLineAccessorCore( unsigned num_fields = 0, uint64_t field_mask = 0 )
+	SqlLineAccessorCore( unsigned num_fields = 0, const uint64_t * field_mask = nullptr )
 		: m_NumFields{ num_fields }, m_FieldViewMask{ field_mask } {}
 
 public:
@@ -408,7 +408,7 @@ private:
 	statement_ptr_t m_Statement;
 
 public:
-	SqlLogLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement );
+	SqlLogLineAccessor( const SqlLogAccessor * log_accessor, const uint64_t * field_mask, statement_ptr_t statement );
 
 	void IncLineNo( void ) {
 		m_LineBuffer.Clear();
@@ -435,7 +435,7 @@ private:
 	std::vector<capture_t> m_Captures;
 
 public:
-	void Capture( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement );
+	void Capture( const SqlLogAccessor * log_accessor, const uint64_t * field_mask, statement_ptr_t statement );
 
 public:
 	// LineAccessor interfaces
@@ -589,7 +589,7 @@ private:
 	nlineno_t m_NumLines{ 0 };
 
 	// Line caching
-	using LineCache = Cache<SqlViewLineAccessor, LineKey>;
+	using LineCache = Cache<SqlViewLineAccessor, nlineno_t>;
 	static CacheStatistics m_LineCacheStats;
 	mutable LineCache m_LineCache{ 128, m_LineCacheStats };
 
@@ -670,11 +670,11 @@ nlineno_t SqlLineAccessorCore::GetLength( void ) const
 
 void SqlLineAccessorCore::GetText( const char ** first, const char ** last ) const
 {
-	if( m_LineBuffer.Empty() )
+	if( m_LineBuffer.Empty() && (m_FieldViewMask != nullptr))
 	{
 		uint64_t bit{ 0x1 };
 		for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, bit <<= 1 )
-			if( m_FieldViewMask & bit )
+			if( *m_FieldViewMask & bit )
 			{
 				const char * f{ nullptr }; const char * l{ nullptr };
 				GetFieldText( field_id, &f, &l );
@@ -693,7 +693,7 @@ void SqlLineAccessorCore::GetText( const char ** first, const char ** last ) con
  * SqlLogLineAccessor, definitions
  -----------------------------------------------------------------------*/
 
-SqlLogLineAccessor::SqlLogLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
+SqlLogLineAccessor::SqlLogLineAccessor( const SqlLogAccessor * log_accessor, const uint64_t * field_mask, statement_ptr_t statement )
 	:
 	SqlLineAccessorCore{ static_cast<unsigned>(log_accessor->GetNumFields()), field_mask },
 	m_LogAccessor{ log_accessor },
@@ -720,7 +720,7 @@ fieldvalue_t SqlLogLineAccessor::GetFieldValue( unsigned field_id ) const
  * SqlViewLineAccessor, definitions
  -----------------------------------------------------------------------*/
 
-void SqlViewLineAccessor::Capture( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
+void SqlViewLineAccessor::Capture( const SqlLogAccessor * log_accessor, const uint64_t * field_mask, statement_ptr_t statement )
 {
 	m_NumFields = static_cast<unsigned>(log_accessor->GetNumFields());
 	m_Captures.reserve( m_NumFields );
@@ -732,12 +732,9 @@ void SqlViewLineAccessor::Capture( const SqlLogAccessor * log_accessor, uint64_t
 	for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, mask <<= 1 )
 	{
 		std::string text;
-		if( mask & field_mask )
-		{
-			const char * first{ nullptr }; const char * last{ nullptr };
-			log_accessor->GetFieldText( statement, field_id, &first, &last );
-			text.assign( first, last );
-		}
+		const char * first{ nullptr }; const char * last{ nullptr };
+		log_accessor->GetFieldText( statement, field_id, &first, &last );
+		text.assign( first, last );
 
 		const fieldvalue_t value{ log_accessor->GetFieldValue( statement, field_id ) };
 
@@ -819,7 +816,7 @@ void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64
 	if( !Ok( res ) )
 		return;
 
-	SqlLogLineAccessor line{ this, field_mask, statement };
+	SqlLogLineAccessor line{ this, & field_mask, statement };
 	while( statement->Step() == Error::e_SqlRow )
 	{
 		func( line );
@@ -859,7 +856,7 @@ std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
 
 void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
-	LineCache::find_t found{ m_LineCache.Find( { visit_line_no, m_FieldViewMask } ) };
+	LineCache::find_t found{ m_LineCache.Find( visit_line_no ) };
 	SqlViewLineAccessor * line{ found.second };
 
 	if( !found.first )
@@ -879,12 +876,12 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 				capture = line;
 			else
 			{
-				LineCache::find_t f{ m_LineCache.Find( { visit_line_no + i, m_FieldViewMask } ) };
+				LineCache::find_t f{ m_LineCache.Find( visit_line_no + i ) };
 				capture = f.first ? nullptr : f.second;
 			}
 
 			if( capture && Ok( res ) )
-				capture->Capture( m_LogAccessor, m_FieldViewMask, statement );
+				capture->Capture( m_LogAccessor, & m_FieldViewMask, statement );
 		}
 	}
 

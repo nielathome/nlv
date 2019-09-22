@@ -491,6 +491,7 @@ class G_ViewFilterNode(G_ViewChildNode, G_ThemeNode, G_MatchNode, G_TabContained
     #-------------------------------------------------------
     def OnMatch(self, match, refocus = None):
         if self.GetViewNode().UpdateFilter(match):
+            self.GetViewNode().SetDataExplorerValid()
             self.SetMetrics()
             self.SendFocusToDisplayCtrl(refocus)
             return True
@@ -885,6 +886,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         # track our position in the project tree
         G_DisplayNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self.SetDataExplorerValid()
+
         self._CursorLine = -1
         self._AutoHiliteText = ""
         self._OrigNameId = name.split("/")[-1]
@@ -1063,15 +1066,12 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         line = int(location)
         view = self.GetView()
 
-        builder.AddFieldHeading("Line No")
-        builder.AddFieldValue(location)
+        builder.AddField("Line No", location)
 
         for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
-            builder.AddFieldHeading(name)
-            builder.AddFieldValue(view.GetFieldText(line, field_id))
+            builder.AddField(name, view.GetFieldText(line, field_id))
 
-        builder.AddFieldHeading("Line")
-        builder.AddFieldValue(view.GetNonFieldText(line))
+        builder.AddField("Line", view.GetNonFieldText(line))
 
 
     #-------------------------------------------------------

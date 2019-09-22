@@ -1251,6 +1251,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_LogAnalysisChildProjectorNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self.SetDataExplorerValid()
         self._Name = name
 
     def PostInitNode(self):
@@ -1376,6 +1377,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def OnFilterMatch(self, match):
         """The filter has changed"""
         ok = self.GetTableViewCtrl().UpdateFilter(match)
+        self.SetDataExplorerValid()
 
         # propagate new event list to all metrics
         if not self._Initialising:
@@ -1591,6 +1593,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_LogAnalysisChildProjectorNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self.SetDataExplorerValid()
         self._Name = name
 
     def PostInitNode(self):
@@ -1643,6 +1646,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
+            self.SetDataExplorerValid()
             self.GetMetricsViewCtrl().UpdateMetrics().Realise()
             return True
         else:

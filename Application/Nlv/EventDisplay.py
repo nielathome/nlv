@@ -237,8 +237,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
                 else:
                     text = display_value.Text
 
-                builder.AddFieldHeading(field.Name)
-                builder.AddFieldValue(text)
+                builder.AddField(field.Name, text)
 
 
     #-------------------------------------------------------

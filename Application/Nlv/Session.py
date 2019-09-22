@@ -16,6 +16,7 @@
 #
 
 # Python imports
+import datetime
 import html
 import io
 import logging
@@ -49,6 +50,72 @@ from .Theme import GetThemeGallery
 import Nlog
 
 
+## G_DataExplorerPageCache #################################
+
+class G_DataExplorerPageCache:
+    """Wrapper for wx.MemoryFSHandler"""
+
+    _MaxHistory = 150
+
+
+    #-------------------------------------------------------
+    def __init__(self):
+        # both containers have the same contents, but are used
+        # for different purposes
+        self._MRU = []
+        self._Keys = dict()
+
+
+    #-------------------------------------------------------
+    def Clear(self):
+        for key in self._Keys:
+            wx.MemoryFSHandler.RemoveFile(key)
+
+        self._MRU.clear()
+        self._Keys.clear()
+
+
+    #-------------------------------------------------------
+    def Remove(self, key):
+        wx.MemoryFSHandler.RemoveFile(key)
+        self._MRU.remove(key)
+        del self._Keys[key]
+
+
+    #-------------------------------------------------------
+    def Prune(self):
+        while len(self._MRU) > self._MaxHistory:
+            self.Remove(self._MRU[0])
+
+
+    #-------------------------------------------------------
+    def Contains(self, key):
+        contains = key in self._Keys
+        if contains:
+            # effectively, drop key to end of MRU list; makes
+            # it the most-recently-used key
+            self._MRU.remove(key)
+            self._MRU.append(key)
+        return contains
+
+
+    #-------------------------------------------------------
+    def Valid(self, key, ref_date):
+        # valid id the cache entry was created after the reference date
+        return ref_date < self._Keys[key]
+
+
+    #-------------------------------------------------------
+    def Add(self, key, data):
+        if key in self._Keys:
+            self.Remove(key)
+
+        self._Keys[key] = datetime.datetime.now()
+        self._MRU.append(key)
+        wx.MemoryFSHandler.AddFileWithMimeType(key, data, "text/html")
+        self.Prune()
+    
+
 
 ## G_DataExplorerPageBuilder ###############################
 
@@ -58,37 +125,53 @@ def MakeWebUrl(data_url):
 class G_DataExplorerPageBuilder:
     """Support building pages to display in the data explorer"""
 
+    _PageHead = """
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <link rel="stylesheet" type="text/css" href="memory:style.css">
+        </head>
+        <body>
+    """
+
+    _PageTail = """
+        </body></html>
+    """
+
+
     #-------------------------------------------------------
     def __init__(self, data_explorer):
         self._DataExplorer = data_explorer
         self._HtmlStream = io.StringIO()
-        self.AddText("""
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <link rel="stylesheet" type="text/css" href="memory:style.css">
-            </head>
-            <body>
-        """)
+        self.AddText(self._PageHead)
 
 
     #-------------------------------------------------------
     def AddText(self, text):
         self._HtmlStream.write(text + "\n")
 
-    def AddElement(self, tag, text):
-        self.AddText("<{tag}>{text}</{tag}>".format(tag = tag, text = html.escape(text)))
+    def AddElement(self, tag, text, style = None):
+        if style is not None:
+            style = ' style="{style}"'.format(style = style)
+        else:
+            style = ""
+
+        self.AddText("<{tag}{style}>{text}</{tag}>".format(tag = tag, style = style, text = html.escape(text)))
 
 
     #-------------------------------------------------------
-    def AddPageHeading(self, text):
-        self.AddElement("h1", text)
+    def AddPageHeading(self, text, style = None):
+        self.AddElement("h1", text, style)
 
     def AddFieldHeading(self, text):
         self.AddElement("h2", text)
 
     def AddFieldValue(self, text):
         self.AddElement("p", text)
+
+    def AddField(self, heading, value):
+        self.AddFieldHeading(heading)
+        self.AddFieldValue(value)
 
     def AddLink(self, data_url, text):
         if self._DataExplorer.CreatePage(data_url):
@@ -97,7 +180,7 @@ class G_DataExplorerPageBuilder:
 
     #-------------------------------------------------------
     def Close(self):
-        self.AddText("</body></html>")
+        self.AddText(self._PageTail)
         return self._HtmlStream.getvalue()
 
 
@@ -108,6 +191,7 @@ class G_DataExplorer:
     """Class that implements the project data explorer panel"""
 
     _DataExplorer = None
+
     _NodePathSplit = "__node_path__"
     _LocationSplit = "__at__"
     _PageSplit = "__page__"
@@ -145,7 +229,9 @@ class G_DataExplorer:
     #-------------------------------------------------------
     def __init__(self, frame):
         self._Frame = frame
-        self._LastUrl = None
+        self._PageCache = G_DataExplorerPageCache()
+        self._LastWebUrl = None
+
         parent = frame.GetDataExplorer()
 
         # create web control
@@ -165,7 +251,7 @@ class G_DataExplorer:
         vsizer = wx.BoxSizer(wx.VERTICAL)
 
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
-        #self.Bind(wx.html2.EVT_WEBVIEW_NAVIGATING, self.OnWebViewNavigating, self._WebView)
+        parent.Bind(wx.html2.EVT_WEBVIEW_NAVIGATING, self.OnWebViewNavigating)
         parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnWebViewLoaded)
 
         button = wx.Button(parent, style = wx.BU_NOTEXT)
@@ -186,20 +272,18 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
-    def ClearHistory(self):
-        self._WebView.ClearHistory()
-
-
-    #-------------------------------------------------------
-    def GetRootNode(self):
-        return self._Frame.GetProject().GetRootNode()
-
-
     def FindNode(self, factory_id, node_path):
-        for node in self.GetRootNode().ListSubNodes(factory_id, recursive = True):
+        root_node = self._Frame.GetProject().GetRootNode()
+        for node in root_node.ListSubNodes(factory_id, recursive = True):
             if node.GetNodePath() == node_path:
                 return node
         return None
+
+
+    #-------------------------------------------------------
+    def ClearHistory(self):
+        self._PageCache.Clear()
+        self._WebView.ClearHistory()
 
 
     #-------------------------------------------------------
@@ -208,9 +292,10 @@ class G_DataExplorer:
         node = self.FindNode(factory_id, node_path)
 
         if node is not None:
-            page_builder = G_DataExplorerPageBuilder(self)
-            node.CreateDataExplorerPage(page_builder, location, page)
-            wx.MemoryFSHandler.AddFileWithMimeType(data_url, page_builder.Close(), "text/html")
+            if not self._PageCache.Contains(data_url):
+                page_builder = G_DataExplorerPageBuilder(self)
+                node.CreateDataExplorerPage(page_builder, location, page)
+                self._PageCache.Add(data_url, page_builder.Close())
             return True
 
         else:
@@ -219,8 +304,22 @@ class G_DataExplorer:
 
     def Update(self, data_url):
         if self.CreatePage(data_url):
-            web_url = self._LastUrl = web_url = MakeWebUrl(data_url)
+            self._LastWebUrl = web_url = MakeWebUrl(data_url)
             self._WebView.LoadURL(web_url)
+
+
+    #-------------------------------------------------------
+    def MakeErrorPage(self, title, text, data_url):
+        builder = G_DataExplorerPageBuilder(self)
+        builder.AddPageHeading(title, "color:darkred")
+        builder.AddFieldValue(text)
+
+        factory_id, node_path, location, page = self.SplitDataUrl(data_url)
+        builder.AddField("Path", node_path)
+        builder.AddField("Location", location)
+        builder.AddField("Page", page)
+
+        self._PageCache.Add(data_url, builder.Close())
 
 
     #-------------------------------------------------------
@@ -238,20 +337,47 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
-    def OnWebViewLoaded(self, event):
-        url = self._WebView.GetCurrentURL()
-        if url.find("memory:") != 0 or self._LastUrl == url:
+    def OnWebViewNavigating(self, event):
+        web_url = event.GetURL()
+        if web_url.find("memory:") != 0:
             return
 
-        # user driven forwards/backwards navigation
-        scheme, uri = url.split(':')
-        factory_id, node_path, location, page = self.SplitDataUrl(uri)
+        scheme, data_url = web_url.split(':')
+        if not self._PageCache.Contains(data_url):
+            self.MakeErrorPage("Page not found", "The data explorer page has dropped from the cache, and its data is no longer available.", data_url)
+
+        factory_id, node_path, location, page = self.SplitDataUrl(data_url)
         node = self.FindNode(factory_id, node_path)
 
-        if node is not None:
-            if node.ShowLocation(location):
-                node.MakeActive()
-                self._LastUrl = url
+        if node is None:
+            self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
+            return
+
+        if not self._PageCache.Valid(data_url, node.GetDataExplorerValidDate()):
+            self.MakeErrorPage("Outdated View", "The view has been modified, and has not been synchronised to the data explorer.", data_url)
+            return
+
+        if self._LastWebUrl != web_url and node.ShowLocation(location):
+            node.MakeActive()
+            self._LastWebUrl = web_url
+
+        
+    #-------------------------------------------------------
+    def OnWebViewLoaded(self, event):
+        pass
+        #web_url = event.GetURL()
+        #if web_url.find("memory:") != 0 or self._LastWebUrl == web_url:
+        #    return
+
+        ## user driven forwards/backwards navigation
+        #scheme, data_url = web_url.split(':')
+        #factory_id, node_path, location, page = self.SplitDataUrl(data_url)
+        #node = self.FindNode(factory_id, node_path)
+
+        #if node is not None:
+        #    if node.ShowLocation(location):
+        #        node.MakeActive()
+        #        self._LastWebUrl = web_url
 
 
 
@@ -282,6 +408,14 @@ class G_DataExplorerChildNode():
     def ShowLocation(self, location):
         # default is to do nothing
         return False
+
+
+    #-------------------------------------------------------
+    def SetDataExplorerValid(self):
+        self._DataExplorerValid = datetime.datetime.now()
+
+    def GetDataExplorerValidDate(self):
+        return self._DataExplorerValid
 
 
 
@@ -1316,14 +1450,15 @@ class G_SessionNode(G_TabContainerNode):
         self._StoreManagerPerspective = True
         self._StoreNotebookPerspective = True
 
+        G_DataExplorer.Instance(self.GetFrame()).ClearHistory()
+
+
 
     def PostInitNode(self):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
         self._Field.Add(str(uuid4()), "Guid", replace_existing = False)
         self._Field.Add(1, "EventId", replace_existing = False)
-
-        G_DataExplorer.Instance(self.GetFrame())
 
             
     def PostInitLoad(self):
@@ -1425,8 +1560,6 @@ class G_SessionNode(G_TabContainerNode):
         self._Field.AuiNotebook.Value = layout
 
         self._Field.Project.Value = self.GetProject().SavePerspective()
-
-        self.GetDataExplorer().ClearHistory()
 
 
     #-------------------------------------------------------
