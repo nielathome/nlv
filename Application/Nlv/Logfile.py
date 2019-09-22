@@ -92,6 +92,11 @@ class G_DelayedSendFocus:
 
 
     #-------------------------------------------------------
+    def ClearSendFocusToCtrl(self):
+        self._DelayedFocusWindow = None
+
+
+    #-------------------------------------------------------
     def OnSendFocusToWindow(self, event):
         if self._DelayedFocusWindow is not None:
             # one shot delayed event, so disconnect now
