@@ -883,12 +883,7 @@ LogIndexWriter::LogIndexWriter( const FileMap & fmap, const fielddescriptor_list
 		m_Regex = std::regex{ match_desc, flags };
 	}
 
-	size_t field_offset{ 0 };
-	SetupFields( field_descs, field_offset,
-		[] ( const FieldDescriptor & field_desc, unsigned field_id, size_t & ) -> field_ptr_t {
-			return field_t::CreateField( field_desc, field_id );
-		}
-	);
+	SetupFields( field_descs );
 
 	// the last field must be the TextOffsets
 	m_FieldTextOffsets = dynamic_cast<FieldWriterTextOffsetsBase*>(m_Fields.back().get());

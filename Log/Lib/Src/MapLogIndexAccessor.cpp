@@ -46,7 +46,7 @@ struct FieldEnumAccessor
  * MapFieldAccessor
  -----------------------------------------------------------------------*/
 
-using mapfieldaccessor_maker_t = FieldTraits<MapFieldAccessor>::field_ptr_t (*) (const FieldDescriptor & field_desc, unsigned field_id, size_t & offset);
+using mapfieldaccessor_maker_t = FieldTraits<MapFieldAccessor>::field_ptr_t (*) (const FieldDescriptor & field_desc, unsigned field_id, size_t * offset);
 
 class MapFieldAccessor : public FieldFactory<MapFieldAccessor, mapfieldaccessor_maker_t>
 {
@@ -75,15 +75,15 @@ protected:
 
 public:
 	// constructor
-	MapFieldAccessor( FieldValueType type, size_t size, const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessor( FieldValueType type, size_t size, const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		:
 		c_FieldType{ type },
 		c_FieldSize{ size },
 		c_FieldName{ field_desc.f_Name },
 		c_FieldId { field_id },
-		c_FieldOffset{ offset }
+		c_FieldOffset{ *offset }
 	{
-		offset += c_FieldSize;
+		(*offset) += c_FieldSize;
 	}
 
 	// the field's class
@@ -134,7 +134,7 @@ public:
 // use where no data is associated with a field - e.g. a text only field
 struct MapFieldAccessorNull : public MapFieldAccessor
 {
-	MapFieldAccessorNull( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessorNull( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		: MapFieldAccessor{ FieldValueType::invalid, 0, field_desc, field_id, offset } {}
 };
 
@@ -150,7 +150,7 @@ struct MapFieldAccessorScalar : public MapFieldAccessor
 	using mapped_t = T_MAPPED_VALUE;
 	using fieldtype_t = T_FIELD_VALUE;
 
-	MapFieldAccessorScalar( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessorScalar( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		: MapFieldAccessor{ TypeToFieldType<fieldtype_t>::type, sizeof( mapped_t ), field_desc, field_id, offset } {}
 
 	fieldvalue_t GetValue( const uint8_t * line_data ) const override {
@@ -188,7 +188,7 @@ private:
 	const FieldHeaderEnumV1 * m_FieldHeader{ nullptr };
 
 public:
-	MapFieldAccessorEnum( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessorEnum( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		: base_t{ field_desc, field_id, offset } {}
 
 	// attach the accessor to a logfile; initialise m_FieldHeader
@@ -239,7 +239,7 @@ protected:
 	}
 
 public:
-	MapFieldAccessorTextOffsets( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessorTextOffsets( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		: MapFieldAccessor{ FieldValueType::invalid, CalcOffsetFieldSize( field_id), field_desc, field_id, offset } {}
 
 	// does the line have any fields
@@ -304,29 +304,29 @@ using MapFieldAccessorTextOffsets16 = MapFieldAccessorTextOffsets<uint16_t, uint
 
 MapFieldAccessor::factory_t::map_t MapFieldAccessor::factory_t::m_Map
 {
-	{ c_Type_DateTime_Unix, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_IntStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_IntHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_UsHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Bool, &MakeField<MapFieldAccessorBool, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint08, &MakeField<MapFieldAccessorUint<uint8_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint16, &MakeField<MapFieldAccessorUint<uint16_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint32, &MakeField<MapFieldAccessorUint<uint32_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint64, &MakeField<MapFieldAccessorUint<uint64_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int08, &MakeField<MapFieldAccessorInt<int8_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int16, &MakeField<MapFieldAccessorInt<int16_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int32, &MakeField<MapFieldAccessorInt<int32_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int64, &MakeField<MapFieldAccessorInt<int64_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Float32, &MakeField<MapFieldAccessorFloat<float>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Float64, &MakeField<MapFieldAccessorFloat<double>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Enum08, &MakeField<MapFieldAccessorEnum<uint8_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Enum16, &MakeField<MapFieldAccessorEnum<uint16_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Emitter, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Text, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_TextOffsets08, &MakeField<MapFieldAccessorTextOffsets08, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_TextOffsets16, &MakeField<MapFieldAccessorTextOffsets16, const FieldDescriptor &, unsigned, size_t &> }
+	{ c_Type_DateTime_Unix, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_IntStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_IntHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_UsHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Bool, &MakeField<MapFieldAccessorBool, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint08, &MakeField<MapFieldAccessorUint<uint8_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint16, &MakeField<MapFieldAccessorUint<uint16_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint32, &MakeField<MapFieldAccessorUint<uint32_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint64, &MakeField<MapFieldAccessorUint<uint64_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int08, &MakeField<MapFieldAccessorInt<int8_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int16, &MakeField<MapFieldAccessorInt<int16_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int32, &MakeField<MapFieldAccessorInt<int32_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int64, &MakeField<MapFieldAccessorInt<int64_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Float32, &MakeField<MapFieldAccessorFloat<float>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Float64, &MakeField<MapFieldAccessorFloat<double>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Enum08, &MakeField<MapFieldAccessorEnum<uint8_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Enum16, &MakeField<MapFieldAccessorEnum<uint16_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Emitter, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Text, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_TextOffsets08, &MakeField<MapFieldAccessorTextOffsets08, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_TextOffsets16, &MakeField<MapFieldAccessorTextOffsets16, const FieldDescriptor &, unsigned, size_t *> }
 };
 
 
@@ -337,16 +337,7 @@ MapFieldAccessor::factory_t::map_t MapFieldAccessor::factory_t::m_Map
 
 LogIndexAccessor::LogIndexAccessor( const fielddescriptor_list_t & field_descs )
 {
-	size_t field_offset{ 0 };
-
-	SetupFields( field_descs, field_offset,
-		[] ( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset ) -> field_ptr_t {
-			// the template arguments are needed to ensure offset is passed by reference
-			return field_t::CreateField<unsigned, size_t &>( field_desc, field_id, offset );
-		}
-	);
-
-	m_LineDataSize = field_offset;
+	SetupFields( field_descs, &m_LineDataSize );
 }
 
 

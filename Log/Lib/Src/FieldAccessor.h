@@ -128,39 +128,30 @@ protected:
 
 	// the fields
 	field_array_t m_Fields;
+	unsigned m_FieldCount{ 0 };
 
-	// iterate over a list of field descriptors; T_MAKER should accept (const FieldDescriptor &, unsigned, offset &)
-	template<typename T_MAKER>
-	void SetupFields( const fielddescriptor_list_t & field_descs, size_t & offset, T_MAKER maker )
+	// CreateField(const FieldDescriptor &, unsigned, offset *), or
+	// CreateField( const FieldDescriptor &, unsigned )
+	template<typename ...T_ARGS>
+	void AddField( const FieldDescriptor & field_desc, T_ARGS ...args )
 	{
-		unsigned field_id{ 0 };
-		for( const FieldDescriptor & field_desc : field_descs )
-		{
-			field_ptr_t field{ maker( field_desc, field_id, offset ) };
-			if( field )
-				m_Fields.push_back( field );
+		field_ptr_t field{ field_t::CreateField( field_desc, m_FieldCount, args... ) };
+		if( field )
+			m_Fields.push_back( field );
 
-			field_id += 1;
-		}
+		m_FieldCount += 1;
 	}
 
-	// iterate over a list of field descriptors; T_MAKER should accept (const FieldDescriptor &, unsigned)
-	template<typename T_MAKER>
-	void SetupFields( const fielddescriptor_list_t & field_descs, T_MAKER maker )
+	// iterate over a list of field descriptors
+	template<typename ...T_ARGS>
+	void SetupFields( const fielddescriptor_list_t & field_descs, T_ARGS ...args )
 	{
-		unsigned field_id{ 0 };
 		for( const FieldDescriptor & field_desc : field_descs )
-		{
-			field_ptr_t field{ maker( field_desc, field_id ) };
-			if( field )
-				m_Fields.push_back( field );
-
-			field_id += 1;
-		}
+			AddField( field_desc, args... );
 	}
 
 public:
 	size_t GetNumFields( void ) const {
-		return m_Fields.size();
+		return m_FieldCount;
 	}
 };

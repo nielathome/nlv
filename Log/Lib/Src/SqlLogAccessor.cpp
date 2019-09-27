@@ -754,11 +754,7 @@ void SqlViewLineAccessor::Capture( const SqlLogAccessor * log_accessor, uint64_t
 SqlLogAccessor::SqlLogAccessor( LogAccessorDescriptor & descriptor )
 	: m_FieldDescriptors{ std::move( descriptor.m_FieldDescriptors ) }
 {
-	SetupFields( m_FieldDescriptors,
-		[] ( const FieldDescriptor & field_desc, unsigned field_id ) -> field_ptr_t {
-			return field_t::CreateField( field_desc, field_id );
-		}
-	);
+	SetupFields( m_FieldDescriptors );
 }
 
 
