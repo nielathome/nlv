@@ -64,6 +64,6 @@ protected:
 	Error WriteLines( WriteContext & cxt, nlineno_t * num_lines, ProgressMeter * progress );
 
 public:
-	LogIndexWriter( const FileMap & fmap, const fielddescriptor_list_t & field_descs, const std::string & match_desc );
+	LogIndexWriter( const FileMap & fmap, const fielddescriptor_list_t & field_descs, const std::string & text_offsets_field_type, const std::string & match_desc );
 	Error Write( const std::filesystem::path & index_path, FILETIME modified_time, const std::string & guid, ProgressMeter * progress );
 };

@@ -75,7 +75,9 @@ namespace
 		}
 
 		void AddArgument( const wchar_t * arg ) override {
-			m_PythonPerfTimer.attr( "AddArgument" )(arg);
+			using converter_t = std::wstring_convert<std::codecvt_utf8<wchar_t>>;
+			std::string utf8{ converter_t{}.to_bytes( arg ) };
+			m_PythonPerfTimer.attr( "AddArgument" )(utf8);
 		}
 
 		void Close( size_t item_count ) override {
@@ -232,7 +234,7 @@ void Setup( object logger, object perf_timer_factory )
 // Python access to logfile factory
 logfile_ptr_t MakeLogfile( const std::string & nlog_path, object log_schema, object progress )
 {
-	using converter_t = std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>;
+	using converter_t = std::wstring_convert<std::codecvt_utf8<wchar_t>>;
 	std::wstring wnlog_path{ converter_t{}.from_bytes( nlog_path ) };
 
 	struct PythonProgress : public ProgressMeter

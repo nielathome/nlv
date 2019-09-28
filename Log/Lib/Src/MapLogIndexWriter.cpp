@@ -768,7 +768,8 @@ protected:
 public:
 	virtual void Setup( size_t num_fields ) = 0;
 	virtual void Clear( int64_t last_parsed_line ) = 0;
-	virtual void SetOffsets( WriteContext & cxt, size_t field_id, size_t lower, size_t upper ) = 0;
+	virtual void SetFieldOffsets( WriteContext & cxt, size_t field_id, size_t lower, size_t upper ) = 0;
+	virtual void SetNonFieldOffset( WriteContext & cxt, size_t offset ) = 0;
 };
 
 
@@ -785,7 +786,8 @@ class FieldWriterTextOffsets
 {
 private:
 	// buffer for line offsets
-	std::vector<offset_t> m_Offsets;
+	std::vector<offset_t> m_RawFieldDataStore;
+	RawFieldData * m_RawFieldData{ nullptr };
 
 	// line match results for next write
 	Error m_Res{ e_OK };
@@ -808,22 +810,28 @@ public:
 		: FieldWriterTextOffsetsBase{ field_desc, field_id } {}
 
 	void Setup( size_t num_fields ) override {
-		m_Offsets.resize( CalcOffsetFieldSize( num_fields ) / sizeof( offset_t ) );
+		m_RawFieldDataStore.resize( CalcOffsetFieldSize( num_fields ) / sizeof( offset_t ) );
+		m_RawFieldData = reinterpret_cast<RawFieldData*>(m_RawFieldDataStore.data());
 	}
 
 	void Clear( int64_t last_parsed_line ) override {
-		std::fill( m_Offsets.begin(), m_Offsets.end(), 0 );
-		GetLastRegular( reinterpret_cast<uint8_t *>(& m_Offsets[0] ) ) = last_parsed_line;
+		std::fill( m_RawFieldDataStore.begin(), m_RawFieldDataStore.end(), 0 );
+		m_RawFieldData->u_Irregular.s_LastRegular = last_parsed_line;
 	}
 
-	void SetOffsets( WriteContext & cxt, size_t field_id, size_t lower, size_t upper ) override {
+	void SetNonFieldOffset( WriteContext & cxt, size_t offset ) override {
+		m_RawFieldData->u_Regular.s_NonFieldTextOffset = MakeOffset( cxt, offset );
+	}
+
+	void SetFieldOffsets( WriteContext & cxt, size_t field_id, size_t lower, size_t upper ) override {
 		const size_t idx{ 2 * field_id };
-		m_Offsets[ idx + 0 ] = MakeOffset( cxt, lower );
-		m_Offsets[ idx + 1 ] = MakeOffset( cxt, upper );
+		offset_t * offsets{ m_RawFieldData->u_Regular.s_FieldTextOffsets };
+		offsets[ idx + 0 ] = MakeOffset( cxt, lower );
+		offsets[ idx + 1 ] = MakeOffset( cxt, upper );
 	}
 
 	Error Write( WriteContext & cxt, uint64_t = 0 ) override {
-		cxt.f_Stream.write( reinterpret_cast<char*>(&m_Offsets[ 0 ]), m_Offsets.size() * c_OffsetSize );
+		cxt.f_Stream.write( reinterpret_cast<char*>(m_RawFieldData), m_RawFieldDataStore.size() * c_OffsetSize );
 		const Error ret{ m_Res };
 		m_Res = e_OK;
 		return ret;
@@ -871,8 +879,8 @@ FieldWriter::factory_t::map_t FieldWriter::factory_t::m_Map
 
 using field_location_t = std::tuple<bool, const char *, const char *>;
 
-LogIndexWriter::LogIndexWriter( const FileMap & fmap, const fielddescriptor_list_t & field_descs, const std::string & match_desc )
-	: m_Log{ fmap }, m_UseRegex{ ! match_desc.empty() }
+LogIndexWriter::LogIndexWriter( const FileMap & fmap, const fielddescriptor_list_t & field_descs, const std::string & text_offsets_field_type, const std::string & match_desc )
+	: m_Log{ fmap }, m_UseRegex{ !match_desc.empty() }
 {
 	if( m_UseRegex )
 	{
@@ -883,10 +891,10 @@ LogIndexWriter::LogIndexWriter( const FileMap & fmap, const fielddescriptor_list
 		m_Regex = std::regex{ match_desc, flags };
 	}
 
-	SetupFields( field_descs );
-
-	// the last field must be the TextOffsets
-	m_FieldTextOffsets = dynamic_cast<FieldWriterTextOffsetsBase*>(m_Fields.back().get());
+	AddInternalField( CreateField( FieldDescriptor{ false, "", "uint64" } ) );
+	SetupUserFields( field_descs );
+	AddInternalField( CreateField( FieldDescriptor{ false, "", text_offsets_field_type } ) );
+	m_FieldTextOffsets = dynamic_cast<FieldWriterTextOffsetsBase*>(m_AllFields.back().get());
 }
 
 
@@ -907,12 +915,12 @@ Error LogIndexWriter::WriteLine( WriteContext & cxt, size_t offset, const char *
 
 	// first field is the line's absolute location
 	Error res{ e_OK };
-	UpdateError( res, m_Fields[ 0 ]->Write( cxt, offset ) );
+	UpdateError( res, m_AllFields[ 0 ]->Write( cxt, offset ) );
 
 	// output user visible fields
 	bool line_ok{ true };
-	const size_t num_field{ m_Fields.size() - 1 };
-	for( size_t i = 1; i < num_field; ++i )
+	const size_t num_user_field{ m_UserFields.size() };
+	for( size_t i = 0; i < num_user_field; ++i )
 	{
 		field_location_t field;
 		if( line_ok )
@@ -927,8 +935,8 @@ Error LogIndexWriter::WriteLine( WriteContext & cxt, size_t offset, const char *
 		if( line_ok )
 		{
 			const char * field_begin{ std::get<1>( field ) }, *field_end{ std::get<2>( field ) };
-			m_FieldTextOffsets->SetOffsets( cxt, i, field_begin - begin, field_end - begin );
-			const Error write_err{ m_Fields[ i ]->WriteValue( cxt, field_begin, field_end ) };
+			m_FieldTextOffsets->SetFieldOffsets( cxt, i, field_begin - begin, field_end - begin );
+			const Error write_err{ m_UserFields[ i ]->WriteValue( cxt, field_begin, field_end ) };
 			line_ok = Ok( write_err );
 
 			// only record errors that leave the index file corrupt/unusable
@@ -937,13 +945,13 @@ Error LogIndexWriter::WriteLine( WriteContext & cxt, size_t offset, const char *
 		}
 
 		if( !line_ok )
-			UpdateError( res, m_Fields[ i ]->Write( cxt ) );
+			UpdateError( res, m_UserFields[ i ]->Write( cxt ) );
 	}
 
 	// last field is always the text_offsets field
 	if( line_ok )
 	{
-		m_FieldTextOffsets->SetOffsets( cxt, 0, field_get.Remainder() - begin, 0 );
+		m_FieldTextOffsets->SetNonFieldOffset( cxt, field_get.Remainder() - begin );
 		cxt.f_LastParsedLine = cxt.f_LineNo;
 	}
 	else
@@ -1012,7 +1020,7 @@ Error LogIndexWriter::WriteLineSeparated( WriteContext & cxt, size_t offset, con
 		}
 	};
 
-	FieldGet field_get{ m_Fields, begin, end };
+	FieldGet field_get{ m_UserFields, begin, end };
 	return WriteLine( cxt, offset, begin, end, field_get );
 }
 
@@ -1049,7 +1057,7 @@ Error LogIndexWriter::WriteLineRegex( WriteContext & cxt, size_t offset, const c
 		}
 	};
 
-	const size_t num_field{ m_Fields.size() - 1 };
+	const size_t num_field{ m_UserFields.size() };
 	FieldGet field_get{ &m_Regex, begin, end, num_field };
 	return WriteLine( cxt, offset, begin, end, field_get );
 }
@@ -1087,7 +1095,7 @@ Error LogIndexWriter::WriteLines( WriteContext & cxt, nlineno_t * pnum_lines, Pr
 	const char *text{ m_Log.GetData() };
 	nlineno_t start{ 0 };
 	Error res{ e_OK };
-	m_FieldTextOffsets->Setup( GetNumFields() - 1 );
+	m_FieldTextOffsets->Setup( GetNumUserFields() );
 
 	// silently strip any UTF-8 BOM
 	if( (num_char >= 3) && (text[ 0 ] == char(0xEF)) && (text[ 1 ] == char(0xBB)) && (text[ 2 ] == char(0xBF)) )
@@ -1172,7 +1180,7 @@ Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME 
 	stream.seekp( pos_field_data, std::ios_base::beg );
 
 	// write out field header data
-	for( auto field : m_Fields )
+	for( auto & field : m_AllFields )
 		UpdateError( res, field->WriteFieldHeader( cxt ) );
 
 	// write out string table
@@ -1182,7 +1190,7 @@ Error LogIndexWriter::Write( const std::filesystem::path & index_path, FILETIME 
 	// rewind and write out file header
 	strcpy_s( header.f_SchemaGuid, guid.c_str() );
 	header.f_LogfileModifiedTime = modified_time;
-	header.f_NumFields = static_cast<uint8_t>(m_Fields.size());
+	header.f_NumFields = static_cast<uint8_t>(m_AllFields.size());
 	header.f_NumLines = num_lines;
 	header.f_FieldDataOffset = pos_field_data;
 	header.f_StringTableOffset = pos_strtbl;
