@@ -1247,7 +1247,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self.GetEditor().Refresh()
 
     def UpdateFieldColour(self, field_id, colour):
-        self.GetEditor().StyleSetForeground(field_id + 1, colour)
+        self.GetEditor().StyleSetForeground(field_id, colour)
 
 
     #-------------------------------------------------------

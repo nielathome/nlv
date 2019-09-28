@@ -127,31 +127,38 @@ protected:
 	using field_array_t = std::vector<field_ptr_t>;
 
 	// the fields
-	field_array_t m_Fields;
-	unsigned m_FieldCount{ 0 };
+	field_array_t m_UserFields;
+	field_array_t m_AllFields;
+
 
 	// CreateField(const FieldDescriptor &, unsigned, offset *), or
 	// CreateField( const FieldDescriptor &, unsigned )
 	template<typename ...T_ARGS>
-	void AddField( const FieldDescriptor & field_desc, T_ARGS ...args )
+	field_ptr_t CreateField( const FieldDescriptor & field_desc, T_ARGS ...args )
 	{
-		field_ptr_t field{ field_t::CreateField( field_desc, m_FieldCount, args... ) };
-		if( field )
-			m_Fields.push_back( field );
+		const unsigned field_id{ static_cast<unsigned>(m_AllFields.size()) };
+		return field_t::CreateField( field_desc, field_id, args... );
+	}
+	
+	void AddUserField( field_ptr_t field ) {
+		m_AllFields.push_back( field );
+		m_UserFields.push_back( field );
+	}
 
-		m_FieldCount += 1;
+	void AddInternalField( field_ptr_t field ) {
+		m_AllFields.push_back( field );
 	}
 
 	// iterate over a list of field descriptors
 	template<typename ...T_ARGS>
-	void SetupFields( const fielddescriptor_list_t & field_descs, T_ARGS ...args )
+	void SetupUserFields( const fielddescriptor_list_t & field_descs, T_ARGS ...args )
 	{
 		for( const FieldDescriptor & field_desc : field_descs )
-			AddField( field_desc, args... );
+			AddUserField( CreateField( field_desc, args... ) );
 	}
 
 public:
-	size_t GetNumFields( void ) const {
-		return m_FieldCount;
+	unsigned GetNumUserFields( void ) const {
+		return static_cast<unsigned>(m_UserFields.size());
 	}
 };

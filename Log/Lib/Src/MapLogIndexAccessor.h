@@ -202,6 +202,9 @@ private:
 	// the timecode field index and UTC datum from the file header
 	NTimecodeBase m_TimecodeBase;
 
+	// line offsets field
+	field_ptr_t m_FieldLineOffset;
+
 protected:
 	// number of lines in the logfile
 	nlineno_t m_NumLines{ 0 };
@@ -215,12 +218,10 @@ protected:
 	}
 
 	// fetch offset to line's text in the text map
-	nlineno_t GetLineOffset( nlineno_t line_no ) const {
-		return nlineno_cast( GetFieldValue( line_no, 0 ).As<uint64_t>() );
-	}
+	nlineno_t GetLineOffset( nlineno_t line_no ) const;
 
 public:
-	LogIndexAccessor( const fielddescriptor_list_t & field_descs );
+	LogIndexAccessor( const fielddescriptor_list_t & field_descs, unsigned text_offsets_size );
 	Error Load( const std::filesystem::path & file_path, FILETIME modified_time, const std::string & guid );
 
 	virtual bool IsLineRegular( nlineno_t line_no ) const = 0;
