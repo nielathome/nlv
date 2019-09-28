@@ -383,7 +383,7 @@ BOOST_PYTHON_MODULE( Nlog )
 		;
 
 	class_<NViewTimecode>( "ViewTimecode", no_init )
-		.def( "GetUtcTimecode", &NViewTimecode::GetUtcTimecode, return_value_policy<manage_new_object>() ) \
+		.def( "GetNearestUtcTimecode", &NViewTimecode::GetNearestUtcTimecode, return_value_policy<manage_new_object>() ) \
 		;
 
 	class_<NLineSet, lineset_ptr_t, bases<NViewCore, NViewFieldAccess, NViewTimecode, NViewLineTranslation>>( "LineSet", no_init )

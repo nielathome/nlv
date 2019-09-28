@@ -310,6 +310,10 @@ public:
 		return this;
 	}
 
+	bool HasTimeCode( int line_no ) const override {
+		return m_LogAccessor->IsLineRegular( ViewLineToLogLine( line_no ) );
+	}
+
 	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
 		return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
 	}

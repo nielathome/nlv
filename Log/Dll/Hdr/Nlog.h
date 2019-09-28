@@ -475,7 +475,7 @@ public:
 	NViewTimecode( void );
 
 	// numeric access to a line's timecode, timecode is referenced to UTC
-	NTimecode * GetUtcTimecode( vint_t line_no );
+	NTimecode * GetNearestUtcTimecode( vint_t line_no );
 };
 
 

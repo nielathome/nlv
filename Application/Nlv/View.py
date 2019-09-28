@@ -1056,8 +1056,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def GetTrackInfo(self):
         return self.FindChildNode(G_Project.NodeID_ViewTracking).GetTrackInfo()
 
-    def GetUtcTimecode(self, line_no):
-        return self._N_View.GetUtcTimecode(line_no)
+    def GetNearestUtcTimecode(self, line_no):
+        return self._N_View.GetNearestUtcTimecode(line_no)
 
 
     #-------------------------------------------------------
@@ -1159,7 +1159,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                 self._N_View.SetLocalTrackerLine(cur_line)
 
             # capture new tracker data
-            timecode = self.GetUtcTimecode(cur_line)
+            timecode = self.GetNearestUtcTimecode(cur_line)
             self.UpdateTrackers(update_local, update_global_idx, [timecode])
 
             # flush any changes through to the GUI
@@ -1208,7 +1208,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                 handled = True
                 self._N_View.SetLocalTrackerLine(cur_line)
                 self.RefreshTrackers(True, False, self)
-                timecode = self.GetUtcTimecode(cur_line)
+                timecode = self.GetNearestUtcTimecode(cur_line)
                 self.UpdateTrackers(True, -1, [timecode])
 
         elif key_code in self._GlobalTrackerKeys:
@@ -1218,7 +1218,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                 self.ScrollToLine(self._N_View.GetGlobalTrackerLine(tracker_idx))
             elif modifiers == wx.MOD_CONTROL:
                 handled = True
-                timecode = self.GetUtcTimecode(cur_line)
+                timecode = self.GetNearestUtcTimecode(cur_line)
                 Nlog.SetGlobalTracker(tracker_idx, timecode)
                 self.RefreshTrackers(False, True, self)
                 self.UpdateTrackers(False, tracker_idx, [timecode])
@@ -1308,8 +1308,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             width = editor.TextWidth(wx.stc.STC_STYLE_LINENUMBER, "_" + "9" * digits)
 
         elif type == Nlog.EnumMarginType.Offset:
-            begin_timecode = self.GetUtcTimecode(0)
-            end_timecode = self.GetUtcTimecode(editor.GetNumberOfLines() - 1)
+            begin_timecode = self.GetNearestUtcTimecode(0)
+            end_timecode = self.GetNearestUtcTimecode(editor.GetNumberOfLines() - 1)
             duration = end_timecode.Subtract(begin_timecode) / 1000000000
 
             if precision == Nlog.EnumMarginPrecision.MinSec:

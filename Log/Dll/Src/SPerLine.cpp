@@ -154,11 +154,14 @@ void SLineMarginText::CreateOffsetText( vint_t line, std::ostringstream & strm )
 		offset = line.GetFieldValue( m_DateFieldId ).As<int64_t>();
 	} );
 
-	constexpr int64_t c_Billion{ 1'000'000'000 };
-	const int64_t sec{ offset / c_Billion };
-	const int64_t nsec{ offset - (sec * c_Billion) };
+	if( offset != 0 )
+	{
+		constexpr int64_t c_Billion{ 1'000'000'000 };
+		const int64_t sec{ offset / c_Billion };
+		const int64_t nsec{ offset - (sec * c_Billion) };
 
-	(*m_CreateOffsetTextFunc)(sec, nsec, strm);
+		(*m_CreateOffsetTextFunc)(sec, nsec, strm);
+	}
 }
 
 
