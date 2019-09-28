@@ -230,34 +230,36 @@ class MapFieldAccessorTextOffsets
 	public FieldTextOffsetsCommon<T_OFFSET, T_OFFSET_PAIR>
 {
 protected:
-	const offset_t * GetTextOffsetData( const uint8_t * line_data, unsigned field_id = 0 ) const {
-		return GetFieldData<offset_t>(line_data) + (2 * field_id);
+	const RawFieldData * GetRawFieldData( const uint8_t * line_data ) const {
+		return GetFieldData<RawFieldData>( line_data );
 	}
 
 public:
 	MapFieldAccessorTextOffsets( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
-		: MapFieldAccessor{ FieldValueType::invalid, CalcOffsetFieldSize( field_id), field_desc, field_id, offset } {}
+		: MapFieldAccessor{ FieldValueType::invalid, CalcOffsetFieldSize( field_id - 1 ), field_desc, field_id, offset } {}
 
 	// does the line have any fields
 	bool IsRegular( const uint8_t * line_data ) const {
-		return FieldTextOffsetsCommon::IsRegular( GetFieldData( line_data ) );
+		return RawToIsRegular( GetRawFieldData( line_data ) );
 	}
 
 	int64_t LastRegularLine( const uint8_t * line_data ) const {
-		return GetLastRegular( GetFieldData( line_data ) );
+		return RawToLastRegular( GetRawFieldData( line_data ) );
 	}
 
 	void GetNonFieldTextOffset( const uint8_t * line_data, offset_t * first ) const {
-		if( IsRegular( line_data ) )
-			*first = GetTextOffsetData( line_data )[0];
+		const RawFieldData * data{ GetRawFieldData( line_data ) };
+		if( RawToIsRegular( data ) )
+			*first = RawToNonFieldTextOffset( data );
 		else
 			*first = 0;
 	}
 
 	void GetFieldTextOffsets( const uint8_t * line_data, unsigned field_id, offset_t * first, offset_t * last ) const {
-		if( IsRegular( line_data ) )
+		const RawFieldData * data{ GetRawFieldData( line_data ) };
+		if( RawToIsRegular( data ) )
 		{
-			const offset_t * field_data{ GetTextOffsetData( line_data, field_id ) };
+			const offset_t * field_data{ RawToFieldTextOffsets( data, field_id ) };
 			*first = field_data[ 0 ];
 			*last = field_data[ 1 ];
 		}
@@ -271,7 +273,8 @@ public:
 		if( field_mask == 0 )
 			return;
 
-		if( !IsRegular( line_data ) )
+		const RawFieldData * data{ GetRawFieldData( line_data ) };
+		if( !RawToIsRegular( data ) )
 			return;
 
 		// for each visible field
@@ -280,9 +283,7 @@ public:
 		{
 			if( field_bit & field_mask )
 			{
-				// internally, the zero'th field is an offset to the non-field text; skip
-				// over that below
-				const offset_t * field_data{ GetTextOffsetData( line_data, field_id + 1 ) };
+				const offset_t * field_data{ RawToFieldTextOffsets( data, field_id ) };
 				func( field_id, field_data[ 0 ], field_data[ 1 ] );
 			}
 			field_bit = field_bit << 1;

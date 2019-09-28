@@ -154,26 +154,58 @@ protected:
 	using offsetpair_t = T_OFFSET_PAIR;
 	static const size_t c_OffsetPairSize{ sizeof( offsetpair_t ) };
 
-	static_assert(c_OffsetPairSize == 2 * c_OffsetSize, "Mismatched offset sizes");
+	static_assert(sizeof( offsetpair_t ) == 2 * sizeof( offset_t ), "Mismatched offset sizes");
+
+	#pragma pack(push)
+	#pragma pack(1)
+	//
+	// for lines containing fields, the offsets field is an array of offset_t;
+	// otherwise where no fields are present, the offsets "array" consists of
+	// the line number of the last line which did have fields, preceded by two
+	// zero offset_t's
+	//
+	union RawFieldData
+	{
+		struct Regular
+		{
+			offset_t s_NonFieldTextOffset;
+			offset_t s_Packing;
+			offset_t s_FieldTextOffsets[ 2 ];
+		} u_Regular;
+		static_assert(offsetof( Regular, s_FieldTextOffsets ) == sizeof( offsetpair_t ), "Bad offsets");
+
+		struct Irregular
+		{
+			offsetpair_t s_Prefix;
+			int64_t s_LastRegular;
+		} u_Irregular;
+		static_assert(offsetof( Irregular, s_LastRegular ) == sizeof( offsetpair_t ), "Bad line number offset");
+	};
+	static_assert(offsetof( RawFieldData, u_Regular ) == 0, "Bad union offset");
+	static_assert(offsetof( RawFieldData, u_Irregular ) == 0, "Bad union offset");
+	#pragma pack(pop)
+
 
 	// determine the size of the offsets field in bytes
 	static size_t CalcOffsetFieldSize( size_t num_fields ) {
-		// for lines containing fields, the offsets field is an array of offset_t;
-		// otherwise where no fields are present, the offsets "array" consists of
-		// the line number of the last line which did have fields, preceded by two
-		// zero offset_t's
-		return std::max( 2 * num_fields * c_OffsetSize, sizeof( int64_t ) + c_OffsetPairSize );
+		return std::max( c_OffsetPairSize + (2 * num_fields * c_OffsetSize), c_OffsetPairSize + sizeof( int64_t )  );
 	}
 
-	static bool IsRegular( const uint8_t * data ) {
-		return *reinterpret_cast<const offsetpair_t*>( data ) != 0;
+protected:
+	static offset_t RawToNonFieldTextOffset( const RawFieldData * data ) {
+		return data->u_Regular.s_NonFieldTextOffset;
 	}
 
-	static int64_t & GetLastRegular( uint8_t * data ) {
-		return * reinterpret_cast<int64_t*>( data + c_OffsetPairSize);
+	static const offset_t * RawToFieldTextOffsets( const RawFieldData * data, unsigned field_id ) {
+		return & data->u_Regular.s_FieldTextOffsets[ 2 * field_id ];
 	}
-	static int64_t GetLastRegular( const uint8_t * data ) {
-		return *reinterpret_cast<const int64_t*>( data + c_OffsetPairSize);
+
+	static bool RawToIsRegular( const RawFieldData * data ) {
+		return data->u_Irregular.s_Prefix != 0;
+	}
+
+	static int64_t RawToLastRegular( const RawFieldData * data ) {
+		return data->u_Irregular.s_LastRegular;
 	}
 };
 
