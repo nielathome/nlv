@@ -442,7 +442,6 @@ bool NViewCore::Filter( boost::python::object match, bool add_irregular )
 fieldvalue_t NViewFieldAccess::GetFieldValue( vint_t line_no, vint_t field_no )
 {
 	fieldvalue_t res;
-	field_no += m_FieldNoOffset;
 
 	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		res = line.GetFieldValue( field_no );
@@ -469,7 +468,6 @@ std::string NViewFieldAccess::GetNonFieldText( vint_t line_no )
 std::string NViewFieldAccess::GetFieldText( vint_t line_no, vint_t field_no )
 {
 	std::string res;
-	field_no += m_FieldNoOffset;
 
 	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		const char * first; const char * last;
@@ -596,7 +594,6 @@ void NEventView::Sort( unsigned col_num, int direction )
 NLogView::NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	NViewCore{ logfile, view_accessor },
-	NViewFieldAccess{ 1 },
 	m_CellBuffer{ view_accessor },
 	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), view_accessor } },
 	m_LineLevel{ new SLineLevels },
