@@ -127,40 +127,38 @@ protected:
 	using field_array_t = std::vector<field_ptr_t>;
 
 	// the fields
-	field_array_t m_Fields;
+	field_array_t m_UserFields;
+	field_array_t m_AllFields;
 
-	// iterate over a list of field descriptors; T_MAKER should accept (const FieldDescriptor &, unsigned, offset &)
-	template<typename T_MAKER>
-	void SetupFields( const fielddescriptor_list_t & field_descs, size_t & offset, T_MAKER maker )
+
+	// CreateField(const FieldDescriptor &, unsigned, offset *), or
+	// CreateField( const FieldDescriptor &, unsigned )
+	template<typename ...T_ARGS>
+	field_ptr_t CreateField( const FieldDescriptor & field_desc, T_ARGS ...args )
 	{
-		unsigned field_id{ 0 };
-		for( const FieldDescriptor & field_desc : field_descs )
-		{
-			field_ptr_t field{ maker( field_desc, field_id, offset ) };
-			if( field )
-				m_Fields.push_back( field );
-
-			field_id += 1;
-		}
+		const unsigned field_id{ static_cast<unsigned>(m_AllFields.size()) };
+		return field_t::CreateField( field_desc, field_id, args... );
+	}
+	
+	void AddUserField( field_ptr_t field ) {
+		m_AllFields.push_back( field );
+		m_UserFields.push_back( field );
 	}
 
-	// iterate over a list of field descriptors; T_MAKER should accept (const FieldDescriptor &, unsigned)
-	template<typename T_MAKER>
-	void SetupFields( const fielddescriptor_list_t & field_descs, T_MAKER maker )
-	{
-		unsigned field_id{ 0 };
-		for( const FieldDescriptor & field_desc : field_descs )
-		{
-			field_ptr_t field{ maker( field_desc, field_id ) };
-			if( field )
-				m_Fields.push_back( field );
+	void AddInternalField( field_ptr_t field ) {
+		m_AllFields.push_back( field );
+	}
 
-			field_id += 1;
-		}
+	// iterate over a list of field descriptors
+	template<typename ...T_ARGS>
+	void SetupUserFields( const fielddescriptor_list_t & field_descs, T_ARGS ...args )
+	{
+		for( const FieldDescriptor & field_desc : field_descs )
+			AddUserField( CreateField( field_desc, args... ) );
 	}
 
 public:
-	size_t GetNumFields( void ) const {
-		return m_Fields.size();
+	unsigned GetNumUserFields( void ) const {
+		return static_cast<unsigned>(m_UserFields.size());
 	}
 };

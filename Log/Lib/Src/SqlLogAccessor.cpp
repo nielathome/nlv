@@ -512,7 +512,7 @@ public:
 	}
 
 	FieldValueType GetFieldType( unsigned field_id ) const override {
-		return m_Fields[ field_id ]->c_FieldType;
+		return m_UserFields[ field_id ]->c_FieldType;
 	}
 
 	uint16_t GetFieldEnumCount( unsigned field_id ) const override {
@@ -548,11 +548,11 @@ public:
 	}
 
 	void GetFieldText( statement_ptr_t statement, unsigned field_id, const char ** first, const char ** last ) const {
-		m_Fields[ field_id ]->GetAsText( statement, first, last );
+		m_UserFields[ field_id ]->GetAsText( statement, first, last );
 	}
 
 	fieldvalue_t GetFieldValue( statement_ptr_t statement, unsigned field_id ) const {
-		return m_Fields[ field_id ]->GetValue( statement );
+		return m_UserFields[ field_id ]->GetValue( statement );
 	}
 
 	template<typename T_FUNCTOR>
@@ -754,11 +754,7 @@ void SqlViewLineAccessor::Capture( const SqlLogAccessor * log_accessor, uint64_t
 SqlLogAccessor::SqlLogAccessor( LogAccessorDescriptor & descriptor )
 	: m_FieldDescriptors{ std::move( descriptor.m_FieldDescriptors ) }
 {
-	SetupFields( m_FieldDescriptors,
-		[] ( const FieldDescriptor & field_desc, unsigned field_id ) -> field_ptr_t {
-			return field_t::CreateField( field_desc, field_id );
-		}
-	);
+	SetupUserFields( m_FieldDescriptors );
 }
 
 

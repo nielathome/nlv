@@ -369,22 +369,11 @@ const std::string & ExpandFieldOffsetSize( unsigned text_offsets_size )
 }
 
 
-fielddescriptor_list_t && ExpandFieldDescriptors( const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs )
-{
-	// expand the application defined field descriptor list with 2 "hidden" fields:
-	// - the first field is always the line position
-	// - and the last field is always the text offsets data
-	field_descs.insert( field_descs.begin(), FieldDescriptor{ false, "", "uint64" } );
-	field_descs.push_back( FieldDescriptor{ false, "", text_offsets_field_type } );
-	return std::move(field_descs);
-}
-
-
 MapLogAccessor::MapLogAccessor( LogAccessorDescriptor & descriptor )
 	:
 	m_Guid{ std::move( descriptor.m_Guid ) },
 	m_TextOffsetsFieldType{ ExpandFieldOffsetSize( descriptor.m_TextOffsetsSize ) },
-	m_FieldDescriptors{ ExpandFieldDescriptors( m_TextOffsetsFieldType, std::move( descriptor.m_FieldDescriptors ) ) },
+	m_FieldDescriptors{ std::move( descriptor.m_FieldDescriptors ) },
 	m_RegexText{ std::move( descriptor.m_RegexText ) },
 	m_LineFormatters{ std::move( descriptor.m_LineFormatters ) }
 {
@@ -460,7 +449,7 @@ Error MapLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 	{
 		// write new index
 		m_Index = MakeLogIndexAccessor( m_TextOffsetsFieldType, m_FieldDescriptors );
-		LogIndexWriter indexer{ m_Log, m_FieldDescriptors, m_RegexText };
+		LogIndexWriter indexer{ m_Log, m_FieldDescriptors, m_TextOffsetsFieldType, m_RegexText };
 		idx_error = indexer.Write( index_path, log_modified_time, m_Guid, progress );
 
 		// and attempt to load it

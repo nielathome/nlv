@@ -103,6 +103,7 @@ def Projector(connection, cursor, context):
             finish_text TEXT,
             finish_offset_ns INT,
             duration_ns INT,
+            process INT,
             place REAL,
             abool INT
         )""")
@@ -116,6 +117,7 @@ def Projector(connection, cursor, context):
             finish_text,
             finish_offset_ns + (finish_utc - {utc_datum}) * 1000000000,
             duration_ns,
+            process,
             place,
             abool
         FROM
@@ -136,6 +138,7 @@ Project(
         .AddStart("Start", width = 100)
         .AddFinish("Finish", width = 100)
         .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)
+        .AddField("Process", "int", 60)
         .AddField("Place", "real", 60)
         .AddField("Abool", "bool", 60)
 )
