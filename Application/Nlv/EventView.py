@@ -1260,7 +1260,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         # setup UI
         display_notebook = self.GetDisplayNoteBook()
         doc_url = self.GetLogNode().MakeDataUrl()
-        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self, doc_url = doc_url)
+        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self.OnTableSelectionChanged, doc_url = doc_url)
         display_notebook.AddPage(table_ctrl, self._Name)
         self.SetDisplayCtrl(display_notebook, table_ctrl, owns_display_ctrl = False)
         self.SetupTableViewIntercepts()
@@ -1587,11 +1587,12 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
         # setup UI
         display_notebook = self.GetDisplayNoteBook()
-        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(display_notebook, self._Name)
+        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(display_notebook, self.OnTableSelectionChanged, self._Name)
         display_notebook.AddPage(metrics_viewer, self._Name)
         self.SetDisplayCtrl(display_notebook, metrics_viewer, owns_display_ctrl = False)
         self.SetupTableViewIntercepts()
-        self.SetupDataExplorer(metrics_viewer.GetModel(),metrics_viewer)
+        table_ctrl = metrics_viewer.GetTableViewCtrl()
+        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
 
 
     #-------------------------------------------------------
@@ -1620,6 +1621,16 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     #-------------------------------------------------------
     def GetQuantifierName(self):
         return self._Name
+
+
+    #-------------------------------------------------------
+    def OnTableSelectionChanged(self, item):
+        if item is None:
+            # ignore de-selection events
+            return
+
+        # tell the data explorer
+        self.GetDataExplorer().Update(self.MakeDataUrl(self.GetMetricsViewCtrl().GetTableViewCtrl().GetLocation(item)))
 
 
     #-------------------------------------------------------

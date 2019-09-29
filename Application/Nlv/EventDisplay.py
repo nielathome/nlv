@@ -702,14 +702,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
     #-------------------------------------------------------
-    def __init__(self, parent, node, permit_nesting = True, multiple_selection = False, doc_url = None):
+    def __init__(self, parent, selection_handler, permit_nesting = True, multiple_selection = False, doc_url = None):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
         super().__init__(parent, permit_nesting, flags, doc_url)
 
-        self._SelectionHandlerNode = node
+        self._SelectionHandler = selection_handler
         self.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED, self.OnItemActivated)
 
 
@@ -788,7 +788,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
         return self.GetModel().GetEventRange(event_no)
 
     def OnItemActivated(self, evt):
-        self._SelectionHandlerNode.OnTableSelectionChanged(evt.GetItem())
+        self._SelectionHandler(evt.GetItem())
 
 
     #-------------------------------------------------------
@@ -1014,18 +1014,19 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
 class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
-    def __init__(self, parent, quantifier_name):
+    def __init__(self, parent, selection_handler, quantifier_name):
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
 
         # the ID distinguishes different tables in the event,
         # but otherwise, has no real meaning
+        self._SelectionHandler = selection_handler
         self._QuantifierName = quantifier_name
         self._CollectorLocked = True
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TableViewCtrl = G_TableViewCtrl(self, self, permit_nesting = False, multiple_selection = True)
+        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, permit_nesting = False, multiple_selection = True)
 
         self._ChartPane = wx.Panel(self)
         self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
@@ -1116,6 +1117,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
+        self._SelectionHandler(item)
         self.UpdateSelection().Realise()
 
 
