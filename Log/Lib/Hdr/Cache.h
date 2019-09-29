@@ -148,7 +148,7 @@ public:
 		{
 			m_Stats.Miss();
 			EraseLRU();
-			return std::make_pair( false, & CreateEntry( key, initialiser() ).m_UserItem );
+			return std::make_pair( false, & CreateEntry( key, initialiser( key ) ).m_UserItem );
 		}
 	}
 

@@ -486,6 +486,7 @@ nlineno_t LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::GetLineLength( nlineno_t li
 template<typename T_FIELD_TEXTOFFSETS>
 void LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::CopyLine( nlineno_t line_no, uint64_t field_mask, const char * log_text, LineBuffer * line_buffer ) const
 {
+	line_buffer->Clear();
 	const char * line_text{ log_text + GetLineOffset( line_no ) };
 
 	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumUserFields(),
@@ -504,6 +505,8 @@ void LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::CopyLine( nlineno_t line_no, uin
 template<typename T_FIELD_TEXTOFFSETS>
 void LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::CopyStyle( nlineno_t line_no, uint64_t field_mask, LineBuffer * line_buffer ) const
 {
+	line_buffer->Clear();
+
 	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumUserFields(),
 		[&line_buffer] ( unsigned field_id, offset_t off_lo, offset_t off_hi ) {
 			line_buffer->Append( static_cast<char>(field_id), off_hi - off_lo + 1 );
