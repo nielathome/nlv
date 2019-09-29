@@ -26,10 +26,12 @@ help()
   echo "build options"
   echo "--clean - clean workspace of build results"
   echo "--help | -h - display help"
+  echo "--release | -r - increment release number"
   echo "--verbose | -v - increase detail in output"
 }
 
 cfg_clean=""
+cfg_release=""
 cfg_verbose=""
 cfg_skip_phoenix=""
 for arg in $*; do
@@ -49,6 +51,10 @@ for arg in $*; do
       cfg_skip_phoenix=1
       ;;
       
+    "--release"|"-r")
+      cfg_release=1
+      ;;
+
     "--verbose"|"-v")
       cfg_verbose=1
       ;;
@@ -127,9 +133,16 @@ function msg_line()
 msg_header "Initialising NLV Build Directory"
 
 # figure out a PEP440 compliant version number
-counter=ver.txt
-ver=`cat $counter`
-echo -n $(($ver + 1)) > $counter
+if [ -n "$cfg_release" ]; then
+  echo "0" > bld.txt
+  tmp=`cat ver.txt`
+  echo -n $(($tmp + 1)) > ver.txt
+else
+  tmp=`cat bld.txt`
+  echo -n $(($tmp + 1)) > bld.txt
+fi
+ver="`cat ver.txt`.`cat bld.txt`"
+
 
 # make the application version available to the Python code
 sed -e "s/__DEV__/$ver/" < Application/Template/tpl-Version.py > Application/Nlv/Version.py

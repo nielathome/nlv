@@ -141,6 +141,7 @@ if __name__ == '__main__':
             "Nlv": [
                 '*.xml',
                 '*.ico',
+                '*.css',
                  "Sphinx/doctrees/*",
                  "Sphinx/html/[!_]*",
                  "Sphinx/html/_sources/*",
