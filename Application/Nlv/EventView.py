@@ -1259,7 +1259,8 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
         # setup UI
         display_notebook = self.GetDisplayNoteBook()
-        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self)
+        doc_url = self.GetLogNode().MakeDataUrl()
+        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self, doc_url = doc_url)
         display_notebook.AddPage(table_ctrl, self._Name)
         self.SetDisplayCtrl(display_notebook, table_ctrl, owns_display_ctrl = False)
         self.SetupTableViewIntercepts()
@@ -1302,11 +1303,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def OnDisplayKey(self, key_code, modifiers, view_node):
         handled = False
         return handled
-
-
-    #-------------------------------------------------------
-    def GetNodePath(self):
-        return "{log_id}/{name}".format(log_id = self.GetLogNode().GetNodeLabel(), name = self._Name)
 
 
     #-------------------------------------------------------

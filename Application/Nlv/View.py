@@ -1048,10 +1048,6 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
-    def GetNodePath(self):
-        return self.GetNodeLabel()
-
-
     def ShowLocation(self, location):
         line = int(location)
         self.GetView().SetHistoryLine(line)

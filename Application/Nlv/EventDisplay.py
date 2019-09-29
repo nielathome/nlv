@@ -231,7 +231,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     def CreateDataExplorerPage(self, builder, location, page):
         builder.AddPageHeading("Event")
-        builder.AddLink(self._DocumentUrl, "Show log ...")
+        if self._DocumentUrl is not None:
+            builder.AddLink(self._DocumentUrl, "Show log ...")
 
         item_key = int(location)
         table_schema = self._TableSchema
@@ -701,12 +702,11 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
     #-------------------------------------------------------
-    def __init__(self, parent, node, permit_nesting = True, multiple_selection = False):
+    def __init__(self, parent, node, permit_nesting = True, multiple_selection = False, doc_url = None):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        doc_url = node.GetLogNode().MakeDataUrl()
         super().__init__(parent, permit_nesting, flags, doc_url)
 
         self._SelectionHandlerNode = node

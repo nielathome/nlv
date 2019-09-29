@@ -289,7 +289,7 @@ class G_DataExplorer:
     def FindNode(self, factory_id, node_path):
         root_node = self._Frame.GetProject().GetRootNode()
         for node in root_node.ListSubNodes(factory_id, recursive = True):
-            if node.GetNodePath() == node_path:
+            if node.GetDataExplorerId() == node_path:
                 return node
         return None
 
@@ -427,7 +427,6 @@ class G_DataExplorerChildNode():
     """
     G_DataExplorer integration/support. Nodes will need to
     implement:
-        GetNodePath()
         GetFactoryID()
 
     and if the default provider is used:
@@ -444,11 +443,12 @@ class G_DataExplorerChildNode():
 
     #-------------------------------------------------------
     def MakeDataUrl(self, location = "any", page = "0"):
-        return G_DataExplorer.MakeDataUrl(self.GetFactoryID(), self.GetNodePath(), location, page)
+        return G_DataExplorer.MakeDataUrl(self.GetFactoryID(), self.GetDataExplorerId(), location, page)
 
 
     #-------------------------------------------------------
     def SetupDataExplorer(self, provider = None, sync = None):
+        self._DataExplorerId = str(uuid4())
         self._DataExplorerProvider = provider
         self._DataExplorerSync = sync
         self.SetDataExplorerValidity("Initialisation")
@@ -464,6 +464,11 @@ class G_DataExplorerChildNode():
             return self
         else:
             return self._DataExplorerSync
+
+
+    #-------------------------------------------------------
+    def GetDataExplorerId(self):
+        return self._DataExplorerId
 
 
     #-------------------------------------------------------

@@ -1089,10 +1089,6 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
 
 
     #-------------------------------------------------------
-    def GetNodePath(self):
-        return self.GetNodeLabel()
-
-
     def CreateDataExplorerPage(self, builder, location, page):
         builder.AddPageHeading("Log")
 
