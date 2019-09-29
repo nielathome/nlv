@@ -159,7 +159,7 @@ class G_LineAccessor:
 
     #-------------------------------------------------------
     def GetUtcTimecode(self):
-        return self._LineSet.GetUtcTimecode(self._LineNo)
+        return self._LineSet.GetNearestUtcTimecode(self._LineNo)
 
 
 
