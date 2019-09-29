@@ -28,113 +28,7 @@
 
 // Application includes
 #include "Ntypes.h"
-
-
-
-/*-----------------------------------------------------------------------
- * Cache
- -----------------------------------------------------------------------*/
-
-// simple cache for tracking key line number information; it seems Scintilla rarely
-// keeps a copy of a value, even in a local variable, so endlessly re-requests the
-// same information
-template<typename T_KEY, typename T_VALUE, size_t c_MaxSize>
-class Cache
-{
-private:
-	using key_t = T_KEY;
-	using value_t = T_VALUE;
-
-	struct Entry;
-	using entry_ptr_t = std::shared_ptr<Entry>;
-
-	using mru_list_t = std::list<entry_ptr_t>;
-	using map_t = std::map<key_t, entry_ptr_t>;
-
-	struct Entry
-	{
-		// back pointers to hosting containers
-		typename mru_list_t::iterator m_ListPos;
-		typename map_t::iterator m_MapPos;
-
-		// the entry's value
-		value_t m_Value;
-
-		Entry( const value_t & value )
-			: m_Value{ value } {}
-	};
-
-	// the MRU list is used to identify the oldest item in the cache
-	mru_list_t m_MRUList;
-
-	// the cache itself
-	map_t m_Map;
-
-	// find a cached item, return false if not present
-	using lookup_t = std::pair<bool, value_t>;
-	lookup_t Lookup( const key_t & key )
-	{
-		map_t::iterator ientry{ m_Map.find( key ) };
-
-		if( ientry == m_Map.end() )
-			return lookup_t{ false, value_t{} };
-
-		else
-		{
-			// ensure entry is at front of MRU list
-			entry_ptr_t pentry{ ientry->second };
-			if( m_MRUList.front() != pentry )
-			{
-				m_MRUList.erase( pentry->m_ListPos );
-				m_MRUList.push_front( pentry );
-				pentry->m_ListPos = m_MRUList.begin();
-			}
-
-			return lookup_t{ true, pentry->m_Value };
-		}
-	}
-
-	// put a new value into the cache, evict the oldest existing value where cache is full
-	void Add( const key_t & key, const value_t & value )
-	{
-		if( m_MRUList.size() > c_MaxSize )
-		{
-			entry_ptr_t pentry{ m_MRUList.back() };
-			m_Map.erase( pentry->m_MapPos );
-			m_MRUList.pop_back();
-		}
-
-		entry_ptr_t pentry{ std::make_shared<Entry>( value ) };
-		pentry->m_MapPos = m_Map.insert( map_t::value_type{ key, pentry } ).first;
-		m_MRUList.push_front( pentry );
-		pentry->m_ListPos = m_MRUList.begin();
-	}
-
-public:
-	void Clear( void )
-	{
-		m_MRUList.clear();
-		m_Map.clear();
-	}
-
-	// fetch item in cache; if not present, calculate using the supplied functor
-	template<typename T_CALC>
-	value_t Fetch( const key_t & key, T_CALC calculator )
-	{
-		lookup_t cache_value{ Lookup( key ) };
-
-		value_t value;
-		if( cache_value.first )
-			value = cache_value.second;
-		else
-		{
-			value = calculator( key );
-			Add( key, value );
-		}
-
-		return value;
-	}
-};
+#include "Cache.h"
 
 
 
@@ -439,9 +333,6 @@ using lineannotation_ptr_t = boost::intrusive_ptr<SLineAnnotation>;
  * SContractionState
  -----------------------------------------------------------------------*/
 
- // the cache size should be large enough for a screen's worth of lines
-constexpr size_t c_CacheSize{ 127 };
-
 //
 // It isn't ideal feeding the Editor's contraction state through to content.
 // However, the default implementation within Scintilla has some serious flaws - mainly
@@ -461,10 +352,20 @@ private:
 	// cached annotation values
 	mutable annotationsizes_list_t m_AnnotationSizes;
 
-	using linecache_t = Cache<vint_t, vint_t, c_CacheSize>;
-	mutable linecache_t m_DisplayFromDoc;
-	mutable linecache_t m_DocFromDisplay;
-	mutable linecache_t m_Height;
+	// caches for tracking key line number information; it seems Scintilla rarely
+	// keeps a copy of a value, even in a local variable, so endlessly re-requests
+	// the same information
+	using linecache_t = Cache<vint_t, vint_t>;
+
+	static CacheStatistics s_DisplayFromDocStats;
+	mutable linecache_t m_DisplayFromDoc{ s_DisplayFromDocStats };
+
+	static CacheStatistics s_DocFromDisplayStats;
+	mutable linecache_t m_DocFromDisplay{ s_DocFromDisplayStats };
+
+	static CacheStatistics s_HeightStats;
+	mutable linecache_t m_Height{ s_HeightStats };
+
 	mutable vint_t m_LinesinDocument{ 0 };
 	mutable vint_t m_LinesDisplayed{ 0 };
 

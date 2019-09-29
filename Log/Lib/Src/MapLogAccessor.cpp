@@ -105,11 +105,11 @@ private:
 
 	// Line/style caching
 	using LineCache = Cache<LineBuffer, LineKey>;
-	static CacheStatistics m_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
+	static CacheStatistics s_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
 	mutable LineCache m_LineCache[ static_cast<int>(e_LineData::_Count) ]
 	{
-		{ 128, m_LineCacheStats[ 0 ] },
-		{ 128, m_LineCacheStats[ 1 ] }
+		{ s_LineCacheStats[ 0 ] },
+		{ s_LineCacheStats[ 1 ] }
 	};
 
 	// line formatting
@@ -360,7 +360,7 @@ public:
  * MapLogAccessor, definitions
  -----------------------------------------------------------------------*/
 
-CacheStatistics MapLogAccessor::m_LineCacheStats[]
+CacheStatistics MapLogAccessor::s_LineCacheStats[]
 {
 	{ "MapLogAccessor/Text" },
 	{ "MapLogAccessor/Style" }
@@ -473,8 +473,6 @@ viewaccessor_ptr_t MapLogAccessor::CreateViewAccessor( void )
 
 void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * line_buffer ) const
 {
-	line_buffer->Clear();
-
 	if( type == e_LineData::Text )
 		m_Index->CopyLine( line_no, field_mask, m_Text, line_buffer );
 
@@ -490,13 +488,15 @@ void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t fiel
 const LineBuffer & MapLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
 {
 	LineCache & line_cache{ m_LineCache[ static_cast<int>(type) ] };
-	LineCache::find_t found{ line_cache.Find( { line_no, field_mask } ) };
-
-	LineBuffer * line{ found.second };
-	if( !found.first )
-		CopyLine( type, line_no, field_mask, line );
-
-	return *line;
+	return * line_cache.Fetch(
+		{ line_no, field_mask },
+		[this, type] ( const LineKey & key ) -> LineBuffer
+		{
+			LineBuffer buffer;
+			CopyLine( type, key.f_LineNo, key.f_FieldMask, &buffer );
+			return buffer;
+		}
+	).second;
 }
 
 
@@ -616,10 +616,7 @@ public:
 	}
 
 	void GetText( const char ** first, const char ** last ) const override {
-		m_LineBuffer.Clear();
-
 		m_Accessor.CopyLine( e_LineData::Text, m_LineNo, m_FieldMask, &m_LineBuffer );
-
 		*first = m_LineBuffer.First();
 		*last = m_LineBuffer.Last();
 	}
@@ -643,10 +640,7 @@ public:
 	}
 
 	void GetText( const char ** first, const char ** last ) const override {
-		m_LineBuffer.Clear();
-
 		m_Accessor.CopyLine( e_LineData::Text, m_LineNo, &m_LineBuffer );
-
 		*first = m_LineBuffer.First();
 		*last = m_LineBuffer.Last();
 	}

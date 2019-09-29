@@ -34,8 +34,10 @@
 
 namespace ci = boost::intrusive;
 
+// the cache size should be large enough for a screen's worth of lines
+constexpr size_t c_DefaultCacheSize{ 128 };
 
-// T_ITEM should be default constructable; T_KEY must be comparable
+// T_ITEM should have a move constructor; T_KEY must be comparable
 template<typename T_ITEM, typename T_KEY>
 class Cache
 {
@@ -44,11 +46,11 @@ public:
 	using key_t = T_KEY;
 
 private:
-	// maximum size the cache will grow to
-	const size_t m_Limit;
-
 	// cache behaviour/performance measure
 	CacheStatistics & m_Stats;
+
+	// maximum size the cache will grow to
+	const size_t m_Limit;
 
 	// the link list pointers maintained by the intrusive MRU list
 	using hook_t = ci::list_member_hook
@@ -71,8 +73,8 @@ private:
 		// intrusive list pointers
 		hook_t m_Hook;
 
-		CacheEntry( const key_t & key )
-			: m_Key{ key } {}
+		CacheEntry( const key_t & key, item_t && item )
+			: m_Key{ key }, m_UserItem{ std::move( item ) } {}
 
 		void unlink( void ) {
 			return m_Hook.unlink();
@@ -111,9 +113,9 @@ protected:
 	}
 
 	// create and index a new cache entry
-	entry_t & CreateEntry( const key_t & key )
+	entry_t & CreateEntry( const key_t & key, item_t && item )
 	{
-		entry_ptr_t pentry{ std::make_unique<entry_t>( key ) };
+		entry_ptr_t pentry{ std::make_unique<entry_t>( key, std::move( item ) ) };
 		entry_t & entry{ *pentry };
 		m_MruList.push_back( *pentry );
 
@@ -124,11 +126,13 @@ protected:
 	}
 
 public:
-	Cache( size_t limit, CacheStatistics & stats )
-		: m_Limit{ limit }, m_Stats{ stats } {}
+	Cache( CacheStatistics & stats, size_t limit = c_DefaultCacheSize )
+		: m_Stats{ stats }, m_Limit{ limit } {}
 
 	using find_t = std::pair<bool, item_t*>;
-	find_t Find( const key_t & key )
+
+	template<typename T_INITIALISER>
+	find_t Fetch( const key_t & key, T_INITIALISER initialiser )
 	{
 		m_Stats.Lookup();
 
@@ -144,7 +148,7 @@ public:
 		{
 			m_Stats.Miss();
 			EraseLRU();
-			return std::make_pair( false, & CreateEntry( key ).m_UserItem );
+			return std::make_pair( false, & CreateEntry( key, initialiser( key ) ).m_UserItem );
 		}
 	}
 

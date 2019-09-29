@@ -368,6 +368,9 @@ public:
 	SqlLineAccessorCore( unsigned num_fields = 0, uint64_t field_mask = 0 )
 		: m_NumFields{ num_fields }, m_FieldViewMask{ field_mask } {}
 
+	SqlLineAccessorCore( SqlLineAccessorCore && rhs )
+		: m_NumFields{ rhs.m_NumFields }, m_FieldViewMask{ rhs.m_FieldViewMask } {}
+
 public:
 	// LineAccessor interfaces
 
@@ -435,7 +438,12 @@ private:
 	std::vector<capture_t> m_Captures;
 
 public:
-	void Capture( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement );
+	SqlViewLineAccessor( void ) {}
+
+	SqlViewLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t & statement );
+
+	SqlViewLineAccessor( SqlViewLineAccessor && rhs )
+		: m_Captures{ std::move( rhs.m_Captures ) }, SqlLineAccessorCore{ std::move( rhs ) } {}
 
 public:
 	// LineAccessor interfaces
@@ -590,8 +598,8 @@ private:
 
 	// Line caching
 	using LineCache = Cache<SqlViewLineAccessor, LineKey>;
-	static CacheStatistics m_LineCacheStats;
-	mutable LineCache m_LineCache{ 128, m_LineCacheStats };
+	static CacheStatistics s_LineCacheStats;
+	mutable LineCache m_LineCache{ s_LineCacheStats };
 
 	// Sorting
 	unsigned m_SortColumn{ 1 };
@@ -600,6 +608,7 @@ private:
 protected:
 	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider );
 	std::string MakeViewSql( bool with_limit = false ) const;
+	SqlViewLineAccessor CaptureLine( Error status, statement_ptr_t & statement ) const;
 
 	void RecordEvent( void ) {
 		m_LineCache.Clear();
@@ -720,13 +729,10 @@ fieldvalue_t SqlLogLineAccessor::GetFieldValue( unsigned field_id ) const
  * SqlViewLineAccessor, definitions
  -----------------------------------------------------------------------*/
 
-void SqlViewLineAccessor::Capture( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t statement )
+SqlViewLineAccessor::SqlViewLineAccessor( const SqlLogAccessor * log_accessor, uint64_t field_mask, statement_ptr_t & statement )
+	: SqlLineAccessorCore{ static_cast<unsigned>(log_accessor->GetNumFields()), field_mask }
 {
-	m_NumFields = static_cast<unsigned>(log_accessor->GetNumFields());
 	m_Captures.reserve( m_NumFields );
-	m_Captures.clear();
-	m_LineBuffer.Clear();
-	m_FieldViewMask = field_mask;
 
 	uint64_t mask{ 0x1 };
 	for( unsigned field_id = 0; field_id < m_NumFields; ++field_id, mask <<= 1 )
@@ -829,7 +835,7 @@ void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64
  * SqlViewAccessor, definitions
  -----------------------------------------------------------------------*/
 
-CacheStatistics SqlViewAccessor::m_LineCacheStats{ "SqlLineCache" };
+CacheStatistics SqlViewAccessor::s_LineCacheStats{ "SqlLineCache" };
 
 std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
 {
@@ -853,38 +859,54 @@ std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
 }
 
 
+SqlViewLineAccessor SqlViewAccessor::CaptureLine( Error status, statement_ptr_t & statement ) const
+{
+	if( Ok( status ) )
+		return SqlViewLineAccessor{ m_LogAccessor, m_FieldViewMask, statement };
+	else
+		return SqlViewLineAccessor{};
+}
+
+
 void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 {
-	LineCache::find_t found{ m_LineCache.Find( { visit_line_no, m_FieldViewMask } ) };
-	SqlViewLineAccessor * line{ found.second };
+	Error res;
+	statement_ptr_t statement;
+
+	const LineCache::find_t found{ m_LineCache.Fetch(
+		{ visit_line_no, m_FieldViewMask },
+
+		[this, &res, &statement] ( const LineKey & key ) -> SqlViewLineAccessor
+		{
+			res = m_LogAccessor->MakeStatement( MakeViewSql( true ).c_str(), false, false, statement );
+
+			if( Ok( res ) )
+				UpdateError( res, statement->Bind( 1, key.f_LineNo ) );
+
+			if( Ok( res ) )
+				UpdateError( res, statement->Step() );
+
+			return CaptureLine( res, statement );
+		}
+	) };
 
 	if( !found.first )
 	{
-		statement_ptr_t statement;
-		Error res{ m_LogAccessor->MakeStatement( MakeViewSql( true ).c_str(), false, false, statement ) };
-
-		if( Ok( res ) )
-			UpdateError( res, statement->Bind( 1, visit_line_no ) );
-
-		for( int i = 0; i < 16 && Ok( res ); ++i )
+		for( int i = 1; i < 16 && Ok( res ); ++i )
 		{
 			res = statement->Step();
 
-			SqlViewLineAccessor * capture;
-			if( i == 0 )
-				capture = line;
-			else
-			{
-				LineCache::find_t f{ m_LineCache.Find( { visit_line_no + i, m_FieldViewMask } ) };
-				capture = f.first ? nullptr : f.second;
-			}
-
-			if( capture && Ok( res ) )
-				capture->Capture( m_LogAccessor, m_FieldViewMask, statement );
+			m_LineCache.Fetch(
+				{ visit_line_no + i, m_FieldViewMask },
+				[this, res, & statement] ( const LineKey & key ) -> SqlViewLineAccessor
+				{
+					return CaptureLine( res, statement );
+				}
+			);
 		}
 	}
 
-	task.Action( *line );
+	task.Action( *found.second );
 }
 
 
