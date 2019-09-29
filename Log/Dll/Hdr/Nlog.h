@@ -419,13 +419,7 @@ private:
 	// numeric access to defined fields
 	fieldvalue_t GetFieldValue( vint_t line_no, vint_t field_no );
 
-	// simple map of Python field numbers to internal field numbers
-	const vint_t m_FieldNoOffset;
-
 public:
-	NViewFieldAccess( vint_t field_no_offset = 0 )
-		: m_FieldNoOffset{ field_no_offset } {}
-
 	// raw text access to defined text/fields
 
 	std::string GetNonFieldText( vint_t line_no );
@@ -482,7 +476,7 @@ public:
 	NViewTimecode( void );
 
 	// numeric access to a line's timecode, timecode is referenced to UTC
-	NTimecode * GetUtcTimecode( vint_t line_no );
+	NTimecode * GetNearestUtcTimecode( vint_t line_no );
 };
 
 

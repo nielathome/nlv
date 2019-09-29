@@ -442,7 +442,6 @@ bool NViewCore::Filter( boost::python::object match, bool add_irregular )
 fieldvalue_t NViewFieldAccess::GetFieldValue( vint_t line_no, vint_t field_no )
 {
 	fieldvalue_t res;
-	field_no += m_FieldNoOffset;
 
 	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		res = line.GetFieldValue( field_no );
@@ -469,7 +468,6 @@ std::string NViewFieldAccess::GetNonFieldText( vint_t line_no )
 std::string NViewFieldAccess::GetFieldText( vint_t line_no, vint_t field_no )
 {
 	std::string res;
-	field_no += m_FieldNoOffset;
 
 	m_ViewAccessor->VisitLine( line_no, [field_no, &res] ( const LineAccessor & line ) {
 		const char * first; const char * last;
@@ -528,9 +526,9 @@ NViewTimecode::NViewTimecode( void )
 }
 
 
-NTimecode * NViewTimecode::GetUtcTimecode( vint_t line_no )
+NTimecode * NViewTimecode::GetNearestUtcTimecode( vint_t line_no )
 {
-	return new NTimecode{ m_ViewTimecode->GetUtcTimecode( line_no ) };
+	return new NTimecode{ m_ViewTimecode->GetNearestUtcTimecode( line_no ) };
 }
 
 
@@ -596,7 +594,6 @@ void NEventView::Sort( unsigned col_num, int direction )
 NLogView::NLogView( logfile_ptr_t logfile, viewaccessor_ptr_t view_accessor )
 	:
 	NViewCore{ logfile, view_accessor },
-	NViewFieldAccess{ 1 },
 	m_CellBuffer{ view_accessor },
 	m_LineMarker{ new SLineMarkers{ logfile->GetAdornments(), view_accessor } },
 	m_LineLevel{ new SLineLevels },
@@ -781,7 +778,16 @@ vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
 	vint_t low_idx{ 0 }, high_idx{ view_map->m_NumLinesOrOne - 1 };
 	do
 	{
-		const vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
+		vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
+		while( !m_ViewTimecode->HasTimeCode( idx ) )
+			idx -= 1;
+		
+		if( idx < 0 )
+			break;
+		
+		if( idx < low_idx )
+			low_idx = idx;
+
 		const NTimecode value{ m_ViewTimecode->GetUtcTimecode( idx ) };
 		if( target < value )
 			high_idx = idx - 1;
@@ -816,6 +822,9 @@ void NLogView::SetupMarginText( SLineMarginText::Type type, SLineMarginText::Pre
 
 bool GlobalTracker::IsNearest( int line_no, int max_line_no, const ViewTimecode * timecode_accessor ) const
 {
+	if( !timecode_accessor->HasTimeCode( line_no ) )
+		return false;
+
 	const NTimecode timecode{ timecode_accessor->GetUtcTimecode( line_no ) };
 	const int64_t delta{ timecode - f_UtcTimecode };
 
@@ -833,7 +842,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const ViewTimecode 
 	// tracker is at, or before, this line
 	if( tracker_at_or_before )
 	{
-		const NTimecode prev_timecode{ timecode_accessor->GetUtcTimecode( line_no - 1 ) };
+		const NTimecode prev_timecode{ timecode_accessor->GetNearestUtcTimecode( line_no - 1 ) };
 		const int64_t prev_delta{ prev_timecode - f_UtcTimecode };
 		const bool tracker_at_or_before_prev{ prev_delta >= 0 };
 
@@ -846,7 +855,7 @@ bool GlobalTracker::IsNearest( int line_no, int max_line_no, const ViewTimecode 
 	// tracker is after this line
 	else
 	{
-		const NTimecode next_timecode{ timecode_accessor->GetUtcTimecode( line_no + 1 ) };
+		const NTimecode next_timecode{ timecode_accessor->GetNearestUtcTimecode( line_no + 1 ) };
 		const int64_t next_delta{ next_timecode - f_UtcTimecode };
 		const bool tracker_at_or_after_next{ next_delta <= 0 };
 

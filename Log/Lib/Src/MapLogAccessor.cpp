@@ -105,11 +105,11 @@ private:
 
 	// Line/style caching
 	using LineCache = Cache<LineBuffer, LineKey>;
-	static CacheStatistics m_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
+	static CacheStatistics s_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
 	mutable LineCache m_LineCache[ static_cast<int>(e_LineData::_Count) ]
 	{
-		{ 128, m_LineCacheStats[ 0 ] },
-		{ 128, m_LineCacheStats[ 1 ] }
+		{ s_LineCacheStats[ 0 ] },
+		{ s_LineCacheStats[ 1 ] }
 	};
 
 	// line formatting
@@ -310,6 +310,10 @@ public:
 		return this;
 	}
 
+	bool HasTimeCode( int line_no ) const override {
+		return m_LogAccessor->IsLineRegular( ViewLineToLogLine( line_no ) );
+	}
+
 	NTimecode GetUtcTimecode( nlineno_t line_no ) const override {
 		return m_LogAccessor->GetUtcTimecode( ViewLineToLogLine( line_no ) );
 	}
@@ -356,7 +360,7 @@ public:
  * MapLogAccessor, definitions
  -----------------------------------------------------------------------*/
 
-CacheStatistics MapLogAccessor::m_LineCacheStats[]
+CacheStatistics MapLogAccessor::s_LineCacheStats[]
 {
 	{ "MapLogAccessor/Text" },
 	{ "MapLogAccessor/Style" }
@@ -369,22 +373,11 @@ const std::string & ExpandFieldOffsetSize( unsigned text_offsets_size )
 }
 
 
-fielddescriptor_list_t && ExpandFieldDescriptors( const std::string & text_offsets_field_type, fielddescriptor_list_t && field_descs )
-{
-	// expand the application defined field descriptor list with 2 "hidden" fields:
-	// - the first field is always the line position
-	// - and the last field is always the text offsets data
-	field_descs.insert( field_descs.begin(), FieldDescriptor{ false, "", "uint64" } );
-	field_descs.push_back( FieldDescriptor{ false, "", text_offsets_field_type } );
-	return std::move(field_descs);
-}
-
-
 MapLogAccessor::MapLogAccessor( LogAccessorDescriptor & descriptor )
 	:
 	m_Guid{ std::move( descriptor.m_Guid ) },
 	m_TextOffsetsFieldType{ ExpandFieldOffsetSize( descriptor.m_TextOffsetsSize ) },
-	m_FieldDescriptors{ ExpandFieldDescriptors( m_TextOffsetsFieldType, std::move( descriptor.m_FieldDescriptors ) ) },
+	m_FieldDescriptors{ std::move( descriptor.m_FieldDescriptors ) },
 	m_RegexText{ std::move( descriptor.m_RegexText ) },
 	m_LineFormatters{ std::move( descriptor.m_LineFormatters ) }
 {
@@ -460,7 +453,7 @@ Error MapLogAccessor::Open( const std::filesystem::path & file_path, ProgressMet
 	{
 		// write new index
 		m_Index = MakeLogIndexAccessor( m_TextOffsetsFieldType, m_FieldDescriptors );
-		LogIndexWriter indexer{ m_Log, m_FieldDescriptors, m_RegexText };
+		LogIndexWriter indexer{ m_Log, m_FieldDescriptors, m_TextOffsetsFieldType, m_RegexText };
 		idx_error = indexer.Write( index_path, log_modified_time, m_Guid, progress );
 
 		// and attempt to load it
@@ -480,8 +473,6 @@ viewaccessor_ptr_t MapLogAccessor::CreateViewAccessor( void )
 
 void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t field_mask, LineBuffer * line_buffer ) const
 {
-	line_buffer->Clear();
-
 	if( type == e_LineData::Text )
 		m_Index->CopyLine( line_no, field_mask, m_Text, line_buffer );
 
@@ -497,13 +488,15 @@ void MapLogAccessor::CopyLine( e_LineData type, nlineno_t line_no, uint64_t fiel
 const LineBuffer & MapLogAccessor::GetLine( e_LineData type, nlineno_t line_no, uint64_t field_mask ) const
 {
 	LineCache & line_cache{ m_LineCache[ static_cast<int>(type) ] };
-	LineCache::find_t found{ line_cache.Find( { line_no, field_mask } ) };
-
-	LineBuffer * line{ found.second };
-	if( !found.first )
-		CopyLine( type, line_no, field_mask, line );
-
-	return *line;
+	return * line_cache.Fetch(
+		{ line_no, field_mask },
+		[this, type] ( const LineKey & key ) -> LineBuffer
+		{
+			LineBuffer buffer;
+			CopyLine( type, key.f_LineNo, key.f_FieldMask, &buffer );
+			return buffer;
+		}
+	).second;
 }
 
 
@@ -623,10 +616,7 @@ public:
 	}
 
 	void GetText( const char ** first, const char ** last ) const override {
-		m_LineBuffer.Clear();
-
 		m_Accessor.CopyLine( e_LineData::Text, m_LineNo, m_FieldMask, &m_LineBuffer );
-
 		*first = m_LineBuffer.First();
 		*last = m_LineBuffer.Last();
 	}
@@ -650,10 +640,7 @@ public:
 	}
 
 	void GetText( const char ** first, const char ** last ) const override {
-		m_LineBuffer.Clear();
-
 		m_Accessor.CopyLine( e_LineData::Text, m_LineNo, &m_LineBuffer );
-
 		*first = m_LineBuffer.First();
 		*last = m_LineBuffer.Last();
 	}

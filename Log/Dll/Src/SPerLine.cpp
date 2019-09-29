@@ -162,11 +162,14 @@ void SLineMarginText::CreateOffsetText( vint_t line, std::ostringstream & strm )
 		offset = line.GetFieldValue( m_DateFieldId ).As<int64_t>();
 	} );
 
-	constexpr int64_t c_Billion{ 1'000'000'000 };
-	const int64_t sec{ offset / c_Billion };
-	const int64_t nsec{ offset - (sec * c_Billion) };
+	if( offset != 0 )
+	{
+		constexpr int64_t c_Billion{ 1'000'000'000 };
+		const int64_t sec{ offset / c_Billion };
+		const int64_t nsec{ offset - (sec * c_Billion) };
 
-	(*m_CreateOffsetTextFunc)(sec, nsec, strm);
+		(*m_CreateOffsetTextFunc)(sec, nsec, strm);
+	}
 }
 
 
@@ -367,6 +370,11 @@ vint_t SLineAnnotation::Lines( vint_t line ) const
  * SContractionState
  -----------------------------------------------------------------------*/
 
+CacheStatistics SContractionState::s_DisplayFromDocStats{ "ContractionState/DisplayFromDoc" };;
+CacheStatistics SContractionState::s_DocFromDisplayStats{ "ContractionState/DocFromDisplay" };;
+CacheStatistics SContractionState::s_HeightStats{ "ContractionState/Height" };;
+
+
 // count number of lines in all annotations up to the provided view line number
 vint_t SContractionState::SumAnnotationSizes( vint_t line ) const
 {
@@ -388,7 +396,7 @@ vint_t SContractionState::SumAnnotationSizes( vint_t line ) const
 void SContractionState::ValidateCache( void ) const
 {
 	// statistics
-	static CacheStatistics cache_stats{ "SContractionState" };
+	static CacheStatistics cache_stats{ "ContractionState" };
 
 	// cache management
 	cache_stats.Lookup();
@@ -428,14 +436,11 @@ vint_t SContractionState::DisplayFromDoc( vint_t lineDoc ) const
 {
 	ValidateCache();
 
-	return m_DisplayFromDoc.Fetch( lineDoc, [ this ]( vint_t lineDoc ) -> vint_t
+	return * m_DisplayFromDoc.Fetch( lineDoc, [ this ]( vint_t lineDoc ) -> vint_t
 	{
-		vint_t lineDisplay{ 0 };
 		const vint_t annotation_lines{ SumAnnotationSizes( lineDoc ) };
-		lineDisplay = lineDoc + annotation_lines;
-
-		return lineDisplay;
-	} );
+		return lineDoc + annotation_lines;
+	} ).second;
 }
 
 
@@ -451,7 +456,7 @@ vint_t SContractionState::DocFromDisplay( vint_t lineDisplay ) const
 {
 	ValidateCache();
 
-	return m_DocFromDisplay.Fetch( lineDisplay, [ this ]( vint_t lineDisplay ) -> vint_t
+	return * m_DocFromDisplay.Fetch( lineDisplay, [ this ]( vint_t lineDisplay ) -> vint_t
 	{
 		vint_t lineDoc{ lineDisplay };
 
@@ -473,7 +478,7 @@ vint_t SContractionState::DocFromDisplay( vint_t lineDisplay ) const
 		}
 
 		return lineDoc;
-	} );
+	} ).second;
 }
 
 
@@ -482,7 +487,7 @@ vint_t SContractionState::GetHeight( vint_t lineDoc ) const
 {
 	ValidateCache();
 
-	return m_Height.Fetch( lineDoc, [this] ( vint_t lineDoc ) -> vint_t
+	return * m_Height.Fetch( lineDoc, [this] ( vint_t lineDoc ) -> vint_t
 	{
 		// default line height is 1
 		vint_t height{ 1 };
@@ -498,6 +503,6 @@ vint_t SContractionState::GetHeight( vint_t lineDoc ) const
 		}
 
 		return height;
-	} );
+	} ).second;
 }
 

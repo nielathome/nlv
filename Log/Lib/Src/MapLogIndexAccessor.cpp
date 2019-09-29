@@ -46,7 +46,7 @@ struct FieldEnumAccessor
  * MapFieldAccessor
  -----------------------------------------------------------------------*/
 
-using mapfieldaccessor_maker_t = FieldTraits<MapFieldAccessor>::field_ptr_t (*) (const FieldDescriptor & field_desc, unsigned field_id, size_t & offset);
+using mapfieldaccessor_maker_t = FieldTraits<MapFieldAccessor>::field_ptr_t (*) (const FieldDescriptor & field_desc, unsigned field_id, size_t * offset);
 
 class MapFieldAccessor : public FieldFactory<MapFieldAccessor, mapfieldaccessor_maker_t>
 {
@@ -75,15 +75,14 @@ protected:
 
 public:
 	// constructor
-	MapFieldAccessor( FieldValueType type, size_t size, const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessor( FieldValueType type, size_t size, const FieldDescriptor & field_desc, unsigned, size_t * offset )
 		:
 		c_FieldType{ type },
 		c_FieldSize{ size },
 		c_FieldName{ field_desc.f_Name },
-		c_FieldId { field_id },
-		c_FieldOffset{ offset }
+		c_FieldOffset{ *offset }
 	{
-		offset += c_FieldSize;
+		(*offset) += c_FieldSize;
 	}
 
 	// the field's class
@@ -94,9 +93,6 @@ public:
 
 	// the field's name
 	const std::string c_FieldName;
-
-	// effectively, the index of this field within the parent index
-	const unsigned c_FieldId;
 
 	// the offset of this field's data from the start of the line entry
 	const size_t c_FieldOffset;
@@ -134,7 +130,7 @@ public:
 // use where no data is associated with a field - e.g. a text only field
 struct MapFieldAccessorNull : public MapFieldAccessor
 {
-	MapFieldAccessorNull( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessorNull( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		: MapFieldAccessor{ FieldValueType::invalid, 0, field_desc, field_id, offset } {}
 };
 
@@ -150,7 +146,7 @@ struct MapFieldAccessorScalar : public MapFieldAccessor
 	using mapped_t = T_MAPPED_VALUE;
 	using fieldtype_t = T_FIELD_VALUE;
 
-	MapFieldAccessorScalar( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessorScalar( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		: MapFieldAccessor{ TypeToFieldType<fieldtype_t>::type, sizeof( mapped_t ), field_desc, field_id, offset } {}
 
 	fieldvalue_t GetValue( const uint8_t * line_data ) const override {
@@ -188,7 +184,7 @@ private:
 	const FieldHeaderEnumV1 * m_FieldHeader{ nullptr };
 
 public:
-	MapFieldAccessorEnum( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
+	MapFieldAccessorEnum( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
 		: base_t{ field_desc, field_id, offset } {}
 
 	// attach the accessor to a logfile; initialise m_FieldHeader
@@ -234,34 +230,36 @@ class MapFieldAccessorTextOffsets
 	public FieldTextOffsetsCommon<T_OFFSET, T_OFFSET_PAIR>
 {
 protected:
-	const offset_t * GetTextOffsetData( const uint8_t * line_data, unsigned field_id = 0 ) const {
-		return GetFieldData<offset_t>(line_data) + (2 * field_id);
+	const RawFieldData * GetRawFieldData( const uint8_t * line_data ) const {
+		return GetFieldData<RawFieldData>( line_data );
 	}
 
 public:
-	MapFieldAccessorTextOffsets( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset )
-		: MapFieldAccessor{ FieldValueType::invalid, CalcOffsetFieldSize( field_id), field_desc, field_id, offset } {}
+	MapFieldAccessorTextOffsets( const FieldDescriptor & field_desc, unsigned field_id, size_t * offset )
+		: MapFieldAccessor{ FieldValueType::invalid, CalcOffsetFieldSize( field_id - 1 ), field_desc, field_id, offset } {}
 
 	// does the line have any fields
 	bool IsRegular( const uint8_t * line_data ) const {
-		return FieldTextOffsetsCommon::IsRegular( GetFieldData( line_data ) );
+		return RawToIsRegular( GetRawFieldData( line_data ) );
 	}
 
 	int64_t LastRegularLine( const uint8_t * line_data ) const {
-		return GetLastRegular( GetFieldData( line_data ) );
+		return RawToLastRegular( GetRawFieldData( line_data ) );
 	}
 
 	void GetNonFieldTextOffset( const uint8_t * line_data, offset_t * first ) const {
-		if( IsRegular( line_data ) )
-			*first = GetTextOffsetData( line_data )[0];
+		const RawFieldData * data{ GetRawFieldData( line_data ) };
+		if( RawToIsRegular( data ) )
+			*first = RawToNonFieldTextOffset( data );
 		else
 			*first = 0;
 	}
 
 	void GetFieldTextOffsets( const uint8_t * line_data, unsigned field_id, offset_t * first, offset_t * last ) const {
-		if( IsRegular( line_data ) )
+		const RawFieldData * data{ GetRawFieldData( line_data ) };
+		if( RawToIsRegular( data ) )
 		{
-			const offset_t * field_data{ GetTextOffsetData( line_data, field_id ) };
+			const offset_t * field_data{ RawToFieldTextOffsets( data, field_id ) };
 			*first = field_data[ 0 ];
 			*last = field_data[ 1 ];
 		}
@@ -272,20 +270,20 @@ public:
 	template<typename T_FUNC>
 	void VisitFieldOffsets( const uint8_t * line_data, uint64_t field_mask, size_t max_count, T_FUNC & func )
 	{
-		if( !IsRegular( line_data ) )
+		if( field_mask == 0 )
 			return;
 
-		// internally, the zero'th field is associated with the non-field text, so
-		// bit 0 of the caller's mask is our bit 1
-		field_mask = field_mask << 1;
-		uint64_t field_bit{ 0x2 };
+		const RawFieldData * data{ GetRawFieldData( line_data ) };
+		if( !RawToIsRegular( data ) )
+			return;
 
 		// for each visible field
-		for( unsigned field_id = 1; field_id < max_count; ++field_id )
+		uint64_t field_bit{ 0x1 };
+		for( unsigned field_id = 0; field_id < max_count; ++field_id )
 		{
 			if( field_bit & field_mask )
 			{
-				const offset_t * field_data{ GetTextOffsetData( line_data, field_id ) };
+				const offset_t * field_data{ RawToFieldTextOffsets( data, field_id ) };
 				func( field_id, field_data[ 0 ], field_data[ 1 ] );
 			}
 			field_bit = field_bit << 1;
@@ -304,29 +302,29 @@ using MapFieldAccessorTextOffsets16 = MapFieldAccessorTextOffsets<uint16_t, uint
 
 MapFieldAccessor::factory_t::map_t MapFieldAccessor::factory_t::m_Map
 {
-	{ c_Type_DateTime_Unix, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_IntStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_IntHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_DateTime_TraceFmt_UsHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Bool, &MakeField<MapFieldAccessorBool, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint08, &MakeField<MapFieldAccessorUint<uint8_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint16, &MakeField<MapFieldAccessorUint<uint16_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint32, &MakeField<MapFieldAccessorUint<uint32_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Uint64, &MakeField<MapFieldAccessorUint<uint64_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int08, &MakeField<MapFieldAccessorInt<int8_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int16, &MakeField<MapFieldAccessorInt<int16_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int32, &MakeField<MapFieldAccessorInt<int32_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Int64, &MakeField<MapFieldAccessorInt<int64_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Float32, &MakeField<MapFieldAccessorFloat<float>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Float64, &MakeField<MapFieldAccessorFloat<double>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Enum08, &MakeField<MapFieldAccessorEnum<uint8_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Enum16, &MakeField<MapFieldAccessorEnum<uint16_t>, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Emitter, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_Text, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_TextOffsets08, &MakeField<MapFieldAccessorTextOffsets08, const FieldDescriptor &, unsigned, size_t &> },
-	{ c_Type_TextOffsets16, &MakeField<MapFieldAccessorTextOffsets16, const FieldDescriptor &, unsigned, size_t &> }
+	{ c_Type_DateTime_Unix, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_IntStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_IntHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_DateTime_TraceFmt_UsHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Bool, &MakeField<MapFieldAccessorBool, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint08, &MakeField<MapFieldAccessorUint<uint8_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint16, &MakeField<MapFieldAccessorUint<uint16_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint32, &MakeField<MapFieldAccessorUint<uint32_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Uint64, &MakeField<MapFieldAccessorUint<uint64_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int08, &MakeField<MapFieldAccessorInt<int8_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int16, &MakeField<MapFieldAccessorInt<int16_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int32, &MakeField<MapFieldAccessorInt<int32_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Int64, &MakeField<MapFieldAccessorInt<int64_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Float32, &MakeField<MapFieldAccessorFloat<float>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Float64, &MakeField<MapFieldAccessorFloat<double>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Enum08, &MakeField<MapFieldAccessorEnum<uint8_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Enum16, &MakeField<MapFieldAccessorEnum<uint16_t>, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Emitter, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Text, &MakeField<MapFieldAccessorNull, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_TextOffsets08, &MakeField<MapFieldAccessorTextOffsets08, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_TextOffsets16, &MakeField<MapFieldAccessorTextOffsets16, const FieldDescriptor &, unsigned, size_t *> }
 };
 
 
@@ -335,30 +333,34 @@ MapFieldAccessor::factory_t::map_t MapFieldAccessor::factory_t::m_Map
  * LogIndexAccessor
  -----------------------------------------------------------------------*/
 
-LogIndexAccessor::LogIndexAccessor( const fielddescriptor_list_t & field_descs )
+LogIndexAccessor::LogIndexAccessor( const fielddescriptor_list_t & field_descs, unsigned text_offsets_size )
 {
-	size_t field_offset{ 0 };
+	m_FieldLineOffset = CreateField( FieldDescriptor{ false, "", "uint64" }, &m_LineDataSize );
+	AddInternalField( m_FieldLineOffset );
 
-	SetupFields( field_descs, field_offset,
-		[] ( const FieldDescriptor & field_desc, unsigned field_id, size_t & offset ) -> field_ptr_t {
-			// the template arguments are needed to ensure offset is passed by reference
-			return field_t::CreateField<unsigned, size_t &>( field_desc, field_id, offset );
-		}
-	);
+	SetupUserFields( field_descs, &m_LineDataSize );
 
-	m_LineDataSize = field_offset;
+	const std::string text_offsets_field_type{ text_offsets_size == sizeof(uint16_t) ? c_Type_TextOffsets16 : c_Type_TextOffsets08 };
+	AddInternalField( CreateField( FieldDescriptor{ false, "", text_offsets_field_type }, &m_LineDataSize ) );
+}
+
+
+nlineno_t LogIndexAccessor::GetLineOffset( nlineno_t line_no ) const
+{
+	const fieldvalue_t value{ m_FieldLineOffset->GetValue( GetLineData( line_no ) ) };
+	return nlineno_cast( value.As<uint64_t>() );
 }
 
 
 FieldValueType LogIndexAccessor::GetFieldType( unsigned field_id ) const
 {
-	return m_Fields[ field_id ]->GetType();
+	return m_UserFields[ field_id ]->GetType();
 }
 
 
 fieldvalue_t LogIndexAccessor::GetFieldValue( nlineno_t line_no, unsigned field_id ) const
 {
-	return m_Fields[ field_id ]->GetValue( GetLineData( line_no ) );
+	return m_UserFields[ field_id ]->GetValue( GetLineData( line_no ) );
 }
 
 
@@ -378,17 +380,19 @@ Error LogIndexAccessor::LoadHeader( FILETIME modified_time, const std::string & 
 	if( std::string( hdr->f_SchemaGuid) != guid )
 		return TraceError( e_FieldSchemaChanged, "Index is out of date" );
 
-	if( hdr->f_NumFields != m_Fields.size() )
+	if( hdr->f_NumFields != m_AllFields.size() )
 		return TraceError( e_WrongIndex, "Index does not match given specification" );
 
 	Error res{ e_OK };
-	for(unsigned field_id = 0; field_id < m_Fields.size(); ++field_id )
-		UpdateError( res, m_Fields[ field_id ]->AttachIndex( field_id, hdr ) );
+	for(unsigned field_id = 0; field_id < m_AllFields.size(); ++field_id )
+		UpdateError( res, m_AllFields[ field_id ]->AttachIndex( field_id, hdr ) );
 
 	m_LineData = reinterpret_cast<const uint8_t*>( m_Map.GetData() + hdr->f_LineDataOffset );
 	m_NumLines = nlineno_cast(hdr->f_NumLines);
 
-	const unsigned field_id{ static_cast<unsigned>(hdr->f_TimecodeFieldId) };
+	// for historic reasons, the stored timecode field id is actually the field
+	// index, which is one more than the user-field id - hence subtract one here
+	const unsigned field_id{ static_cast<unsigned>(hdr->f_TimecodeFieldId) - 1 };
 	m_TimecodeBase = NTimecodeBase{ hdr->f_UtcDatum, field_id };
 
 	return res;
@@ -406,14 +410,14 @@ Error LogIndexAccessor::Load( const std::filesystem::path & file_path, FILETIME 
 
 uint16_t LogIndexAccessor::GetFieldEnumCount( unsigned field_id ) const
 {
-	const FieldEnumAccessor * enum_accessor{ m_Fields[ field_id ]->GetEnumAccessor() };
+	const FieldEnumAccessor * enum_accessor{ m_UserFields[ field_id ]->GetEnumAccessor() };
 	return enum_accessor ? enum_accessor->GetCount() : 0;
 }
 
 
 const char * LogIndexAccessor::GetFieldEnumName( unsigned field_id, uint16_t enum_id ) const
 {
-	const FieldEnumAccessor * enum_accessor{ m_Fields[ field_id ]->GetEnumAccessor() };
+	const FieldEnumAccessor * enum_accessor{ m_UserFields[ field_id ]->GetEnumAccessor() };
 	return enum_accessor ? enum_accessor->GetText( enum_id ) : nullptr;
 }
 
@@ -443,10 +447,10 @@ protected:
 
 public:
 	LogIndexAccessorFull( const fielddescriptor_list_t & field_descs )
-		: LogIndexAccessor{ field_descs }
+		: LogIndexAccessor{ field_descs, T_FIELD_TEXTOFFSETS::c_OffsetSize }
 	{
 		// the last field must be the TextOffsets
-		m_FieldTextOffsets = dynamic_cast<T_FIELD_TEXTOFFSETS*>(m_Fields.back().get());
+		m_FieldTextOffsets = dynamic_cast<T_FIELD_TEXTOFFSETS*>(m_AllFields.back().get());
 	}
 };
 
@@ -465,7 +469,7 @@ nlineno_t LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::GetLineLength( nlineno_t li
 {
 	nlineno_t length{ 0 };
 
-	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumFields() - 1,
+	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumUserFields(),
 		[&length] ( unsigned, offset_t off_lo, offset_t off_hi ) {
 			length += off_hi - off_lo + 1;
 		}
@@ -482,9 +486,10 @@ nlineno_t LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::GetLineLength( nlineno_t li
 template<typename T_FIELD_TEXTOFFSETS>
 void LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::CopyLine( nlineno_t line_no, uint64_t field_mask, const char * log_text, LineBuffer * line_buffer ) const
 {
+	line_buffer->Clear();
 	const char * line_text{ log_text + GetLineOffset( line_no ) };
 
-	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumFields() - 1,
+	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumUserFields(),
 		[&line_buffer, line_text] ( unsigned, offset_t off_lo, offset_t off_hi ) {
 			line_buffer->Append( line_text + off_lo, line_text + off_hi );
 			line_buffer->Append( ' ' );
@@ -500,7 +505,9 @@ void LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::CopyLine( nlineno_t line_no, uin
 template<typename T_FIELD_TEXTOFFSETS>
 void LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::CopyStyle( nlineno_t line_no, uint64_t field_mask, LineBuffer * line_buffer ) const
 {
-	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumFields() - 1,
+	line_buffer->Clear();
+
+	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumUserFields(),
 		[&line_buffer] ( unsigned field_id, offset_t off_lo, offset_t off_hi ) {
 			line_buffer->Append( static_cast<char>(field_id), off_hi - off_lo + 1 );
 		}

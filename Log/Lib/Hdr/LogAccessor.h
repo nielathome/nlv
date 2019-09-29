@@ -109,6 +109,13 @@ private:
 	}
 
 public:
+	LineBuffer( void ) {}
+
+	LineBuffer( const LineBuffer & rhs ) = default;
+
+	LineBuffer( LineBuffer && rhs )
+		: m_Reserved{ rhs.m_Reserved }, m_Buffer{ std::move( rhs.m_Buffer ) } {}
+
 	void Append( char ch, size_t cnt = 1 ) {
 		Reserve();
 		m_Buffer.append( cnt, ch );

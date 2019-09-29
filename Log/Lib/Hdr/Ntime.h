@@ -120,7 +120,14 @@ public:
 
 struct ViewTimecode
 {
+	virtual bool HasTimeCode( int line_no ) const = 0;
 	virtual NTimecode GetUtcTimecode( int line_no ) const = 0;
+
+	NTimecode GetNearestUtcTimecode( int line_no ) const {
+		while( (line_no > 0) && !HasTimeCode( line_no ) )
+			line_no -= 1;
+		return GetUtcTimecode( line_no );
+	}
 };
 
 
