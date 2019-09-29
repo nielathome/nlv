@@ -36,6 +36,8 @@ from .EventProjector import G_ScriptGuard
 from .Project import G_Global
 from .Project import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
+from .Session import G_DataExplorerProvider
+from .Session import G_DataExplorerSync
 
 # wxWidgets imports
 import wx
@@ -101,20 +103,23 @@ class G_TableFieldFormatter:
 
 ## G_TableDataModel ########################################
 
-class G_TableDataModel(wx.dataview.DataViewModel):
+class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
-    def __init__(self, permit_nesting):
+    def __init__(self, permit_nesting, doc_url):
         super().__init__()
 
         self._PermitNesting = permit_nesting
+        self._DocumentUrl = doc_url
         self._ViewFlat = True
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
+        self._HistoryColour = G_ColourTraits.MakeColour("LIGHT SLATE BLUE")
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
+        self._HistoryKey = None
         self.Reset()
 
         self._Icons = [
@@ -135,6 +140,10 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
 
     #-------------------------------------------------------
+    def ClearDataValidity(self, reason):
+        self._HistoryKey = None
+        self.SetDataValidity(reason)
+
     def Reset(self, table_schema = None):
         self._N_Logfile = None
         self._N_EventView = None
@@ -155,6 +164,8 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             self._ModelColumnToFieldId.append(fid)
 
         self._ParentKeyToChildKeys = dict()
+
+        self.ClearDataValidity("Model reset")
 
 
     #-------------------------------------------------------
@@ -208,6 +219,38 @@ class G_TableDataModel(wx.dataview.DataViewModel):
             return candidate_parent_key
 
         return -1
+
+
+    #-------------------------------------------------------
+    def GetLocation(self, item):
+        return str(self.ItemToKey(item))
+
+    def SetHistoryKey(self, key):
+        self._HistoryKey = key
+        return self.KeyToItem(key)
+
+    def CreateDataExplorerPage(self, builder, location, page):
+        builder.AddPageHeading("Event")
+        if self._DocumentUrl is not None:
+            builder.AddLink(self._DocumentUrl, "Show log ...")
+
+        item_key = int(location)
+        table_schema = self._TableSchema
+
+        for col_num, field in enumerate(self._TableSchema):
+            if field.Available:
+                display_value = self.GetFieldDisplayValue(item_key, col_num)
+                if isinstance(display_value, str):
+                    text = display_value
+                elif isinstance(display_value, bool):
+                    if display_value:
+                        text = "True"
+                    else:
+                        text = "False"
+                else:
+                    text = display_value.Text
+
+                builder.AddField(field.Name, text)
 
 
     #-------------------------------------------------------
@@ -337,6 +380,9 @@ class G_TableDataModel(wx.dataview.DataViewModel):
                 wrapped_attr.SetFgColour(self._ColumnColours[field_id])
 
         item_key = self.ItemToKey(item)
+        if item_key == self._HistoryKey:
+            wrapped_attr.SetBgColour(self._HistoryColour, True)
+
         for hiliter in self._Hiliters:
             if self._N_EventView.GetHiliter(hiliter._Id).Hit(item_key):
                 wrapped_attr.SetBgColour(hiliter._Colour)
@@ -466,6 +512,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if not self.FilterLineSet(match):
             return False
         
+        self.ClearDataValidity("Filter: {match}".format(match = match.GetDescription()))
         self.Cleared()
         return True
 
@@ -475,6 +522,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
         if self._N_EventView is not None:
             (data_col_offset, direction) = self._TableSchema[col_num].ToggleSortDirection()
             self._N_EventView.Sort(col_num + data_col_offset, direction)
+            self.ClearDataValidity("Sorting")
             self.Cleared()
             return True
         else:
@@ -546,6 +594,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 
         self._ViewFlat = view_flat
         if do_rebuild:
+            self.ClearDataValidity("Nesting level")
             self.Cleared()
 
 
@@ -573,7 +622,7 @@ class G_TableDataModel(wx.dataview.DataViewModel):
 class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, permit_nesting, flags):
+    def __init__(self, parent, permit_nesting, flags, doc_url):
         super().__init__(
             parent,
             style = wx.dataview.DV_ROW_LINES
@@ -581,7 +630,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
             | flags
         )
 
-        self.AssociateModel(G_TableDataModel(permit_nesting))
+        self.AssociateModel(G_TableDataModel(permit_nesting, doc_url))
         self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
@@ -650,17 +699,17 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 ## G_TableViewCtrl #########################################
 
-class G_TableViewCtrl(G_DataViewCtrl):
+class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
     #-------------------------------------------------------
-    def __init__(self, parent, node, permit_nesting = True, multiple_selection = False):
+    def __init__(self, parent, selection_handler, permit_nesting = True, multiple_selection = False, doc_url = None):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        super().__init__(parent, permit_nesting, flags)
+        super().__init__(parent, permit_nesting, flags, doc_url)
 
-        self._SelectionHandlerNode = node
+        self._SelectionHandler = selection_handler
         self.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED, self.OnItemActivated)
 
 
@@ -725,11 +774,21 @@ class G_TableViewCtrl(G_DataViewCtrl):
 
 
     #-------------------------------------------------------
+    def GetLocation(self, item):
+        return self.GetModel().GetLocation(item)
+
+    def ShowLocation(self, location):
+        item = self.GetModel().SetHistoryKey(int(location))
+        self.EnsureVisible(item)
+        return True
+
+
+    #-------------------------------------------------------
     def GetEventRange(self, event_no):
         return self.GetModel().GetEventRange(event_no)
 
     def OnItemActivated(self, evt):
-        self._SelectionHandlerNode.OnTableSelectionChanged(evt.GetItem())
+        self._SelectionHandler(evt.GetItem())
 
 
     #-------------------------------------------------------
@@ -955,18 +1014,19 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
 class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
-    def __init__(self, parent, quantifier_name):
+    def __init__(self, parent, selection_handler, quantifier_name):
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
 
         # the ID distinguishes different tables in the event,
         # but otherwise, has no real meaning
+        self._SelectionHandler = selection_handler
         self._QuantifierName = quantifier_name
         self._CollectorLocked = True
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TableViewCtrl = G_TableViewCtrl(self, self, permit_nesting = False, multiple_selection = True)
+        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, permit_nesting = False, multiple_selection = True)
 
         self._ChartPane = wx.Panel(self)
         self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
@@ -1057,6 +1117,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
+        self._SelectionHandler(item)
         self.UpdateSelection().Realise()
 
 

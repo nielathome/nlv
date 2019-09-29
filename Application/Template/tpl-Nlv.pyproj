@@ -55,6 +55,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="data.css" />
     <Content Include="theme.event.default.xml" />
     <Content Include="theme.log.default.xml" />
     <Content Include="theme.view.default.xml" />

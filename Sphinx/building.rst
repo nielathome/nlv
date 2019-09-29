@@ -21,15 +21,14 @@ Building
 Structure
 ---------
 
-NLV is a Python program and relies on wxPython & wxWidgets to provide all Windows
-UI capabilities. The version of Scintilla contained with wxWidgets must be modified
-in order to work with NLV. The supplied VSTC patch contains the modifications.
+NLV is a Python program and relies on customised versions of wxPython & wxWidgets
+to provide all Windows UI capabilities. These are provided as Git submodules.
 
 NLV relies on Nlog, a C++ DLL, for all searching, mapping and indexing tasks. The
 Nlog DLL makes use of a number of Open Source packages.
 
 Building requires downloading the dependencies, patching wxWidgets, and compiling
-& packaging the source. It is recommended the supplied nlvsetup.sh script is
+& packaging the source. It is recommended the supplied build.sh script is
 used to do this.
 
 
@@ -38,7 +37,7 @@ Tools
 
 The build machine should have the following tools installed:
 
-* CygWin: (x32 or x64): base install + git + graphviz + wget (https://www.cygwin.com/)
+* CygWin: (x32 or x64): base install + git + graphviz + wget + unzip (https://www.cygwin.com/)
 * Python 3.6.x: 64-bit install, ensure Python is added to path (https://www.python.org/)
 * Visual Studio 2015 Community Edition (https://www.visualstudio.com/vs/older-downloads/).
 

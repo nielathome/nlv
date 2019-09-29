@@ -25,9 +25,15 @@
  * SLineMarkers
  -----------------------------------------------------------------------*/
 
+int SLineMarkers::HistoryLineMarkValue( vint_t view_line_no )
+{
+	return view_line_no == m_HistoryLineNo ? 0x1 << NConstants::e_StyleHistory : 0;
+}
+
+
 int SLineMarkers::ViewMarkValue( vint_t view_line_no )
 {
-	int res{ 0 }, bit{ 0x1 << (int) NConstants::e_StyleBaseTracker };
+	int res{ 0 }, bit{ 0x1 << NConstants::e_StyleBaseTracker };
 
 	const ViewTimecode * timecode_accessor{ m_ViewAccessor->GetTimecode() };
 	const vint_t max_line_no{ m_ViewMap->m_NumLinesOrOne - 1 };
@@ -54,7 +60,9 @@ vint_t SLineMarkers::MarkValue( vint_t view_line_no )
 	// the global timecode markers
 	const int global_markers{ ViewMarkValue( view_line_no ) };
 	
-	return log_markers | global_markers;
+	// history line marker
+	const int history_marker{ HistoryLineMarkValue( view_line_no ) };
+	return history_marker | log_markers | global_markers;
 }
 
 

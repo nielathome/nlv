@@ -39,6 +39,8 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
+from .Session import G_DataExplorerProvider
+from .Session import G_DataExplorerSync
 from .StyleNode import G_ColourNode
 from .StyleNode import G_ColourTraits
 from .StyleNode import G_EnabledColourNode
@@ -868,7 +870,7 @@ class G_ViewThemeContainerNode(G_ViewChildNode, G_ListContainerNode):
 
 ## G_ViewNode ##############################################
 
-class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
+class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider, G_DataExplorerSync):
     """Class that implements a view onto a logfile"""
 
     # global tracker key binding map to tracker index
@@ -885,6 +887,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         # track our position in the project tree
         G_DisplayNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self.SetupDataExplorer()
+
         self._CursorLine = -1
         self._AutoHiliteText = ""
         self._OrigNameId = name.split("/")[-1]
@@ -958,12 +962,18 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         editor.SetMarginWidth(2, 14)
         editor.SetMarginMask(2, tracker_mask)
 
+        # history line marker
+        from .StyleNode import G_ColourTraits
+        history_marker = Nlog.EnumConstants.StyleHistory
+        editor.MarkerDefine(history_marker, wx.stc.STC_MARK_BACKGROUND)
+        editor.MarkerSetBackground(history_marker, G_ColourTraits.GetColour("MEDIUM SLATE BLUE"))
+        editor.MarkerSetAlpha(history_marker, 50)
+
         # setup cursor unwanted zone (UZ); keeps GotoLine away from the top/bottom
         # of the screen
         editor.SetYCaretPolicy(wx.stc.STC_CARET_SLOP | wx.stc.STC_CARET_EVEN, 10)
 
         # setup caret line hiliting
-        from .StyleNode import G_ColourTraits
         editor.SetCaretLineBackground(G_ColourTraits.GetColour("GOLDENROD"))
         editor.SetCaretLineBackAlpha(50)
         editor.SetCaretLineVisible(True)
@@ -1035,6 +1045,30 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self._N_View = None
 
         super().DoClose(delete)
+
+
+    #-------------------------------------------------------
+    def ShowLocation(self, location):
+        line = int(location)
+        self.GetView().SetHistoryLine(line)
+        self.ScrollToLine(line)
+        self.RefreshView()
+        return True
+
+
+    def CreateDataExplorerPage(self, builder, location, page):
+        builder.AddPageHeading("View")
+        builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
+
+        line = int(location)
+        view = self.GetView()
+
+        builder.AddField("Line No", location)
+
+        for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
+            builder.AddField(name, view.GetFieldText(line, field_id))
+
+        builder.AddField("Line", view.GetNonFieldText(line))
 
 
     #-------------------------------------------------------
@@ -1165,7 +1199,10 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             # flush any changes through to the GUI
             self.RefreshTrackers(update_local, update_global, self)
 
-        # and tell the world
+        # tell the data explorer
+        self.GetDataExplorer().Update(self.MakeDataUrl(str(cur_line)))
+
+        # tell the world
         self.NotifyLine(cur_line)
 
         # maintanance note - do not add any more random stuff to this function,
@@ -1295,8 +1332,11 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def UpdateFilter(self, match):
         """The filter GUI page has been altered; re-filter the logfile view"""
-        return self._N_View.Filter(match)
-
+        ok = self._N_View.Filter(match)
+        if ok:
+            self.SetDataExplorerValidity("Filter: {match}".format(match = match.GetDescription()))
+        return ok
+            
 
     #-------------------------------------------------------
     def UpdateMargin(self, type, precision):

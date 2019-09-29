@@ -160,6 +160,15 @@ class G_MatchItem(D_Document.D_Value):
         return len(self.MatchText) == 0
 
 
+    #-------------------------------------------------------
+    def GetDescription(self):
+        """Determine a representatitive description of the filter"""
+        if self.IsEmpty():
+            return "Cleared"
+        else:
+            return "{type}=[{text}]".format(type = self.MatchType, text = self.MatchText)
+
+
 
 ## G_MatchAllHistoryStore ##################################
 

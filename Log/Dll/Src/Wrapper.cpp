@@ -326,6 +326,7 @@ BOOST_PYTHON_MODULE( Nlog )
 	enum_<NConstants>( "EnumConstants" )
 		.value( "StyleBaseMarker", NConstants::e_StyleBaseMarker )
 		.value( "StyleBaseTracker", NConstants::e_StyleBaseTracker )
+		.value( "StyleHistory", NConstants::e_StyleHistory )
 		.export_values()
 		;
 
@@ -404,6 +405,7 @@ BOOST_PYTHON_MODULE( Nlog )
 		.def( "GetLocalTrackerLine", &NLogView::GetLocalTrackerLine )
 		.def( "GetGlobalTrackerLine", &NLogView::GetGlobalTrackerLine )
 		.def( "SetupMarginText", &NLogView::SetupMarginText )
+		.def( "SetHistoryLine", &NLogView::SetHistoryLine )
 		;
 
 	class_<NLogfile, logfile_ptr_t, boost::noncopyable>( "Logfile", no_init )

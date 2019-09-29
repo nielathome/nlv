@@ -16,6 +16,7 @@
 #
 
 # Python imports
+import datetime
 from pathlib import Path
 from weakref import ref as MakeWeakRef
 
@@ -36,6 +37,8 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
+from .Session import G_DataExplorerProvider
+from .Session import G_DataExplorerSync
 from .Session import G_SessionChildNode
 from .StyleNode import G_ColourNode
 from .StyleNode import G_MarkerStyleNode
@@ -88,6 +91,11 @@ class G_DelayedSendFocus:
         """Delayed forwarding of input focus; safe to use in any event context"""
         self._DelayedFocusWindow = ctrl
         self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
+
+
+    #-------------------------------------------------------
+    def ClearSendFocusToCtrl(self):
+        self._DelayedFocusWindow = None
 
 
     #-------------------------------------------------------
@@ -932,7 +940,7 @@ class G_LogThemeContainerNode(G_LogChildNode, G_ListContainerNode):
 
 ## G_LogNode ##############################################
 
-class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
+class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider, G_DataExplorerSync):
     """
     Class that implements a logfile.
     Instances are attached to the logfile nodes in the project tree.
@@ -941,6 +949,8 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         super().__init__(factory, wproject, witem)
+        self.SetupDataExplorer()
+
         self._ViewCount = 0
         self._N_Logfile = None
         self._OrigLogfileName = name
@@ -1076,6 +1086,21 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     def MakeSessionDir(self):
         session_guid = self.GetSessionNode().GetSessionGuid()
         return G_Global.MakeCacheDir(self._FullPath, session_guid)
+
+
+    #-------------------------------------------------------
+    def CreateDataExplorerPage(self, builder, location, page):
+        builder.AddPageHeading("Log")
+
+        builder.AddField("Path", str(self._FullPath))
+
+        stat = self._FullPath.stat()
+
+        size = int(stat.st_size / 1024)
+        builder.AddField("Size", "{size} K".format(size = size))
+
+        mtime = datetime.datetime.fromtimestamp(stat.st_mtime)
+        builder.AddField("Modified", mtime.strftime("%A %d %B %Y %H:%M:%S"))
 
 
     #-------------------------------------------------------
