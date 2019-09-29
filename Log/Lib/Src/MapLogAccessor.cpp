@@ -105,11 +105,11 @@ private:
 
 	// Line/style caching
 	using LineCache = Cache<LineBuffer, LineKey>;
-	static CacheStatistics m_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
+	static CacheStatistics s_LineCacheStats[ static_cast<int>(e_LineData::_Count) ];
 	mutable LineCache m_LineCache[ static_cast<int>(e_LineData::_Count) ]
 	{
-		{ m_LineCacheStats[ 0 ] },
-		{ m_LineCacheStats[ 1 ] }
+		{ s_LineCacheStats[ 0 ] },
+		{ s_LineCacheStats[ 1 ] }
 	};
 
 	// line formatting
@@ -360,7 +360,7 @@ public:
  * MapLogAccessor, definitions
  -----------------------------------------------------------------------*/
 
-CacheStatistics MapLogAccessor::m_LineCacheStats[]
+CacheStatistics MapLogAccessor::s_LineCacheStats[]
 {
 	{ "MapLogAccessor/Text" },
 	{ "MapLogAccessor/Style" }

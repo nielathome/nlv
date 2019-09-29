@@ -598,8 +598,8 @@ private:
 
 	// Line caching
 	using LineCache = Cache<SqlViewLineAccessor, LineKey>;
-	static CacheStatistics m_LineCacheStats;
-	mutable LineCache m_LineCache{ m_LineCacheStats };
+	static CacheStatistics s_LineCacheStats;
+	mutable LineCache m_LineCache{ s_LineCacheStats };
 
 	// Sorting
 	unsigned m_SortColumn{ 1 };
@@ -835,7 +835,7 @@ void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64
  * SqlViewAccessor, definitions
  -----------------------------------------------------------------------*/
 
-CacheStatistics SqlViewAccessor::m_LineCacheStats{ "SqlLineCache" };
+CacheStatistics SqlViewAccessor::s_LineCacheStats{ "SqlLineCache" };
 
 std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
 {
