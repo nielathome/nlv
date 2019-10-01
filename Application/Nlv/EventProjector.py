@@ -866,7 +866,7 @@ class G_ProjectionContext:
                 """.format(table = table))
 
             datum = cursor.fetchone()[0]
-            if utc_datum == 0 or datum < utc_datum:
+            if datum is not None and (utc_datum == 0 or datum < utc_datum):
                 utc_datum = datum
 
         cursor.execute("DROP TABLE IF EXISTS main.projection_meta")

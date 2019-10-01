@@ -74,29 +74,6 @@ Recognise(
 
 ## Project #####################################################
 
-class Projector:
-
-    #-----------------------------------------------------------
-    @staticmethod
-    def IsSameProcess(parent_process, child_process):
-        """
-        Called to determine whether the `child` event can be
-        considered subordinate-to, or contained-within, the `parent`
-        event.
-
-        Both `parent` and `child` are objects returned via the
-        select query. The function should return True
-        if the child event is to be considered "contained by"
-        (or "subordinate to") the parent event, and False otherwise.
-        Contained events mey be displayed nested in the UI.
-
-        This routine is only called where schema.AddNesting()
-        was called in the DefineSchema() method.
-        """
-        return parent_process == child_process
-
-
-#---------------------------------------------------------------
 def Projector(connection, cursor, context):
 
     tables = ["expire"]

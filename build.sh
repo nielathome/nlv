@@ -134,7 +134,7 @@ msg_header "Initialising NLV Build Directory"
 
 # figure out a PEP440 compliant version number
 if [ -n "$cfg_release" ]; then
-  echo "0" > bld.txt
+  echo -n "0" > bld.txt
   tmp=`cat ver.txt`
   echo -n $(($tmp + 1)) > ver.txt
 else
