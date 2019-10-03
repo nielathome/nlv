@@ -233,7 +233,10 @@ class D_ThemeGallery:
 
     def _GetThemeItemValue(self, theme_id, field_id):
         """Lookup the theme value for the supplied field ID"""
-        value = self._GetThemeItem(theme_id, field_id).text
+        value = None
+        item = self._GetThemeItem(theme_id, field_id)
+        if item is not None:
+            value = item.text
         if value is None:
             value = ""
         return value

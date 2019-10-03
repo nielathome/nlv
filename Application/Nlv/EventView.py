@@ -533,6 +533,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                     for projector in self._AnalysisResults.Projectors.values():
                         self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, projector.ProjectionName)
 
+                self.PostAnalyse()
+
                     #for quantifier in self._AnalysisResults.Quantifiers.values():
                     #    self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
 
@@ -698,7 +700,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def _ForallProjectors(self, func, event = True, metrics = True):
+    def _ForallProjectors(self, func, event, metrics):
         if event:
             self.VisitSubNodes(func, factory_id = G_Project.NodeID_EventProjector, recursive = True)
 
@@ -713,14 +715,21 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         def Work(node):
             node.DoReleaseFiles()
 
-        self._ForallProjectors(Work)
+        self._ForallProjectors(Work, event = True, metrics = True)
+
+
+    def PostAnalyse(self):
+        def Work(node):
+            node.PostAnalyse(self._AnalysisResults)
+
+        self._ForallProjectors(Work, event = True, metrics = False)
 
 
     def UnlockCharts(self):
         def Work(node):
             node.UnlockCharts()
 
-        self._ForallProjectors(Work, event = False)
+        self._ForallProjectors(Work, event = False, metrics = True)
 
 
     @G_Global.TimeFunction
@@ -740,15 +749,20 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def UpdateValidity(self, valid):
         def Work(node):
             node.UpdateValidity(valid)
-        self._ForallProjectors(Work)
+        self._ForallProjectors(Work, event = True, metrics = True)
 
 
     #-------------------------------------------------------
+    @G_Global.ProgressMeter
     @G_Global.TimeFunction
     def UpdateAnalysis(self):
         """Analysis requested by user"""
-        self.AnalyseForAll()
-        self.UpdateContent()
+        def Work():
+            self.AnalyseForAll()
+            self.UpdateContent()
+            self.PostAnalyse()
+
+        self.WithFrameLocked(Work)
 
 
     #-------------------------------------------------------
@@ -1378,6 +1392,13 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def UnlockCharts(self):
         # there are no charts, so do nothing
         pass
+
+
+    #-------------------------------------------------------
+    def PostAnalyse(self, analysis_results):
+        event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
+        settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
+        self.FindChildNode(G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------

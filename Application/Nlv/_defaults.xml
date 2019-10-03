@@ -300,48 +300,48 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     <!-- Hiliter container and defined hiliters -->
     <node factory="187B89FD-8E79-4F6C-B513-2211B82B6029" name="Search">
       <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(1) Bad">
-        <field name="ColourName" type="Str" field_id="193032BE-30F7-40F0-80E7-0C75F1946F0A" theme_cls="global" override="0">TOMATO</field>
-        <field name="MatchText" type="Str" field_id="C32B2009-A78F-43FB-A7BF-21AA90687F04" theme_cls="event" override="0"/>
-        <field name="MatchCase" type="Bool" field_id="05569C3E-86CA-43FC-81AE-52503818EE20" theme_cls="event" override="0">True</field>
-        <field name="MatchType" type="Str" field_id="7236C2F9-CC3C-465E-86D1-E92E68584CE0" theme_cls="event" override="0">Literal</field>
+        <field name="ColourName" type="Str">TOMATO</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
         <field name="MatchEdit" type="Bool">True</field>
       </node>
       <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(2) Unsure">
-        <field name="ColourName" type="Str" field_id="7E9B028B-64C6-41E1-936D-AFB1D38C31BE" theme_cls="global" override="0">ORCHID</field>
-        <field name="MatchText" type="Str" field_id="EF072092-A595-44EF-98F1-97889BC577B6" theme_cls="event" override="0"/>
-        <field name="MatchCase" type="Bool" field_id="F89733BD-50F0-44E8-9921-6AA7F3AD1C00" theme_cls="event" override="0">True</field>
-        <field name="MatchType" type="Str" field_id="26FB9648-2207-4840-8406-AF6C03738588" theme_cls="event" override="0">Literal</field>
+        <field name="ColourName" type="Str">ORCHID</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
         <field name="MatchEdit" type="Bool">True</field>
       </node>
       <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(3) Check">
-        <field name="ColourName" type="Str" field_id="C24DAF4F-DB94-4D8A-BEDC-C9EED8F5C1C3" theme_cls="global" override="0">GOLD</field>
-        <field name="MatchText" type="Str" field_id="B8821C72-A6B9-44FE-AC8B-E954AC3BA7F1" theme_cls="event" override="0"/>
-        <field name="MatchCase" type="Bool" field_id="CE7AE3C1-9509-4FBA-B119-F6611857FEAE" theme_cls="event" override="0">True</field>
-        <field name="MatchType" type="Str" field_id="D0D7849D-64AD-4444-A3B9-81E01BFB92B9" theme_cls="event" override="0">Literal</field>
+        <field name="ColourName" type="Str">GOLD</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
         <field name="MatchEdit" type="Bool">True</field>
       </node>
     </node>
     
     <!-- Filter node-->
     <node factory="9913F5A0-C726-4A4C-974A-B5A92E71ECEB" name="Filter">
-      <field name="MatchText" type="Str" field_id="684AC3BE-7E57-4AF7-B429-3D097C8834E2" theme_cls="event" override="0"/>
-      <field name="MatchCase" type="Bool" field_id="9EE092BD-BC19-4E94-9302-3FE0CC3466DC" theme_cls="event" override="0">True</field>
-      <field name="MatchType" type="Str" field_id="15AFAC90-1EC0-4F4E-9E08-EF60E97B57B6" theme_cls="event" override="0">Literal</field>
+      <field name="MatchText" type="Str"/>
+      <field name="MatchCase" type="Bool">True</field>
+      <field name="MatchType" type="Str">Literal</field>
       <field name="MatchEdit" type="Bool">True</field>
     </node>
 
     <!-- Event tracking node -->
     <node factory="53AD7641-989C-4561-8F56-401DC378BAB6" name="Track">
       <object name="TrackInfo">
-        <field name="idxUpdateMarker" type="Int" field_id="491AB385-20EF-42AD-96D1-855444D66D7B" theme_cls="event" override="0">0</field>
-        <field name="idxUpdateGlobal" type="Int" field_id="16AEEF65-AF10-4231-BBE4-F6FAB8AAE70B" theme_cls="event" override="0">0</field>
+        <field name="idxUpdateMarker" type="Int">3</field>
+        <field name="idxUpdateGlobal" type="Int">1</field>
       </object>
     </node>
 
     <!-- Field node-->
     <node factory="3DDAF4B3-8B58-496B-888A-855CB78C59ED" name="Fields">
-      <field name="ColourNames" type="StrArray" field_id="EF11514A-E147-4E6A-B2EC-FB8FEBC88E0C" theme_cls="event" override="0">BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK</field>
-      <field name="Visibility" type="BoolArray" field_id="02A7CEC6-AE38-4632-9C19-6361D0109A8B" theme_cls="event" override="0">True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True</field>
+      <field name="ColourNames" type="StrArray">BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK</field>
+      <field name="Visibility" type="BoolArray">True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True</field>
     </node>
 
     <!-- Options node-->

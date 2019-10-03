@@ -62,9 +62,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
   <name field_id="F770D255-E7C3-4376-BC79-40DD6EE67EC5">View search 6.Colour</name>
   <name field_id="32CDDF0D-CEE4-4E89-A27B-A2AD3B02F6BC">View search 6.Style</name>
   <name field_id="0ACE781D-0C98-4FF9-8565-1588233AA774">View Margin.Colour</name>
-  <name field_id="193032BE-30F7-40F0-80E7-0C75F1946F0A">Event search 1.Colour</name>
-  <name field_id="7E9B028B-64C6-41E1-936D-AFB1D38C31BE">Event search 1.Colour</name>
-  <name field_id="C24DAF4F-DB94-4D8A-BEDC-C9EED8F5C1C3">Event search 1.Colour</name>
 
   <!-- Map of log theme field_id GUIDs to friendly names-->
   <name field_id="D2A56B54-4BC9-4BD2-AA61-B6F81AB10EDD">Marker 1.Text</name>
@@ -111,21 +108,5 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
   <name field_id="91F38F0D-3375-4005-935E-0CC7A738F74C">Event analyser.Description</name>
   <name field_id="F1DF7FB1-9C9F-45B1-BD6A-DEDAED883E34">Event analyser.Python Source</name>
   <name field_id="EE35CE97-8ECC-448C-82E0-374007BEE21E">Event analyser.Display Nesting</name>
-  <name field_id="C32B2009-A78F-43FB-A7BF-21AA90687F04">Event search 1.Text</name>
-  <name field_id="05569C3E-86CA-43FC-81AE-52503818EE20">Event search 1.Case</name>
-  <name field_id="7236C2F9-CC3C-465E-86D1-E92E68584CE0">Event search 1.Type</name>
-  <name field_id="EF072092-A595-44EF-98F1-97889BC577B6">Event search 2.Text</name>
-  <name field_id="F89733BD-50F0-44E8-9921-6AA7F3AD1C00">Event search 2.Case</name>
-  <name field_id="26FB9648-2207-4840-8406-AF6C03738588">Event search 2.Type</name>
-  <name field_id="B8821C72-A6B9-44FE-AC8B-E954AC3BA7F1">Event search 3.Text</name>
-  <name field_id="CE7AE3C1-9509-4FBA-B119-F6611857FEAE">Event search 3.Case</name>
-  <name field_id="D0D7849D-64AD-4444-A3B9-81E01BFB92B9">Event search 3.Type</name>
-  <name field_id="684AC3BE-7E57-4AF7-B429-3D097C8834E2">Event filter.Text</name>
-  <name field_id="9EE092BD-BC19-4E94-9302-3FE0CC3466DC">Event filter.Case</name>
-  <name field_id="15AFAC90-1EC0-4F4E-9E08-EF60E97B57B6">Event filter.Type</name>
-  <name field_id="491AB385-20EF-42AD-96D1-855444D66D7B">Tracker.Update Marker</name>
-  <name field_id="16AEEF65-AF10-4231-BBE4-F6FAB8AAE70B">Tracker.Update Global</name>
-  <name field_id="EF11514A-E147-4E6A-B2EC-FB8FEBC88E0C">Field.Colours</name>
-  <name field_id="02A7CEC6-AE38-4632-9C19-6361D0109A8B">Field.Visibility</name>
 
 </root>

@@ -190,7 +190,7 @@ Project(
     MakeDisplaySchema()
         .AddEventId()
         .AddStart("Start", width = 100)
-        .AddFinish("Finish", width = 100)
+        .AddFinish("Finish", width = 100, initial_visibility = False)
         .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)
         .AddField("Process", "int", 60)
         .AddField("Place", "real", 60)
@@ -244,7 +244,7 @@ projection = Project(
         .AddEventId()
         .AddStart("Start", width = 100)
         .AddDuration("Duration", scale = "s", width = 60)
-        .AddField("Event Summary", "text", 150, "left")
+        .AddField("Event Summary", "text", 150, "left", initial_colour = "ROYAL BLUE")
 )
 
 

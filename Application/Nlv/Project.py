@@ -827,6 +827,7 @@ class G_Node:
 
         return new_node
 
+    @G_Global.ProgressMeter
     def BuildNode(self, document, copy_defaults, name, **kwargs ):
         """Common node building implementation"""
 
@@ -1328,6 +1329,7 @@ class G_RootNode(G_TreeNode):
 
 
     #-------------------------------------------------------
+    @G_Global.ProgressMeter
     def LoadNode(self, node_name, document_path = None):
         node = None
 

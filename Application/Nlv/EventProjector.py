@@ -576,18 +576,20 @@ class G_ProjectionFieldSchema:
     """Describe a single projector field (database 'colummn')"""
 
     #-------------------------------------------------------
-    def __init__(self, name, type, available, width = 0, align = None, formatter = None, data_col_offset = 0, scale_factor = None):
+    def __init__(self, name, type, available, width = 0, align = None, formatter = None, data_col_offset = 0, scale_factor = None, initial_visibility = None, initial_colour = None):
         # user data
         if align is None:
             align = wx.ALIGN_CENTER
 
         self.Name = name
         self.Type = type
+        self.Available = self.Visible = available
         self.Width = width
         self.Align = align
         self.Formatter = formatter
         self.ScaleFactor = scale_factor
-        self.Available = self.Visible = available
+        self.InitialVisibility = initial_visibility
+        self.InitialColour = initial_colour
 
         # Nlog indexer info
         self.Separator = ","
@@ -596,7 +598,6 @@ class G_ProjectionFieldSchema:
 
         # management data
         self.IsFirst = False
-        self.ColumnColour = None
         self.SortDirection = 0
         self.DataColumnOffset = data_col_offset
 
@@ -682,10 +683,10 @@ class G_ProjectionSchema(G_FieldSchemata):
         return self.Append(G_ProjectionFieldSchema(name, type, False))
 
 
-    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None, data_col_offset = 0, scale_factor = None):
+    def MakeFieldSchema(self, name, type, width = 30, align = "centre", formatter = None, data_col_offset = 0, scale_factor = None, initial_visibility = True, initial_colour = "BLACK"):
         G_ProjectionTypeManager.ValidateType(type)
         al = __class__._CalcAlign(align)
-        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter, data_col_offset, scale_factor))
+        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, formatter, data_col_offset, scale_factor, initial_visibility, initial_colour))
 
 
     #-------------------------------------------------------
@@ -701,24 +702,24 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.ColProjectionNo = self.MakeHiddenFieldSchema("log_row_id", "int")
         return self
 
-    def AddField(self, name, type, width = 30, align = "centre", formatter = None, scale = None):
+    def AddField(self, name, type, width = 30, align = "centre", formatter = None, scale = None, initial_visibility = True, initial_colour = "BLACK"):
         name, sf = self._CalcScaleFactor(name, scale)
-        self.MakeFieldSchema(name, type, width, align, formatter, scale_factor = sf)
+        self.MakeFieldSchema(name, type, width, align, formatter, scale_factor = sf, initial_visibility = initial_visibility, initial_colour = initial_colour)
         return self
 
-    def AddStart(self, name, width = 30, align = "centre", formatter = None):
-        self.MakeFieldSchema(name, "text", width, align, formatter, data_col_offset = 1)
+    def AddStart(self, name, width = 30, align = "centre", formatter = None, initial_visibility = True, initial_colour = "BLACK"):
+        self.MakeFieldSchema(name, "text", width, align, formatter, data_col_offset = 1, initial_visibility = initial_visibility, initial_colour = initial_colour)
         self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "int")
         return self
 
-    def AddFinish(self, name, width = 30, align = "centre", formatter = None):
-        self.MakeFieldSchema(name, "text", width, align, formatter, data_col_offset = 1)
+    def AddFinish(self, name, width = 30, align = "centre", formatter = None, initial_visibility = True, initial_colour = "BLACK"):
+        self.MakeFieldSchema(name, "text", width, align, formatter, data_col_offset = 1, initial_visibility = initial_visibility, initial_colour = initial_colour)
         self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "int")
         return self
 
-    def AddDuration(self, name, width = 30, align = "centre", formatter = None, scale = "us"):
+    def AddDuration(self, name, width = 30, align = "centre", formatter = None, scale = "us", initial_visibility = True, initial_colour = "BLACK"):
         name, sf = self._CalcScaleFactor(name, scale)
-        self.ColDuration = self.MakeFieldSchema(name, "int", width, align, formatter, scale_factor = sf)
+        self.ColDuration = self.MakeFieldSchema(name, "int", width, align, formatter, scale_factor = sf, initial_visibility = initial_visibility, initial_colour = initial_colour)
         return self
 
 
