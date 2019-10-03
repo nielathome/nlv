@@ -527,12 +527,14 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
                 # make sure hideable is setup before child is made
                 self.PostInitHideableTreeNode()
-                self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, "Events")
                 self.AnalyseForAll()
 
                 if self._AnalysisResults is not None:
-                    for quantifier in self._AnalysisResults.Quantifiers.values():
-                        self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
+                    for projector in self._AnalysisResults.Projectors.values():
+                        self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, projector.ProjectionName)
+
+                    #for quantifier in self._AnalysisResults.Quantifiers.values():
+                    #    self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
 
             self.UpdateContent(unlock_charts = False)
 
@@ -1385,8 +1387,9 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
         # load events into event viewer data control
         events_view = self.GetTableViewCtrl()
-        event_schema = quantifier_context.AnalysisResults.EventSchema
-        events_db_path = quantifier_context.AnalysisResults.EventsDbPath
+        info = quantifier_context.AnalysisResults.GetProjectorInfo(self._Name)
+        event_schema = info.ProjectionSchema
+        events_db_path = info.ProjectionDbPath
         events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, quantifier_context.Valid)
         
         self.GetLogAnalysisNode().ActivateSubTab(events_view)

@@ -83,7 +83,7 @@ def Projector(connection, cursor, context):
         SELECT
             title,
             count(title) AS cnt
-        FROM program
+        FROM analysis.program
         GROUP BY title
         ORDER BY cnt DESC
     """)

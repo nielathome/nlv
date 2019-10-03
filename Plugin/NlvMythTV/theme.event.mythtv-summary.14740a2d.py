@@ -22,7 +22,77 @@ import re
 
 ## Recognise ###################################################
 
-class Recogniser:
+class RescheduleRecogniser:
+
+    #-----------------------------------------------------------
+    _RegexPlace = re.compile("([\d.]+)\splace")
+
+
+    #-----------------------------------------------------------
+    def Begin(self, connection, cursor):
+        self.Cursor = cursor
+
+        cursor.execute("DROP TABLE IF EXISTS main.reschedule")
+        cursor.execute("""
+            CREATE TABLE reschedule
+            (
+                event_id INT,
+                start_text TEXT,
+                start_line_no INT,
+                start_utc INT,
+                start_offset_ns INT,
+                finish_text TEXT,
+                finish_line_no INT,
+                finish_utc INT,
+                finish_offset_ns INT,
+                duration_ns INT,
+                process INT,
+                place REAL,
+                abool INT
+            )""")
+
+
+    #-----------------------------------------------------------
+    def MatchEventStart(self, context, line):
+        self.Process = line.GetFieldValueUnsigned("Process")
+        return self.MatchEventFinish
+
+
+    #-----------------------------------------------------------
+    def MatchEventFinish(self, context, line):
+        f_place = 0.0
+        match = re.search(self._RegexPlace, line.GetNonFieldText())
+        if match and match.lastindex == 1:
+            f_place = float(match[1])
+        f_bool = f_place > 0.16
+
+        self.Cursor.execute("INSERT INTO reschedule VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (
+            *context.GetEventFullDetails(),
+            self.Process,
+            f_place,
+            f_bool
+        ))
+
+        return True
+
+
+    #-----------------------------------------------------------
+    def End(self):
+        pass
+
+
+Recognise(
+    RescheduleRecogniser(),
+    ('LogView Filter', 'function = "HandleReschedule" and log ~= "Reschedule"'),
+    ('LogView Filter', 'function = "HandleReschedule" and log ~= "Scheduled"')
+)
+
+
+
+## Recognise ###################################################
+
+class SummaryRecogniser:
 
     #-----------------------------------------------------------
     def Begin(self, connection, cursor):
@@ -65,7 +135,7 @@ class Recogniser:
 
 
 Recognise(
-    Recogniser(),
+    SummaryRecogniser(),
     ('LogView Filter', 'function = "CalcParams"'),
     ('LogView Filter', 'function = "HandleAnnounce" and log ~= "adding"')
 )
@@ -74,47 +144,65 @@ Recognise(
 
 ## Project #####################################################
 
-def Projector(connection, cursor, context):
+def RescheduleProjector(connection, cursor, context):
+    utc_datum = context.CalcUtcDatum(cursor, ["reschedule"])
 
-    tables = ["expire"]
-    db_file = context.FindDbFile("B62B556A-DABA-4886-A469-F739492750D3")
-
-    if db_file is not None:
-        cursor.execute("ATTACH DATABASE '{db}' AS db".format(db = db_file))
-        tables.append("db.reschedule")
-
-    utc_datum = context.CalcUtcDatum(cursor, tables)
-
-    select_expire = """
-        SELECT
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
+    cursor.execute("""
+        CREATE TABLE projection
+        (
             event_id INT,
-            start_text,
-            start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
-            duration_ns,
-            'expire' AS summary
-        FROM
-            expire
-        """.format(utc_datum = utc_datum)
+            start_text TEXT,
+            start_offset_ns INT,
+            finish_text TEXT,
+            finish_offset_ns INT,
+            duration_ns INT,
+            process INT,
+            place REAL,
+            abool INT
+        )""")
 
-    select_reschedule = """
+    cursor.execute("""
+        INSERT INTO projection
         SELECT
             event_id,
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
+            finish_text,
+            finish_offset_ns + (finish_utc - {utc_datum}) * 1000000000,
             duration_ns,
-            'P=[' || place || ']' AS summary
+            process,
+            place,
+            abool
         FROM
-            db.reschedule
-        """.format(utc_datum = utc_datum)
+            analysis.reschedule
+        """.format(utc_datum = utc_datum))
 
-    if db_file is None:
-        select = select_expire
-    else:
-        select = """
-            {}
-            UNION ALL
-            {}
-        """.format(select_expire, select_reschedule)
+
+def SimpleFormatter(value, attr):
+    if value > 1:
+        attr.SetBold(True)
+
+
+Project(
+    "Reschedule",
+    RescheduleProjector,
+    MakeDisplaySchema()
+        .AddEventId()
+        .AddStart("Start", width = 100)
+        .AddFinish("Finish", width = 100)
+        .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)
+        .AddField("Process", "int", 60)
+        .AddField("Place", "real", 60)
+        .AddField("Abool", "bool", 60)
+)
+
+
+
+## Project #####################################################
+
+def SummaryProjector(connection, cursor, context):
+    utc_datum = context.CalcUtcDatum(cursor, ["analysis.reschedule", "analysis.expire"])
 
     cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
@@ -129,13 +217,29 @@ def Projector(connection, cursor, context):
 
     cursor.execute("""
         INSERT INTO projection
-            {}
-        """.format(select))
+        SELECT
+            event_id,
+            start_text,
+            start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
+            duration_ns,
+            'P=[' || place || ']' AS summary
+        FROM
+            analysis.reschedule
+        UNION ALL
+        SELECT
+            event_id INT,
+            start_text,
+            start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
+            duration_ns,
+            'expire' AS summary
+        FROM
+            analysis.expire
+        """.format(utc_datum = utc_datum))
 
 
-Project(
+projection = Project(
     "Summary",
-    Projector,
+    SummaryProjector,
     MakeDisplaySchema()
         .AddEventId()
         .AddStart("Start", width = 100)
@@ -174,50 +278,48 @@ def GeneralQuantifier(events_db_path, connection, cursor):
         """)
 
 
-Quantify(
-    "General",
-    GeneralQuantifier,
+#metrics = projection.Quantify(
+#    "General",
+#    GeneralQuantifier,
+#    MakeDisplaySchema()
+#        .AddField("Summary", "text", 150, "left")
+#        .AddField("Count", "int", 80, "left")
+#        .AddField("Duration (s)", "int", 80, "left")
+#        .AddField("Average (s)", "real", 80, "left")
+#)
 
-    MakeDisplaySchema()
-        .AddField("Summary", "text", 150, "left")
-        .AddField("Count", "int", 80, "left")
-        .AddField("Duration (s)", "int", 80, "left")
-        .AddField("Average (s)", "real", 80, "left"),
 
-    [
-        ("Breakdown by Count", True, ch.PieChart("summary", "count")),
-        ("Breakdown by Duration", True, ch.PieChart("summary", "sum")),
-        ("Durations", True, ch.BarChart("summary", "average"))
-    ]
-)
+#metrics.Chart("Breakdown by Count", True, ch.PieChart("summary", "count"))
+#metrics.Chart("Breakdown by Duration", True, ch.PieChart("summary", "sum"))
+#metrics.Chart("Durations", True, ch.BarChart("summary", "average"))
 
 
 
 ## TimingQuantifier ############################################
 
-class TimingQuantifier:
+#class TimingQuantifier:
 
-    #-----------------------------------------------------------
-    @staticmethod
-    def DefineSchema(schema):
-        schema.AddField("Category", "text", 150, "left")
-        schema.AddField("Duration (s)", "uint32", 80, "left")
-
-
-    #-----------------------------------------------------------
-    def __init__(self):
-        self.Name = "Histogram"
-        self.Charts = [
-            EventMetrics.HistogramChart("Histogram", 0, 1),
-        ]
+#    #-----------------------------------------------------------
+#    @staticmethod
+#    def DefineSchema(schema):
+#        schema.AddField("Category", "text", 150, "left")
+#        schema.AddField("Duration (s)", "uint32", 80, "left")
 
 
-    #-----------------------------------------------------------
-    def Assemble(self, metrics, num_metrics, collector):
-        category_id = collector.GetFieldId("Event Summary")
-        value_id = collector.GetFieldId("Duration (s)")
+#    #-----------------------------------------------------------
+#    def __init__(self):
+#        self.Name = "Histogram"
+#        self.Charts = [
+#            EventMetrics.HistogramChart("Histogram", 0, 1),
+#        ]
 
-        for evt_no in range(num_metrics):
-            category = metrics.GetFieldText(evt_no, category_id)
-            value = metrics.GetFieldValueUnsigned(evt_no, value_id)
-            collector.AddMetric([category, value])
+
+#    #-----------------------------------------------------------
+#    def Assemble(self, metrics, num_metrics, collector):
+#        category_id = collector.GetFieldId("Event Summary")
+#        value_id = collector.GetFieldId("Duration (s)")
+
+#        for evt_no in range(num_metrics):
+#            category = metrics.GetFieldText(evt_no, category_id)
+#            value = metrics.GetFieldValueUnsigned(evt_no, value_id)
+#            collector.AddMetric([category, value])
