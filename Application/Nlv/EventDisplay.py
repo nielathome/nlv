@@ -1063,17 +1063,15 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Quantify(self, node, quantifier_context):
+    def Quantify(self, node, quantifier_info, valid, error_reporter):
         G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
-        self.ResetModel(quantifier_context.ErrorReporter)
+        self.ResetModel(error_reporter)
         with G_ScriptGuard("Quantify", self._ErrorReporter):
-            quantifier_info = quantifier_context.GetQuantifierInfo(self._QuantifierName)
-            events_db_path = quantifier_context.AnalysisResults.EventsDbPath
-            quantifier = G_Quantifier(quantifier_info, events_db_path)
+            quantifier = G_Quantifier(quantifier_info)
             quantifier.Run(self._CollectorLocked)
 
             metrics_db_path = quantifier_info.MetricsDbPath
-            self._TableViewCtrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, quantifier_context.Valid)
+            self._TableViewCtrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, valid)
             self._TableViewCtrl.SetFieldMask(-1)
 
             pane = self._ChartPane

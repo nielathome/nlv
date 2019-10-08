@@ -749,6 +749,7 @@ class G_QuantifierInfo:
         self.Name = name
         self.UserQuantifier = quantifier
         self.MetricsSchema = metrics_schema
+        self.BaseDbPath = base_db_path
         self.MetricsDbPath = DeriveSubPath(base_db_path, idx)
         self.Charts = []
 
@@ -789,6 +790,11 @@ class G_ProjectorInfo:
         return info
 
 
+    #-------------------------------------------------------
+    def GetQuantifierInfo(self, name):
+        return self.Quantifiers[name]
+
+
 
 ## G_AnalysisResults #######################################
 
@@ -811,10 +817,6 @@ class G_AnalysisResults:
     #-------------------------------------------------------
     def GetProjectorInfo(self, name):
         return self.Projectors[name]
-
-    def GetQuantifierInfo(self, name):
-        projector, quantifier = name.split(".")
-        return self.GetProjectorInfo(projector).Quantifiers[quantifier]
 
 
 
@@ -1047,23 +1049,25 @@ class G_Analyser:
 class G_Quantifier:
 
     #-------------------------------------------------------
-    def __init__(self, quantifier_info, events_db_path):
+    def __init__(self, quantifier_info):
         self._QuantifierInfo = quantifier_info
-        self._EventsDbPath = events_db_path
 
 
     #-------------------------------------------------------
     def Run(self, locked):
-        if not  Path(self._EventsDbPath).exists():
+        events_db_path = self._QuantifierInfo.BaseDbPath
+        if not  Path(events_db_path).exists():
             return
 
-        if locked and Path(self._QuantifierInfo.MetricsDbPath).exists():
+        metrics_db_path = self._QuantifierInfo.MetricsDbPath
+        if locked and Path(metrics_db_path).exists():
             return
 
-        connection = ConnectDb(self._QuantifierInfo.MetricsDbPath)
+        connection = ConnectDb(metrics_db_path)
         cursor = connection.cursor()
 
-        self._QuantifierInfo.UserQuantifier(self._EventsDbPath, connection, cursor)
+# why not connect the metriocs path here ?
+        self._QuantifierInfo.UserQuantifier(events_db_path, connection, cursor)
         
         MakeProjectionView(cursor)
         cursor.close()

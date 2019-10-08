@@ -249,9 +249,9 @@ projection = Project(
 
 
 
-## GeneralQuantifier ###########################################
+## SummaryQuantifier ###########################################
 
-def GeneralQuantifier(events_db_path, connection, cursor):
+def SummaryQuantifier(events_db_path, connection, cursor):
     cursor.execute("ATTACH DATABASE '{db}' AS db".format(db = events_db_path))
 
     cursor.execute("DROP TABLE IF EXISTS main.projection")
@@ -278,18 +278,18 @@ def GeneralQuantifier(events_db_path, connection, cursor):
         """)
 
 
-#metrics = projection.Quantify(
-#    "General",
-#    GeneralQuantifier,
-#    MakeDisplaySchema()
-#        .AddField("Summary", "text", 150, "left")
-#        .AddField("Count", "int", 80, "left")
-#        .AddField("Duration (s)", "int", 80, "left")
-#        .AddField("Average (s)", "real", 80, "left")
-#)
+metrics = projection.Quantify(
+    "Breakdown",
+    SummaryQuantifier,
+    MakeDisplaySchema()
+        .AddField("Summary", "text", 150, "left")
+        .AddField("Count", "int", 80, "left")
+        .AddField("Duration (s)", "int", 80, "left")
+        .AddField("Average (s)", "real", 80, "left")
+)
 
 
-#metrics.Chart("Breakdown by Count", True, ch.PieChart("summary", "count"))
+metrics.Chart("Breakdown by Count", True, ch.PieChart("summary", "count"))
 #metrics.Chart("Breakdown by Duration", True, ch.PieChart("summary", "sum"))
 #metrics.Chart("Durations", True, ch.BarChart("summary", "average"))
 
