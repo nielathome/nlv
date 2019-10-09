@@ -1065,9 +1065,9 @@ class G_Quantifier:
 
         connection = ConnectDb(metrics_db_path)
         cursor = connection.cursor()
+        cursor.execute("ATTACH DATABASE '{events}' AS events".format(events = events_db_path))
 
-# why not connect the metriocs path here ?
-        self._QuantifierInfo.UserQuantifier(events_db_path, connection, cursor)
+        self._QuantifierInfo.UserQuantifier(connection, cursor)
         
         MakeProjectionView(cursor)
         cursor.close()

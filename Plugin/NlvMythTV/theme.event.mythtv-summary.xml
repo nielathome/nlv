@@ -22,10 +22,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <root>
 
-  <theme guid="14740A2D-4202-4614-83C5-945FD0838952" name="MythTV Event Summary" read_only="1">
+  <theme guid="14740A2D-4202-4614-83C5-945FD0838952" name="MythTV Events Summary" read_only="1">
 
     <!-- Node name (as displayed in the tree control) -->
-    <item field_id="DD9B316C-4F9E-4DF3-9970-0781D56980B0">Event Summary</item>
+    <item field_id="DD9B316C-4F9E-4DF3-9970-0781D56980B0">Events</item>
 
     <!-- Script -->
     <item field_id="91F38F0D-3375-4005-935E-0CC7A738F74C">MythTV Event Summary - example recogniser.</item>

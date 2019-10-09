@@ -251,9 +251,7 @@ projection = Project(
 
 ## SummaryQuantifier ###########################################
 
-def SummaryQuantifier(events_db_path, connection, cursor):
-    cursor.execute("ATTACH DATABASE '{db}' AS db".format(db = events_db_path))
-
+def SummaryQuantifier(connection, cursor):
     cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
         CREATE TABLE projection
@@ -272,7 +270,7 @@ def SummaryQuantifier(events_db_path, connection, cursor):
             sum(duration_ns / 1000000000),
             round(avg(duration_ns / 1000000000), 2)
         FROM
-            db.filtered_projection
+            events.filtered_projection
         GROUP BY
             summary
         """)
@@ -289,8 +287,8 @@ metrics = projection.Quantify(
 )
 
 
-metrics.Chart("Breakdown by Count", True, ch.PieChart("summary", "count"))
-#metrics.Chart("Breakdown by Duration", True, ch.PieChart("summary", "sum"))
+metrics.Chart("By Count", True, ch.PieChart("summary", "count"))
+metrics.Chart("By Duration", True, ch.PieChart("summary", "sum"))
 #metrics.Chart("Durations", True, ch.BarChart("summary", "average"))
 
 
