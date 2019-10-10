@@ -528,10 +528,6 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self.WithFocusLock(Work)
 
 
-    def PostInitLoad(self):
-        self.UnlockCharts()
-
-
     def PostInitLayout(self):
         self.PostInitHideableTreeNode()
 
@@ -709,13 +705,6 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             node.ReleaseFiles()
 
         self._ForallProjectors(Work, event = True, metrics = True)
-
-
-    def UnlockCharts(self):
-        def Work(node):
-            node.UnlockCharts()
-
-        self._ForallProjectors(Work, event = False, metrics = True)
 
 
     @G_Global.TimeFunction
@@ -1274,8 +1263,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
     def PostInitChildren(self):
         if self._InitAnalysis:
-            analysis_results, is_valid = self.GetAnalysisResults()
-            projector_info = analysis_results.GetProjectorInfo(self._Name)
+            projector_info, valid = self.GetProjectorInfo()
             for quantifier in projector_info.Quantifiers.values():
                 self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
 
@@ -1571,7 +1559,6 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
         pane.Thaw()
 
         self.PushParameterValues()
-        self.GetChartViewCtrl().Realise()
 
 
     #-------------------------------------------------------
@@ -1583,7 +1570,7 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
             values =  self._ParameterValues.GetValues(chart_no)
             chart_ctrl = self.GetChartViewCtrl()
             if chart_ctrl is not None:
-                chart_ctrl.Update(parameters = values).Realise()
+                chart_ctrl.Update(parameters = values)
 
             if not out_of_range:
                 self._PushParameterValues[chart_no] = False
@@ -1678,18 +1665,10 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetMetricsViewCtrl().UpdateMetrics().Realise()
+            self.GetMetricsViewCtrl().UpdateMetrics()
             return True
         else:
             return False
-
-
-    #-------------------------------------------------------
-    @G_Global.TimeFunction
-    def UnlockCharts(self):
-        active_chart = self.GetMetricsViewCtrl().UnlockCharts()
-        if active_chart is not None:
-            active_chart.Realise()
 
 
     #-------------------------------------------------------
@@ -1698,12 +1677,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         quantifier_info, is_valid = self.GetQuantifierInfo()
         error_reporter = self.GetErrorReporter()
         if self.GetMetricsViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter):
-            self.GetMetricsViewCtrl().UpdateMetrics().Realise()
-
-    
-    #-------------------------------------------------------
-    #def UpdateNesting(self, nesting):
-    #    pass
+            self.GetMetricsViewCtrl().UpdateMetrics()
 
     def UpdateValidity(self, valid):
         self.GetTableViewCtrl().UpdateDisplay(valid = valid)
