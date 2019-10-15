@@ -62,12 +62,14 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
     """STC editor displays the log data"""
 
     #-------------------------------------------------------
+    _StyleIdxBase = Nlog.EnumConstants.StyleAnnotation
+
     _Descs = [
         # name, pen_style, scintilla style number, text colour, background
-        ("Note", wx.PENSTYLE_TRANSPARENT, 40, "BLACK", "LEMON CHIFFON"),
-        ("Good", wx.PENSTYLE_TRANSPARENT, 41, "NAVY", "LIGHT BLUE"),
-        ("Neutral", wx.PENSTYLE_TRANSPARENT, 42, "SADDLE BROWN", "KHAKI"),
-        ("Concern", wx.PENSTYLE_TRANSPARENT, 43, "FIREBRICK", "PINK")
+        ("Note", wx.PENSTYLE_TRANSPARENT, _StyleIdxBase + 0, "BLACK", "LEMON CHIFFON"),
+        ("Good", wx.PENSTYLE_TRANSPARENT, _StyleIdxBase + 1, "NAVY", "LIGHT BLUE"),
+        ("Neutral", wx.PENSTYLE_TRANSPARENT, _StyleIdxBase + 2, "SADDLE BROWN", "KHAKI"),
+        ("Concern", wx.PENSTYLE_TRANSPARENT, _StyleIdxBase + 3, "FIREBRICK", "PINK")
     ]
 
     _Traits = [
@@ -75,7 +77,7 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
         for d in _Descs
     ]
 
-    _StyleTraits = G_StyleTraits(_Traits)
+    StyleTraits = G_StyleTraits(_Traits)
 
 
     #-------------------------------------------------------
@@ -104,7 +106,7 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
         style_label = wx.StaticText(self, label = "Style:")
         style_sizer.Add(style_label, proportion = 0, flag = wx.LEFT | wx.TOP | wx.RIGHT, border = G_Const.Sizer_StdBorder)
 
-        self._StyleCombo = G_StyleCombo(self, self._StyleTraits)
+        self._StyleCombo = G_StyleCombo(self, self.StyleTraits)
         style_sizer.Add(self._StyleCombo, proportion = 0, flag = wx.LEFT | wx.BOTTOM | wx.RIGHT, border = G_Const.Sizer_StdBorder)
 
         # rhs vertical sizer contains label and annotation text
@@ -136,7 +138,7 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
         return self._Editor
 
     def GetStyle(self):
-        return self._StyleTraits.GetData(self._StyleCombo.GetValue())
+        return self.StyleTraits.GetData(self._StyleCombo.GetValue())
 
 
     #-------------------------------------------------------
@@ -155,7 +157,7 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
         self._Annotation.SetValue(annotation_text)
 
         if annotation_text != "":
-            traits = self._StyleTraits
+            traits = self.StyleTraits
             style_no = editor.AnnotationGetStyle(line)
             self._StyleCombo.SetSelection(traits.GetIndexByData(style_no))
 
@@ -980,12 +982,12 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
         # setup annotation styles
         editor.AnnotationSetVisible(wx.stc.STC_ANNOTATION_BOXED)
-        from .StyleNode import G_AnnotationTraits
-        for a in G_AnnotationTraits.Get():
-            style_no = a[1]
+        anno_traits = G_ViewControl.StyleTraits
+        for anno_idx in range(anno_traits.GetNumStyles()):
+            style_no = anno_traits.GetDataByIndex(anno_idx)
             editor.StyleSetItalic(style_no, True)
-            editor.StyleSetForeground(style_no, a[2])
-            editor.StyleSetBackground(style_no, a[3])
+            editor.StyleSetForeground(style_no, anno_traits.GetForegroundColourByIndex(anno_idx))
+            editor.StyleSetBackground(style_no, anno_traits.GetBackgroundColourByIndex(anno_idx))
 
         # editor must be set to read-only; switches off behaviour that Nlog
         # does not implement

@@ -49,7 +49,8 @@ enum NConstants
 {
 	e_StyleBaseMarker = 0,
 	e_StyleBaseTracker = 8,
-	e_StyleHistory = 16
+	e_StyleHistory = 16,
+	e_StyleAnnotation = 40
 };
 
 

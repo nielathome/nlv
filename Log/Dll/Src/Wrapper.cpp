@@ -327,6 +327,7 @@ BOOST_PYTHON_MODULE( Nlog )
 		.value( "StyleBaseMarker", NConstants::e_StyleBaseMarker )
 		.value( "StyleBaseTracker", NConstants::e_StyleBaseTracker )
 		.value( "StyleHistory", NConstants::e_StyleHistory )
+		.value( "StyleAnnotation", NConstants::e_StyleAnnotation )
 		.export_values()
 		;
 

@@ -136,32 +136,6 @@ G_ColourTraits._Init()
 
 
 
-## G_AnnotationTraits ######################################
-
-class G_AnnotationTraits:
-    """Annotation traits - fully static class"""
-
-    #-------------------------------------------------------
-    _Descs = [
-        # name, scintilla style number, text colour, background
-        ("Note", 40, "BLACK", "LEMON CHIFFON"),
-        ("Good", 41, "NAVY", "LIGHT BLUE"),
-        ("Neutral", 42, "SADDLE BROWN", "KHAKI"),
-        ("Concern", 43, "FIREBRICK", "PINK")
-    ]
-
-    _Traits = [
-        [d[0], d[1], G_ColourTraits.GetColour(d[2]), G_ColourTraits.GetColour(d[3])]
-        for d in _Descs
-    ]
-
-
-    #-------------------------------------------------------
-    def Get():
-        return __class__._Traits
-
-
-
 ## G_ColourCombo ###########################################
 
 class G_ColourCombo(wx.adv.OwnerDrawnComboBox):
@@ -393,6 +367,9 @@ class G_StyleTraits:
 
 
     #-------------------------------------------------------
+    def GetNumStyles(self):
+        return len(self._Styles)
+
     def GetStyleNames(self):
         return ListToNames(self._Styles)
 
