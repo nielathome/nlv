@@ -277,6 +277,19 @@ class G_EnabledColourNode:
 
 
     #-------------------------------------------------------
+    def OverrideSettings(self, settings):
+        """Allow programmatic update of colours and visibility"""
+        for field_id, setting in enumerate(settings):
+            visibility, colour = setting
+            self.UpdateColour(field_id, colour)
+            self.UpdateVisibility(field_id, visibility)
+
+        self.OnColours()
+        self.OnEnable()
+
+
+        
+    #-------------------------------------------------------
     def ActivateEnabledColour(self, labels):
         # handle visible controls
         num_controls = self._Field.NumActive.Value = len(labels)
@@ -302,20 +315,25 @@ class G_EnabledColourNode:
 
 
     #-------------------------------------------------------
+    def UpdateVisibility(self, field_id, value):
+        visibility = self._Field.Visibility.Value
+        visibility[field_id] = value
+        self._Field.Visibility.Value = visibility
+
     def OnCheckBox(self, event):
         """Action the enable box; derived class must implement OnEnable"""
-        field_id = event.GetId() - wx.ID_HIGHEST
-        visibility = self._Field.Visibility.Value
-        visibility[field_id] = event.IsChecked()
-        self._Field.Visibility.Value = visibility
+        self.UpdateVisibility(event.GetId() - wx.ID_HIGHEST, event.IsChecked())
         self.OnEnable()
+
+    def UpdateColour(self, field_id, colour_name):
+        colour_names = self._Field.ColourNames.Value
+        colour_names[field_id] = colour_name
+        self._Field.ColourNames.Value = colour_names
 
     def OnColourCombo(self, event):
         """Action the colour selection; derived class must implement OnColour"""
         field_id = event.GetId() - wx.ID_HIGHEST
-        colour_names = self._Field.ColourNames.Value
-        colour_names[field_id] = self._ColourCombos[field_id].GetValue()
-        self._Field.ColourNames.Value = colour_names
+        self.UpdateColour(field_id, self._ColourCombos[field_id].GetValue())
         self.OnColour(field_id)
 
     def OnColours(self):
@@ -326,6 +344,8 @@ class G_EnabledColourNode:
     #-------------------------------------------------------
     def GetColour(self, field_id):
         colour_names = self._Field.ColourNames.Value
+        if field_id >= len(colour_names):
+            field_id = 0
         return G_ColourTraits.GetColour(colour_names[field_id])
     
 

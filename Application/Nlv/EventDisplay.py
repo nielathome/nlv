@@ -898,42 +898,6 @@ class G_ParameterCollector:
 
 
 
-## G_ChangeTracker #########################################
-
-class G_ChangeTracker:
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self._MetricsChanged = self._SelectionChanged = self._ParametersChanged = True
-
-
-    #-------------------------------------------------------
-    def Update(self, metrics_changed, selection_changed, parameters, name):
-        if metrics_changed:
-            self._MetricsChanged = True
-
-        if selection_changed:
-            self._SelectionChanged = True
-
-        if parameters is not None:
-            self._ParametersChanged = True
-
-        if name is not None:
-            if name == "metrics":
-                self._MetricsChanged = True
-            elif name == "selection":
-                self._SelectionChanged = True
-
-
-    #-------------------------------------------------------
-    def Changed(self, include_selection):
-        selection = include_selection and self._SelectionChanged
-        res = self._MetricsChanged or selection or self._ParametersChanged
-        self._MetricsChanged = self._SelectionChanged = self._ParametersChanged = False
-        return res
-
-
-
 ## G_ChartViewCtrl #########################################
 
 class G_ChartViewCtrl(FigureCanvasWxAgg):
@@ -948,30 +912,40 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
         self._TableViewCtrl = table_view_ctrl
         self._ErrorReporter = error_reporter
 
-        self._ParameterChangeTracker = G_ChangeTracker()
-        self._RealiseChangeTracker = G_ChangeTracker()
-
-        self._Parameters = None
+        self._DoRealise = True
         self._ParamaterValues = dict()
 
-        self._RealiseLock = True
+        handler = wx.EvtHandler()
+        handler.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.PushEventHandler(handler)
+
+
+    #-------------------------------------------------------
+    def PreClose(self):
+        self.PopEventHandler(True)
+
+    def OnPaint(self, evt):
+        if self._DoRealise:
+            self._DoRealise = False
+            self.Realise()
+
+        evt.Skip()
 
 
     #-------------------------------------------------------
     def DefineParameters(self):
-        self._Parameters = None
+        parameters = None
 
         with G_ScriptGuard("DefineParameters", self._ErrorReporter):
-            if self._ParameterChangeTracker.Changed(self._ChartDesigner.WantSelection):
-                connection = ConnectDb(self._MetricsDbPath, True)
-                if connection is not None:
-                    cursor = connection.cursor()
-                    selection = self._TableViewCtrl.GetSelectedItems()
-                    collector = G_ParameterCollector()
-                    self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
-                    self._Parameters = collector.Close()
+            connection = ConnectDb(self._MetricsDbPath, True)
+            if connection is not None:
+                cursor = connection.cursor()
+                selection = self._TableViewCtrl.GetSelectedItems()
+                collector = G_ParameterCollector()
+                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
+                parameters = collector.Close()
 
-        return self._Parameters
+        return parameters
 
 
     #-------------------------------------------------------
@@ -980,32 +954,33 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
         """Redraw the chart if needed"""
         G_Global.GetCurrentTimer().AddArgument(self._ChartDesigner.Name)
         with G_ScriptGuard("Realise", self._ErrorReporter):
-            if not self._RealiseLock and self._RealiseChangeTracker.Changed(self._ChartDesigner.WantSelection):
-                connection = ConnectDb(self._MetricsDbPath, True)
-                if connection is not None:
-                    cursor = connection.cursor()
-                    selection = self._TableViewCtrl.GetSelectedItems()
-                    self._Figure.clear()
+            connection = ConnectDb(self._MetricsDbPath, True)
+            if connection is not None:
+                cursor = connection.cursor()
+                selection = self._TableViewCtrl.GetSelectedItems()
+                self._Figure.clear()
 
-                    with G_PerfTimerScope("Design"):
-                        self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
+                with G_PerfTimerScope("Design"):
+                    self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
 
-                    with G_PerfTimerScope("Draw"):
-                        self.draw()
+                with G_PerfTimerScope("Draw"):
+                    self.draw()
 
 
     #-------------------------------------------------------
-    def Update(self, metrics_changed = False, selection_changed = False, parameters = None, name = None):
-        for tracker in [self._ParameterChangeTracker, self._RealiseChangeTracker]:
-            tracker.Update(metrics_changed, selection_changed, parameters, name)
+    def Update(self, metrics_changed = False, selection_changed = False, parameters = None):
+        if metrics_changed:
+            self._DoRealise = True
 
-        if parameters is not None:
-            self._ParamaterValues = parameters
+        if selection_changed and self._ChartDesigner.WantSelection:
+            self._DoRealise = True
 
-        if name is not None and name == "unlock":
-            self._RealiseLock = False
+        if parameters is not None and parameters != self._ParamaterValues:
+            self._DoRealise = True
+            self._ParamaterValues = parameters.copy()
 
-        return self
+        if self.IsShown():
+            self.Refresh()
             
 
 
@@ -1021,6 +996,9 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
         # but otherwise, has no real meaning
         self._SelectionHandler = selection_handler
         self._QuantifierName = quantifier_name
+
+        # one-shot lock to inhibit initial Quantification if
+        # table data already exists
         self._CollectorLocked = True
 
         self.SetMinimumPaneSize(150)
@@ -1063,17 +1041,16 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Quantify(self, node, quantifier_context):
+    def Quantify(self, node, quantifier_info, valid, error_reporter):
         G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
-        self.ResetModel(quantifier_context.ErrorReporter)
+        self.ResetModel(error_reporter)
         with G_ScriptGuard("Quantify", self._ErrorReporter):
-            quantifier_info = quantifier_context.GetQuantifierInfo(self._QuantifierName)
-            events_db_path = quantifier_context.AnalysisResults.EventsDbPath
-            quantifier = G_Quantifier(quantifier_info, events_db_path)
+            quantifier = G_Quantifier(quantifier_info)
             quantifier.Run(self._CollectorLocked)
+            self._CollectorLocked = False
 
             metrics_db_path = quantifier_info.MetricsDbPath
-            self._TableViewCtrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, quantifier_context.Valid)
+            self._TableViewCtrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, valid)
             self._TableViewCtrl.SetFieldMask(-1)
 
             pane = self._ChartPane
@@ -1085,46 +1062,37 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
                     pane_sizer.Add(chart_view_ctrl, flag = wx.EXPAND | wx.ALIGN_CENTER)
                     node.InterceptSetFocus(chart_view_ctrl)
 
-            return True
+                pane_sizer.ShowItems(False)
 
-        return False
+            self.UpdateMetrics()
 
 
     #-------------------------------------------------------
-    def UpdateCharts(self, name):
-        active_chart = self.GetChartViewCtrl(0, False) # niel - needed ?
-
+    def UpdateCharts(self, metrics_changed = False, selection_changed = False):
         for chart_view in self._ChartPane.GetChildren():
-            chart_view.Update(name = name)
-            if chart_view.IsShown():
-                active_chart = chart_view
-
-        return active_chart
-
-
-    def UnlockCharts(self):
-        self._CollectorLocked = False
-        return self.UpdateCharts("unlock")
-
+            chart_view.Update(metrics_changed, selection_changed)
 
     def UpdateMetrics(self):
-        return self.UpdateCharts("metrics")
-
+        self.UpdateCharts(metrics_changed = True)
 
     def UpdateSelection(self):
-        return self.UpdateCharts("selection")
+        return self.UpdateCharts(selection_changed = True)
 
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
         self._SelectionHandler(item)
-        self.UpdateSelection().Realise()
+        self.UpdateSelection()
 
 
     #-------------------------------------------------------
     def ResetModel(self, error_reporter = None):
         self._ErrorReporter = error_reporter
 
-        self._ChartPane.GetSizer().Clear(delete_windows = True)
+        chartpane_sizer = self._ChartPane.GetSizer()
+        for item in chartpane_sizer.GetChildren():
+            item.GetWindow().PreClose()
+
+        chartpane_sizer.Clear(delete_windows = True)
 
         self._TableViewCtrl.ResetModel()

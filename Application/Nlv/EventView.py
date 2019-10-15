@@ -80,23 +80,6 @@ import Nlog
 
 
 
-## G_QuantifierContext #####################################
-
-class G_QuantifierContext:
-
-    #-------------------------------------------------------
-    def __init__(self, error_reporter, analysis_results, valid):
-        self.ErrorReporter = error_reporter
-        self.AnalysisResults = analysis_results
-        self.Valid = valid
-
-
-    #-------------------------------------------------------
-    def GetQuantifierInfo(self, name):
-        return self.AnalysisResults.GetQuantifierInfo(name)
-
-
-
 ## G_LogAnalysisChildNode ##################################
 
 class G_LogAnalysisChildNode(G_DisplayChildNode):
@@ -106,6 +89,11 @@ class G_LogAnalysisChildNode(G_DisplayChildNode):
     def GetLogAnalysisNode(self):
         # recursive lookup; find our view node
         return self.GetParentNode(G_Project.NodeID_LogAnalysis)
+
+
+    #-------------------------------------------------------
+    def GetErrorReporter(self):
+        return self.GetLogAnalysisNode().GetErrorReporter()
 
 
 
@@ -527,20 +515,17 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
                 # make sure hideable is setup before child is made
                 self.PostInitHideableTreeNode()
-                self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, "Events")
                 self.AnalyseForAll()
 
                 if self._AnalysisResults is not None:
-                    for quantifier in self._AnalysisResults.Quantifiers.values():
-                        self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
+                    for projector in self._AnalysisResults.Projectors.values():
+                        self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, projector.ProjectionName, do_analysis = self._InitAnalysis)
 
-            self.UpdateContent(unlock_charts = False)
+                self.PostAnalyse()
+
+            self.UpdateEventContent()
 
         self.WithFocusLock(Work)
-
-
-    def PostInitLoad(self):
-        self.UnlockCharts()
 
 
     def PostInitLayout(self):
@@ -684,19 +669,20 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def MakeQuantifierContext(self):
+    def GetAnalysisResults(self):
         if not self._AnalysisRun:
             self.AnalyseForMeta()
 
-        if self._AnalysisResults is None:
-            return None
+        is_valid = self._Field.AnalysisIsValid.Value
+        return self._AnalysisResults, is_valid
 
-        valid = self._Field.AnalysisIsValid.Value
-        return G_QuantifierContext(self.OnAnalyserError, self._AnalysisResults, valid)
+
+    def GetErrorReporter(self):
+        return self.OnAnalyserError
 
 
     #-------------------------------------------------------
-    def _ForallProjectors(self, func, event = True, metrics = True):
+    def _ForallProjectors(self, func, event, metrics):
         if event:
             self.VisitSubNodes(func, factory_id = G_Project.NodeID_EventProjector, recursive = True)
 
@@ -704,49 +690,52 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             self.VisitSubNodes(func, factory_id = G_Project.NodeID_MetricsProjector, recursive = True)
 
 
+    def PostAnalyse(self):
+        def Work(node):
+            node.PostAnalyse(self._AnalysisResults)
+
+        self._ForallProjectors(Work, event = True, metrics = False)
+
+
     def ReleaseFiles(self):
         self._AnalysisResults = None
         self._AnalysisRun = False
         
         def Work(node):
-            node.DoReleaseFiles()
+            node.ReleaseFiles()
 
-        self._ForallProjectors(Work)
-
-
-    def UnlockCharts(self):
-        def Work(node):
-            node.UnlockCharts()
-
-        self._ForallProjectors(Work, event = False)
+        self._ForallProjectors(Work, event = True, metrics = True)
 
 
     @G_Global.TimeFunction
-    def UpdateContent(self, event = True, metrics = True, unlock_charts = True):
-        quantifier_context = self.MakeQuantifierContext()
-        if quantifier_context is None:
+    def UpdateEventContent(self):
+        analysis, is_valid = self.GetAnalysisResults()
+        if analysis is None:
             return
 
         def Work(node):
-            node.UpdateContent(quantifier_context)
-            if unlock_charts:
-                node.UnlockCharts()
+            node.UpdateEventContent()
 
-        self._ForallProjectors(Work, event, metrics)
+        self._ForallProjectors(Work, event = True, metrics = False)
 
 
     def UpdateValidity(self, valid):
         def Work(node):
             node.UpdateValidity(valid)
-        self._ForallProjectors(Work)
+        self._ForallProjectors(Work, event = True, metrics = True)
 
 
     #-------------------------------------------------------
+    @G_Global.ProgressMeter
     @G_Global.TimeFunction
     def UpdateAnalysis(self):
         """Analysis requested by user"""
-        self.AnalyseForAll()
-        self.UpdateContent()
+        def Work():
+            self.AnalyseForAll()
+            self.UpdateEventContent()
+            self.PostAnalyse()
+
+        self.WithFrameLocked(Work)
 
 
     #-------------------------------------------------------
@@ -1253,6 +1242,11 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         G_TabContainerNode.__init__(self, factory, wproject, witem)
         self._Name = name
 
+        self._InitAnalysis = False
+        if "do_analysis" in kwargs:
+            self._InitAnalysis = kwargs["do_analysis"]
+
+
     def PostInitNode(self):
         # make document fields accessible
         self._Field = D_Document(self.GetDocument(), self)
@@ -1267,22 +1261,33 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
 
 
+    def PostInitChildren(self):
+        if self._InitAnalysis:
+            projector_info, valid = self.GetProjectorInfo()
+            for quantifier in projector_info.Quantifiers.values():
+                self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
+
+
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateContainer()
 
 
     #-------------------------------------------------------
-    def DoReleaseFiles(self):
+    def ReleaseFiles(self):
         """Release all resources owned by the view"""
         self.GetTableViewCtrl().ResetModel()
 
     def DoClose(self, delete):
-        self.DoReleaseFiles()
+        self.ReleaseFiles()
         super().DoClose(delete)
 
 
     #-------------------------------------------------------
+    def GetProjectorInfo(self):
+        analysis_results, is_valid = self.GetLogAnalysisNode().GetAnalysisResults()
+        return analysis_results.GetProjectorInfo(self._Name), is_valid
+
     def GetNesting(self):
         node = self.FindChildNode(G_Project.NodeID_EventProjectorOptions, recursive = True)
         return node.GetNesting()
@@ -1367,29 +1372,41 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
         # propagate new event list to all metrics
         if ok and not self._Initialising:
-            self.GetLogAnalysisNode().UpdateContent(event = False)
+            self.UpdateMetricContent()
 
         return ok
 
 
     #-------------------------------------------------------
-    def UnlockCharts(self):
-        # there are no charts, so do nothing
-        pass
+    def PostAnalyse(self, analysis_results):
+        event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
+        settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
+        self.FindChildNode(G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
+    def UpdateMetricContent(self):
+        def Work(node):
+            node.UpdateMetricContent()
+
+        self.VisitSubNodes(Work, factory_id = G_Project.NodeID_MetricsProjector, recursive = True)
+
+
     @G_Global.TimeFunction
-    def UpdateContent(self, quantifier_context):
+    def UpdateEventContent(self):
         """Load event/feature data into the viewer"""
 
         # load events into event viewer data control
         events_view = self.GetTableViewCtrl()
-        event_schema = quantifier_context.AnalysisResults.EventSchema
-        events_db_path = quantifier_context.AnalysisResults.EventsDbPath
-        events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, quantifier_context.Valid)
+        projector_info, is_valid = self.GetProjectorInfo()
+        event_schema = projector_info.ProjectionSchema
+        events_db_path = projector_info.ProjectionDbPath
+        events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, is_valid)
         
         self.GetLogAnalysisNode().ActivateSubTab(events_view)
+
+        # forward to child metrics views
+        self.UpdateMetricContent()
 
 
     #-------------------------------------------------------
@@ -1427,7 +1444,7 @@ class G_ParameterValues:
     def GetValue(self, chart_no, param_name):
         return self.GetValues(chart_no).get(param_name)
 
-    def Setvalue(self, chart_no, param_name, value):
+    def SetValue(self, chart_no, param_name, value):
         self.GetValues(str(chart_no))[param_name] = value
 
 
@@ -1457,11 +1474,6 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
         G_TabContainedNode.__init__(self, factory, wproject, witem)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainEvent)
 
-        # the first time we switch a chart, we have to ensure any paramater
-        # values are sent to the chart - irritating, as this places a hidden limit
-        # on the number of fully supported charts ...
-        self._PushParameterValues = [True for i in range(30)]
-
 
     def PostInitNode(self):
         self._Field = D_Document(self.GetDocument(), self)
@@ -1469,17 +1481,12 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
         self._QuantifierName = self.GetParentNode().GetQuantifierName()
 
 
-    def PostInitLoad(self):
-        # flush our parameter values through to the chart control
-        self.PushParameterValues()
-
 
     #-------------------------------------------------------
     def ActivateSelectChart(self):
-        quantifier_context = self.GetLogAnalysisNode().MakeQuantifierContext()
-        with G_ScriptGuard("ActivateSelectChart", quantifier_context.ErrorReporter):
-            quantifier_info = quantifier_context.GetQuantifierInfo(self._QuantifierName)
-
+        error_reporter = self.GetProjectorNode().GetErrorReporter()
+        with G_ScriptGuard("ActivateSelectChart", error_reporter):
+            quantifier_info, is_valid = self.GetProjectorNode().GetQuantifierInfo()
             num_charts = 0
 
             if quantifier_info is not None:
@@ -1503,13 +1510,13 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
 
     #-------------------------------------------------------
     def ActivateDynamicPane(self):
-        parameters = self._Parameters = self.GetChartViewCtrl().DefineParameters()
+        parameters = self._Parameters = self.GetChartViewCtrl(activate = False).DefineParameters()
+        pane = self.DynamicPane
+        sizer = pane.GetSizer()
+        sizer.Clear(delete_windows = True)
 
         # build UI controls for the parameters
         if parameters is not None:
-            pane = self.DynamicPane
-            sizer = pane.GetSizer()
-            sizer.Clear(delete_windows = True)
             info = G_WindowInfo(sizer, pane)
             chart_no = self._Field.idxSelectChart.Value
 
@@ -1527,7 +1534,7 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
 
 
     #-------------------------------------------------------
-    def GetChartViewCtrl(self, activate = True):
+    def GetChartViewCtrl(self, activate):
         chart_no = self._Field.idxSelectChart.Value
         return self.GetParentNode().GetMetricsViewCtrl().GetChartViewCtrl(chart_no, activate)
 
@@ -1542,32 +1549,23 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
         pane.GetSizer().Layout()
         pane.Thaw()
 
-        self.PushParameterValues()
-        self.GetChartViewCtrl().Realise()
+        self.PushParameterValues(activate_chart = True)
 
 
     #-------------------------------------------------------
-    def PushParameterValues(self, force = False):
-        chart_no = self._Field.idxSelectChart.Value
-        out_of_range = chart_no > len(self._PushParameterValues)
-
-        if force or out_of_range or self._PushParameterValues[chart_no]:
-            values =  self._ParameterValues.GetValues(chart_no)
-            chart_ctrl = self.GetChartViewCtrl()
-            if chart_ctrl is not None:
-                chart_ctrl.Update(parameters = values).Realise()
-
-            if not out_of_range:
-                self._PushParameterValues[chart_no] = False
+    def PushParameterValues(self, activate_chart):
+        chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
+        values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
+        chart_ctrl.Update(parameters = values)
 
 
     def OnDynamicCtrl(self, event = None):
         chart_no = self._Field.idxSelectChart.Value
         for param in self._Parameters:
-            self._ParameterValues.Setvalue(chart_no, param.Name, param.GetValue())
+            self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
 
         self._Field.ParameterValues.Value = self._ParameterValues.GetAsString()
-        self.PushParameterValues(True)
+        self.PushParameterValues(activate_chart = False)
 
 
 
@@ -1601,16 +1599,23 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
 
     #-------------------------------------------------------
-    def DoReleaseFiles(self):
+    def ReleaseFiles(self):
         """Release all resources owned by the view"""
         self.GetMetricsViewCtrl().ResetModel()
 
     def DoClose(self, delete):
-        self.DoReleaseFiles()
+        self.ReleaseFiles()
         super().DoClose(delete)
 
 
     #-------------------------------------------------------
+    def GetEventProjectorNode(self):
+        return self.GetParentNode(G_Project.NodeID_EventProjector)
+
+    def GetQuantifierInfo(self):
+        projector_info, is_valid = self.GetEventProjectorNode().GetProjectorInfo()
+        return projector_info.GetQuantifierInfo(self._Name), is_valid
+
     def GetMetricsViewCtrl(self):
         return self._MetricsViewer
 
@@ -1643,7 +1648,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetMetricsViewCtrl().UpdateMetrics().Realise()
+            self.GetMetricsViewCtrl().UpdateMetrics()
             return True
         else:
             return False
@@ -1651,22 +1656,11 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def UnlockCharts(self):
-        active_chart = self.GetMetricsViewCtrl().UnlockCharts()
-        if active_chart is not None:
-            active_chart.Realise()
-
-
-    #-------------------------------------------------------
-    @G_Global.TimeFunction
-    def UpdateContent(self, metrics_context):
-        if self.GetMetricsViewCtrl().Quantify(self, metrics_context):
-            self.GetMetricsViewCtrl().UpdateMetrics().Realise()
-
-    
-    #-------------------------------------------------------
-    def UpdateNesting(self, nesting):
-        pass
+    def UpdateMetricContent(self):
+        quantifier_info, is_valid = self.GetQuantifierInfo()
+        error_reporter = self.GetErrorReporter()
+        self.GetMetricsViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter)
+        self.FindChildNode(G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
 
     def UpdateValidity(self, valid):
         self.GetTableViewCtrl().UpdateDisplay(valid = valid)
