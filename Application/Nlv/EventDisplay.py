@@ -898,36 +898,6 @@ class G_ParameterCollector:
 
 
 
-## G_ChangeTracker #########################################
-
-class G_ChangeTracker:
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self._MetricsChanged = self._SelectionChanged = self._ParametersChanged = True
-
-
-    #-------------------------------------------------------
-    def Update(self, metrics_changed, selection_changed, parameters):
-        if metrics_changed:
-            self._MetricsChanged = True
-
-        if selection_changed:
-            self._SelectionChanged = True
-
-        if parameters is not None:
-            self._ParametersChanged = True
-
-
-    #-------------------------------------------------------
-    def Changed(self, include_selection):
-        selection = include_selection and self._SelectionChanged
-        res = self._MetricsChanged or selection or self._ParametersChanged
-        self._MetricsChanged = self._SelectionChanged = self._ParametersChanged = False
-        return res
-
-
-
 ## G_ChartViewCtrl #########################################
 
 class G_ChartViewCtrl(FigureCanvasWxAgg):
@@ -942,10 +912,7 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
         self._TableViewCtrl = table_view_ctrl
         self._ErrorReporter = error_reporter
 
-        self._ParameterChangeTracker = G_ChangeTracker()
-        self._RealiseChangeTracker = G_ChangeTracker()
-
-        self._Parameters = None
+        self._DoRealise = True
         self._ParamaterValues = dict()
 
         handler = wx.EvtHandler()
@@ -958,7 +925,8 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
         self.PopEventHandler(True)
 
     def OnPaint(self, evt):
-        if self._RealiseChangeTracker.Changed(self._ChartDesigner.WantSelection):
+        if self._DoRealise:
+            self._DoRealise = False
             self.Realise()
 
         evt.Skip()
@@ -966,19 +934,18 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
 
     #-------------------------------------------------------
     def DefineParameters(self):
-        self._Parameters = None
+        parameters = None
 
         with G_ScriptGuard("DefineParameters", self._ErrorReporter):
-            if self._ParameterChangeTracker.Changed(self._ChartDesigner.WantSelection):
-                connection = ConnectDb(self._MetricsDbPath, True)
-                if connection is not None:
-                    cursor = connection.cursor()
-                    selection = self._TableViewCtrl.GetSelectedItems()
-                    collector = G_ParameterCollector()
-                    self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
-                    self._Parameters = collector.Close()
+            connection = ConnectDb(self._MetricsDbPath, True)
+            if connection is not None:
+                cursor = connection.cursor()
+                selection = self._TableViewCtrl.GetSelectedItems()
+                collector = G_ParameterCollector()
+                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
+                parameters = collector.Close()
 
-        return self._Parameters
+        return parameters
 
 
     #-------------------------------------------------------
@@ -1002,11 +969,15 @@ class G_ChartViewCtrl(FigureCanvasWxAgg):
 
     #-------------------------------------------------------
     def Update(self, metrics_changed = False, selection_changed = False, parameters = None):
-        for tracker in [self._ParameterChangeTracker, self._RealiseChangeTracker]:
-            tracker.Update(metrics_changed, selection_changed, parameters)
+        if metrics_changed:
+            self._DoRealise = True
 
-        if parameters is not None:
-            self._ParamaterValues = parameters
+        if selection_changed and self._ChartDesigner.WantSelection:
+            self._DoRealise = True
+
+        if parameters is not None and parameters != self._ParamaterValues:
+            self._DoRealise = True
+            self._ParamaterValues = parameters.copy()
 
         if self.IsShown():
             self.Refresh()
@@ -1091,9 +1062,9 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
                     pane_sizer.Add(chart_view_ctrl, flag = wx.EXPAND | wx.ALIGN_CENTER)
                     node.InterceptSetFocus(chart_view_ctrl)
 
-            return True
+                pane_sizer.ShowItems(False)
 
-        return False
+            self.UpdateMetrics()
 
 
     #-------------------------------------------------------

@@ -1444,7 +1444,7 @@ class G_ParameterValues:
     def GetValue(self, chart_no, param_name):
         return self.GetValues(chart_no).get(param_name)
 
-    def Setvalue(self, chart_no, param_name, value):
+    def SetValue(self, chart_no, param_name, value):
         self.GetValues(str(chart_no))[param_name] = value
 
 
@@ -1474,21 +1474,12 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
         G_TabContainedNode.__init__(self, factory, wproject, witem)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainEvent)
 
-        # the first time we switch a chart, we have to ensure any paramater
-        # values are sent to the chart - irritating, as this places a hidden limit
-        # on the number of fully supported charts ...
-        self._PushParameterValues = [True for i in range(30)]
-
 
     def PostInitNode(self):
         self._Field = D_Document(self.GetDocument(), self)
         self._ParameterValues = G_ParameterValues(self._Field.ParameterValues.Value)
         self._QuantifierName = self.GetParentNode().GetQuantifierName()
 
-
-    def PostInitLoad(self):
-        # flush our parameter values through to the chart control
-        self.PushParameterValues()
 
 
     #-------------------------------------------------------
@@ -1519,13 +1510,13 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
 
     #-------------------------------------------------------
     def ActivateDynamicPane(self):
-        parameters = self._Parameters = self.GetChartViewCtrl().DefineParameters()
+        parameters = self._Parameters = self.GetChartViewCtrl(activate = False).DefineParameters()
+        pane = self.DynamicPane
+        sizer = pane.GetSizer()
+        sizer.Clear(delete_windows = True)
 
         # build UI controls for the parameters
         if parameters is not None:
-            pane = self.DynamicPane
-            sizer = pane.GetSizer()
-            sizer.Clear(delete_windows = True)
             info = G_WindowInfo(sizer, pane)
             chart_no = self._Field.idxSelectChart.Value
 
@@ -1543,7 +1534,7 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
 
 
     #-------------------------------------------------------
-    def GetChartViewCtrl(self, activate = True):
+    def GetChartViewCtrl(self, activate):
         chart_no = self._Field.idxSelectChart.Value
         return self.GetParentNode().GetMetricsViewCtrl().GetChartViewCtrl(chart_no, activate)
 
@@ -1558,31 +1549,23 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
         pane.GetSizer().Layout()
         pane.Thaw()
 
-        self.PushParameterValues()
+        self.PushParameterValues(activate_chart = True)
 
 
     #-------------------------------------------------------
-    def PushParameterValues(self, force = False):
-        chart_no = self._Field.idxSelectChart.Value
-        out_of_range = chart_no > len(self._PushParameterValues)
-
-        if force or out_of_range or self._PushParameterValues[chart_no]:
-            values =  self._ParameterValues.GetValues(chart_no)
-            chart_ctrl = self.GetChartViewCtrl()
-            if chart_ctrl is not None:
-                chart_ctrl.Update(parameters = values)
-
-            if not out_of_range:
-                self._PushParameterValues[chart_no] = False
+    def PushParameterValues(self, activate_chart):
+        chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
+        values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
+        chart_ctrl.Update(parameters = values)
 
 
     def OnDynamicCtrl(self, event = None):
         chart_no = self._Field.idxSelectChart.Value
         for param in self._Parameters:
-            self._ParameterValues.Setvalue(chart_no, param.Name, param.GetValue())
+            self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
 
         self._Field.ParameterValues.Value = self._ParameterValues.GetAsString()
-        self.PushParameterValues(True)
+        self.PushParameterValues(activate_chart = False)
 
 
 
@@ -1676,8 +1659,8 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def UpdateMetricContent(self):
         quantifier_info, is_valid = self.GetQuantifierInfo()
         error_reporter = self.GetErrorReporter()
-        if self.GetMetricsViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter):
-            self.GetMetricsViewCtrl().UpdateMetrics()
+        self.GetMetricsViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter)
+        self.FindChildNode(G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
 
     def UpdateValidity(self, valid):
         self.GetTableViewCtrl().UpdateDisplay(valid = valid)
