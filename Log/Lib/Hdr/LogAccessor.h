@@ -66,9 +66,10 @@ struct LineKey
 
 enum Style : char
 {
-	e_StyleDefault = 0,
-	e_StyleField00 = 1,
-	e_StyleField19 = 20
+	e_StyleAnnotationBase = 40,
+	e_StyleDefault = 50,
+	e_StyleFieldBase = 51,
+	e_StyleUserFormatBase = 80
 };
 
 

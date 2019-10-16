@@ -42,15 +42,14 @@ selector_ptr_t MakeSelector( boost::python::object match, bool empty_selects_all
 
 
 /*-----------------------------------------------------------------------
- * NConstants
+ * MarkerNumber
  -----------------------------------------------------------------------*/
 
-enum NConstants
+enum MarkerNumber
 {
-	e_StyleBaseMarker = 0,
-	e_StyleBaseTracker = 8,
-	e_StyleHistory = 16,
-	e_StyleAnnotation = 40
+	e_MarkerNumberStandardBase = 0,
+	e_MarkerNumberTrackerBase = 8,
+	e_MarkerNumberHistory = 16
 };
 
 

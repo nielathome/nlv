@@ -62,7 +62,7 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
     """STC editor displays the log data"""
 
     #-------------------------------------------------------
-    _StyleIdxBase = Nlog.EnumConstants.StyleAnnotation
+    _StyleIdxBase = Nlog.EnumStyle.AnnotationBase
 
     _Descs = [
         # name, pen_style, scintilla style number, text colour, background
@@ -952,7 +952,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         # setup Scintilla editor margins
         editor.SetMarginType(0, wx.stc.STC_MARGIN_RTEXT)
 
-        marker_mask = (2 ** Nlog.EnumConstants.StyleBaseTracker) - 1
+        marker_mask = (2 ** Nlog.EnumMarker.TrackerBase) - 1
         editor.SetMarginBackground(1, wx.Colour(0xf0f0f0))
         editor.SetMarginType(1, wx.stc.STC_MARGIN_COLOUR)
         editor.SetMarginWidth(1, 14)
@@ -966,7 +966,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
         # history line marker
         from .StyleNode import G_ColourTraits
-        history_marker = Nlog.EnumConstants.StyleHistory
+        history_marker = Nlog.EnumMarker.History
         editor.MarkerDefine(history_marker, wx.stc.STC_MARK_BACKGROUND)
         editor.MarkerSetBackground(history_marker, G_ColourTraits.GetColour("MEDIUM SLATE BLUE"))
         editor.MarkerSetAlpha(history_marker, 50)
@@ -1286,7 +1286,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         self.GetEditor().Refresh()
 
     def UpdateFieldColour(self, field_id, colour):
-        self.GetEditor().StyleSetForeground(field_id, colour)
+        style_no = field_id + Nlog.EnumStyle.FieldBase
+        self.GetEditor().StyleSetForeground(style_no, colour)
 
 
     #-------------------------------------------------------

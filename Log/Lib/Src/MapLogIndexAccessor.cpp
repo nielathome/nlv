@@ -509,7 +509,8 @@ void LogIndexAccessorFull<T_FIELD_TEXTOFFSETS>::CopyStyle( nlineno_t line_no, ui
 
 	m_FieldTextOffsets->VisitFieldOffsets( GetLineData( line_no ), field_mask, GetNumUserFields(),
 		[&line_buffer] ( unsigned field_id, offset_t off_lo, offset_t off_hi ) {
-			line_buffer->Append( static_cast<char>(field_id), off_hi - off_lo + 1 );
+			const char style_no{ static_cast<char>(Style::e_StyleFieldBase + field_id) };
+			line_buffer->Append( style_no, off_hi - off_lo + 1 );
 		}
 	);
 

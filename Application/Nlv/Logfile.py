@@ -605,7 +605,7 @@ class G_MarkerNode(G_LogChildNode, G_ThemeNode, G_MatchNode, G_MarkerFormatNode,
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_ListContainedNode.__init__(self, factory, wproject, witem)
         G_MatchNode.__init__(self, G_Const.LogThemeCls, "Marker")
-        G_MarkerFormatNode.__init__(self, Nlog.EnumConstants.StyleBaseMarker)
+        G_MarkerFormatNode.__init__(self, Nlog.EnumMarker.StandardBase)
         G_MarkerStyleNode.__init__(self)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainLogfile)
 
@@ -691,7 +691,7 @@ class G_TrackerNode(G_LogChildNode, G_ThemeNode, G_MarkerFormatNode, G_ColourNod
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_ListContainedNode.__init__(self, factory, wproject, witem)
-        G_MarkerFormatNode.__init__(self, Nlog.EnumConstants.StyleBaseTracker)
+        G_MarkerFormatNode.__init__(self, Nlog.EnumMarker.TrackerBase)
         G_TrackerStyleNode.__init__(self)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainLogfile)
 

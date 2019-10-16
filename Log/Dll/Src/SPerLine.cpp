@@ -27,13 +27,13 @@
 
 int SLineMarkers::HistoryLineMarkValue( vint_t view_line_no )
 {
-	return view_line_no == m_HistoryLineNo ? 0x1 << NConstants::e_StyleHistory : 0;
+	return view_line_no == m_HistoryLineNo ? 0x1 << MarkerNumber::e_MarkerNumberHistory : 0;
 }
 
 
 int SLineMarkers::ViewMarkValue( vint_t view_line_no )
 {
-	int res{ 0 }, bit{ 0x1 << NConstants::e_StyleBaseTracker };
+	int res{ 0 }, bit{ 0x1 << MarkerNumber::e_MarkerNumberTrackerBase };
 
 	const ViewTimecode * timecode_accessor{ m_ViewAccessor->GetTimecode() };
 	const vint_t max_line_no{ m_ViewMap->m_NumLinesOrOne - 1 };

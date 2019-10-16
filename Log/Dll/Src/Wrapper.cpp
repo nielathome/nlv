@@ -323,11 +323,18 @@ BOOST_PYTHON_MODULE( Nlog )
 		.export_values()
 		;
 
-	enum_<NConstants>( "EnumConstants" )
-		.value( "StyleBaseMarker", NConstants::e_StyleBaseMarker )
-		.value( "StyleBaseTracker", NConstants::e_StyleBaseTracker )
-		.value( "StyleHistory", NConstants::e_StyleHistory )
-		.value( "StyleAnnotation", NConstants::e_StyleAnnotation )
+	enum_<MarkerNumber>( "EnumMarker" )
+		.value( "StandardBase", MarkerNumber::e_MarkerNumberStandardBase )
+		.value( "TrackerBase", MarkerNumber::e_MarkerNumberTrackerBase )
+		.value( "History", MarkerNumber::e_MarkerNumberHistory )
+		.export_values()
+		;
+
+	enum_<Style>( "EnumStyle" )
+		.value( "AnnotationBase", Style::e_StyleAnnotationBase )
+		.value( "Default", Style::e_StyleDefault )
+		.value( "FieldBase", Style::e_StyleFieldBase )
+		.value( "UserFormatBase", Style::e_StyleUserFormatBase )
 		.export_values()
 		;
 

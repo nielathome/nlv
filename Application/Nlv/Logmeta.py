@@ -369,7 +369,7 @@ class G_StyleSet:
     #-------------------------------------------------------
     def __init__(self, element):
         
-        g = G_NumGenerator(50)
+        g = G_NumGenerator(Nlog.EnumStyle.UserFormatBase)
 
         self._Styles = dict(
             [(s.get("name"), G_Style(g, s)) for s in element.iterfind("style")]

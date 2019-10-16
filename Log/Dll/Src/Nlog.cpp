@@ -266,7 +266,7 @@ int NAdornments::LogMarkValue( vint_t log_line_no, const LineAccessor & line )
 	NLineAdornmentsProvider provider{ this };
 	LineAdornmentsAccessor adornments{ &provider, log_line_no };
 
-	int res{ 0 }, bit{ 0x1 << NConstants::e_StyleBaseMarker };
+	int res{ 0 }, bit{ 0x1 << MarkerNumber::e_MarkerNumberStandardBase };
 
 	// process auto markers first (i.e. lowest precedence is first item)
 	for( const selector_ptr_t & selector : m_AutoMarkers )
@@ -282,7 +282,7 @@ int NAdornments::LogMarkValue( vint_t log_line_no, const LineAccessor & line )
 
 	// marker for the tracked line is managed from a different marker range
 	if( m_LocalTrackerLine == log_line_no )
-		res |= (0x1 << NConstants::e_StyleBaseTracker);
+		res |= (0x1 << MarkerNumber::e_MarkerNumberTrackerBase);
 
 	return res;
 }
