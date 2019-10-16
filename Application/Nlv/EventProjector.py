@@ -448,18 +448,12 @@ class G_ProjectionTypeManager:
 
 
     def _GetSigned(field_schema, view, line_no, field_no):
-        value = view.GetFieldValueSigned(line_no, field_no)
-        scale_factor = field_schema.ScaleFactor
-        if scale_factor is not None:
-            value = int(value / scale_factor)
-        return value
+        # raw data access, so no scaling
+        return view.GetFieldValueSigned(line_no, field_no)
 
     def _GetFloat(field_schema, view, line_no, field_no):
-        value = view.GetFieldValueFloat(line_no, field_no)
-        scale_factor = field_schema.ScaleFactor
-        if scale_factor is not None:
-            value = value / scale_factor
-        return value
+        # raw data access, so no scaling
+        return view.GetFieldValueFloat(line_no, field_no)
 
     def _GetBool(field_schema, view, line_no, field_no):
         return bool(view.GetFieldValueUnsigned(line_no, field_no))
