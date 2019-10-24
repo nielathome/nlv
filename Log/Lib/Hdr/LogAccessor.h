@@ -352,6 +352,19 @@ struct SortControl
 
 
 /*-----------------------------------------------------------------------
+ * HierarchyAccessor
+ -----------------------------------------------------------------------*/
+
+struct HierarchyAccessor
+{
+	virtual bool IsContainer( nlineno_t row_no ) = 0;
+	virtual void GetChildren( nlineno_t row_no ) = 0;
+	virtual int GetParent( nlineno_t row_no ) = 0;
+};
+
+
+
+/*-----------------------------------------------------------------------
  * ViewAccessor
  -----------------------------------------------------------------------*/
 
@@ -404,6 +417,10 @@ struct ViewAccessor
 	}
 
 	virtual SortControl * GetSortControl( void ) {
+		return nullptr;
+	}
+
+	virtual HierarchyAccessor * GetHierarchyAccessor( void ) {
 		return nullptr;
 	}
 

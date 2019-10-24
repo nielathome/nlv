@@ -547,6 +547,11 @@ public:
 
 	// determine how the event view is sorted
 	void Sort( unsigned col_num, int direction );
+
+	// hierarchy access
+	bool IsContainer( vint_t row_no );
+	void GetChildren( vint_t row_no );
+	int GetParent( vint_t row_no );
 };
 
 

@@ -584,6 +584,27 @@ void NEventView::Sort( unsigned col_num, int direction )
 }
 
 
+bool NEventView::IsContainer( vint_t row_no )
+{
+	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
+	return hierarchy ? hierarchy->IsContainer( row_no ) : false;
+}
+
+
+void NEventView::GetChildren( vint_t row_no )
+{
+	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
+
+}
+
+
+int NEventView::GetParent( vint_t row_no )
+{
+	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
+	return hierarchy ? hierarchy->GetParent( row_no ) : -1;
+}
+
+
 
 /*-----------------------------------------------------------------------
  * NLogView

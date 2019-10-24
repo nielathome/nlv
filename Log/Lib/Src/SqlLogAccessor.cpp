@@ -435,6 +435,7 @@ class SqlViewLineAccessor : public SqlLineAccessorCore
 {
 private:
 	using capture_t = std::pair<std::string, fieldvalue_t>;
+	int64_t m_EventID{ -1 };
 	std::vector<capture_t> m_Captures;
 
 public:
@@ -443,7 +444,15 @@ public:
 	SqlViewLineAccessor( const SqlLogAccessor * log_accessor, const uint64_t * field_mask, statement_ptr_t & statement );
 
 	SqlViewLineAccessor( SqlViewLineAccessor && rhs )
-		: m_Captures{ std::move( rhs.m_Captures ) }, SqlLineAccessorCore{ std::move( rhs ) } {}
+		:
+		m_EventID{ rhs.m_EventID },
+		m_Captures{ std::move( rhs.m_Captures ) },
+		SqlLineAccessorCore{ std::move( rhs ) }
+	{}
+
+	int64_t GetEventID( void ) const {
+		return m_EventID;
+	}
 
 public:
 	// LineAccessor interfaces
@@ -585,7 +594,8 @@ class SqlViewAccessor
 	:
 	public ViewProperties,
 	public ViewAccessor,
-	public SortControl
+	public SortControl,
+	public HierarchyAccessor
 {
 private:
 	// our substrate
@@ -609,6 +619,7 @@ protected:
 	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider );
 	std::string MakeViewSql( bool with_limit = false ) const;
 	SqlViewLineAccessor CaptureLine( Error status, statement_ptr_t & statement ) const;
+	const SqlViewLineAccessor & GetCachedLine( nlineno_t line_no ) const;
 
 	void RecordEvent( void ) {
 		m_LineCache.Clear();
@@ -659,6 +670,17 @@ public:
 	}
 
 	SortControl * GetSortControl( void ) override {
+		return this;
+	}
+
+public:
+	// HierarchyAccessor interfaces
+
+	bool IsContainer( nlineno_t row_no ) override;
+	void GetChildren( nlineno_t row_no ) override;
+	int GetParent( nlineno_t row_no ) override;
+
+	virtual HierarchyAccessor * GetHierarchyAccessor( void ) {
 		return this;
 	}
 };
@@ -730,7 +752,9 @@ fieldvalue_t SqlLogLineAccessor::GetFieldValue( unsigned field_id ) const
  -----------------------------------------------------------------------*/
 
 SqlViewLineAccessor::SqlViewLineAccessor( const SqlLogAccessor * log_accessor, const uint64_t * field_mask, statement_ptr_t & statement )
-	: SqlLineAccessorCore{ static_cast<unsigned>(log_accessor->GetNumFields()), field_mask }
+	:
+	SqlLineAccessorCore{ static_cast<unsigned>(log_accessor->GetNumFields()), field_mask },
+	m_EventID{ statement->GetAsInt64( 0 ) }
 {
 	m_Captures.reserve( m_NumFields );
 
@@ -865,13 +889,15 @@ SqlViewLineAccessor SqlViewAccessor::CaptureLine( Error status, statement_ptr_t 
 }
 
 
-void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
+const SqlViewLineAccessor & SqlViewAccessor::GetCachedLine( nlineno_t line_no ) const
 {
+
+
 	Error res;
 	statement_ptr_t statement;
 
 	const LineCache::find_t found{ m_LineCache.Fetch(
-		visit_line_no,
+		line_no,
 
 		[this, &res, &statement] ( nlineno_t line_no ) -> SqlViewLineAccessor
 		{
@@ -894,7 +920,7 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 			res = statement->Step();
 
 			m_LineCache.Fetch(
-				visit_line_no + i,
+				line_no + i,
 				[this, res, & statement] ( nlineno_t ) -> SqlViewLineAccessor
 				{
 					return CaptureLine( res, statement );
@@ -903,7 +929,13 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 		}
 	}
 
-	task.Action( *found.second );
+	return *found.second;
+}
+
+
+void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
+{
+	task.Action( GetCachedLine( visit_line_no ) );
 }
 
 
@@ -992,3 +1024,41 @@ std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdo
 	return map;
 }
 
+bool SqlViewAccessor::IsContainer( nlineno_t row_no )
+{
+	statement_ptr_t statement;
+	Error res{ m_LogAccessor->MakeStatement(
+		R"__(
+			SELECT
+				count(*)
+			FROM
+				hierarchy
+			WHERE
+				parent_event_id = ?1)__",
+		false, false, statement ) };
+
+	const int64_t event_id{ GetCachedLine( row_no ).GetEventID() };
+	if( Ok( res ) )
+		UpdateError( res, statement->Bind( 1, event_id ) );
+
+	if( Ok( res ) )
+		UpdateError( res, statement->Step() );
+
+	int count{ 0 };
+	if( Ok( res ) )
+		count = statement->GetAsInt( 0 );
+
+	return count != 0;
+}
+
+
+void SqlViewAccessor::GetChildren( nlineno_t row_no )
+{
+
+}
+
+
+int SqlViewAccessor::GetParent( nlineno_t row_no )
+{
+	return -2;
+}
