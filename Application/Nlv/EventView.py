@@ -1160,9 +1160,16 @@ class G_EventProjectorOptionsNode(G_ProjectorChildNode, G_ThemeNode, G_TabContai
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateCommon()
+
+        permit_nesting = self.GetProjectorNode().PermitNesting()
+        display_nesting = False
+        if permit_nesting:
+            display_nesting = self._Field.DisplayNesting.Value
+
         self._ChkNesting.Unbind(wx.EVT_CHECKBOX)
-        self._ChkNesting.SetValue(self._Field.DisplayNesting.Value)
+        self._ChkNesting.SetValue(display_nesting)
         self._ChkNesting.Bind(wx.EVT_CHECKBOX, self.OnChkNesting)
+        self._ChkNesting.Enable(permit_nesting)
 
 
     #-------------------------------------------------------
@@ -1379,9 +1386,10 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def PostAnalyse(self, analysis_results):
-        event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
-        settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
-        self.FindChildNode(G_Project.NodeID_EventField).OverrideSettings(settings)
+        if analysis_results is not None:
+            event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
+            settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
+            self.FindChildNode(G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
@@ -1410,6 +1418,10 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    def PermitNesting(self):
+        projector_info, is_valid = self.GetProjectorInfo()
+        return projector_info.ProjectionSchema.PermitNesting
+
     def UpdateNesting(self, nesting):
         self.GetTableViewCtrl().UpdateDisplay(nesting = nesting)
 
