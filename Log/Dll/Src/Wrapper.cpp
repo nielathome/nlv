@@ -302,6 +302,10 @@ namespace boost
 //  https://wiki.python.org/moin/boost.python/PointersAndSmartPointers
 BOOST_PYTHON_MODULE( Nlog )
 {
+	class_<std::vector<int> >( "ivec" )
+		.def( "__iter__", iterator<std::vector<int>>() )
+		;
+
 	// although boost::noncopyable is specified here, Boost still attempts
 	// to make use of a copy constructor, so the kludged default constructors
 	// are needed for the time being

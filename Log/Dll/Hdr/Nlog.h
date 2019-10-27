@@ -549,9 +549,9 @@ public:
 	void Sort( unsigned col_num, int direction );
 
 	// hierarchy access
-	bool IsContainer( vint_t row_no );
-	void GetChildren( vint_t row_no );
-	int GetParent( vint_t row_no );
+	bool IsContainer( vint_t line_no );
+	std::vector<int> GetChildren( vint_t line_no );
+	int GetParent( vint_t line_no );
 };
 
 

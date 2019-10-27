@@ -61,21 +61,27 @@ def MakeProjectionView(cursor):
     cursor.execute("""
         CREATE TABLE main.filter
         (
-            log_row_no INT
+            event_id INT NOT NULL PRIMARY KEY
         )""")
 
-    # note: the * here means the result has a log_row_no column
+    cursor.execute("DROP TABLE IF EXISTS main.display")
     cursor.execute("""
-        CREATE VIEW IF NOT EXISTS main.filtered_projection AS
-		SELECT
-			*,
-            filter.rowid as view_row_no
-		FROM
-			projection
-		JOIN
-			filter
-		ON
-			projection.rowid = filter.log_row_no
+        CREATE TABLE main.display
+        (
+            event_id INT NOT NULL PRIMARY KEY
+        )""")
+
+    cursor.execute("""
+        CREATE VIEW IF NOT EXISTS
+            main.filtered_projection
+        AS SELECT
+	        projection.*
+        FROM
+	        filter
+        JOIN
+	        projection
+        ON
+	        filter.event_id = projection.event_id
         """)
 
 

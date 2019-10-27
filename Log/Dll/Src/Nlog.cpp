@@ -584,24 +584,24 @@ void NEventView::Sort( unsigned col_num, int direction )
 }
 
 
-bool NEventView::IsContainer( vint_t row_no )
+bool NEventView::IsContainer( vint_t line_no )
 {
 	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
-	return hierarchy ? hierarchy->IsContainer( row_no ) : false;
+	return hierarchy ? hierarchy->IsContainer( line_no ) : false;
 }
 
 
-void NEventView::GetChildren( vint_t row_no )
+std::vector<int> NEventView::GetChildren( vint_t line_no )
 {
 	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
-
+	return hierarchy ? hierarchy->GetChildren( line_no ) : std::vector<int>{};
 }
 
 
-int NEventView::GetParent( vint_t row_no )
+int NEventView::GetParent( vint_t line_no )
 {
 	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
-	return hierarchy ? hierarchy->GetParent( row_no ) : -1;
+	return hierarchy ? hierarchy->GetParent( line_no ) : -1;
 }
 
 

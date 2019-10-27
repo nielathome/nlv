@@ -357,9 +357,9 @@ struct SortControl
 
 struct HierarchyAccessor
 {
-	virtual bool IsContainer( nlineno_t row_no ) = 0;
-	virtual void GetChildren( nlineno_t row_no ) = 0;
-	virtual int GetParent( nlineno_t row_no ) = 0;
+	virtual bool IsContainer( nlineno_t line_no ) = 0;
+	virtual std::vector<int> GetChildren( nlineno_t line_no ) = 0;
+	virtual int GetParent( nlineno_t line_no ) = 0;
 };
 
 

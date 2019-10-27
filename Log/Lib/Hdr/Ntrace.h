@@ -108,10 +108,18 @@ inline bool IsOsError( Error value )
 }
 
 
-inline void UpdateError( Error &value, Error error )
+inline void UpdateError( Error & value, Error error )
 {
 	if( Ok( value ) )
 		value = error;
+}
+
+
+template<typename T_FUNC>
+void ExecuteIfOk( T_FUNC func, Error & value )
+{
+	if( Ok( value ) )
+		value = func();
 }
 
 

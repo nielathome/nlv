@@ -130,6 +130,9 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
     #-------------------------------------------------------
     @staticmethod
     def ItemToKey(item):
+        # in SQL terms, the key is the entry's line number in
+        # the display table (where line number is one less than
+        # the "rowid"); note, items cannot be zero, so offset here
         return int(item.GetID()) - 1
 
 
@@ -174,7 +177,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         field_schema = self._TableSchema[col_num]
         icon = None
         if field_schema.IsFirst:
-            pass
+            icon = self._Icons[0]
 # icon = self._Icons[item_key in self._ParentKeyToChildKeys]
         return G_ProjectionTypeManager.GetDisplayValue(field_schema, icon, self._N_EventView, item_key, col_num)
 
@@ -191,11 +194,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             return 0
         else:
             return self._N_EventView.GetNumLines()
-
-
-    #-------------------------------------------------------
-    def GetRowKeys(self):
-        return range(self.GetNumItems())
 
 
     #-------------------------------------------------------
@@ -292,14 +290,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._ViewFlat:
             if parent_item:
                 raise RuntimeError
-            AppendChildren(self.GetRowKeys())
+            AppendChildren(range(self.GetNumItems()))
 
         elif parent_item:
-            pass
+            item_key = self.ItemToKey(parent_item)
+            AppendChildren(self._N_EventView.GetChildren(item_key))
 
         else:
             # root node; all rows without a stated parent belong here
-            pass
+            AppendChildren(self._N_EventView.GetChildren(-1))
 
         return count
 
@@ -314,9 +313,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._ViewFlat:
             return False
         else:
-            #item_key = self.ItemToKey(item)
-            #answer = self._N_EventView.IsContainer(item_key)
-            return False
+            item_key = self.ItemToKey(item)
+            return self._N_EventView.IsContainer(item_key)
 
 
     def HasContainerColumns(self, item):
@@ -334,7 +332,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             return wx.dataview.NullDataViewItem
 
         item_key = self.ItemToKey(item)
-        parent_key = self.self._N_EventView.GetParent(item_key)
+        parent_key = self._N_EventView.GetParent(item_key)
 
         if parent_key < 0:
             return wx.dataview.NullDataViewItem
