@@ -146,7 +146,7 @@ Recognise(
 ## Project #####################################################
 
 def RescheduleProjector(connection, cursor, context):
-    utc_datum = context.CalcUtcDatum(cursor, ["reschedule"])
+    utc_datum = context.CalcUtcDatum(cursor, ["analysis.reschedule"])
 
     cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
@@ -249,7 +249,7 @@ def SummaryProjector(connection, cursor, context):
     cursor.execute("""
         CREATE TABLE hierarchy
         (
-            child_event_id INT,
+            child_event_id INT NOT NULL PRIMARY KEY,
             parent_event_id INT
         )""")
 
@@ -285,10 +285,11 @@ def SummaryProjector(connection, cursor, context):
         # same line)
         candidates.append(row)
 
-        for idx in range(len(candidates) - 2, 0, -1):
+        for idx in range(len(candidates) - 2, -1, -1):
             prev = candidates[idx]
-            if prev[2] > finish_line and prev[3] == process:
+            if prev[2] >= finish_line and prev[3] == process:
                 c2.execute("INSERT INTO hierarchy VALUES (?, ?)", (row[0], prev[0]))
+                break
 
     c2.close()
 
