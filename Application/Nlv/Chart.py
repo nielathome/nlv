@@ -102,7 +102,7 @@ class PieChart:
                 count({value}),
                 sum({value})
             FROM
-                filtered_projection
+                display
             """.format(value = self._ValueField))
 
         (count, sum) = cursor.fetchone()
@@ -113,9 +113,9 @@ class PieChart:
             SELECT
                 {category},
                 {value},
-                log_row_no
+                event_id
             FROM
-                filtered_projection
+                display
             ORDER BY
                 {value} DESC
             """.format(category = self._CategoryField, value = self._ValueField))

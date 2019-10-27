@@ -313,6 +313,7 @@ def SummaryQuantifier(connection, cursor):
     cursor.execute("""
         CREATE TABLE projection
         (
+            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
             summary TEXT,
             count INT,
             sum INT,
@@ -321,13 +322,19 @@ def SummaryQuantifier(connection, cursor):
 
     cursor.execute("""
         INSERT INTO projection
+        (
+            summary,
+            count,
+            sum,
+            average
+        )
         SELECT
             summary,
             count(duration_ns),
             sum(duration_ns / 1000000000),
             round(avg(duration_ns / 1000000000), 2)
         FROM
-            events.filtered_projection
+            events.display
         GROUP BY
             summary
         """)

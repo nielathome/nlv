@@ -614,9 +614,7 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.ColStartOffset = None
         self.ColFinishOffset = None
         self.ColDuration = None
-        self.ColProjectionNo = None
-
-        self.MakeHiddenFieldSchema("event_id", "int")
+        self.ColEventId = self.MakeHiddenFieldSchema("event_id", "int")
 
 
     #-------------------------------------------------------
@@ -678,10 +676,6 @@ class G_ProjectionSchema(G_FieldSchemata):
     #-------------------------------------------------------
     def AddNesting(self, enable = True):
         self.PermitNesting = enable
-        return self
-
-    def AddProjectionNo(self):
-        self.ColProjectionNo = self.MakeHiddenFieldSchema("log_row_id", "int")
         return self
 
     def AddField(self, name, type, width = 30, align = "centre", formatter = None, scale = None, initial_visibility = True, initial_colour = "BLACK"):
@@ -758,12 +752,6 @@ class G_ProjectorInfo:
     #-------------------------------------------------------
     def Quantify(self, name, user_quantifier, metrics_schema):
         """Implements user analyse script Quantify() function"""
-
-        # the projection number is a side effect of the selection
-        # in the filtered_projection view, and is effectively a
-        # unique number in the view; it is used to map selections
-        # in the table to position independent IDs
-        metrics_schema.AddProjectionNo()
 
         idx = len(self.Quantifiers)
         name = "{}.{}".format(self.ProjectionName, name)

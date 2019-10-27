@@ -372,15 +372,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def MapSelectionToProjectionNo(self, selection):
-        col_num = self._TableSchema.ColProjectionNo
+    def MapSelectionToEventIds(self, selection):
+        col_num = self._TableSchema.ColEventId
         return [self.GetFieldValue(s, col_num) for s in selection]
 
 
     #-------------------------------------------------------
     def GetNextItem(self, what, cur_item, forward, index = 0):
         cur_key = 0
-        if cur_item is not None:
+        if cur_item is not None and cur_item:
           cur_key = self.ItemToKey(cur_item)
   
         if what == "hilite":
@@ -661,6 +661,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
         super().__init__(parent, flags, doc_url)
 
         self._SelectionHandler = selection_handler
+        self._IsMultipleSelection = multiple_selection
         self.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED, self.OnItemActivated)
 
 
@@ -672,7 +673,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
     #-------------------------------------------------------
     def GetSelectedItems(self):
         selection = [G_TableDataModel.ItemToKey(item) for item in self.GetSelections()]
-        return self.GetModel().MapSelectionToProjectionNo(selection)
+        return self.GetModel().MapSelectionToEventIds(selection)
 
 
     #-------------------------------------------------------
@@ -694,6 +695,9 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
         next_item = self.GetModel().GetNextItem(what, cur_item, forward, index)
 
         if next_item is not None:
+            if cur_item is not None and self._IsMultipleSelection:
+                self.UnselectAll()
+
             self.Select(next_item)
             self.EnsureVisible(next_item)
 
