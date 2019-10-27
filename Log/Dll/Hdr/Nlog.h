@@ -550,7 +550,7 @@ public:
 
 	// hierarchy access
 	bool IsContainer( vint_t line_no );
-	std::vector<int> GetChildren( vint_t line_no );
+	std::vector<int> GetChildren( vint_t line_no, bool view_flat );
 	int GetParent( vint_t line_no );
 };
 

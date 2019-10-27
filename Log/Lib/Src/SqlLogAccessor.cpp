@@ -572,8 +572,28 @@ public:
 		return m_DB.MakeStatement( sql_text, step, suppress_error_trace, statement );
 	}
 
+	Error MakeStatement( const char * sql_text, bool step, statement_ptr_t & statement ) const {
+		return m_DB.MakeStatement( sql_text, step, false, statement );
+	}
+
+	Error MakeStatement( const std::string & sql_text, bool step, statement_ptr_t & statement ) const {
+		return MakeStatement( sql_text.c_str(), step, statement );
+	}
+
+	Error MakeStatement( const std::ostringstream & sql_text, bool step, statement_ptr_t & statement ) const {
+		return MakeStatement( sql_text.str(), step, statement );
+	}
+
 	Error ExecuteStatements( const char * sql_text ) const {
 		return m_DB.ExecuteStatements( sql_text );
+	}
+
+	Error ExecuteStatements( const std::string & sql_text ) const {
+		return ExecuteStatements( sql_text.c_str() );
+	}
+
+	Error ExecuteStatements( const std::ostringstream & sql_text ) const {
+		return ExecuteStatements( sql_text.str() );
 	}
 
 	nlineno_t GetNumLines( void ) const {
@@ -636,12 +656,21 @@ private:
 	int m_SortDirection{ 1 };
 
 protected:
-	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool push_id );
+	std::string MakeOrderSql( void ) const;
 	std::string MakeViewSql( bool with_limit = false ) const;
+
+	const std::string & GetSortColumn( void ) const {
+		return m_ColumnNames[ m_SortColumn ];
+	}
+
+	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool push_id );
 	SqlViewLineAccessor CaptureLine( Error status, statement_ptr_t & statement ) const;
 	const SqlViewLineAccessor & GetCachedLine( nlineno_t line_no ) const;
+
 	void BuildDisplayTable( void );
-	std::vector<int> GetRootChildren( void );
+	int GetNumDisplayedEvents( void );
+	std::vector<int> GetRootChildrenFlat( void );
+	std::vector<int> GetRootChildrenNested( void );
 	std::vector<int> GetParentChildren( nlineno_t line_no );
 
 	// record a change
@@ -688,9 +717,7 @@ public:
 	void SqlViewAccessor::SetSort( unsigned col_num, int direction ) override {
 		m_SortColumn = col_num;
 		m_SortDirection = direction;
-
 		RecordEvent();
-		BuildDisplayTable();
 	}
 
 	SortControl * GetSortControl( void ) override {
@@ -701,7 +728,7 @@ public:
 	// HierarchyAccessor interfaces
 
 	bool IsContainer( nlineno_t line_no ) override;
-	std::vector<int> GetChildren( nlineno_t line_no ) override;
+	std::vector<int> GetChildren( nlineno_t line_no, bool view_flat ) override;
 	int GetParent( nlineno_t line_no ) override;
 
 	virtual HierarchyAccessor * GetHierarchyAccessor( void ) {
@@ -844,7 +871,7 @@ Error SqlLogAccessor::GetDatum( void )
 Error SqlLogAccessor::CalcNumLines( void )
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( "SELECT count(*) FROM projection", true, false, statement ) };
+	Error res{ MakeStatement( "SELECT count(*) FROM projection", true, statement ) };
 
 	if( Ok( res ) )
 		m_NumLines = statement->GetAsInt();
@@ -857,7 +884,7 @@ template<typename T_FUNCTOR>
 void SqlLogAccessor::VisitLines( const char * projection, T_FUNCTOR func, uint64_t field_mask ) const
 {
 	statement_ptr_t statement;
-	Error res{ MakeStatement( projection, false, false, statement ) };
+	Error res{ MakeStatement( projection, false, statement ) };
 	if( !Ok( res ) )
 		return;
 
@@ -906,19 +933,29 @@ void SqlViewAccessor::SetupColumnNames( void )
 }
 
 
+std::string SqlViewAccessor::MakeOrderSql( void ) const
+{
+	std::ostringstream strm;
+
+	strm
+		<< GetSortColumn() << " "
+		<< (m_SortDirection > 0 ? "ASC" : "DESC");
+
+	return strm.str();
+}
+
+
 std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
 {
 	std::ostringstream strm;
 
 	strm << R"__(
 		SELECT
-			projection.*
+			*
 		FROM
 			display
-		JOIN
-			projection
-		ON
-			display.event_id = projection.event_id)__";
+		ORDER BY
+			)__" << MakeOrderSql();
 
 	if( with_limit )
 		strm << R"__(
@@ -948,7 +985,7 @@ const SqlViewLineAccessor & SqlViewAccessor::GetCachedLine( nlineno_t line_no ) 
 
 		[this, &res, &statement] ( nlineno_t line_no ) -> SqlViewLineAccessor
 		{
-			res = m_LogAccessor->MakeStatement( MakeViewSql( true ).c_str(), false, false, statement );
+			res = m_LogAccessor->MakeStatement( MakeViewSql( true ), false, statement );
 
 			ExecuteIfOk( [&] () { return statement->Bind( 1, line_no ); }, res );
 			ExecuteIfOk( [&] () { return statement->Step(); }, res );
@@ -1028,7 +1065,7 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 	if( Ok( res ) )
 	{
 		statement_ptr_t statement;
-		res = m_LogAccessor->MakeStatement( "INSERT INTO filter VALUES (?1)", false, false, statement );
+		res = m_LogAccessor->MakeStatement( "INSERT INTO filter VALUES (?1)", false, statement );
 
 		for( nlineno_t event_id : map )
 		{
@@ -1071,36 +1108,53 @@ void SqlViewAccessor::BuildDisplayTable( void )
 {
 	PythonPerfTimer timer{ __FUNCTION__ };
 
-	Error res{ m_LogAccessor->ExecuteStatements( "BEGIN TRANSACTION; DELETE FROM display" ) };
+	const size_t num_user_columns{ m_LogAccessor->GetNumFields() };
+	std::string columns;
+
+	{
+		const std::string table{ "projection" };
+		std::ostringstream strm;
+
+		strm << table << "." << m_ColumnNames[ 0 ];
+		for( size_t col = 1; col < num_user_columns; ++col )
+			strm << ", " << table << "." << m_ColumnNames[ col ];
+
+		columns = strm.str();
+	}
+
+	Error res{ m_LogAccessor->ExecuteStatements( R"__(
+		BEGIN TRANSACTION;
+		DROP TABLE IF EXISTS display)__"
+	) };
 
 	if( Ok( res ) )
 	{
 		std::ostringstream strm;
 		strm << R"__(
-			WITH
-				sorted_projection AS
-				(
-					SELECT
-						event_id,
-						)__" << m_ColumnNames[ m_SortColumn ] << R"__( AS sort
-					FROM
-						projection
-					ORDER BY
-						sort )__" << (m_SortDirection > 0 ? "ASC" : "DESC") << R"__(
-				)
-			INSERT INTO
+			CREATE TABLE
 				display
-			SELECT
-				sorted_projection.event_id
+			AS SELECT
+				)__" << columns << R"__(
 			FROM
-				sorted_projection
+				projection
 			JOIN
 				filter
 			ON
-				sorted_projection.event_id = filter.event_id)__";
+				projection.event_id = filter.event_id)__";
 
-		statement_ptr_t statement;
-		res = m_LogAccessor->MakeStatement( strm.str().c_str(), true, false, statement );
+		res = m_LogAccessor->ExecuteStatements( strm );
+	}
+
+	for( size_t col = 0; Ok( res ) && col < num_user_columns; ++col )
+	{
+		std::ostringstream strm;
+		strm << R"__(
+			CREATE INDEX
+				display_)__" << m_ColumnNames[ col ] << R"__(
+			ON
+				display()__" << m_ColumnNames[ col ] << ")";
+
+		res = m_LogAccessor->ExecuteStatements( strm );
 	}
 
 	m_LogAccessor->ExecuteStatements( Ok( res ) ? "COMMIT TRANSACTION" : "ROLLBACK TRANSACTION" );
@@ -1121,7 +1175,7 @@ bool SqlViewAccessor::IsContainer( nlineno_t line_no )
 				hierarchy
 			WHERE
 				parent_event_id = ?1)__",
-		false, false, statement ) };
+		false, statement ) };
 
 	const int64_t event_id{ GetCachedLine( line_no ).GetEventID() };
 	ExecuteIfOk( [&] () { return statement->Bind( 1, event_id ); }, res );
@@ -1135,28 +1189,62 @@ bool SqlViewAccessor::IsContainer( nlineno_t line_no )
 }
 
 
-std::vector<int> SqlViewAccessor::GetRootChildren( void )
+int SqlViewAccessor::GetNumDisplayedEvents( void )
 {
-	// root node; add all rows without a defined parent
 	statement_ptr_t statement;
-	Error res{ m_LogAccessor->MakeStatement(
-		R"__(
-			WITH
-				child_event_ids AS
-					(SELECT DISTINCT child_event_id FROM hierarchy)
-			SELECT
-				rowid
-			FROM
-				display
-			WHERE
-				event_id NOT IN child_event_ids)__",
-		true, false, statement ) };
+	Error res{ m_LogAccessor->MakeStatement( R"__(
+		SELECT
+			count(*)
+		 FROM display)__",
+		true, statement ) };
+
+	return Ok( res ) ? statement->GetAsInt() : 0;
+}
+
+std::vector<int> SqlViewAccessor::GetRootChildrenFlat( void )
+{
+	const int num_rows{ GetNumDisplayedEvents() };
 
 	std::vector<int> rows;
-	while( Ok(res) && res != e_SqlDone )
+	rows.resize( num_rows );
+
+	// root node; add all rows
+	for( int i = 0; i < num_rows; ++i )
+		rows[ i ] = i;
+
+	return rows;
+}
+
+
+std::vector<int> SqlViewAccessor::GetRootChildrenNested( void )
+{
+	// root node; add all rows without a defined parent
+	std::ostringstream strm;
+	strm << R"__(
+		WITH
+			child_event_ids AS (
+				SELECT child_event_id FROM hierarchy
+			)
+		SELECT
+			event_id NOT IN child_event_ids as include,
+			)__" << GetSortColumn() << R"__(
+		FROM
+			display
+		ORDER BY
+			)__" << MakeOrderSql();
+
+	statement_ptr_t statement;
+	Error res{ m_LogAccessor->MakeStatement( strm, true, statement ) };
+
+	const int num_rows{ GetNumDisplayedEvents() };
+	std::vector<int> rows;
+	rows.reserve( num_rows );
+
+	for( int line_no = 0; Ok(res) && res != e_SqlDone; ++line_no )
 	{
-		// convert rowid (starts counting at 1) to a line number (starts counting at 0)
-		rows.push_back( statement->GetAsInt() - 1);
+		const bool include{ statement->GetAsInt() != 0 };
+		if( include )
+			rows.push_back( line_no );
 		UpdateError( res, statement->Step() );
 	}
 
@@ -1166,21 +1254,30 @@ std::vector<int> SqlViewAccessor::GetRootChildren( void )
 
 std::vector<int> SqlViewAccessor::GetParentChildren( nlineno_t line_no )
 {
+#ifdef waiting_for_newer_sql
+	std::ostringstream strm;
+	strm << R"__(
+		WITH
+			child_event_ids AS (
+				SELECT child_event_id FROM hierarchy WHERE parent_event_id = ?1
+			),
+			annotated_display as (
+				SELECT
+					row_number() OVER (ORDER BY )__" << MakeOrderSql() << R"__() AS line_id,
+					event_id
+				FROM
+					display
+			)
+						
+		SELECT
+			line_id
+		FROM
+			annotated_display
+		WHERE
+			event_id IN child_event_ids)__";
+
 	statement_ptr_t statement;
-	Error res{ m_LogAccessor->MakeStatement(
-		R"__(
-			WITH
-				child_event_ids AS
-					(SELECT child_event_id FROM hierarchy WHERE parent_event_id = ?1)
-			SELECT
-				display.rowid
-			FROM
-				display
-			JOIN
-				child_event_ids
-			ON
-				event_id = child_event_id)__",
-		false, false, statement ) };
+	Error res{ m_LogAccessor->MakeStatement( strm, false, statement ) };
 
 	const int64_t event_id{ GetCachedLine( line_no ).GetEventID() };
 	ExecuteIfOk( [&] () { return statement->Bind( 1, event_id ); }, res );
@@ -1189,46 +1286,95 @@ std::vector<int> SqlViewAccessor::GetParentChildren( nlineno_t line_no )
 	std::vector<int> rows;
 	while( Ok( res ) && res != e_SqlDone )
 	{
-		// convert rowid (starts counting at 1) to a line number (starts counting at 0)
+		// convert line_id (starts counting at 1) to a line number (starts counting at 0)
 		rows.push_back( statement->GetAsInt() - 1 );
 		UpdateError( res, statement->Step() );
 	}
 
 	return rows;
-}
+#else
+	std::ostringstream strm;
+	strm << R"__(
+		WITH
+			child_event_ids AS (
+				SELECT child_event_id FROM hierarchy WHERE parent_event_id = ?1
+			)
+		SELECT
+			event_id IN child_event_ids as include,
+			)__" << GetSortColumn() << R"__(
+		FROM
+			display
+		ORDER BY
+			)__" << MakeOrderSql();
 
-
-std::vector<int> SqlViewAccessor::GetChildren( nlineno_t line_no )
-{
-	return (line_no < 0) ? GetRootChildren() : GetParentChildren( line_no );
-}
-
-
-int SqlViewAccessor::GetParent( nlineno_t line_no )
-{
 	statement_ptr_t statement;
-	Error res{ m_LogAccessor->MakeStatement(
-		R"__(
-			WITH
-				parent_event_ids AS
-					(SELECT parent_event_id FROM hierarchy WHERE child_event_id + ?1)
-			SELECT
-				display.rowid
-			FROM
-				display
-			JOIN
-				parent_event_ids
-			ON
-				event_id = parent_event_id)__",
-		false, false, statement ) };
+	Error res{ m_LogAccessor->MakeStatement( strm, false, statement ) };
 
 	const int64_t event_id{ GetCachedLine( line_no ).GetEventID() };
 	ExecuteIfOk( [&] () { return statement->Bind( 1, event_id ); }, res );
 	ExecuteIfOk( [&] () { return statement->Step(); }, res );
 
-	if( res != e_SqlRow )
-		return -1;
+	const int num_rows{ GetNumDisplayedEvents() };
+	std::vector<int> rows;
+	rows.reserve( num_rows );
+
+	for( int line_no = 0; Ok( res ) && res != e_SqlDone; ++line_no )
+	{
+		const bool include{ statement->GetAsInt() != 0 };
+		if( include )
+			rows.push_back( line_no );
+		UpdateError( res, statement->Step() );
+	}
+
+	return rows;
+#endif
+}
+
+
+std::vector<int> SqlViewAccessor::GetChildren( nlineno_t line_no, bool view_flat )
+{
+	if( view_flat )
+		return GetRootChildrenFlat();
+	else if( line_no < 0 )
+		return GetRootChildrenNested();
 	else
-		// convert rowid (starts counting at 1) to a line number (starts counting at 0)
-		return statement->GetAsInt() - 1;
+		return GetParentChildren( line_no );
+}
+
+
+int SqlViewAccessor::GetParent( nlineno_t line_no )
+{
+#ifndef waiting_for_newer_sql
+	std::ostringstream strm;
+	strm << R"__(
+		WITH
+			parent_event_ids AS (
+				SELECT parent_event_id FROM hierarchy WHERE child_event_id = ?1
+			)
+		SELECT
+			event_id IN parent_event_ids as include,
+			)__" << GetSortColumn() << R"__(
+		FROM
+			display
+		ORDER BY
+			)__" << MakeOrderSql();
+
+	statement_ptr_t statement;
+	Error res{ m_LogAccessor->MakeStatement( strm, false, statement ) };
+
+	const int64_t event_id{ GetCachedLine( line_no ).GetEventID() };
+	ExecuteIfOk( [&] () { return statement->Bind( 1, event_id ); }, res );
+	ExecuteIfOk( [&] () { return statement->Step(); }, res );
+
+	for( int line_no = 0; Ok( res ) && res != e_SqlDone; ++line_no )
+	{
+		const bool include{ statement->GetAsInt() != 0 };
+		if( include )
+			return line_no;
+		UpdateError( res, statement->Step() );
+	}
+
+	return -1;
+
+#endif
 }

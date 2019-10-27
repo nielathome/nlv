@@ -287,18 +287,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                 children.append(self.KeyToItem(item_key))
                 count += 1
 
-        if self._ViewFlat:
-            if parent_item:
-                raise RuntimeError
-            AppendChildren(range(self.GetNumItems()))
-
-        elif parent_item:
+        item_key = -1
+        if parent_item:
             item_key = self.ItemToKey(parent_item)
-            AppendChildren(self._N_EventView.GetChildren(item_key))
 
-        else:
-            # root node; all rows without a stated parent belong here
-            AppendChildren(self._N_EventView.GetChildren(-1))
+        AppendChildren(self._N_EventView.GetChildren(item_key, self._ViewFlat))
 
         return count
 

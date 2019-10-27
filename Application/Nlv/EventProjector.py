@@ -64,26 +64,6 @@ def MakeProjectionView(cursor):
             event_id INT NOT NULL PRIMARY KEY
         )""")
 
-    cursor.execute("DROP TABLE IF EXISTS main.display")
-    cursor.execute("""
-        CREATE TABLE main.display
-        (
-            event_id INT NOT NULL PRIMARY KEY
-        )""")
-
-    cursor.execute("""
-        CREATE VIEW IF NOT EXISTS
-            main.filtered_projection
-        AS SELECT
-	        projection.*
-        FROM
-	        filter
-        JOIN
-	        projection
-        ON
-	        filter.event_id = projection.event_id
-        """)
-
 
 
 ## G_ScriptGuard ###########################################
@@ -905,6 +885,7 @@ class G_ProjectionContext:
     def CalcUtcDatum(self, cursor, tables):
         """Each table in tables must contain a 'start_utc' column"""
 
+# could use min() aggregate function here
         utc_datum = 0
         for table in tables:
             cursor.execute("""

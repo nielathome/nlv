@@ -591,10 +591,10 @@ bool NEventView::IsContainer( vint_t line_no )
 }
 
 
-std::vector<int> NEventView::GetChildren( vint_t line_no )
+std::vector<int> NEventView::GetChildren( vint_t line_no, bool view_flat )
 {
 	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
-	return hierarchy ? hierarchy->GetChildren( line_no ) : std::vector<int>{};
+	return hierarchy ? hierarchy->GetChildren( line_no, view_flat ) : std::vector<int>{};
 }
 
 
