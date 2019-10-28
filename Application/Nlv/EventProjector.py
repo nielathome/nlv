@@ -873,7 +873,6 @@ class G_ProjectionContext:
     def CalcUtcDatum(self, cursor, tables):
         """Each table in tables must contain a 'start_utc' column"""
 
-# could use min() aggregate function here
         utc_datum = 0
         for table in tables:
             cursor.execute("""

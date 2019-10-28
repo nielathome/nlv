@@ -1037,6 +1037,8 @@ std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, n
 			const nlineno_t log_line_no{ line.GetLineNo() };
 			LineAdornmentsAccessor adornments{ adornments_provider, log_line_no };
 			if( selector->Hit( line, adornments ) )
+				// dubious implicit conversion to int here; really need all internal
+				// code to move to 64-bit integers.
 				map.push_back( push_id ? line.GetFieldValue( c_EventIdColumn ).As<int64_t>() : log_line_no );
 		},
 		m_FieldViewMask

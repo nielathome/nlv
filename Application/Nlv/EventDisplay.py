@@ -173,12 +173,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         field_schema = self._TableSchema[col_num]
         return G_ProjectionTypeManager.GetValue(field_schema, self._N_EventView, item_key, col_num)
 
-    def GetFieldDisplayValue(self, item_key, col_num):
+    def GetFieldDisplayValue(self, item, col_num):
+        item_key = self.ItemToKey(item)
         field_schema = self._TableSchema[col_num]
         icon = None
+
         if field_schema.IsFirst:
-            icon = self._Icons[0]
-# icon = self._Icons[item_key in self._ParentKeyToChildKeys]
+            icon = self._Icons[self.IsContainer(item)]
+
         return G_ProjectionTypeManager.GetDisplayValue(field_schema, icon, self._N_EventView, item_key, col_num)
 
 
@@ -209,12 +211,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._DocumentUrl is not None:
             builder.AddLink(self._DocumentUrl, "Show log ...")
 
+        item_key = self.ItemToKey(item)
+
         item_key = int(location)
+        item = self.KeyToItem(item_key)
         table_schema = self._TableSchema
 
         for col_num, field in enumerate(self._TableSchema):
             if field.Available:
-                display_value = self.GetFieldDisplayValue(item_key, col_num)
+                display_value = self.GetFieldDisplayValue(item, col_num)
                 if isinstance(display_value, str):
                     text = display_value
                 elif isinstance(display_value, bool):
@@ -363,8 +368,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     def GetValue(self, item, col_num):
         """Return the value to be displayed for this item and column."""
-        item_key = self.ItemToKey(item)
-        return self.GetFieldDisplayValue(item_key, col_num)
+        return self.GetFieldDisplayValue(item, col_num)
 
 
     def Compare(self, item_l, item_r, col_num, ascending):
