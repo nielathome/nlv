@@ -74,12 +74,17 @@ def Projector(connection, cursor, context):
     cursor.execute("""
         CREATE TABLE projection
         (
+            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
             title TEXT,
             count INT
         )""")
 
     cursor.execute("""
         INSERT INTO projection
+        (
+            title,
+            count
+        )
         SELECT
             title,
             count(title) AS cnt

@@ -1112,7 +1112,9 @@ void SqlViewAccessor::BuildDisplayTable( void )
 {
 	PythonPerfTimer timer{ __FUNCTION__ };
 
-	const size_t num_user_columns{ m_LogAccessor->GetNumFields() };
+	const size_t num_user_columns{
+		std::min( m_LogAccessor->GetNumFields(), m_ColumnNames.size() )
+	};
 	std::string columns;
 
 	{
