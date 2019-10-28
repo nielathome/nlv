@@ -108,6 +108,7 @@ class SummaryRecogniser:
                 start_utc INT,
                 start_offset_ns INT,
                 duration_ns INT,
+                finish_line_no INT,
                 process INT
             )""")
 
@@ -120,7 +121,7 @@ class SummaryRecogniser:
 
     #-----------------------------------------------------------
     def MatchEventFinish(self, context, line):
-        self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?, ?)",
+        self.Cursor.execute("INSERT INTO expire VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
         (
             * context.GetEventStartDetails(),
             self.Process
@@ -145,7 +146,7 @@ Recognise(
 ## Project #####################################################
 
 def RescheduleProjector(connection, cursor, context):
-    utc_datum = context.CalcUtcDatum(cursor, ["reschedule"])
+    utc_datum = context.CalcUtcDatum(cursor, ["analysis.reschedule"])
 
     cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
@@ -188,7 +189,6 @@ Project(
     "Reschedule",
     RescheduleProjector,
     MakeDisplaySchema()
-        .AddEventId()
         .AddStart("Start", width = 100)
         .AddFinish("Finish", width = 100, initial_visibility = False)
         .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)
@@ -208,11 +208,14 @@ def SummaryProjector(connection, cursor, context):
     cursor.execute("""
         CREATE TABLE projection
         (
-            event_id,
+            event_id INT,
             start_text TEXT,
             start_offset_ns INT,
             duration_ns INT,
-            summary TEXT
+            summary TEXT,
+            start_line_no INT,
+            finish_line_no INT,
+            process INT
         )""")
 
     cursor.execute("""
@@ -222,7 +225,10 @@ def SummaryProjector(connection, cursor, context):
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
             duration_ns,
-            'P=[' || place || ']' AS summary
+            'P=[' || place || ']' AS summary,
+            start_line_no,
+            finish_line_no,
+            process
         FROM
             analysis.reschedule
         UNION ALL
@@ -231,17 +237,68 @@ def SummaryProjector(connection, cursor, context):
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
             duration_ns,
-            'expire' AS summary
+            'expire' AS summary,
+            start_line_no,
+            finish_line_no,
+            process
         FROM
             analysis.expire
         """.format(utc_datum = utc_datum))
+
+    cursor.execute("DROP TABLE IF EXISTS main.hierarchy")
+    cursor.execute("""
+        CREATE TABLE hierarchy
+        (
+            child_event_id INT NOT NULL PRIMARY KEY,
+            parent_event_id INT
+        )""")
+
+    cursor.execute("""
+        SELECT
+            event_id,
+            start_line_no,
+            finish_line_no,
+            process
+        FROM
+            projection
+        ORDER BY
+            start_line_no
+        """)
+
+    candidates = []
+    c2 = connection.cursor()
+
+    for row in cursor:
+        # remove any candidate rows that finish before 'row' starts
+        start_line = row[1]
+        finish_line = row[2]
+        process = row[3]
+
+        idx = len(candidates) - 1
+        while idx >= 0:
+            if candidates[idx][2] < start_line:
+                candidates.pop(idx)
+            idx -= 1
+
+        # since events are processed in start order, we know that
+        # 'row' starts after candidates (two events can't start on the
+        # same line)
+        candidates.append(row)
+
+        for idx in range(len(candidates) - 2, -1, -1):
+            prev = candidates[idx]
+            if prev[2] >= finish_line and prev[3] == process:
+                c2.execute("INSERT INTO hierarchy VALUES (?, ?)", (row[0], prev[0]))
+                break
+
+    c2.close()
 
 
 projection = Project(
     "Summary",
     SummaryProjector,
     MakeDisplaySchema()
-        .AddEventId()
+        .AddNesting()
         .AddStart("Start", width = 100)
         .AddDuration("Duration", scale = "s", width = 60)
         .AddField("Event Summary", "text", 150, "left", initial_colour = "ROYAL BLUE")
@@ -256,6 +313,7 @@ def SummaryQuantifier(connection, cursor):
     cursor.execute("""
         CREATE TABLE projection
         (
+            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
             summary TEXT,
             count INT,
             sum INT,
@@ -264,13 +322,19 @@ def SummaryQuantifier(connection, cursor):
 
     cursor.execute("""
         INSERT INTO projection
+        (
+            summary,
+            count,
+            sum,
+            average
+        )
         SELECT
             summary,
             count(duration_ns),
             sum(duration_ns / 1000000000),
             round(avg(duration_ns / 1000000000), 2)
         FROM
-            events.filtered_projection
+            events.display
         GROUP BY
             summary
         """)

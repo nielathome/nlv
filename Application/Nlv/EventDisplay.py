@@ -106,12 +106,11 @@ class G_TableFieldFormatter:
 class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
-    def __init__(self, permit_nesting, doc_url):
+    def __init__(self, doc_url):
         super().__init__()
 
-        self._PermitNesting = permit_nesting
-        self._DocumentUrl = doc_url
         self._ViewFlat = True
+        self._DocumentUrl = doc_url
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
@@ -131,6 +130,9 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
     #-------------------------------------------------------
     @staticmethod
     def ItemToKey(item):
+        # in SQL terms, the key is the entry's line number in
+        # the display table (where line number is one less than
+        # the "rowid"); note, items cannot be zero, so offset here
         return int(item.GetID()) - 1
 
 
@@ -163,8 +165,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
             self._ModelColumnToFieldId.append(fid)
 
-        self._ParentKeyToChildKeys = dict()
-
         self.ClearDataValidity("Model reset")
 
 
@@ -173,11 +173,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         field_schema = self._TableSchema[col_num]
         return G_ProjectionTypeManager.GetValue(field_schema, self._N_EventView, item_key, col_num)
 
-    def GetFieldDisplayValue(self, item_key, col_num):
+    def GetFieldDisplayValue(self, item, col_num):
+        item_key = self.ItemToKey(item)
         field_schema = self._TableSchema[col_num]
         icon = None
+
         if field_schema.IsFirst:
-            icon = self._Icons[item_key in self._ParentKeyToChildKeys]
+            icon = self._Icons[self.IsContainer(item)]
+
         return G_ProjectionTypeManager.GetDisplayValue(field_schema, icon, self._N_EventView, item_key, col_num)
 
 
@@ -196,32 +199,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def GetRowKeys(self):
-        return range(self.GetNumItems())
-
-
-    #-------------------------------------------------------
-    def GetItemKeyParentKey(self, item_key):
-        parent_id = -1
-        if self._TableSchema.ColParentId is not None:
-            parent_id = self.GetFieldValue(item_key, self._TableSchema.ColParentId)
-
-        if parent_id < 0:
-            return parent_id
-
-        candidate_parent_key = self._N_EventView.LogLineToViewLine(parent_id)
-        if candidate_parent_key < 0:
-            return candidate_parent_key
-
-        # check for an exact match
-        actual_parent_id = self._N_EventView.ViewLineToLogLine(candidate_parent_key)
-        if parent_id == actual_parent_id:
-            return candidate_parent_key
-
-        return -1
-
-
-    #-------------------------------------------------------
     def GetLocation(self, item):
         return str(self.ItemToKey(item))
 
@@ -234,12 +211,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._DocumentUrl is not None:
             builder.AddLink(self._DocumentUrl, "Show log ...")
 
+        item_key = self.ItemToKey(item)
+
         item_key = int(location)
+        item = self.KeyToItem(item_key)
         table_schema = self._TableSchema
 
         for col_num, field in enumerate(self._TableSchema):
             if field.Available:
-                display_value = self.GetFieldDisplayValue(item_key, col_num)
+                display_value = self.GetFieldDisplayValue(item, col_num)
                 if isinstance(display_value, str):
                     text = display_value
                 elif isinstance(display_value, bool):
@@ -312,20 +292,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                 children.append(self.KeyToItem(item_key))
                 count += 1
 
-        if self._ViewFlat:
-            if parent_item:
-                raise RuntimeError
-            AppendChildren(self.GetRowKeys())
+        item_key = -1
+        if parent_item:
+            item_key = self.ItemToKey(parent_item)
 
-        elif parent_item:
-            parent_key = self.ItemToKey(parent_item)
-            if parent_key in self._ParentKeyToChildKeys:
-                AppendChildren(self._ParentKeyToChildKeys[parent_key])
-
-        else:
-            # root node; all rows without a stated parent belong here
-            keys = [key for key in self.GetRowKeys() if self.GetItemKeyParentKey(key) < 0]
-            AppendChildren(keys)
+        AppendChildren(self._N_EventView.GetChildren(item_key, self._ViewFlat))
 
         return count
 
@@ -341,7 +312,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             return False
         else:
             item_key = self.ItemToKey(item)
-            return item_key in self._ParentKeyToChildKeys
+            return self._N_EventView.IsContainer(item_key)
 
 
     def HasContainerColumns(self, item):
@@ -359,7 +330,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             return wx.dataview.NullDataViewItem
 
         item_key = self.ItemToKey(item)
-        parent_key = self.GetItemKeyParentKey(item_key)
+        parent_key = self._N_EventView.GetParent(item_key)
 
         if parent_key < 0:
             return wx.dataview.NullDataViewItem
@@ -397,8 +368,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     def GetValue(self, item, col_num):
         """Return the value to be displayed for this item and column."""
-        item_key = self.ItemToKey(item)
-        return self.GetFieldDisplayValue(item_key, col_num)
+        return self.GetFieldDisplayValue(item, col_num)
 
 
     def Compare(self, item_l, item_r, col_num, ascending):
@@ -406,15 +376,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def MapSelectionToProjectionNo(self, selection):
-        col_num = self._TableSchema.ColProjectionNo
+    def MapSelectionToEventIds(self, selection):
+        col_num = self._TableSchema.ColEventId
         return [self.GetFieldValue(s, col_num) for s in selection]
 
 
     #-------------------------------------------------------
     def GetNextItem(self, what, cur_item, forward, index = 0):
         cur_key = 0
-        if cur_item is not None:
+        if cur_item is not None and cur_item:
           cur_key = self.ItemToKey(cur_item)
   
         if what == "hilite":
@@ -445,26 +415,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._N_Logfile is None:
             return False
 
-        if match is not None:
-            if self._N_EventView is None:
-                return True
-
+        if match is not None and self._N_EventView is not None:
             return self._N_EventView.Filter(match)
-
-        map = self._ParentKeyToChildKeys = dict()
-
-        if not self._PermitNesting:
-            return True
-
-        # temp
-        return True
-        for child_key in self.GetRowKeys():
-            parent_key = self.GetItemKeyParentKey(child_key)
-            if parent_key >= 0:
-                if parent_key in map:
-                    map[parent_key].append(child_key)
-                else:
-                    map[parent_key] = [child_key]
 
         return True
 
@@ -582,10 +534,13 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
     def UpdateNesting(self, nesting, do_rebuild = True):
-        if not self._PermitNesting:
+        if nesting is None:
             return
 
-        if nesting is None:
+        if self._TableSchema is None:
+            return
+
+        if not self._TableSchema.PermitNesting:
             return
 
         view_flat = not nesting
@@ -622,7 +577,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, permit_nesting, flags, doc_url):
+    def __init__(self, parent, flags, doc_url):
         super().__init__(
             parent,
             style = wx.dataview.DV_ROW_LINES
@@ -630,7 +585,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
             | flags
         )
 
-        self.AssociateModel(G_TableDataModel(permit_nesting, doc_url))
+        self.AssociateModel(G_TableDataModel(doc_url))
         self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
@@ -702,14 +657,15 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
     #-------------------------------------------------------
-    def __init__(self, parent, selection_handler, permit_nesting = True, multiple_selection = False, doc_url = None):
+    def __init__(self, parent, selection_handler, multiple_selection = False, doc_url = None):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        super().__init__(parent, permit_nesting, flags, doc_url)
+        super().__init__(parent, flags, doc_url)
 
         self._SelectionHandler = selection_handler
+        self._IsMultipleSelection = multiple_selection
         self.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED, self.OnItemActivated)
 
 
@@ -721,7 +677,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
     #-------------------------------------------------------
     def GetSelectedItems(self):
         selection = [G_TableDataModel.ItemToKey(item) for item in self.GetSelections()]
-        return self.GetModel().MapSelectionToProjectionNo(selection)
+        return self.GetModel().MapSelectionToEventIds(selection)
 
 
     #-------------------------------------------------------
@@ -743,6 +699,9 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
         next_item = self.GetModel().GetNextItem(what, cur_item, forward, index)
 
         if next_item is not None:
+            if cur_item is not None and self._IsMultipleSelection:
+                self.UnselectAll()
+
             self.Select(next_item)
             self.EnsureVisible(next_item)
 
@@ -1004,7 +963,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, permit_nesting = False, multiple_selection = True)
+        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, multiple_selection = True)
 
         self._ChartPane = wx.Panel(self)
         self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))

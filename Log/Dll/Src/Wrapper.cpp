@@ -302,6 +302,10 @@ namespace boost
 //  https://wiki.python.org/moin/boost.python/PointersAndSmartPointers
 BOOST_PYTHON_MODULE( Nlog )
 {
+	class_<std::vector<int> >( "ivec" )
+		.def( "__iter__", iterator<std::vector<int>>() )
+		;
+
 	// although boost::noncopyable is specified here, Boost still attempts
 	// to make use of a copy constructor, so the kludged default constructors
 	// are needed for the time being
@@ -401,6 +405,9 @@ BOOST_PYTHON_MODULE( Nlog )
 	class_<NEventView, eventview_ptr_t, bases<NViewCore, NViewFieldAccess, NViewHiliting>>( "NEventView", no_init )
 		.def( "Filter", &NEventView::Filter )
 		.def( "Sort", &NEventView::Sort )
+		.def( "IsContainer", &NEventView::IsContainer )
+		.def( "GetChildren", &NEventView::GetChildren )
+		.def( "GetParent", &NEventView::GetParent )
 		;
 
 	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewTimecode, NViewHiliting>>( "LogView", no_init )

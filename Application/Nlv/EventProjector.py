@@ -61,22 +61,8 @@ def MakeProjectionView(cursor):
     cursor.execute("""
         CREATE TABLE main.filter
         (
-            log_row_no INT
+            event_id INT NOT NULL PRIMARY KEY
         )""")
-
-    # note: the * here means the last column in the result
-    # will be the log_row_no
-    cursor.execute("""
-        CREATE VIEW IF NOT EXISTS main.filtered_projection AS
-		SELECT
-			*
-		FROM
-			projection
-			JOIN
-				filter
-			ON
-				projection.rowid = filter.log_row_no
-        """)
 
 
 
@@ -288,6 +274,7 @@ class G_Recogniser:
             3 (start_utc INT) - UTC date/time of event start, to previous whole second
             4 (start_offset_ns INT) - offset from #2 to event start, in ns
             5 (duration_ns INT) - event duration, in ns
+            6 (finish_line_no INT) - finish line number
         """
 
         start_timecode = self._StartAccessor.GetUtcTimecode()
@@ -305,7 +292,10 @@ class G_Recogniser:
             start_timecode.GetOffsetNs(),
 
             # duration
-            finish_timecode.Subtract(start_timecode)
+            finish_timecode.Subtract(start_timecode),
+
+            # finish line
+            self._FinishLine
         )
 
 
@@ -619,12 +609,12 @@ class G_ProjectionSchema(G_FieldSchemata):
     def __init__(self, guid = ""):
         super().__init__("sql", guid)
         self._SetTextOffsetSize(16)
+        self.PermitNesting = False
         self.DurationScale = 1
-        self.ColParentId = None
         self.ColStartOffset = None
         self.ColFinishOffset = None
         self.ColDuration = None
-        self.ColProjectionNo = None
+        self.ColEventId = self.MakeHiddenFieldSchema("event_id", "int")
 
 
     #-------------------------------------------------------
@@ -684,16 +674,8 @@ class G_ProjectionSchema(G_FieldSchemata):
 
 
     #-------------------------------------------------------
-    def AddNesting(self):
-        self.ColParentId = self.MakeHiddenFieldSchema("parent_id", "int")
-        return self
-
-    def AddEventId(self):
-        self.MakeHiddenFieldSchema("event_id", "int")
-        return self
-
-    def AddProjectionNo(self):
-        self.ColProjectionNo = self.MakeHiddenFieldSchema("log_row_id", "int")
+    def AddNesting(self, enable = True):
+        self.PermitNesting = enable
         return self
 
     def AddField(self, name, type, width = 30, align = "centre", formatter = None, scale = None, initial_visibility = True, initial_colour = "BLACK"):
@@ -770,12 +752,6 @@ class G_ProjectorInfo:
     #-------------------------------------------------------
     def Quantify(self, name, user_quantifier, metrics_schema):
         """Implements user analyse script Quantify() function"""
-
-        # the projection number is a side effect of the selection
-        # in the filtered_projection view, and is effectively a
-        # unique number in the view; it is used to map selections
-        # in the table to position independent IDs
-        metrics_schema.AddProjectionNo()
 
         idx = len(self.Quantifiers)
         name = "{}.{}".format(self.ProjectionName, name)
