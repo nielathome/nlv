@@ -27,6 +27,7 @@
 
 // C++ includes
 #include <sstream>
+#include <set>
 
 // force link this module
 void force_link_sqlaccessor_module() {}
@@ -655,6 +656,9 @@ private:
 	unsigned m_SortColumn{ 1 };
 	int m_SortDirection{ 1 };
 
+	// container caching
+	std::set<int> m_ContainerCache;
+
 protected:
 	std::string MakeOrderSql( void ) const;
 	std::string MakeViewSql( bool with_limit = false ) const;
@@ -1166,26 +1170,7 @@ void SqlViewAccessor::BuildDisplayTable( void )
 
 bool SqlViewAccessor::IsContainer( nlineno_t line_no )
 {
-	statement_ptr_t statement;
-	Error res{ m_LogAccessor->MakeStatement(
-		R"__(
-			SELECT
-				count(*)
-			FROM
-				hierarchy
-			WHERE
-				parent_event_id = ?1)__",
-		false, statement ) };
-
-	const int64_t event_id{ GetCachedLine( line_no ).GetEventID() };
-	ExecuteIfOk( [&] () { return statement->Bind( 1, event_id ); }, res );
-	ExecuteIfOk( [&] () { return statement->Step(); }, res );
-
-	int count{ 0 };
-	if( Ok( res ) )
-		count = statement->GetAsInt();
-
-	return count != 0;
+	return m_ContainerCache.find( line_no ) != m_ContainerCache.end();
 }
 
 
@@ -1219,14 +1204,19 @@ std::vector<int> SqlViewAccessor::GetRootChildrenFlat( void )
 std::vector<int> SqlViewAccessor::GetRootChildrenNested( void )
 {
 	// root node; add all rows without a defined parent
+	// i.e. all rows that are not children
 	std::ostringstream strm;
 	strm << R"__(
 		WITH
 			child_event_ids AS (
 				SELECT child_event_id FROM hierarchy
+			),
+			parent_event_ids AS (
+				SELECT DISTINCT parent_event_id FROM hierarchy
 			)
 		SELECT
 			event_id NOT IN child_event_ids as include,
+			event_id IN parent_event_ids as container,
 			)__" << GetSortColumn() << R"__(
 		FROM
 			display
@@ -1240,11 +1230,21 @@ std::vector<int> SqlViewAccessor::GetRootChildrenNested( void )
 	std::vector<int> rows;
 	rows.reserve( num_rows );
 
+	m_ContainerCache.clear();
+
 	for( int line_no = 0; Ok(res) && res != e_SqlDone; ++line_no )
 	{
-		const bool include{ statement->GetAsInt() != 0 };
+		const bool include{ statement->GetAsInt( 0 ) != 0 };
+		const bool container{ statement->GetAsInt( 1 ) != 0 };
+
 		if( include )
 			rows.push_back( line_no );
+
+		// while we're here, build a local parent cache - IsContainer
+		// is called extensively, and is a performance bottleneck
+		if( container )
+			m_ContainerCache.insert( line_no );
+
 		UpdateError( res, statement->Step() );
 	}
 
