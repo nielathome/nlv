@@ -180,9 +180,26 @@ def RescheduleProjector(connection, cursor, context):
         """.format(utc_datum = utc_datum))
 
 
-def SimpleFormatter(value, attr):
+def DataExplorerOpen(builder):
+    mycss = """
+        h2 {
+          color: lightsteelblue;
+        }
+    """
+
+    builder.AddHeaderElement("style", mycss)
+
+
+def ViewFormatter(value, attr):
     if value > 1:
         attr.SetBold(True)
+
+
+def ExplorerFormatter(builder, field_name, value_text):
+    style = ""
+    if value_text[0] == 'T':
+        style = "font-weight: bold;"
+    builder.AddField(field_name, value_text, value_style = style)
 
 
 Project(
@@ -191,10 +208,11 @@ Project(
     MakeDisplaySchema()
         .AddStart("Start", width = 100)
         .AddFinish("Finish", width = 100, initial_visibility = False)
-        .AddDuration("Duration", scale = "s", width = 60, formatter = SimpleFormatter)
+        .AddDuration("Duration", scale = "s", width = 60, view_formatter = ViewFormatter)
         .AddField("Process", "int", 60)
         .AddField("Place", "real", 60)
-        .AddField("Abool", "bool", 60)
+        .AddField("Abool", "bool", 60, explorer_formatter = ExplorerFormatter)
+        .OnDataExplorerOpen(DataExplorerOpen)
 )
 
 

@@ -154,46 +154,68 @@ class G_DataExplorerPageBuilder:
     #-------------------------------------------------------
     def __init__(self, data_explorer):
         self._DataExplorer = data_explorer
-        self._HtmlStream = io.StringIO()
-        self.AddText(self._PageHead)
+
+        self._HeaderHtmlStream = io.StringIO()
+        self.AddHeaderText("""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <link rel="stylesheet" type="text/css" href="memory:style.css">
+        """)
+
+        self._BodyHtmlStream = io.StringIO()
+        self.AddBodyText("<body>")
 
 
     #-------------------------------------------------------
-    def AddText(self, text):
-        self._HtmlStream.write(text + "\n")
+    def AddHeaderText(self, text):
+        self._HeaderHtmlStream.write(text + "\n")
 
-    def AddElement(self, tag, text, style = None):
+    def AddHeaderElement(self, tag, text):
+        self.AddHeaderText("<{tag}>{text}</{tag}>".format(tag = tag, text = html.escape(text)))
+
+
+    #-------------------------------------------------------
+    def AddBodyText(self, text):
+        self._BodyHtmlStream.write(text + "\n")
+
+    def AddBodyElement(self, tag, text, style = None):
         if style is not None:
             style = ' style="{style}"'.format(style = style)
         else:
             style = ""
 
-        self.AddText("<{tag}{style}>{text}</{tag}>".format(tag = tag, style = style, text = html.escape(text)))
+        self.AddBodyText("<{tag}{style}>{text}</{tag}>".format(tag = tag, style = style, text = html.escape(text)))
 
 
     #-------------------------------------------------------
     def AddPageHeading(self, text, style = None):
-        self.AddElement("h1", text, style)
+        self.AddBodyElement("h1", text, style)
 
-    def AddFieldHeading(self, text):
-        self.AddElement("h2", text)
+    def AddFieldHeading(self, text, style = None):
+        self.AddBodyElement("h2", text, style)
 
-    def AddFieldValue(self, text):
-        self.AddElement("p", text)
+    def AddFieldValue(self, text, style = None):
+        self.AddBodyElement("p", text, style)
 
-    def AddField(self, heading, value):
-        self.AddFieldHeading(heading)
-        self.AddFieldValue(value)
+    def AddField(self, heading, value, heading_style = None, value_style = None):
+        self.AddFieldHeading(heading, heading_style)
+        self.AddFieldValue(value, value_style)
 
     def AddLink(self, data_url, text):
         if self._DataExplorer.CreatePage(data_url):
-            self.AddText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = MakeWebUrl(data_url), text = html.escape(text)))
+            self.AddBodyText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = MakeWebUrl(data_url), text = html.escape(text)))
 
 
     #-------------------------------------------------------
     def Close(self):
-        self.AddText(self._PageTail)
-        return self._HtmlStream.getvalue()
+        self.AddBodyText("</body>")
+
+        self.AddHeaderText("</head>")
+        self.AddHeaderText(self._BodyHtmlStream.getvalue())
+        self.AddHeaderText("</html>")
+
+        return self._HeaderHtmlStream.getvalue()
 
 
 

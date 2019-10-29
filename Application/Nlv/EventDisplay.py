@@ -207,11 +207,13 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         return self.KeyToItem(key)
 
     def CreateDataExplorerPage(self, builder, location, page):
+        schema = self._TableSchema
+        if schema.UserDataExplorerOpen is not None:
+            schema.UserDataExplorerOpen(builder)
+
         builder.AddPageHeading("Event")
         if self._DocumentUrl is not None:
             builder.AddLink(self._DocumentUrl, "Show log ...")
-
-        item_key = self.ItemToKey(item)
 
         item_key = int(location)
         item = self.KeyToItem(item_key)
@@ -230,7 +232,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                 else:
                     text = display_value.Text
 
-                builder.AddField(field.Name, text)
+                if field.ExplorerFormatter is not None:
+                    with G_ScriptGuard("CreateFieldDataForExplorer"):
+                        field.ExplorerFormatter(builder, field.Name, text)
+                else:
+                    builder.AddField(field.Name, text)
+
+        if schema.UserDataExplorerClose is not None:
+            schema.UserDataExplorerClose(builder)
 
 
     #-------------------------------------------------------
@@ -359,9 +368,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                 wrapped_attr.SetBgColour(hiliter._Colour)
                 break
 
-        formatter = self._TableSchema[col_num].Formatter
-        if formatter is not None:
-            formatter(self.GetFieldValue(item_key, col_num), wrapped_attr)
+        view_formatter = self._TableSchema[col_num].ViewFormatter
+        if view_formatter is not None:
+            with G_ScriptGuard("GetFieldAttributesForDisplay"):
+                view_formatter(self.GetFieldValue(item_key, col_num), wrapped_attr)
 
         return True
 
