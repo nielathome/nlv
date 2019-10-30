@@ -172,7 +172,6 @@ class G_ConsoleLog(wx.Log):
 
 ## G_LogViewFrame ##########################################
 
-@G_Global.TimeFunction
 class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------

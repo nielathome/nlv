@@ -788,14 +788,20 @@ class G_SessionManager:
         dlg.Destroy()
 
         if path is not None:
-            def Open(path):
-                self.SessionReap()
-                self.SessionOpen(path)
+            self.DoCmdSessionOpen(path)
 
-            self.GetRootNode().WithFrameLocked(Open, path)
+
+    @G_Global.ProgressMeter
+    def DoCmdSessionOpen(self, path):
+        def Open(path):
+            self.SessionReap()
+            self.SessionOpen(path)
+
+        self.GetRootNode().WithFrameLocked(Open, path)
 
 
     #-------------------------------------------------------
+    @G_Global.ProgressMeter
     def OnCmdSessionRecent(self, idx):
         def Recent(idx):
             self.SessionReap()
@@ -1041,6 +1047,11 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
 
         dlg.Destroy()
 
+        self.DoCmdOpenLogfile(paths)
+
+
+    @G_Global.ProgressMeter
+    def DoCmdOpenLogfile(self, paths):
         for path in paths:
             builder_guid = None
             if len(self._BuilderNames) != 0:
@@ -1048,7 +1059,6 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
 
             relative_path = str(G_Global.RelPath(path).as_posix())
             self.GetSessionNode().AppendLog(relative_path, self.GetLogSchemaGuid(), builder_guid)
-
 
 
     #-------------------------------------------------------

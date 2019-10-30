@@ -232,12 +232,13 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                 else:
                     text = display_value.Text
 
-                if field.ExplorerFormatter is not None:
-                    with G_ScriptGuard("CreateFieldDataForExplorer"):
-                        field.ExplorerFormatter(builder, field.Name, text)
-                else:
-                    builder.AddField(field.Name, text)
-
+                if text is not None and len(text) != 0:
+                    if field.ExplorerFormatter is not None:
+                        with G_ScriptGuard("CreateFieldDataForExplorer"):
+                            field.ExplorerFormatter(builder, field.Name, text)
+                    else:
+                        builder.AddField(field.Name, text)
+                    
         if schema.UserDataExplorerClose is not None:
             schema.UserDataExplorerClose(builder)
 
