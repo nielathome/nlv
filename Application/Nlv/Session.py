@@ -131,25 +131,40 @@ class G_DataExplorerPageCache:
 
 ## G_DataExplorerPageBuilder ###############################
 
+def set_reg(name, reg_path, value):
+    import winreg
+
+    try:
+        winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE)
+        winreg.SetValueEx(registry_key, name, 0, winreg.REG_DWORD, value)
+        winreg.CloseKey(registry_key)
+        return True
+    except WindowsError:
+        return False
+
+def get_reg(name, reg_path):
+    try:
+        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_READ)
+        value, regtype = winreg.QueryValueEx(registry_key, name)
+        winreg.CloseKey(registry_key)
+        return value
+    except WindowsError:
+        return None
+
+def bodge_java():
+    import os
+    import sys
+
+    reg_path = r"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"
+    set_reg(os.path.basename(sys.executable), reg_path, 11001)
+
+
 def MakeWebUrl(data_url):
     return "memory:" + data_url
 
 class G_DataExplorerPageBuilder:
     """Support building pages to display in the data explorer"""
-
-    _PageHead = """
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <link rel="stylesheet" type="text/css" href="memory:style.css">
-        </head>
-        <body>
-    """
-
-    _PageTail = """
-        </body></html>
-    """
-
 
     #-------------------------------------------------------
     def __init__(self, data_explorer):
@@ -158,7 +173,45 @@ class G_DataExplorerPageBuilder:
         self._HeaderHtmlStream = io.StringIO()
         self.AddHeaderText("""
             <!DOCTYPE html>
-            <html>
+
+
+<style>
+
+.chart div {
+  font: 10px sans-serif;
+  background-color: steelblue;
+  text-align: right;
+  padding: 3px;
+  margin: 1px;
+  color: white;
+}
+
+</style>
+<div class="chart"></div>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script>
+
+var data = [4, 8, 15, 16, 23, 42];
+
+var x = d3.scale.linear()
+    .domain([0, d3.max(data)])
+    .range([0, 420]);
+
+d3.select(".chart")
+  .selectAll("div")
+    .data(data)
+  .enter().append("div")
+    .style("width", function(d) { return x(d) + "px"; })
+    .text(function(d) { return d; });
+
+</script>
+
+
+
+
+
+
+
             <head>
                 <link rel="stylesheet" type="text/css" href="memory:style.css">
         """)
@@ -218,6 +271,14 @@ class G_DataExplorerPageBuilder:
         return self._HeaderHtmlStream.getvalue()
 
 
+class MyHandler(wx.html2.WebViewFSHandler):
+    def __init__(self, name):
+        super().__init__(name)
+
+    def GetFile(self, url):
+        ret = super().GetFile(url)
+        return ret
+
 
 ## G_DataExplorer ##########################################
 
@@ -269,18 +330,25 @@ class G_DataExplorer:
         parent = frame.GetDataExplorer()
 
         # create web control
+        bodge_java()
         self._WebView = wx.html2.WebView.New(parent)
         self._WebView.EnableHistory(True)
-        self._WebView.EnableContextMenu(False)
+#        self._WebView.EnableContextMenu(False)
 
         # setup virtual filesystem: "memory:"
         wx.FileSystem.AddHandler(wx.MemoryFSHandler())
-        self._WebView.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
+        self._WebView.RegisterHandler(MyHandler("memory"))
+        #self._WebView.RegisterHandler(MyHandler("http"))
+        #self._WebView.RegisterHandler(MyHandler("https"))
 
         # can't seem to access local files from HTML; so workaround
         with open(str(Path( __file__ ).parent.joinpath("data.css"))) as css_file:
             css_str = css_file.read();
             wx.MemoryFSHandler.AddFile("style.css", css_str)
+
+        with open(str(Path( __file__ ).parent.joinpath("d3.min.js"))) as d3_file:
+            d3_str = d3_file.read();
+            wx.MemoryFSHandler.AddFileWithMimeType("d3.v3.min.js", d3_str, "text/javascript")
 
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
