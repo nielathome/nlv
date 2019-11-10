@@ -21,6 +21,12 @@ rem
 rem A Python virtual environment is required
 rem
 
+set TARGET=Nlv
+if "%1"=="--withdemo" (
+  set TARGET=NlvMythTV
+  shift
+)
+
 if not "%VIRTUAL_ENV%"=="" goto :INSTALL
 
 call .\iver.bat
@@ -34,7 +40,7 @@ echo Installing NLV to %ENVDIR%
 
 if not exist %ENVDIR% (
   echo ===============================================================================
-  echo Unable to locate Python virtual environment ... creating
+  echo Creating Python virtual environment
   python -m venv %ENVDIR%
 )
 
@@ -51,7 +57,7 @@ echo ===========================================================================
 echo ==== NLV
  
 python -m pip install --upgrade pip
-pip install --upgrade --find-links=. NlvMythTV
+pip install --upgrade --find-links=. %TARGET%
  
 for %%f in (plugin-*.bat) do (
   call %%~nf
@@ -69,4 +75,5 @@ if "%ENVDIR%"=="" goto :FINISH
 call %ENVDIR%\Scripts\Deactivate.bat
 
 :FINISH
+set TARGET=
 set ENVDIR=

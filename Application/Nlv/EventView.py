@@ -1326,7 +1326,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
 
     def OnTableSelectionChanged(self, item):
-        if item is None:
+        if item is None or item.GetID() is None:
             # ignore de-selection events
             return
 

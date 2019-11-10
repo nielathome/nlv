@@ -311,7 +311,7 @@ class G_Recogniser:
             4 (start_offset_ns INT) - offset from #2 to event start, in ns
             5 (finish_text TEXT) - finish time as text; in the same format as the logfile
             6 (finish_line_no INT) - finish line number
-            7 (finish_utc" INT) - UTC date/time of event finish, to previous whole second
+            7 (finish_utc INT) - UTC date/time of event finish, to previous whole second
             8 (finish_offset_ns INT) - offset from #6 to event finish, in ns
             9 (duration_ns INT) - event duration, in ns
         """
@@ -389,7 +389,7 @@ class G_Recogniser:
                     break
 
             if not got_finish:
-                logging.info("Event close not found (performance warning)")
+                logging.info("Match '{}' failed: Event close not found (performance warning)".format(str(match_finish_func)))
 
         user_analyser.End()
         user_analyser = None

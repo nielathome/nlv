@@ -14,7 +14,7 @@ h1 {
 }
 
 h2 {
-  font-size: medium;
+  font-size: small;
   color: steelblue;
   border-bottom: 1px solid grey;
   margin-top: 0.5em;
@@ -22,9 +22,14 @@ h2 {
 }
 
 p {
-  font-size: small;
+  font-size: smaller;
   margin-top: 0.1em;
   margin-bottom: 0.1em;
+}
+
+pre {
+  font-family: "Consolas", monospace;
+  font-size: smaller;
 }
 
 a {
