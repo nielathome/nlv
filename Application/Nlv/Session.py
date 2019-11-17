@@ -490,7 +490,8 @@ class G_DataExplorer:
 # {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
 # >>> # Use these commands in Python code to auto generate .py support
         from win32com.client import gencache
-        gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
+        module = gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
+        iid_map = module.NamesToIIDMap
 
         ctrl_hwnd = self._WebView.GetHandle()
         ie_hwnd = 0
@@ -509,15 +510,22 @@ class G_DataExplorer:
                     ob = pythoncom.ObjectFromLresult(result, pythoncom.IID_IDispatch, 0)
                     if ob is not None:
     # have to force the class ID - not really clear why; without this though, the returned value is a generic CDispatch for class ID '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
-                        doc = win32com.client.Dispatch(ob, resultCLSID = '{332C4425-26CB-11D0-B483-00C04FD90119}')
+                        clsid = iid_map["IHTMLDocument2"]
+                        doc = win32com.client.Dispatch(ob, resultCLSID = clsid)
                         if doc is not None:
-                            p = doc.bgColor
-                            #doc.fgColor = "red"
-                            b = doc.body
-                            s = b.style
-                            q = s.backgroundColor #  = "brown;"
-                            s.backgroundColor = "brown;"
-                            #doc.BackColor = "red"
+                            #p = doc.bgColor
+                            #b = doc.body
+                            #s = b.style
+                            #q = s.backgroundColor #  = "brown;"
+                            #s.backgroundColor = "brown;"
+
+                            elem = doc.createElement("script")
+                            script = win32com.client.Dispatch(elem, resultCLSID = iid_map["IHTMLScriptElement"])
+                            script.text = 'document.body.style.backgroundColor = "brown;";'
+                            body = doc.body
+                            parent = win32com.client.Dispatch(body, resultCLSID = iid_map["IHTMLDOMNode"])
+                            child = parent.appendChild(script)
+                            parent.removeChild(child)
                             return False
 
             return True
