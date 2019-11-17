@@ -276,6 +276,11 @@ class MyHandler(wx.html2.WebViewFSHandler):
         super().__init__(name)
 
     def GetFile(self, url):
+        protocol = "http://"
+        namespace = "memory:"
+        if url.find(protocol) == 0:
+            url = url.replace(protocol, namespace)
+
         ret = super().GetFile(url)
         return ret
 
@@ -348,13 +353,14 @@ class G_DataExplorer:
 
         with open(str(Path( __file__ ).parent.joinpath("d3.min.js"))) as d3_file:
             d3_str = d3_file.read();
-            wx.MemoryFSHandler.AddFileWithMimeType("d3.v3.min.js", d3_str, "text/javascript")
+            wx.MemoryFSHandler.AddFileWithMimeType("d3js.org/d3.v3.min.js", d3_str, "text/javascript")
 
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
 
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         parent.Bind(wx.html2.EVT_WEBVIEW_NAVIGATING, self.OnWebViewNavigating)
+        parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnLoaded)
 
         button = wx.Button(parent, style = wx.BU_NOTEXT)
         button.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_GO_BACK, wx.ART_TOOLBAR, (16, 16)))
@@ -470,6 +476,56 @@ class G_DataExplorer:
             node.MakeActive()
             self._LastWebUrl = web_url
 
+
+    def OnLoaded(self, event):
+        import pythoncom
+        import win32gui, win32con, win32com
+
+        web_url = event.GetURL()
+
+        a = int(self._WebView.GetNativeBackend())
+#        ob = pythoncom.ObjectFromLresult(a, pythoncom.IID_IDispatch, 0)
+
+
+# {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
+# >>> # Use these commands in Python code to auto generate .py support
+        from win32com.client import gencache
+        gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
+
+        ctrl_hwnd = self._WebView.GetHandle()
+        ie_hwnd = 0
+        for child_class in ['TabWindowClass', 'Shell DocObject View', 'Internet Explorer_Server']:
+            ie_hwnd = win32gui.FindWindowEx(ctrl_hwnd, 0, child_class, None)
+
+
+        hwnd_ret = [ 0 ]
+
+        def enum_callback(hwnd, hwnd_ret):
+            cls =  win32gui.GetClassName(hwnd)
+            if cls in ['TabWindowClass', 'Shell DocObject View', 'Internet Explorer_Server']:
+                msg = win32gui.RegisterWindowMessage("WM_HTML_GETOBJECT")
+                rc, result = win32gui.SendMessageTimeout(hwnd, msg, 0, 0, win32con.SMTO_ABORTIFHUNG, 1000)
+                if result != 0:
+                    ob = pythoncom.ObjectFromLresult(result, pythoncom.IID_IDispatch, 0)
+                    if ob is not None:
+    # have to force the class ID - not really clear why; without this though, the returned value is a generic CDispatch for class ID '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
+                        doc = win32com.client.Dispatch(ob, resultCLSID = '{332C4425-26CB-11D0-B483-00C04FD90119}')
+                        if doc is not None:
+                            p = doc.bgColor
+                            #doc.fgColor = "red"
+                            b = doc.body
+                            s = b.style
+                            q = s.backgroundColor #  = "brown;"
+                            s.backgroundColor = "brown;"
+                            #doc.BackColor = "red"
+                            return False
+
+            return True
+                
+        win32gui.EnumChildWindows(self._WebView.GetHandle(), enum_callback, hwnd_ret)
+
+
+    
         
 
 ## G_DataExplorerProvider #################################
