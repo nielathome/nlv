@@ -24,6 +24,8 @@ from weakref import ref as MakeWeakRef
 import wx
 
 # Application imports
+from .DataExplorer import G_DataExplorerProvider
+from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
 from .Logmeta import GetLogSchema
 from .MatchNode import G_MatchItem
@@ -37,8 +39,6 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
-from .Session import G_DataExplorerProvider
-from .Session import G_DataExplorerSync
 from .Session import G_SessionChildNode
 from .StyleNode import G_ColourNode
 from .StyleNode import G_MarkerStyleNode

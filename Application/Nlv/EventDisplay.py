@@ -28,6 +28,8 @@ from pathlib import Path
 matplotlib.use('WXAgg')
 
 # Application imports 
+from .DataExplorer import G_DataExplorerProvider
+from .DataExplorer import G_DataExplorerSync
 from .EventProjector import ConnectDb
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
@@ -36,8 +38,6 @@ from .EventProjector import G_ScriptGuard
 from .Project import G_Global
 from .Project import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
-from .Session import G_DataExplorerProvider
-from .Session import G_DataExplorerSync
 
 # wxWidgets imports
 import wx

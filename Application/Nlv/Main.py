@@ -257,9 +257,9 @@ class G_LogViewFrame(wx.Frame):
                 Name("Info")
         )
 
-        self._DataExplorer = wx.Panel(self._FramePanel)
+        self._DataExplorerPanel = wx.Panel(self._FramePanel)
         self._AuiManager.AddPane(
-            self._DataExplorer,
+            self._DataExplorerPanel,
             aui.AuiPaneInfo().
                 Right().Layer(2).BestSize((300, 700)).MinSize((240, -1)).
                 Floatable(True).FloatingSize((300, 700)).
@@ -292,8 +292,8 @@ class G_LogViewFrame(wx.Frame):
     def GetInfoPanel(self):
         return self._InfoPanel
 
-    def GetDataExplorer(self):
-        return self._DataExplorer
+    def GetDataExplorerPanel(self):
+        return self._DataExplorerPanel
 
 
     #-------------------------------------------------------

@@ -24,6 +24,8 @@ import wx.stc
 from wx.lib.expando import ExpandoTextCtrl
 
 # Application imports 
+from .DataExplorer import G_DataExplorerProvider
+from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
@@ -39,8 +41,6 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
-from .Session import G_DataExplorerProvider
-from .Session import G_DataExplorerSync
 from .StyleNode import G_ColourNode
 from .StyleNode import G_ColourTraits
 from .StyleNode import G_EnabledColourNode
