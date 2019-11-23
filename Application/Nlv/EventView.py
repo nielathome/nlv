@@ -1567,8 +1567,9 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
     #-------------------------------------------------------
     def PushParameterValues(self, activate_chart):
         chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
-        values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
-        chart_ctrl.Update(parameters = values)
+        if chart_ctrl is not None:
+            values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
+            chart_ctrl.Update(parameters = values)
 
 
     def OnDynamicCtrl(self, event = None):

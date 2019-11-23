@@ -112,35 +112,6 @@ class G_DataExplorerPageCache:
 
 ## G_DataExplorerPageBuilder ###############################
 
-def set_reg(name, reg_path, value):
-    import winreg
-
-    try:
-        winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
-        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE)
-        winreg.SetValueEx(registry_key, name, 0, winreg.REG_DWORD, value)
-        winreg.CloseKey(registry_key)
-        return True
-    except WindowsError:
-        return False
-
-def get_reg(name, reg_path):
-    try:
-        registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_READ)
-        value, regtype = winreg.QueryValueEx(registry_key, name)
-        winreg.CloseKey(registry_key)
-        return value
-    except WindowsError:
-        return None
-
-def bodge_java():
-    import os
-    import sys
-
-    reg_path = r"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"
-    set_reg(os.path.basename(sys.executable), reg_path, 11001)
-
-
 def MakeWebUrl(data_url):
     return "memory:" + data_url
 
@@ -154,45 +125,6 @@ class G_DataExplorerPageBuilder:
         self._HeaderHtmlStream = io.StringIO()
         self.AddHeaderText("""
             <!DOCTYPE html>
-
-
-<style>
-
-.chart div {
-  font: 10px sans-serif;
-  background-color: steelblue;
-  text-align: right;
-  padding: 3px;
-  margin: 1px;
-  color: white;
-}
-
-</style>
-<div class="chart"></div>
-<script src="http://d3js.org/d3.v3.min.js"></script>
-<script>
-
-var data = [4, 8, 15, 16, 23, 42];
-
-var x = d3.scale.linear()
-    .domain([0, d3.max(data)])
-    .range([0, 420]);
-
-d3.select(".chart")
-  .selectAll("div")
-    .data(data)
-  .enter().append("div")
-    .style("width", function(d) { return x(d) + "px"; })
-    .text(function(d) { return d; });
-
-</script>
-
-
-
-
-
-
-
             <head>
                 <link rel="stylesheet" type="text/css" href="memory:style.css">
         """)
@@ -252,19 +184,6 @@ d3.select(".chart")
         return self._HeaderHtmlStream.getvalue()
 
 
-class MyHandler(wx.html2.WebViewFSHandler):
-    def __init__(self, name):
-        super().__init__(name)
-
-    def GetFile(self, url):
-        protocol = "http://"
-        namespace = "memory:"
-        if url.find(protocol) == 0:
-            url = url.replace(protocol, namespace)
-
-        ret = super().GetFile(url)
-        return ret
-
 
 ## G_DataExplorer ##########################################
 
@@ -316,32 +235,24 @@ class G_DataExplorer:
         parent = frame.GetDataExplorerPanel()
 
         # create web control
-        bodge_java()
         self._WebView = wx.html2.WebView.New(parent)
         self._WebView.EnableHistory(True)
-#        self._WebView.EnableContextMenu(False)
+        self._WebView.EnableContextMenu(False)
 
         # setup virtual filesystem: "memory:"
         wx.FileSystem.AddHandler(wx.MemoryFSHandler())
-        self._WebView.RegisterHandler(MyHandler("memory"))
-        #self._WebView.RegisterHandler(MyHandler("http"))
-        #self._WebView.RegisterHandler(MyHandler("https"))
+        self._WebView.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
 
         # can't seem to access local files from HTML; so workaround
         with open(str(Path( __file__ ).parent.joinpath("data.css"))) as css_file:
             css_str = css_file.read();
             wx.MemoryFSHandler.AddFile("style.css", css_str)
 
-        with open(str(Path( __file__ ).parent.joinpath("d3.min.js"))) as d3_file:
-            d3_str = d3_file.read();
-            wx.MemoryFSHandler.AddFileWithMimeType("d3js.org/d3.v3.min.js", d3_str, "text/javascript")
-
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
 
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         parent.Bind(wx.html2.EVT_WEBVIEW_NAVIGATING, self.OnWebViewNavigating)
-        parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnLoaded)
 
         button = wx.Button(parent, style = wx.BU_NOTEXT)
         button.SetBitmap(wx.ArtProvider.GetBitmap(wx.ART_GO_BACK, wx.ART_TOOLBAR, (16, 16)))
@@ -457,65 +368,7 @@ class G_DataExplorer:
             node.MakeActive()
             self._LastWebUrl = web_url
 
-
-    def OnLoaded(self, event):
-        import pythoncom
-        import win32gui, win32con, win32com
-
-        web_url = event.GetURL()
-
-        a = int(self._WebView.GetNativeBackend())
-#        ob = pythoncom.ObjectFromLresult(a, pythoncom.IID_IDispatch, 0)
-
-
-# {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
-# >>> # Use these commands in Python code to auto generate .py support
-        from win32com.client import gencache
-        module = gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
-        iid_map = module.NamesToIIDMap
-
-        ctrl_hwnd = self._WebView.GetHandle()
-        ie_hwnd = 0
-        for child_class in ['TabWindowClass', 'Shell DocObject View', 'Internet Explorer_Server']:
-            ie_hwnd = win32gui.FindWindowEx(ctrl_hwnd, 0, child_class, None)
-
-
-        hwnd_ret = [ 0 ]
-
-        def enum_callback(hwnd, hwnd_ret):
-            cls =  win32gui.GetClassName(hwnd)
-            if cls in ['TabWindowClass', 'Shell DocObject View', 'Internet Explorer_Server']:
-                msg = win32gui.RegisterWindowMessage("WM_HTML_GETOBJECT")
-                rc, result = win32gui.SendMessageTimeout(hwnd, msg, 0, 0, win32con.SMTO_ABORTIFHUNG, 1000)
-                if result != 0:
-                    ob = pythoncom.ObjectFromLresult(result, pythoncom.IID_IDispatch, 0)
-                    if ob is not None:
-    # have to force the class ID - not really clear why; without this though, the returned value is a generic CDispatch for class ID '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
-                        clsid = iid_map["IHTMLDocument2"]
-                        doc = win32com.client.Dispatch(ob, resultCLSID = clsid)
-                        if doc is not None:
-                            #p = doc.bgColor
-                            #b = doc.body
-                            #s = b.style
-                            #q = s.backgroundColor #  = "brown;"
-                            #s.backgroundColor = "brown;"
-
-                            elem = doc.createElement("script")
-                            script = win32com.client.Dispatch(elem, resultCLSID = iid_map["IHTMLScriptElement"])
-                            script.text = 'document.body.style.backgroundColor = "brown;";'
-                            body = doc.body
-                            parent = win32com.client.Dispatch(body, resultCLSID = iid_map["IHTMLDOMNode"])
-                            child = parent.appendChild(script)
-                            parent.removeChild(child)
-                            return False
-
-            return True
-                
-        win32gui.EnumChildWindows(self._WebView.GetHandle(), enum_callback, hwnd_ret)
-
-
-    
-        
+       
 
 ## G_DataExplorerProvider #################################
 
