@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -33,17 +33,47 @@ class G_Shell:
     #-------------------------------------------------------
 
     # overall document version; change this when non-backwards
-    # compatible changes are made to the document structure
-    NlvDocumentVersion = 5
+    # compatible changes are made to the document structure or
+    # application
+    _PublicVersion = 3
+
+    _VersionData = {
+        # document-public-version : document-internal-version, icon-file
+        1 : [4, "if_puzzle_yellow_10505.ico"],
+        2 : [5, "if_puzzle_yellow_10505.ico"],
+        3 : [6, "if_puzzle_red_10504.ico"]
+    }
 
 
     #-------------------------------------------------------
-    def Extension():
-        user_ver = __class__.NlvDocumentVersion - 3
-        if user_ver == 1:
+    @classmethod
+    def GetDocumentVersion(cls):
+        return cls._VersionData[cls._PublicVersion][0]
+
+
+    @classmethod
+    def GetPackageDir(cls):
+        return Path( __file__ ).parent
+
+
+    @classmethod
+    def GetIconPath(cls):
+        filename = cls._VersionData[cls._PublicVersion][1]
+        return cls.GetPackageDir() / filename
+
+
+    @classmethod
+    def GetScriptPath(cls):
+        return cls.GetPackageDir().parent.parent.parent / "Scripts" / "nlvw.exe"
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def Extension(cls):
+        if cls._PublicVersion == 1:
             return ".nlv"
         else:
-            return ".nlv{}".format(user_ver)
+            return ".nlv{}".format(cls._PublicVersion)
 
 
     #-------------------------------------------------------
@@ -90,21 +120,8 @@ class G_Shell:
 
 
     #-------------------------------------------------------
-    def GetPackageDir(self):
-        return Path( __file__ ).parent
-
-
-    def GetIconPath(self):
-        return self.GetPackageDir() / "if_puzzle_yellow_10505.ico"
-
-
-    def GetScriptPath(self):
-        return self.GetPackageDir().parent.parent.parent / "Scripts" / "nlvw.exe"
-
-
-    #-------------------------------------------------------
     def _MakeProgId(self):
-        return "NLV.Session.{}".format(self.NlvDocumentVersion)
+        return "NLV.Session.{}".format(self.GetDocumentVersion())
 
 
     def _SetupProgId(self):
@@ -144,7 +161,7 @@ class G_Shell:
 
         menu_dir = shell.SHGetFolderPath (0, shellcon.CSIDL_STARTMENU, 0, 0)
         persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
-        persist_file.Save(os.path.join(menu_dir, "Programs", "NLV.lnk"), 0)
+        persist_file.Save(os.path.join(menu_dir, "Programs", "NLV.{}.lnk".format(self._PublicVersion)), 0)
 
 
     #-------------------------------------------------------

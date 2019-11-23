@@ -1325,7 +1325,7 @@ class G_RootNode(G_TreeNode):
 
     #-------------------------------------------------------
     def _IsKnownDocumentVersion(self):
-        return self.GetDocument().get("version", 0) == str(G_Shell.NlvDocumentVersion)
+        return self.GetDocument().get("version", 0) == str(G_Shell.GetDocumentVersion())
 
 
     #-------------------------------------------------------
@@ -1364,7 +1364,7 @@ class G_RootNode(G_TreeNode):
 
     def NotifyPreSave(self):
         # ensure newly created documents have the right version
-        self.GetDocument().set("version", str(G_Shell.NlvDocumentVersion))
+        self.GetDocument().set("version", str(G_Shell.GetDocumentVersion()))
 
 
 

@@ -190,7 +190,7 @@ class G_LogViewFrame(wx.Frame):
         self.SetMinSize((640,480))
         self.Centre(wx.BOTH)
 
-        icon_path = Path( __file__ ).parent.joinpath("if_puzzle_yellow_10505.ico")
+        icon_path = G_Shell.GetIconPath()
         if icon_path.exists():
             self.SetIcons(wx.IconBundle(str(icon_path)))
 
