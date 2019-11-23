@@ -24,6 +24,9 @@ import win32api
 import win32con
 import winnt
 
+# Application imports
+from .Global import G_Global
+
 
 
 ## G_Shell #################################################
@@ -46,14 +49,14 @@ class G_Shell:
 
 
     #-------------------------------------------------------
+    @staticmethod
+    def GetPackageDir():
+        return G_Global.GetInstallDir()
+
+
     @classmethod
     def GetDocumentVersion(cls):
         return cls._VersionData[cls._PublicVersion][0]
-
-
-    @classmethod
-    def GetPackageDir(cls):
-        return Path( __file__ ).parent
 
 
     @classmethod

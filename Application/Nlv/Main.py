@@ -31,14 +31,14 @@ import wx
 import wx.lib.agw.aui as aui
 
 # Application imports
+from Nlv.Global import G_Global
+from Nlv.Global import G_PerfTimerScope
 import Nlv.Session
 import Nlv.Logfile
 import Nlv.View
 import Nlv.EventView
 from Nlv.Extension import LoadExtensions
-from Nlv.Project import G_Global
 from Nlv.Project import G_Project
-from Nlv.Project import G_PerfTimerScope
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
 

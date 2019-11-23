@@ -36,8 +36,8 @@ from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
 from .EventProjector import G_ScriptGuard
-from .Project import G_Global
-from .Project import G_PerfTimerScope
+from .Global import G_Global
+from .Global import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
 
 # wxWidgets imports

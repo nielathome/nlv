@@ -22,11 +22,11 @@ from pathlib import Path
 import sqlite3
 
 # Application imports 
+from .Global import G_Global
+from .Global import G_PerfTimerScope
 from .Logmeta import G_FieldSchemata
-from .Project import G_Project
 from .MatchNode import G_MatchItem
-from .Project import G_Global
-from .Project import G_PerfTimerScope
+from .Project import G_Project
 
 # wxWidgets imports
 import wx

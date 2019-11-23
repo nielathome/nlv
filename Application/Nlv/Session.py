@@ -30,9 +30,9 @@ from .DataExplorer import G_DataExplorer
 from .DataExplorer import G_DataExplorerChildNode
 from .Document import D_Document
 from .Extension import GetExtensionNames
+from .Global import G_Const
+from .Global import G_Global
 from .Logmeta import GetLogSchema, GetLogSchemataNames
-from .Project import G_Const
-from .Project import G_Global
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_TreeNode

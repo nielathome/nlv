@@ -27,7 +27,8 @@ import wx
 import wx.html2
 
 # Application imports
-from .Project import G_Const
+from .Global import G_Const
+from .Global import G_Global
 
 
 
@@ -244,7 +245,7 @@ class G_DataExplorer:
         self._WebView.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
 
         # can't seem to access local files from HTML; so workaround
-        with open(str(Path( __file__ ).parent.joinpath("data.css"))) as css_file:
+        with open(str(G_Global.GetInstallDir() / "data.css")) as css_file:
             css_str = css_file.read();
             wx.MemoryFSHandler.AddFile("style.css", css_str)
 

@@ -51,13 +51,13 @@ from .EventDisplay import G_MetricsViewCtrl
 from .EventDisplay import G_TableViewCtrl
 from .EventProjector import G_Analyser
 from .EventProjector import G_ScriptGuard
+from .Global import G_Const
+from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
 from .Logfile import G_TabDisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
-from .Project import G_Const
-from .Project import G_Global
 from .Project import G_TabContainedNode
 from .Project import G_TabContainerNode
 from .Project import G_ListContainedNode

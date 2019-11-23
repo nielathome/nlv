@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,8 +27,8 @@ import wx.html
 
 # Application imports
 from .Document import D_Document
-from .Project import G_Const
-from .Project import G_Global
+from .Global import G_Const
+from .Global import G_Global
 from .Project import G_WindowInfo
 
 # Content provider interface

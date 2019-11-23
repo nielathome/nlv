@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,11 +27,11 @@ import wx
 from .DataExplorer import G_DataExplorerProvider
 from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
+from .Global import G_Const
+from .Global import G_Global
 from .Logmeta import GetLogSchema
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
-from .Project import G_Const
-from .Project import G_Global
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_ListContainedNode
