@@ -22,6 +22,7 @@ import os
 from pathlib import Path
 import pythoncom
 import sys
+from uuid import uuid4
 import win32com
 import win32con
 import win32gui
@@ -858,63 +859,21 @@ class G_ParameterCollector:
         return self._Params
 
 
+## G_ChartViewCtrlProxy ####################################
+
+class G_ChartViewCtrlProxy:
+
+    #-------------------------------------------------------
+    def __init__(self, view_ctrl):
+        self._ViewCtrl = view_ctrl
+
+
+    def ExecuteScript(self, script):
+        self._ViewCtrl.EnqueueScript(script)
+
+
 
 ## G_ChartViewCtrl #########################################
-
-#class MyHandler(wx.html2.WebViewFSHandler):
-#    def __init__(self, name):
-#        super().__init__(name)
-
-#    def GetFile(self, url):
-#        protocol = "http://"
-#        namespace = "memory:"
-#        if url.find(protocol) == 0:
-#            url = url.replace(protocol, namespace)
-
-#        ret = super().GetFile(url)
-#        return ret
-
-# temporary
-page = """
-<!DOCTYPE html>
-<style>
-.chart div {
-  font: 10px sans-serif;
-  background-color: steelblue;
-  text-align: right;
-  padding: 3px;
-  margin: 1px;
-  color: white;
-}
-</style>
-
-<div class="chart"></div>
-
-<script src="http://d3js.org/d3.v3.min.js"></script>
-
-<script>
-
-var data = [4, 8, 15, 16, 23, 42];
-
-var x = d3.scale.linear()
-    .domain([0, d3.max(data)])
-    .range([0, 420]);
-
-d3.select(".chart")
-  .selectAll("div")
-    .data(data)
-  .enter().append("div")
-    .style("width", function(d) { return x(d) + "px"; })
-    .text(function(d) { return d; });
-
-</script>
-
-<head>
-</head>
-<body>
-</body>
-"""
-
 
 class G_ChartViewCtrl(wx.Panel):
 
@@ -963,9 +922,6 @@ class G_ChartViewCtrl(wx.Panel):
 
         cls._InitCharting = False
 
-        wx.MemoryFSHandler.AddFileWithMimeType("test.html", page, "text/html")
-
-
 
     #-------------------------------------------------------
     def __init__(self, parent, chart_designer, metrics_db_path, table_view_ctrl, error_reporter):
@@ -978,6 +934,8 @@ class G_ChartViewCtrl(wx.Panel):
 
         self._DoRealise = True
         self._ParamaterValues = dict()
+        self._ScriptQueue = []
+        self._PageName = "{}.html".format(str(uuid4()).replace("-",""))
 
         #handler = wx.EvtHandler()
         #handler.Bind(wx.EVT_PAINT, self.OnPaint)
@@ -991,26 +949,32 @@ class G_ChartViewCtrl(wx.Panel):
         parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 
         self._Figure.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
-        self._Figure.LoadURL("memory:test.html")
+        with G_ScriptGuard("Setup", self._ErrorReporter):
+            page = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
+            wx.MemoryFSHandler.AddFileWithMimeType(self._PageName, page, "text/html")
+            self._Figure.LoadURL("memory:{}".format(self._PageName))
 
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
         vsizer.Add(self._Figure, proportion = 1, flag = wx.EXPAND)
         self.SetSizer(vsizer)
 
-        # capture interface
-        self._IHTMLDocument2 = None
+## capture interface
+#self._IHTMLDocument2 = None
 
 
 
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
-        test = self.GetIHTMLDocument2()
+        self.RunScriptQueue()
 
 
+    #-------------------------------------------------------
     def GetIHTMLDocument2(self):
 
-        def enum_callback(hwnd, me):
+        data = [None]
+
+        def enum_callback(hwnd, data):
             cls =  win32gui.GetClassName(hwnd)
             if cls in ['TabWindowClass', 'Shell DocObject View', 'Internet Explorer_Server']:
                 msg = win32gui.RegisterWindowMessage("WM_HTML_GETOBJECT")
@@ -1021,18 +985,54 @@ class G_ChartViewCtrl(wx.Panel):
                         # have to force the class ID - not really clear why; without this though,
                         # the returned value is a generic CDispatch for class ID 
                         # '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
-                        clsid = me._IIDMap["IHTMLDocument2"]
+                        clsid = self._IIDMap["IHTMLDocument2"]
                         document = win32com.client.Dispatch(object, resultCLSID = clsid)
                         if document is not None:
-                            self._IHTMLDocument2 = document
+                            data[0] = document
                             return False
 
             return True
                 
-        if self._IHTMLDocument2 is None:
-            win32gui.EnumChildWindows(self._Figure.GetHandle(), enum_callback, self)
+        win32gui.EnumChildWindows(self._Figure.GetHandle(), enum_callback, data)
+        return data[0]
 
-        return self._IHTMLDocument2
+
+    #-------------------------------------------------------
+    def EnqueueScript(self, script):
+        last_script = None
+        last_idx = len(self._ScriptQueue) - 1
+
+        if last_idx >= 0:
+            last_script = self._ScriptQueue[last_idx]
+
+        if script != last_script:
+            self._ScriptQueue.append(script)
+#            self.RunScriptQueue()
+        
+
+    def RunScriptQueue(self):
+        doc = self.GetIHTMLDocument2()
+        if doc is None:
+            return
+
+        for script_text in self._ScriptQueue:
+            elem = doc.createElement("script")
+            script_elem = win32com.client.Dispatch(elem, resultCLSID = self._IIDMap["IHTMLScriptElement"])
+            script_elem.text = script_text
+
+            # add script to DOM; will execute
+            node = win32com.client.Dispatch(doc.body, resultCLSID = self._IIDMap["IHTMLDOMNode"])
+            script_node = node.appendChild(script_elem)
+
+            # remove script from DOM; don't need it any more
+            node.removeChild(script_node)
+
+#        self._ScriptQueue = []
+
+
+
+
+
 
     #                    if doc is not None:
     #                        #p = doc.bgColor
@@ -1053,7 +1053,7 @@ class G_ChartViewCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def PreClose(self):
-        pass
+        wx.MemoryFSHandler.RemoveFile(self._PageName)
 #        self.PopEventHandler(True)
 
     #def OnPaint(self, evt):
@@ -1090,10 +1090,10 @@ class G_ChartViewCtrl(wx.Panel):
             if connection is not None:
                 cursor = connection.cursor()
                 selection = self._TableViewCtrl.GetSelectedItems()
-#                self._Figure.clear()
 
-                #with G_PerfTimerScope("Design"):
-                #    self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
+#                with G_PerfTimerScope("Realise"):
+                figure = G_ChartViewCtrlProxy(self)
+                self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, figure, connection, cursor, self._ParamaterValues, selection)
 
                 #with G_PerfTimerScope("Draw"):
                 #    self.draw()
@@ -1111,8 +1111,11 @@ class G_ChartViewCtrl(wx.Panel):
             self._DoRealise = True
             self._ParamaterValues = parameters.copy()
 
-        if self.IsShown():
-            self.Refresh()
+        #if self.IsShown():
+        #    self.Refresh()
+
+        if self._DoRealise:
+            self.Realise()
             
 
 
@@ -1150,9 +1153,11 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
         pane_sizer = pane.GetSizer()
 
         if pane_sizer.IsEmpty():
-            return
+            return None
 
         sizer_items = pane_sizer.GetChildren()
+        if chart_no >= len(sizer_items):
+            return None
 
         if activate:
             pane_sizer.ShowItems(True)

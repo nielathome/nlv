@@ -15,41 +15,80 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-#import collections
-#from matplotlib import cm
-#import numpy as np
-
-
 
 ## BarChart ####################################################
 
 class BarChart:
 
+    _Page = """<!DOCTYPE html>
+    <style>
+    .chart div {
+      font: 10px sans-serif;
+      background-color: steelblue;
+      text-align: right;
+      padding: 3px;
+      margin: 1px;
+      color: white;
+    }
+    </style>
+
+    <div class="chart"></div>
+
+    <script src="http://d3js.org/d3.v3.min.js"></script>
+
+    <script>
+
+    function CreateChart(data) {
+        var x = d3.scale.linear()
+            .domain([0, d3.max(data)])
+            .range([0, 420]);
+
+        d3.select(".chart")
+          .selectAll("div")
+            .data(data)
+          .enter().append("div")
+            .style("width", function(d) { return x(d) + "px"; })
+            .text(function(d) { return d; });
+    }
+
+    </script>
+
+    <head>
+    </head>
+    <body>
+Some text
+    </body>
+    """
+
     #-----------------------------------------------------------
-    def __init__(self, category_field, value_field, std_field = None):
+    def __init__(self, category_field, value_field):
         self._CategoryField = category_field
         self._ValueField = value_field
-        self._StdField = std_field
 
 
     #-----------------------------------------------------------
     def DefineParameters(self, params, connection, cursor, selection):
-        params.AddBool("show_std", "Show error bars", True)
+        pass
+
+
+    #-----------------------------------------------------------
+    @classmethod
+    def Setup(cls, name):
+        return cls._Page
 
 
     #-----------------------------------------------------------
     def Realise(self, name, figure, connection, cursor, param_values, selection):
         labels = []
         values = []
-        stds = None
 
         cursor.execute("""
             SELECT
                 {category},
                 {value},
-                log_row_no
+                event_id
             FROM
-                filtered_projection
+                display
             """.format(category = self._CategoryField, value = self._ValueField))
 
         hilites = []
@@ -58,23 +97,24 @@ class BarChart:
             values.append(row[1])
             if row[2] in selection:
                 hilites.append(idx)
-#            stds.append(metrics.GetFieldValueFloat(i, self._StdField))
 
-        #if not param_values.get("show_std", True):
-        #    stds = None
+        figure.ExecuteScript("CreateChart({});".format(repr(values)))
 
-        x = np.arange(len(labels))
-        axes = figure.add_subplot(111)
-        axes.tick_params(labelsize = "small")
-        bars = axes.bar(x, values, yerr = stds)
-        axes.set_ylabel('Average (s)')
-        axes.set_xticks(x)
-        axes.set_xticklabels(labels, {"rotation": 75})
+#        figure.ExecuteScript("CreateChart([4, 8, 15, 16, 23, 42]);")
+#        figure.ExecuteScript('document.body.style.backgroundColor = "brown;";')
 
-        for col in hilites:
-            bars[col].set_edgecolor("black")
+        #x = np.arange(len(labels))
+        #axes = figure.add_subplot(111)
+        #axes.tick_params(labelsize = "small")
+        #bars = axes.bar(x, values, yerr = stds)
+        #axes.set_ylabel('Average (s)')
+        #axes.set_xticks(x)
+        #axes.set_xticklabels(labels, {"rotation": 75})
 
-        figure.subplots_adjust(bottom = 0.25)
+        #for col in hilites:
+        #    bars[col].set_edgecolor("black")
+
+        #figure.subplots_adjust(bottom = 0.25)
 
 
 
