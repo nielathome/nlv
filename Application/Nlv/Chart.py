@@ -100,21 +100,14 @@ Some text
 
         figure.ExecuteScript("CreateChart({});".format(repr(values)))
 
-#        figure.ExecuteScript("CreateChart([4, 8, 15, 16, 23, 42]);")
 #        figure.ExecuteScript('document.body.style.backgroundColor = "brown;";')
 
-        #x = np.arange(len(labels))
-        #axes = figure.add_subplot(111)
-        #axes.tick_params(labelsize = "small")
-        #bars = axes.bar(x, values, yerr = stds)
         #axes.set_ylabel('Average (s)')
-        #axes.set_xticks(x)
         #axes.set_xticklabels(labels, {"rotation": 75})
 
         #for col in hilites:
         #    bars[col].set_edgecolor("black")
 
-        #figure.subplots_adjust(bottom = 0.25)
 
 
 

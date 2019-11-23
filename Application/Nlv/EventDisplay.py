@@ -946,6 +946,8 @@ class G_ChartViewCtrl(wx.Panel):
         self._Figure = wx.html2.WebView.New(self)
         self._Figure.EnableHistory(False)
 #        self._Figure.EnableContextMenu(False)
+
+        self._PageLoadSkipCount = 1
         parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 
         self._Figure.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
@@ -959,14 +961,14 @@ class G_ChartViewCtrl(wx.Panel):
         vsizer.Add(self._Figure, proportion = 1, flag = wx.EXPAND)
         self.SetSizer(vsizer)
 
-## capture interface
-#self._IHTMLDocument2 = None
-
 
 
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
-        self.RunScriptQueue()
+        if self._PageLoadSkipCount == 0:
+            self.RunScriptQueue()
+        else:
+            self._PageLoadSkipCount -= 1
 
 
     #-------------------------------------------------------
@@ -1007,7 +1009,7 @@ class G_ChartViewCtrl(wx.Panel):
 
         if script != last_script:
             self._ScriptQueue.append(script)
-#            self.RunScriptQueue()
+            self.RunScriptQueue()
         
 
     def RunScriptQueue(self):
@@ -1027,28 +1029,7 @@ class G_ChartViewCtrl(wx.Panel):
             # remove script from DOM; don't need it any more
             node.removeChild(script_node)
 
-#        self._ScriptQueue = []
-
-
-
-
-
-
-    #                    if doc is not None:
-    #                        #p = doc.bgColor
-    #                        #b = doc.body
-    #                        #s = b.style
-    #                        #q = s.backgroundColor #  = "brown;"
-    #                        #s.backgroundColor = "brown;"
-
-    #                        elem = doc.createElement("script")
-    #                        script = win32com.client.Dispatch(elem, resultCLSID = iid_map["IHTMLScriptElement"])
-    #                        script.text = 'document.body.style.backgroundColor = "brown;";'
-    #                        body = doc.body
-    #                        parent = win32com.client.Dispatch(body, resultCLSID = iid_map["IHTMLDOMNode"])
-    #                        child = parent.appendChild(script)
-    #                        parent.removeChild(child)
-
+        self._ScriptQueue = []
 
 
     #-------------------------------------------------------
