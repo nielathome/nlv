@@ -45,37 +45,42 @@
 
         // Update the X axis
         x.domain(data.map(function(d) { return d.Country; }))
-        xAxis.call(d3.axisBottom(x))
+
+        xAxis
+          .call(d3.axisBottom(x))
           .selectAll("text")
             .attr("transform", "translate(-10,0)rotate(-45)")
             .style("text-anchor", "end");
 
         // Update the Y axis
         y.domain([0, d3.max(data, function (d) { return d.Value })]);
-        yAxis.transition().duration(1000).call(d3.axisLeft(y));
+
+        yAxis
+          .transition()
+          .duration(1000)
+          .call(d3.axisLeft(y));
 
 
-        // Create the u variable
+        // bind tha data to a set of bars
         var u = svg.selectAll("rect")
           .data(data)
 
         u
           .enter()
-          .append("rect") // Add a new rect for each new elements
-          .merge(u) // get the already existing elements as well
-          .transition() // and apply changes to all of them
+          .append("rect")   // add a new rect for each new elements
+          .merge(u)         // get the already existing elements as well
+          .transition()     // and apply changes to all of them
           .duration(1000)
             .attr("x", function (d) { return x(d.Country); })
             .attr("y", function (d) { return y(d.Value); })
             .attr("width", x.bandwidth())
             .attr("height", function (d) { return height - y(d.Value); })
-            .attr("fill", "#69b3a2")
+            .attr("fill", function (d) { return d.Colour; })
 
-        // If less group in the new dataset, I delete the ones not in use anymore
+        // remove unused bars
         u
           .exit()
           .remove()
-
     }
 
 </script>

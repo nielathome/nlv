@@ -53,11 +53,11 @@ class BarChart:
             """.format(category = self._CategoryField, value = self._ValueField))
 
         data = []
-        hilites = []
         for idx, row in enumerate(cursor):
-            data.append(dict(zip(["Country", "Value"], [row[0], row[1]])))
+            colour = "#69b3a2"
             if row[2] in selection:
-                hilites.append(idx)
+                colour = "red"
+            data.append(dict(zip(["Country", "Value", "Colour"], [row[0], row[1], colour])))
 
         js = json.dumps(data)
         figure.ExecuteScript("CreateChart('{}');".format(js))
