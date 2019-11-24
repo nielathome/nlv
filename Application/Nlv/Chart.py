@@ -15,6 +15,10 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
+# Python imports
+import json
+
+        
 
 ## BarChart ####################################################
 
@@ -39,9 +43,6 @@ class BarChart:
 
     #-----------------------------------------------------------
     def Realise(self, name, figure, connection, cursor, param_values, selection):
-        labels = []
-        values = []
-
         cursor.execute("""
             SELECT
                 {category},
@@ -51,19 +52,17 @@ class BarChart:
                 display
             """.format(category = self._CategoryField, value = self._ValueField))
 
+        data = []
         hilites = []
         for idx, row in enumerate(cursor):
-            labels.append(row[0])
-            values.append(row[1])
+            data.append(dict(zip(["Country", "Value"], [row[0], row[1]])))
             if row[2] in selection:
                 hilites.append(idx)
 
-        figure.ExecuteScript("CreateChart({});".format(repr(values)))
-
-#        figure.ExecuteScript('document.body.style.backgroundColor = "brown;";')
+        js = json.dumps(data)
+        figure.ExecuteScript("CreateChart('{}');".format(js))
 
         #axes.set_ylabel('Average (s)')
-        #axes.set_xticklabels(labels, {"rotation": 75})
 
         #for col in hilites:
         #    bars[col].set_edgecolor("black")
