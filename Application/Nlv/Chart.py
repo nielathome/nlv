@@ -54,18 +54,18 @@ class BarChart:
 
         data = []
         for idx, row in enumerate(cursor):
-            colour = "#69b3a2"
+            colour = "DarkSlateBlue"
             if row[2] in selection:
-                colour = "red"
-            data.append(dict(zip(["Country", "Value", "Colour"], [row[0], row[1], colour])))
+                colour = "DarkOrange"
+            data.append(dict(zip(["category", "value", "colour"], [row[0], row[1], colour])))
 
-        js = json.dumps(data)
-        figure.ExecuteScript("CreateChart('{}');".format(js))
+        # chart transition time in msec
+        switch_time = 1000
+        if len(selection) != 0:
+            switch_time = 250
 
-        #axes.set_ylabel('Average (s)')
-
-        #for col in hilites:
-        #    bars[col].set_edgecolor("black")
+        json_text = json.dumps(data)
+        figure.ExecuteScript("CreateChart('{}', '{}', '{}', '{}', {});".format(name, self._CategoryField, self._ValueField, json_text, switch_time))
 
 
 

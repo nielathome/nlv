@@ -1,4 +1,4 @@
-﻿<!-- Code originally from d3-graph-gallery.com -->
+<!-- Code originally from d3-graph-gallery.com -->
 <!DOCTYPE html>
 <meta charset="utf-8">
 
@@ -12,75 +12,99 @@
 
     // set the dimensions and margins of the graph
     var margin = {top: 30, right: 30, bottom: 70, left: 60},
-        width = 460 - margin.left - margin.right,
-        height = 400 - margin.top - margin.bottom;
+        width = 900 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
 
     // append the svg object to the body of the page
     var svg = d3.select("#my_dataviz")
-      .append("svg")
-        .attr("width", width + margin.left + margin.right)
-        .attr("height", height + margin.top + margin.bottom)
-      .append("g")
-        .attr("transform",
-              "translate(" + margin.left + "," + margin.top + ")");
+        .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+        .append("g")
+            .attr("transform",
+                "translate(" + margin.left + "," + margin.top + ")");
+
 
     // Initialize the X axis
-    var x = d3.scaleBand()
-      .range([0, width])
-      .padding(0.2);
+    var x_scale = d3.scaleBand()
+        .range([0, width])
+        .padding(0.2);
 
-    var xAxis = svg.append("g")
-      .attr("transform", "translate(0," + height + ")")
+    var x_axis = svg.append("g")
+        .attr("transform", "translate(0," + height + ")");
+
+    var x_label = svg.append("text")
+        .attr("text-anchor", "end")
+        .attr("font-family", "sans-serif");
+
 
     // Initialize the Y axis
-    var y = d3.scaleLinear()
-      .range([height, 0]);
+    var y_scale = d3.scaleLinear()
+        .range([height, 0]);
 
-    var yAxis = svg.append("g")
-      .attr("class", "myYaxis")
+    var y_axis = svg.append("g")
+        .attr("class", "myYaxis");
 
-    function CreateChart(json_text) {
+    var y_label = svg.append("text")
+        .attr("text-anchor", "end")
+        .attr("transform", "rotate(-90)")
+        .attr("font-family", "sans-serif");
 
+
+    // draw the chart
+    function CreateChart(title, x_label_text, y_label_text, json_text, switch_time) {
         data = JSON.parse(json_text);
 
         // Update the X axis
-        x.domain(data.map(function(d) { return d.Country; }))
+        x_scale
+            .domain(data.map(function (d) { return d.category; }))
 
-        xAxis
-          .call(d3.axisBottom(x))
-          .selectAll("text")
-            .attr("transform", "translate(-10,0)rotate(-45)")
-            .style("text-anchor", "end");
+        x_axis
+            .call(d3.axisBottom(x_scale))
+            .selectAll("text")
+                .attr("transform", "translate(-10,0)rotate(-45)")
+                .style("text-anchor", "end");
+
+        x_label
+            .attr("x", width)
+            .attr("y", height + margin.top + 20)
+            .text(x_label_text);
+
 
         // Update the Y axis
-        y.domain([0, d3.max(data, function (d) { return d.Value })]);
+        y_scale
+            .domain([0, d3.max(data, function (d) { return d.value })]);
 
-        yAxis
-          .transition()
-          .duration(1000)
-          .call(d3.axisLeft(y));
+        y_axis
+            .transition()
+            .duration(switch_time)
+            .call(d3.axisLeft(y_scale));
 
+        y_label
+            .attr("y", -margin.left + 20)
+            .attr("x", -margin.top)
+            .text(y_label_text);
 
         // bind tha data to a set of bars
         var u = svg.selectAll("rect")
-          .data(data)
+            .data(data);
 
         u
-          .enter()
-          .append("rect")   // add a new rect for each new elements
-          .merge(u)         // get the already existing elements as well
-          .transition()     // and apply changes to all of them
-          .duration(1000)
-            .attr("x", function (d) { return x(d.Country); })
-            .attr("y", function (d) { return y(d.Value); })
-            .attr("width", x.bandwidth())
-            .attr("height", function (d) { return height - y(d.Value); })
-            .attr("fill", function (d) { return d.Colour; })
+            .enter()
+            .append("rect")   // add a new rect for each new elements
+            .merge(u)         // get the already existing elements as well
+            .transition()     // and apply changes to all of them
+            .duration(switch_time)
+                .attr("x", function (d) { return x_scale(d.category); })
+                .attr("y", function (d) { return y_scale(d.value); })
+                .attr("width", x_scale.bandwidth())
+                .attr("height", function (d) { return height - y_scale(d.value); })
+                .attr("fill", function (d) { return d.colour; })
 
         // remove unused bars
         u
-          .exit()
-          .remove()
+            .exit()
+            .remove()
     }
 
 </script>
