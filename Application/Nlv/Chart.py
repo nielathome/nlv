@@ -20,46 +20,6 @@
 
 class BarChart:
 
-    _Page = """<!DOCTYPE html>
-    <style>
-    .chart div {
-      font: 10px sans-serif;
-      background-color: steelblue;
-      text-align: right;
-      padding: 3px;
-      margin: 1px;
-      color: white;
-    }
-    </style>
-
-    <div class="chart"></div>
-
-    <script src="http://d3js.org/d3.v3.min.js"></script>
-
-    <script>
-
-    function CreateChart(data) {
-        var x = d3.scale.linear()
-            .domain([0, d3.max(data)])
-            .range([0, 420]);
-
-        d3.select(".chart")
-          .selectAll("div")
-            .data(data)
-          .enter().append("div")
-            .style("width", function(d) { return x(d) + "px"; })
-            .text(function(d) { return d; });
-    }
-
-    </script>
-
-    <head>
-    </head>
-    <body>
-Some text
-    </body>
-    """
-
     #-----------------------------------------------------------
     def __init__(self, category_field, value_field):
         self._CategoryField = category_field
@@ -74,7 +34,7 @@ Some text
     #-----------------------------------------------------------
     @classmethod
     def Setup(cls, name):
-        return cls._Page
+        return "BarChart.html"
 
 
     #-----------------------------------------------------------

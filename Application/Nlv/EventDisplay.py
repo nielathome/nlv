@@ -952,8 +952,9 @@ class G_ChartViewCtrl(wx.Panel):
 
         self._Figure.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
         with G_ScriptGuard("Setup", self._ErrorReporter):
-            page = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
-            wx.MemoryFSHandler.AddFileWithMimeType(self._PageName, page, "text/html")
+            file_name = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
+            with open(str(G_Global.GetInstallDir() / file_name)) as file:
+                wx.MemoryFSHandler.AddFileWithMimeType(self._PageName, file.read(), "text/html")
             self._Figure.LoadURL("memory:{}".format(self._PageName))
 
         # layout
