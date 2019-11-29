@@ -28,6 +28,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Chart.py" />
+    <Compile Include="DataExplorer.py" />
     <Compile Include="EventDisplay.py" />
     <Compile Include="EventProjector.py" />
     <Compile Include="EventView.py">
@@ -36,6 +37,7 @@
     <Compile Include="Channel.py" />
     <Compile Include="Document.py" />
     <Compile Include="Extension.py" />
+    <Compile Include="Global.py" />
     <Compile Include="Logfile.py">
       <SubType>Code</SubType>
     </Compile>
@@ -56,6 +58,7 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="BarChart.html" />
     <Content Include="data.css" />
     <Content Include="theme.event.default.xml" />
     <Content Include="theme.log.default.xml" />
