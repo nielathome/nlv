@@ -48,6 +48,112 @@ import wx.html2
 import Nlog
 
 
+
+
+
+
+from ctypes import *
+from comtypes import GUID
+#from comtypes import CoClass
+import comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0
+#from comtypes import BSTR
+from ctypes import HRESULT
+#from comtypes import helpstring
+from comtypes import COMMETHOD
+#from comtypes import dispid
+##from comtypes import IUnknown
+#from comtypes.automation import VARIANT
+#from ctypes.wintypes import VARIANT_BOOL
+#from comtypes.automation import VARIANT
+#from comtypes.automation import IDispatch
+#from comtypes import DISPMETHOD, DISPPROPERTY
+WSTRING = c_wchar_p
+#from comtypes.automation import _midlSAFEARRAY
+#LONG_PTR = c_longlong
+#from ctypes.wintypes import tagRECT
+#from ctypes.wintypes import tagPOINT
+#from ctypes.wintypes import tagRECT
+#from comtypes import wireHWND
+#UINT_PTR = c_ulonglong
+#STRING = c_char_p
+#from ctypes.wintypes import tagSIZE
+#from comtypes.typeinfo import tagSAFEARRAYBOUND
+#from comtypes.typeinfo import tagSAFEARRAYBOUND
+
+
+
+
+
+class IDeveloperConsoleMessageReceiver(comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0.IUnknown):
+    _case_insensitive_ = True
+    'IDeveloperConsoleMessageReceiver interface'
+    _iid_ = GUID('{30510808-98B5-11CF-BB82-00AA00BDCE0B}')
+    _idlflags_ = []
+
+# values for enumeration '_DEV_CONSOLE_MESSAGE_LEVEL'
+DCML_INFORMATIONAL = 0
+DCML_WARNING = 1
+DCML_ERROR = 2
+DEV_CONSOLE_MESSAGE_LEVEL_Max = 2147483647
+_DEV_CONSOLE_MESSAGE_LEVEL = c_int # enum
+IDeveloperConsoleMessageReceiver._methods_ = [
+    COMMETHOD([], HRESULT, 'write',
+              ( ['in'], WSTRING, 'source' ),
+              ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+              ( ['in'], c_int, 'messageId' ),
+              ( ['in'], WSTRING, 'messageText' )),
+    COMMETHOD([], HRESULT, 'WriteWithUrl',
+              ( ['in'], WSTRING, 'source' ),
+              ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+              ( ['in'], c_int, 'messageId' ),
+              ( ['in'], WSTRING, 'messageText' ),
+              ( ['in'], WSTRING, 'fileUrl' )),
+    COMMETHOD([], HRESULT, 'WriteWithUrlAndLine',
+              ( ['in'], WSTRING, 'source' ),
+              ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+              ( ['in'], c_int, 'messageId' ),
+              ( ['in'], WSTRING, 'messageText' ),
+              ( ['in'], WSTRING, 'fileUrl' ),
+              ( ['in'], c_ulong, 'line' )),
+    COMMETHOD([], HRESULT, 'WriteWithUrlLineAndColumn',
+              ( ['in'], WSTRING, 'source' ),
+              ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+              ( ['in'], c_int, 'messageId' ),
+              ( ['in'], WSTRING, 'messageText' ),
+              ( ['in'], WSTRING, 'fileUrl' ),
+              ( ['in'], c_ulong, 'line' ),
+              ( ['in'], c_ulong, 'column' ))
+]
+
+
+
+
+from comtypes import COMObject
+
+class G_DeveloperConsoleMessageReceiver_Impl(COMObject):
+    _com_interfaces_ = [IDeveloperConsoleMessageReceiver]
+
+    def write(self, source, level, messageId, messageText):
+        logging.info("{}({}.{}) {}".format(source, level, messageId, messageText))
+
+    def WriteWithUrl(self, source, level, messageId, messageText, fileUrl):
+        logging.info("{}({}.{}) {} {}".format(source, level, messageId, messageText, fileUrl))
+
+    def WriteWithUrlAndLine(self, source, level, messageId, messageText, fileUrl, line):
+        logging.info("{}({}.{} {}) {} {}".format(source, level, messageId, line, messageText, fileUrl))
+
+    def WriteWithUrlLineAndColumn(self, source, level, messageId, messageText, fileUrl, line, column):
+        logging.info("{}({}.{} {}/{}) {} {}".format(source, level, messageId, line, column, messageText, fileUrl))
+
+
+
+
+
+
+
+
+
+
 ## G_TableHiliter ##########################################
 
 class G_TableHiliter:
@@ -880,6 +986,7 @@ class G_ChartViewCtrl(wx.Panel):
     #-------------------------------------------------------
     _InitCharting = True
     _IIDMap = None
+    _TMP = None
 
 
     @classmethod
@@ -1017,6 +1124,35 @@ class G_ChartViewCtrl(wx.Panel):
         doc = self.GetIHTMLDocument2()
         if doc is None:
             return
+
+        if G_ChartViewCtrl._TMP is None:
+# warning: mixing the two Python COM libraries here. pythoncom/win32com is good for Dispatch/OLE interfaces
+# and comtypes is good for custom interfaces
+            a = G_DeveloperConsoleMessageReceiver_Impl()
+            p = a.QueryInterface(comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0.IUnknown)
+            #s = a.QueryInterface(IDeveloperConsoleMessageReceiver)
+
+            from win32com.axcontrol import axcontrol
+            q = doc._oleobj_.QueryInterface(axcontrol.IID_IOleCommandTarget)
+
+#            win32com.pythoncom.PyIID
+            CGID_MSHTML = "{DE4BA900-59CA-11CF-9592-444553540000}"
+            CGID_MSHTML = pythoncom.MakeIID("{DE4BA900-59CA-11CF-9592-444553540000}")
+            
+            import pywintypes
+#            c = pywintypes.sys.iid
+
+            IDM_ADDCONSOLEMESSAGERECEIVER = 3800
+            OLECMDEXECOPT_DODEFAULT = 0
+
+            G_ChartViewCtrl._TMP = 42
+
+            address = super(comtypes._compointer_base, p).value
+            converted_unk = pythoncom.ObjectFromAddress(address)
+
+            ll = q.Exec(CGID_MSHTML, IDM_ADDCONSOLEMESSAGERECEIVER, OLECMDEXECOPT_DODEFAULT, converted_unk)
+
+
 
         for script_text in self._ScriptQueue:
             elem = doc.createElement("script")
@@ -1206,6 +1342,10 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     #-------------------------------------------------------
     def ResetModel(self, error_reporter = None):
+        #a = G_DeveloperConsoleMessageReceiver_Impl()
+        #p = a.QueryInterface(comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0.IUnknown)
+        #s = a.QueryInterface(IDeveloperConsoleMessageReceiver)
+
         self._ErrorReporter = error_reporter
 
         chartpane_sizer = self._ChartPane.GetSizer()
