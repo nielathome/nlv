@@ -241,7 +241,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         # in SQL terms, the key is the entry's line number in
         # the display table (where line number is one less than
         # the "rowid"); note, items cannot be zero, so offset here
-        return int(item.GetID()) - 1
+        id = item.GetID()
+        if id is None:
+            return None
+        else:
+            return int(item.GetID()) - 1
 
 
     @staticmethod
@@ -308,7 +312,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
     def GetLocation(self, item):
-        return str(self.ItemToKey(item))
+        key = self.ItemToKey(item)
+        if key is None:
+            return key
+        else:
+            return str(key)
 
     def SetHistoryKey(self, key):
         self._HistoryKey = key
@@ -1080,7 +1088,6 @@ class G_ChartViewCtrl(wx.Panel):
         self._TableViewCtrl = table_view_ctrl
         self._ErrorReporter = error_reporter
 
-        self._DoRealise = True
         self._ParamaterValues = dict()
         self._ScriptQueue = []
 
@@ -1090,8 +1097,7 @@ class G_ChartViewCtrl(wx.Panel):
         self._Figure.EnableHistory(False)
 #        self._Figure.EnableContextMenu(False)
 
-        self._PageLoadSkipCount = 1
-        parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
+        self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 
         with G_ScriptGuard("Setup", self._ErrorReporter):
             page_name = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
@@ -1106,13 +1112,8 @@ class G_ChartViewCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
-        if "about:" in event.URL:
-            return
-
-        if self._PageLoadSkipCount == 0:
+        if not "about:" in event.URL:
             self.RunScriptQueue()
-        else:
-            self._PageLoadSkipCount -= 1
 
 
     #-------------------------------------------------------
@@ -1205,30 +1206,24 @@ class G_ChartViewCtrl(wx.Panel):
                 cursor = connection.cursor()
                 selection = self._TableViewCtrl.GetSelectedItems()
 
-#                with G_PerfTimerScope("Realise"):
                 figure = G_ChartViewCtrlProxy(self)
                 self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, figure, connection, cursor, self._ParamaterValues, selection)
-
-                #with G_PerfTimerScope("Draw"):
-                #    self.draw()
 
 
     #-------------------------------------------------------
     def Update(self, metrics_changed = False, selection_changed = False, parameters = None):
+        do_realize = False
         if metrics_changed:
-            self._DoRealise = True
+            do_realize = True
 
         if selection_changed and self._ChartDesigner.WantSelection:
-            self._DoRealise = True
+            do_realize = True
 
         if parameters is not None and parameters != self._ParamaterValues:
-            self._DoRealise = True
+            do_realize = True
             self._ParamaterValues = parameters.copy()
 
-        #if self.IsShown():
-        #    self.Refresh()
-
-        if self._DoRealise:
+        if do_realize:
             self.Realise()
             
 
@@ -1340,10 +1335,6 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
     def ResetModel(self, error_reporter = None):
         self._ErrorReporter = error_reporter
 
-        chartpane_sizer = self._ChartPane.GetSizer()
-        for item in chartpane_sizer.GetChildren():
-            item.GetWindow().PreClose()
-
-        chartpane_sizer.Clear(delete_windows = True)
+        self._ChartPane.GetSizer().Clear(delete_windows = True)
 
         self._TableViewCtrl.ResetModel()

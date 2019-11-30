@@ -1643,12 +1643,14 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
+        # ignore de-selection and non-events
         if item is None:
-            # ignore de-selection events
             return
 
-        # tell the data explorer
-        self.GetDataExplorer().Update(self.MakeDataUrl(self.GetMetricsViewCtrl().GetTableViewCtrl().GetLocation(item)))
+        location = self.GetMetricsViewCtrl().GetTableViewCtrl().GetLocation(item)
+        if location is not None:
+            # tell the data explorer
+            self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
 
     #-------------------------------------------------------

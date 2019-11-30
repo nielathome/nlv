@@ -63,6 +63,8 @@ if _G_WantProfiling:
 
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
+    # Trident/IE require non-standard MIME type for JavaScript,
+    # without this, the JavaScript is not executed
     http.server.SimpleHTTPRequestHandler.extensions_map.update({
         '.js': 'text/javascript'
         })
