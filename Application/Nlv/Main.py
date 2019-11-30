@@ -17,8 +17,12 @@
 
 # Python imports
 import argparse
+import http.server
+import logging
 from pathlib import Path
+import socketserver 
 import sys
+import threading
 
 # the only *reliable* way for Nlog to find and link against the sqlite3.dll
 # is to import the Python module first; in particular, this works around the fact
@@ -52,6 +56,56 @@ _G_Profiler = None
 if _G_WantProfiling:
     import cProfile
     _G_Profiler = cProfile.Profile()
+
+
+
+## HttpRequestHandler ######################################
+
+class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
+
+    http.server.SimpleHTTPRequestHandler.extensions_map.update({
+        '.js': 'text/javascript'
+        })
+
+
+    #-------------------------------------------------------
+    def log_message(self, format, *args):
+        logging.info("HTTPD: {} - {}".format(self.address_string(), format % args))
+
+    def log_error(self, format, *args):
+        logging.error("HTTPD: {} - {}".format(self.address_string(), format % args))
+
+
+    #-------------------------------------------------------
+    def end_headers(self):
+        # exert control over browser cacheing, otherwise
+        # changes to local files can go unnoticed
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
+
+    #-------------------------------------------------------
+    def translate_path(self, path):
+        install_dir = G_Global.GetInstallDir()
+        candidate = install_dir / path.lstrip("/")
+        if candidate.exists():
+            return str(candidate)
+        else:
+            return ""
+
+
+
+## HttpServer ##############################################
+
+def RunHttpServer(name = "localhost", port = 8000):
+    class MyHttpServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        def __init__(self, server_addres, handler_cls):
+            self.daemon_threads = True
+            http.server.HTTPServer.__init__(self, server_addres, handler_cls)
+
+    server_address = (name, port)
+    server = MyHttpServer(server_address, HttpRequestHandler)
+    server.serve_forever()
 
 
 
@@ -277,6 +331,11 @@ class G_LogViewFrame(wx.Frame):
 
         # layout and display
         self._AuiManager.Update()
+
+        # local HTTPD
+        httpd = threading.Thread(target = RunHttpServer)
+        httpd.daemon = True
+        httpd.start()
 
 
     #-------------------------------------------------------

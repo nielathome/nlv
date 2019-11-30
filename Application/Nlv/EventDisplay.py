@@ -25,7 +25,6 @@ import os
 from pathlib import Path
 import pythoncom
 import sys
-from uuid import uuid4
 import win32com
 import win32con
 import win32gui
@@ -1084,11 +1083,6 @@ class G_ChartViewCtrl(wx.Panel):
         self._DoRealise = True
         self._ParamaterValues = dict()
         self._ScriptQueue = []
-        self._PageName = "{}.html".format(str(uuid4()).replace("-",""))
-
-        #handler = wx.EvtHandler()
-        #handler.Bind(wx.EVT_PAINT, self.OnPaint)
-        #self.PushEventHandler(handler)
 
         self.InitCharting()
 
@@ -1099,12 +1093,9 @@ class G_ChartViewCtrl(wx.Panel):
         self._PageLoadSkipCount = 1
         parent.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 
-        self._Figure.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
         with G_ScriptGuard("Setup", self._ErrorReporter):
-            file_name = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
-            with open(str(G_Global.GetInstallDir() / file_name)) as file:
-                wx.MemoryFSHandler.AddFileWithMimeType(self._PageName, file.read(), "text/html")
-            self._Figure.LoadURL("memory:{}".format(self._PageName))
+            page_name = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
+            self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
 
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
@@ -1115,6 +1106,9 @@ class G_ChartViewCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
+        if "about:" in event.URL:
+            return
+
         if self._PageLoadSkipCount == 0:
             self.RunScriptQueue()
         else:
@@ -1182,19 +1176,6 @@ class G_ChartViewCtrl(wx.Panel):
             node.removeChild(script_node)
 
         self._ScriptQueue = []
-
-
-    #-------------------------------------------------------
-    def PreClose(self):
-        wx.MemoryFSHandler.RemoveFile(self._PageName)
-#        self.PopEventHandler(True)
-
-    #def OnPaint(self, evt):
-    #    if self._DoRealise:
-    #        self._DoRealise = False
-    #        self.Realise()
-
-    #    evt.Skip()
 
 
     #-------------------------------------------------------
