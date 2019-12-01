@@ -1087,9 +1087,7 @@ class G_ChartViewCtrl(wx.Panel):
         self._MetricsDbPath = metrics_db_path
         self._TableViewCtrl = table_view_ctrl
         self._ErrorReporter = error_reporter
-
-        self._ParamaterValues = dict()
-        self._ScriptQueue = []
+        self.Reset()
 
         self.InitCharting()
 
@@ -1098,6 +1096,8 @@ class G_ChartViewCtrl(wx.Panel):
 #        self._Figure.EnableContextMenu(False)
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
+
+        self.Bind(wx.html2.EVT_WEBVIEW_NAVIGATED, self.OnNav)
 
         with G_ScriptGuard("Setup", self._ErrorReporter):
             page_name = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
@@ -1109,11 +1109,24 @@ class G_ChartViewCtrl(wx.Panel):
         self.SetSizer(vsizer)
 
 
+    def Reset(self):
+        self._ParamaterValues = dict()
+        self._ScriptQueue = []
+
+        self._Figure = None
+        self._IHTMLDocument2 = None
+
 
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
         if not "about:" in event.URL:
             self.RunScriptQueue()
+        else:
+            dbg = self.GetIHTMLDocument2()
+
+    def OnNav(self, event):
+        dbg = self.GetIHTMLDocument2()
+
 
 
     #-------------------------------------------------------
@@ -1139,9 +1152,22 @@ class G_ChartViewCtrl(wx.Panel):
                             return False
 
             return True
-                
+
+#        if self._IHTMLDocument2 is None:                
         win32gui.EnumChildWindows(self._Figure.GetHandle(), enum_callback, data)
-        return data[0]
+        doc = self._IHTMLDocument2 = data[0]
+
+        if self._IHTMLDocument2 is not None:
+            try:
+                icustomdoc_iid = pythoncom.MakeIID("{3050f3f0-98b5-11cf-bb82-00aa00bdce0b}")
+                rrm = self._IHTMLDocument2._oleobj_.QueryInterface(icustomdoc_iid)
+                a = "hello"
+            except pythoncom.com_error as ex:
+                d = ex
+
+                
+
+        return self._IHTMLDocument2
 
 
     #-------------------------------------------------------
@@ -1335,6 +1361,10 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
     def ResetModel(self, error_reporter = None):
         self._ErrorReporter = error_reporter
 
-        self._ChartPane.GetSizer().Clear(delete_windows = True)
+        chartpane_sizer = self._ChartPane.GetSizer()
+        for item in chartpane_sizer.GetChildren():
+            item.GetWindow().Reset()
+
+        chartpane_sizer.Clear(delete_windows = True)
 
         self._TableViewCtrl.ResetModel()
