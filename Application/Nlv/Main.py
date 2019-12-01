@@ -67,12 +67,12 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     # without this, the JavaScript is not executed
     http.server.SimpleHTTPRequestHandler.extensions_map.update({
         '.js': 'text/javascript'
-        })
+    })
 
 
     #-------------------------------------------------------
     def log_message(self, format, *args):
-        logging.info("HTTPD: {} - {}".format(self.address_string(), format % args))
+        logging.debug("HTTPD: {} - {}".format(self.address_string(), format % args))
 
     def log_error(self, format, *args):
         logging.error("HTTPD: {} - {}".format(self.address_string(), format % args))
