@@ -9,7 +9,6 @@
 <div id="my_dataviz"></div>
 
 <script>
-
     // set the dimensions and margins of the graph
     var margin = {top: 30, right: 30, bottom: 70, left: 60},
         width = 900 - margin.left - margin.right,
@@ -57,7 +56,7 @@
 
         // Update the X axis
         x_scale
-            .domain(data.map(function (d) { return d.category; }))
+            .domain(data.map(function (d) { return d.category; }));
 
         x_axis
             .call(d3.axisBottom(x_scale))
@@ -85,26 +84,18 @@
             .attr("x", -margin.top)
             .text(y_label_text);
 
-        // bind tha data to a set of bars
-        var u = svg.selectAll("rect")
-            .data(data);
-
-        u
-            .enter()
-            .append("rect")   // add a new rect for each new elements
-            .merge(u)         // get the already existing elements as well
-            .transition()     // and apply changes to all of them
-            .duration(switch_time)
+        // Draw columns
+        svg.selectAll(".column")
+            .data(data)
+            .join("rect")
+                .transition()
+                    .duration(switch_time)
+                .attr("class", "column")
                 .attr("x", function (d) { return x_scale(d.category); })
                 .attr("y", function (d) { return y_scale(d.value); })
                 .attr("width", x_scale.bandwidth())
                 .attr("height", function (d) { return height - y_scale(d.value); })
-                .attr("fill", function (d) { return d.colour; })
-
-        // remove unused bars
-        u
-            .exit()
-            .remove()
+                .attr("fill", function (d) { return d.colour; });
     }
 
 </script>

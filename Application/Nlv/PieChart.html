@@ -1,0 +1,111 @@
+﻿<!-- Code originally from d3-graph-gallery.com -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Load d3.js -->
+<script src="http://localhost:8000/d3.v5.min.js"></script>
+
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz"></div>
+
+<script>
+    // set the dimensions and margins of the graph
+    var margin = {top: 30, right: 30, bottom: 70, left: 60},
+        width = 500 - margin.left - margin.right,
+        height = 500 - margin.top - margin.bottom;
+
+    // The radius of the pieplot is half the width or half the height.
+    var radius = Math.min(width, height) / 2 - margin.top
+
+    // append the svg object to the body of the page
+    var svg = d3.select("#my_dataviz")
+        .append("svg")
+            .attr("width", width)
+            .attr("height", height)
+        .append("g")
+            .attr("transform",
+                "translate(" + width / 2 + "," + height / 2 + ")");
+
+    // color
+
+    // draw the chart
+    function CreateChart(title, json_text, switch_time) {
+        data = JSON.parse(json_text);
+
+        // Compute the angle data for each slice in the pie
+        var pie_generator = d3.pie()
+            .sort(null) // Do not sort by size
+            .value(function (d) { return d.value; });
+
+        var slice_data = pie_generator(data);
+
+        // The "slice" generator
+        var slice_generator = d3.arc()
+          .innerRadius(radius * 0.5)
+          .outerRadius(radius * 0.8);
+
+        // Build the pie chart: each part of the pie is a path built using the arc function.
+        svg.selectAll(".slice")
+            .data(slice_data)
+            .join('path')
+                .transition()
+                    .duration(switch_time)
+                .attr("class", "slice")
+                .attr('d', slice_generator)
+                .attr('fill', function (d) { return "red"; })
+                .attr("stroke", "white")
+                .style("stroke-width", "2px")
+                .style("opacity", 0.7);
+
+        // Arc for label line elbows
+        var elbow_generator = d3.arc()
+            .innerRadius(radius * 0.9)
+            .outerRadius(radius * 0.9);
+
+        // Add the polylines between chart and labels
+        svg.selectAll('.line')
+            .data(slice_data)
+            .join('polyline')
+                .transition()
+                    .duration(switch_time)
+                .attr("class", "line")
+                .attr("stroke", "black")
+                .style("fill", "none")
+                .attr("stroke-width", 1)
+                .attr('points', function (d) {
+                    var slice_centre = slice_generator.centroid(d);
+                    var elbow = elbow_generator.centroid(d);
+                    var text = elbow_generator.centroid(d);
+
+                    // we need the angle to see if the X position will be at the extreme right or extreme left
+                    var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                    text[0] = radius * 0.95 * (midangle < Math.PI ? 1 : -1);
+                    return [slice_centre, elbow, text];
+                });
+
+        console.log("Hello-3b");
+
+        // Add the labels
+        svg.selectAll('.label')
+            .data(slice_data)
+            .join('text')
+                .transition()
+                    .duration(switch_time)
+                .attr("class", "label")
+                .text(function (d) { return d.data.category })
+                .attr('transform', function (d) {
+                    var pos = elbow_generator.centroid(d);
+                    var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                    pos[0] = radius * 0.99 * (midangle < Math.PI ? 1 : -1);
+                    return 'translate(' + pos + ')';
+                })
+                .style('text-anchor', function (d) {
+                    var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                    return (midangle < Math.PI ? 'start' : 'end')
+                })
+                .attr("font-family", "sans-serif");
+
+        console.log("Hello-4");
+    }
+
+</script>

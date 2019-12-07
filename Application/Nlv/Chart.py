@@ -88,6 +88,12 @@ class PieChart:
 
 
     #-----------------------------------------------------------
+    @classmethod
+    def Setup(cls, name):
+        return "PieChart.html"
+
+
+    #-----------------------------------------------------------
     def Realise(self, name, figure, connection, cursor, param_values, selection):
         cursor.execute("""
             SELECT
@@ -116,45 +122,33 @@ class PieChart:
         accum = 0
         limit = sum * (1 - (0.05 * (1 + param)))
 
-        labels = []
-        values = []
-        explodes = []
-        other_explode = 0
+        data = []
+        other_selected = False
 
         for row in cursor:
             selected = row[2] in selection
 
             if accum >= limit:
                 if selected:
-                    other_explode = 0.1
+                    other_selected = True
 
             else:
                 value = row[1]
                 accum += value
+                data.append(dict(zip(["category", "value", "selected"], [row[0], value, selected])))
 
-                labels.append(row[0])
-                values.append(value)
-            
-                explode = 0.0
-                if selected:
-                    explode = 0.1
-                explodes.append(explode)
-            
         other = sum - accum
         if other > 0:            
-            labels.append("Other")
-            values.append(other)
-            explodes.append(other_explode)
+            data.append(dict(zip(["category", "value", "selected"], ["Other", other, other_selected])))
 
-        cmap = cm.get_cmap('tab20c', len(values))
-        axes = figure.add_subplot(111)
-        axes.pie(values, labels = labels, autopct = '%1.1f%%', startangle = 90,
-            explode = explodes, colors = cmap.colors, shadow = True
-        )
+        # chart transition time in msec
+        switch_time = 1000
+        if len(selection) != 0:
+            switch_time = 250
 
-        figure.suptitle(name, x = 0.02, y = 0.5,
-            horizontalalignment = 'left', verticalalignment = 'center'
-        )
+        json_text = json.dumps(data)
+        figure.ExecuteScript("CreateChart('{}', '{}', '{}');".format(name, json_text, switch_time))
+
 
 
 
