@@ -41,12 +41,10 @@
     var y_scale = d3.scaleLinear()
         .range([height, 0]);
 
-    var y_axis = svg.append("g")
-        .attr("class", "myYaxis");
+    var y_axis = svg.append("g");
 
     var y_label = svg.append("text")
         .attr("text-anchor", "end")
-        .attr("transform", "rotate(-90)")
         .attr("font-family", "sans-serif");
 
 
@@ -66,7 +64,7 @@
 
         x_label
             .attr("x", width)
-            .attr("y", height + margin.top + 20)
+            .attr("y", height + x_axis.node().getBBox().height + 20)
             .text(x_label_text);
 
 
@@ -76,12 +74,13 @@
 
         y_axis
             .transition()
-            .duration(switch_time)
+                .duration(switch_time)
             .call(d3.axisLeft(y_scale));
 
         y_label
-            .attr("y", -margin.left + 20)
-            .attr("x", -margin.top)
+            .transition()
+                .duration(switch_time)
+            .attr("transform", "translate(" + (-y_axis.node().getBBox().width - 10) + ", 0)rotate(-90)")
             .text(y_label_text);
 
         // Draw columns
@@ -95,7 +94,7 @@
                 .attr("y", function (d) { return y_scale(d.value); })
                 .attr("width", x_scale.bandwidth())
                 .attr("height", function (d) { return height - y_scale(d.value); })
-                .attr("fill", function (d) { return d.colour; });
+                .attr("fill", function (d) { return d.selected ? "DarkOrange" : "DarkSlateBlue";; });
     }
 
 </script>

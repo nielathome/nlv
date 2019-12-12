@@ -8,25 +8,41 @@
 <!-- Create a div where the graph will take place -->
 <div id="my_dataviz"></div>
 
+<style>
+    .slice{
+        stroke: white;
+        stroke-width: 2px;
+    }
+
+    .line{
+        stroke: black;
+        fill: none;
+        stroke-width: 1;
+    }
+
+    .label{
+        font-family: sans-serif;
+        font-size: x-small;
+    }
+</style>
+
 <script>
     // set the dimensions and margins of the graph
-    var margin = {top: 30, right: 30, bottom: 70, left: 60},
-        width = 500 - margin.left - margin.right,
-        height = 500 - margin.top - margin.bottom;
+    var margin = 30,
+        canvas_width = 600, chart_width = canvas_width - (2 * margin),
+        canvas_height = 500, chart_height = canvas_height - (2 * margin);
 
     // The radius of the pieplot is half the width or half the height.
-    var radius = Math.min(width, height) / 2 - margin.top
+    var radius = Math.min(chart_width, chart_height) / 2;
 
     // append the svg object to the body of the page
     var svg = d3.select("#my_dataviz")
         .append("svg")
-            .attr("width", width)
-            .attr("height", height)
+            .attr("width", chart_width)
+            .attr("height", chart_height)
         .append("g")
             .attr("transform",
-                "translate(" + width / 2 + "," + height / 2 + ")");
-
-    // color
+                "translate(" + canvas_width /2+ "," + canvas_height / 2 + ")");
 
     // draw the chart
     function CreateChart(title, json_text, switch_time) {
@@ -34,6 +50,7 @@
 
         // Compute the angle data for each slice in the pie
         var pie_generator = d3.pie()
+            .startAngle(-0.75)
             .sort(null) // Do not sort by size
             .value(function (d) { return d.value; });
 
@@ -52,10 +69,7 @@
                     .duration(switch_time)
                 .attr("class", "slice")
                 .attr('d', slice_generator)
-                .attr('fill', function (d) { return "red"; })
-                .attr("stroke", "white")
-                .style("stroke-width", "2px")
-                .style("opacity", 0.7);
+                .attr('fill', function (d) { return d.data.selected ? "DarkOrange" : "DarkSlateBlue"; })
 
         // Arc for label line elbows
         var elbow_generator = d3.arc()
@@ -69,9 +83,6 @@
                 .transition()
                     .duration(switch_time)
                 .attr("class", "line")
-                .attr("stroke", "black")
-                .style("fill", "none")
-                .attr("stroke-width", 1)
                 .attr('points', function (d) {
                     var slice_centre = slice_generator.centroid(d);
                     var elbow = elbow_generator.centroid(d);
@@ -82,8 +93,6 @@
                     text[0] = radius * 0.95 * (midangle < Math.PI ? 1 : -1);
                     return [slice_centre, elbow, text];
                 });
-
-        console.log("Hello-3b");
 
         // Add the labels
         svg.selectAll('.label')
@@ -102,10 +111,7 @@
                 .style('text-anchor', function (d) {
                     var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
                     return (midangle < Math.PI ? 'start' : 'end')
-                })
-                .attr("font-family", "sans-serif");
-
-        console.log("Hello-4");
+                });
     }
 
 </script>

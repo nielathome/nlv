@@ -1196,10 +1196,8 @@ class G_ChartViewCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    @G_Global.TimeFunction
     def Realise(self):
         """Redraw the chart if needed"""
-        G_Global.GetCurrentTimer().AddArgument(self._ChartDesigner.Name)
         with G_ScriptGuard("Realise", self._ErrorReporter):
             connection = ConnectDb(self._MetricsDbPath, True)
             if connection is not None:

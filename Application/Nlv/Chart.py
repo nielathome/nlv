@@ -54,10 +54,8 @@ class BarChart:
 
         data = []
         for idx, row in enumerate(cursor):
-            colour = "DarkSlateBlue"
-            if row[2] in selection:
-                colour = "DarkOrange"
-            data.append(dict(zip(["category", "value", "colour"], [row[0], row[1], colour])))
+            selected = row[2] in selection
+            data.append(dict(zip(["category", "value", "selected"], [row[0], row[1], selected])))
 
         # chart transition time in msec
         switch_time = 1000
@@ -66,7 +64,6 @@ class BarChart:
 
         json_text = json.dumps(data)
         figure.ExecuteScript("CreateChart('{}', '{}', '{}', '{}', {});".format(name, self._CategoryField, self._ValueField, json_text, switch_time))
-
 
 
 
@@ -131,7 +128,6 @@ class PieChart:
             if accum >= limit:
                 if selected:
                     other_selected = True
-
             else:
                 value = row[1]
                 accum += value
