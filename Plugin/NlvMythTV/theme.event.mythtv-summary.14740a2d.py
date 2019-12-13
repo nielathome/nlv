@@ -369,7 +369,7 @@ metrics = projection.Quantify(
 )
 
 
-metrics.Chart("By Count", True, ch.PieChart("summary", "count"))
+metrics.Chart("By Count", True, ch.BarChart("summary", "count"))
 metrics.Chart("By Duration", True, ch.PieChart("summary", "sum"))
 #metrics.Chart("Durations", True, ch.BarChart("summary", "average"))
 

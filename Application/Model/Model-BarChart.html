@@ -3,7 +3,7 @@
 <meta charset="utf-8">
 
 <!-- Load d3.js -->
-<script src="http://localhost:8000/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3.v5.js"></script>
 
 <!-- Create a div where the graph will take place -->
 <div id="my_dataviz"></div>
@@ -174,4 +174,10 @@
     }
 
     window.addEventListener("resize", OnResize);
+
+
+    //----------------------------------------------------------
+    var model_text = '[{ "category": "P=[0.16]", "value": 1151, "selected": false }, { "category": "expire", "value": 1050, "selected": false }, { "category": "P=[0.15]", "value": 829, "selected": false }, { "category": "P=[0.17]", "value": 799, "selected": false }, { "category": "P=[0.09]", "value": 526, "selected": false }, { "category": "P=[0.18]", "value": 267, "selected": false }, { "category": "P=[0.08]", "value": 185, "selected": false }, { "category": "P=[0.19]", "value": 74, "selected": false }, { "category": "Other", "value": 252, "selected": false }]';
+    CreateChart("Title", "X label", "Y label", model_text, 1000);
+
 </script>
