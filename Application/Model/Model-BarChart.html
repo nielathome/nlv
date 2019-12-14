@@ -61,14 +61,12 @@
             .style("opacity", "0");
 
     function TipShow(d) {
-        g_tooltip
-            .transition(g_short_transition)
+        g_tooltip.transition(g_short_transition)
             .style("opacity", "1");
 
-        d3.select(this)
-            .transition(g_short_transition)
+        d3.select(this).transition(g_short_transition)
             .style("stroke", "black")
-            .style("opacity", 0.8)
+            .style("opacity", 0.8);
     }
 
     function TipMove(d) {
@@ -79,12 +77,10 @@
     }
 
     function TipHide(d) {
-        g_tooltip
-            .transition(g_short_transition)
+        g_tooltip.transition(g_short_transition)
             .style("opacity", "0");
 
-        d3.select(this)
-            .transition(g_short_transition)
+        d3.select(this).transition(g_short_transition)
             .style("stroke", "none")
             .style("opacity", 1);
     }
@@ -213,7 +209,7 @@
         g_title = title;
         g_xlabel = x_label_text;
         g_ylabel = y_label_text;
-        DrawChart(g_title, g_xlabel, g_ylabel, g_data, 0);
+        DrawChart(g_title, g_xlabel, g_ylabel, g_data, switch_time);
     }
 
 

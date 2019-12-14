@@ -21,6 +21,11 @@
         text-align: center;
     }
 
+    .title {
+        font-family: sans-serif;
+        font-size: small;
+    }
+
     .slice {
         stroke: white;
         stroke-width: 2px;
@@ -50,6 +55,9 @@
     var canvas = d3.select("#my_dataviz").append("svg");
     var chart = canvas.append("g");
 
+    var title = chart.append("text")
+        .attr("class", "title");
+
 
     //----------------------------------------------------------
     const g_short_transition = 200;
@@ -59,13 +67,11 @@
             .style("opacity", "0");
 
     function TipShow(d) {
-        g_tooltip
-            .transition(g_short_transition)
+        g_tooltip.transition(g_short_transition)
             .style("opacity", "1");
 
-        d3.select(this)
-            .transition(g_short_transition)
-            .style("opacity", 0.8)
+        d3.select(this).transition(g_short_transition)
+            .style("opacity", 0.8);
     }
 
     function TipMove(d) {
@@ -76,18 +82,16 @@
     }
 
     function TipHide(d) {
-        g_tooltip
-            .transition(g_short_transition)
+        g_tooltip.transition(g_short_transition)
             .style("opacity", "0");
 
-        d3.select(this)
-            .transition(g_short_transition)
+        d3.select(this).transition(g_short_transition)
             .style("opacity", 1);
     }
 
 
     //----------------------------------------------------------
-    function DrawChart(title, data, switch_time) {
+    function DrawChart(title_text, data, switch_time) {
         // set the dimensions and margins of the graph
         var margin = 30, min_window = 300;
         var window_width = Math.max(min_window, document.documentElement.clientWidth);
@@ -100,6 +104,12 @@
 
         chart
             .attr("transform", "translate(" + window_width / 2 + "," + window_height / 2 + ")");
+
+        title.text(title_text);
+        title_bbox = title.node().getBBox();
+        title
+            .attr("x", -title_bbox.width / 2)
+            .attr("y", title_bbox.height / 2);
 
         // Compute the angle data for each slice in the pie
         var pie_generator = d3.pie()
@@ -121,8 +131,8 @@
                 .on("mouseover", TipShow)
                 .on("mousemove", TipMove)
                 .on("mouseleave", TipHide)
-                .transition()
-                    .duration(switch_time)
+            .transition()
+                .duration(switch_time)
                 .attr("class", "slice")
                 .attr('d', slice_generator)
                 .attr('fill', function (d) { return d.data.selected ? "DarkOrange" : "DarkSlateBlue"; })
@@ -136,8 +146,8 @@
         chart.selectAll('.line')
             .data(slice_data)
             .join('polyline')
-                .transition()
-                    .duration(switch_time)
+            .transition()
+                .duration(switch_time)
                 .attr("class", "line")
                 .attr('points', function (d) {
                     var slice_centre = slice_generator.centroid(d);
@@ -154,8 +164,8 @@
         chart.selectAll('.label')
             .data(slice_data)
             .join('text')
-                .transition()
-                    .duration(switch_time)
+            .transition()
+                .duration(switch_time)
                 .attr("class", "label")
                 .text(function (d) { return d.data.category })
                 .attr('transform', function (d) {
@@ -169,7 +179,6 @@
                     return (midangle < Math.PI ? 'start' : 'end')
                 });
     }
-
 
     // draw the chart
     function CreateChart(title, json_text, switch_time) {

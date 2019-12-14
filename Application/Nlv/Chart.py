@@ -20,9 +20,14 @@ import json
 
         
 
-## BarChart ####################################################
+## Bar #########################################################
 
-class BarChart:
+def ReduceFieldName(name):
+    """Convert a 'long' field name to a 'short' field name"""
+    return name.split(" ")[0].lower()
+
+
+class Bar:
 
     #-----------------------------------------------------------
     def __init__(self, category_field, value_field):
@@ -50,7 +55,7 @@ class BarChart:
                 event_id
             FROM
                 display
-            """.format(category = self._CategoryField, value = self._ValueField))
+            """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
         data = []
         for idx, row in enumerate(cursor):
@@ -67,9 +72,9 @@ class BarChart:
 
 
 
-## PieChart ####################################################
+## Pie #########################################################
 
-class PieChart:
+class Pie:
 
     #-----------------------------------------------------------
     c_OtherPcts = ["5%", "10%", "15%"]
@@ -98,7 +103,7 @@ class PieChart:
                 sum({value})
             FROM
                 display
-            """.format(value = self._ValueField))
+            """.format(value = ReduceFieldName(self._ValueField)))
 
         (count, sum) = cursor.fetchone()
         if count == 0:
@@ -113,7 +118,7 @@ class PieChart:
                 display
             ORDER BY
                 {value} DESC
-            """.format(category = self._CategoryField, value = self._ValueField))
+            """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
         param = param_values.get("other_pct", 0)
         accum = 0
@@ -143,63 +148,4 @@ class PieChart:
             switch_time = 250
 
         json_text = json.dumps(data)
-        figure.ExecuteScript("CreateChart('{}', '{}', '{}');".format(name, json_text, switch_time))
-
-
-
-
-## HistogramChart ##############################################
-
-class HistogramChart:
-
-    #-----------------------------------------------------------
-    def __init__(self, category_field, value_field):
-        self._CategoryField = category_field
-        self._ValueField = value_field
-        self._CachedCategoryLengths = None
-
-
-    #-----------------------------------------------------------
-    def _GetCategoryLengths(self, metrics, num_metrics, force = False):
-        if self._CachedCategoryLengths is not None and not force:
-            return self._CachedCategoryLengths
-
-        lengths = self._CachedCategoryLengths = collections.Counter()
-        for i in range(num_metrics):
-            category = metrics.GetFieldText(i, self._CategoryField)
-            lengths[category] += 1
-
-        return lengths
-
-
-    #-----------------------------------------------------------
-    def DefineParameters(self, params, connection):
-        lengths = self._GetCategoryLengths(metrics, num_metrics)
-        for category in lengths.keys():
-            params.AddBool(category, category, True)
-
-
-    #-----------------------------------------------------------
-    def Realise(self, figure, connection, param_values, selection):
-        lengths = self._GetCategoryLengths(metrics, num_metrics, True)
-
-        data = dict()
-        for (category, length) in lengths.items():
-            if param_values.get(category, True):
-                data[category] = [0, np.empty(length, dtype = np.uint32)]
-                
-        for i in range(num_metrics):
-            category = metrics.GetFieldText(i, self._CategoryField)
-            entry = data.get(category, None)
-            if entry is not None:
-                (idx, array) = entry
-                array[idx] = metrics.GetFieldValueUnsigned(idx, self._ValueField)
-                entry[0] += 1
-
-        series = [a for (i, a) in data.values()]
-        axes = figure.add_subplot(111)
-        axes.hist(series, 20, histtype='bar', label = data.keys())
-        axes.legend()
-
-
-
+        figure.ExecuteScript("CreateChart('{}', '{}', '{}');".format(self._ValueField, json_text, switch_time))
