@@ -10,18 +10,29 @@
 
 
 <style>
-    .slice{
+    .tool-tip {
+        position: absolute;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.8);
+        color: bisque;
+        border-radius: 2px;
+        font-family: sans-serif;
+        font-size: x-small;
+        text-align: center;
+    }
+
+    .slice {
         stroke: white;
         stroke-width: 2px;
     }
 
-    .line{
+    .line {
         stroke: black;
         fill: none;
         stroke-width: 1;
     }
 
-    .label{
+    .label {
         font-family: sans-serif;
         font-size: x-small;
     }
@@ -29,6 +40,8 @@
 
 
 <script>
+    //----------------------------------------------------------
+
     // retained data
     var g_data = null;
     var g_title = null;
@@ -38,6 +51,42 @@
     var chart = canvas.append("g");
 
 
+    //----------------------------------------------------------
+    const g_short_transition = 200;
+    var g_tooltip = d3.select("#my_dataviz")
+        .append("div")
+            .attr('class', 'tool-tip')
+            .style("opacity", "0");
+
+    function TipShow(d) {
+        g_tooltip
+            .transition(g_short_transition)
+            .style("opacity", "1");
+
+        d3.select(this)
+            .transition(g_short_transition)
+            .style("opacity", 0.8)
+    }
+
+    function TipMove(d) {
+        g_tooltip
+            .html("<strong>" + d.data.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
+            .style("left", (d3.event.pageX + 15) + "px")
+            .style("top", (d3.event.pageY) + "px");
+    }
+
+    function TipHide(d) {
+        g_tooltip
+            .transition(g_short_transition)
+            .style("opacity", "0");
+
+        d3.select(this)
+            .transition(g_short_transition)
+            .style("opacity", 1);
+    }
+
+
+    //----------------------------------------------------------
     function DrawChart(title, data, switch_time) {
         // set the dimensions and margins of the graph
         var margin = 30, min_window = 300;
@@ -69,6 +118,9 @@
         chart.selectAll(".slice")
             .data(slice_data)
             .join('path')
+                .on("mouseover", TipShow)
+                .on("mousemove", TipMove)
+                .on("mouseleave", TipHide)
                 .transition()
                     .duration(switch_time)
                 .attr("class", "slice")
@@ -127,6 +179,7 @@
     }
 
 
+    //----------------------------------------------------------
     function OnResize() {
         if (g_data !== null) {
             DrawChart(g_title, g_data, 0);

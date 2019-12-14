@@ -10,12 +10,23 @@
 
 
 <style>
-    .x_label {
+    .tool-tip {
+        position: absolute;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.8);
+        color: bisque;
+        border-radius: 2px;
+        font-family: sans-serif;
+        font-size: x-small;
+        text-align: center;
+    }
+
+    .x-label {
         font-family: sans-serif;
         text-anchor: end;
     }
 
-    .y_label {
+    .y-label {
         font-family: sans-serif;
         text-anchor: end;
     }
@@ -36,10 +47,47 @@
     var y_axis = chart.append("g");
 
     var x_label = chart.append("text")
-        .attr("class", "x_label");
+        .attr("class", "x-label");
 
     var y_label = chart.append("text")
-        .attr("class", "y_label");
+        .attr("class", "y-label");
+
+
+    //----------------------------------------------------------
+    const g_short_transition = 200;
+    var g_tooltip = d3.select("#my_dataviz")
+        .append("div")
+            .attr('class', 'tool-tip')
+            .style("opacity", "0");
+
+    function TipShow(d) {
+        g_tooltip
+            .transition(g_short_transition)
+            .style("opacity", "1");
+
+        d3.select(this)
+            .transition(g_short_transition)
+            .style("stroke", "black")
+            .style("opacity", 0.8)
+    }
+
+    function TipMove(d) {
+        g_tooltip
+            .html("<strong>" + d.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
+            .style("left", (d3.event.pageX + 15) + "px")
+            .style("top", (d3.event.pageY) + "px");
+    }
+
+    function TipHide(d) {
+        g_tooltip
+            .transition(g_short_transition)
+            .style("opacity", "0");
+
+        d3.select(this)
+            .transition(g_short_transition)
+            .style("stroke", "none")
+            .style("opacity", 1);
+    }
 
 
     //----------------------------------------------------------
@@ -146,15 +194,18 @@
         chart.selectAll(".column")
             .data(data)
             .join("rect")
-                .transition()
-                    .duration(switch_time)
+                .on("mouseover", TipShow)
+                .on("mousemove", TipMove)
+                .on("mouseleave", TipHide)
+            .transition()
+                .duration(switch_time)
                 .attr("class", "column")
                 .attr("transform", "translate(" + plot_left + ", " + margin + ")")
                 .attr("x", function (d) { return x_scale(d.category); })
                 .attr("y", function (d) { return y_scale(d.value); })
                 .attr("width", x_scale.bandwidth())
                 .attr("height", function (d) { return plot_height - y_scale(d.value); })
-                .attr("fill", function (d) { return d.selected ? "DarkOrange" : "DarkSlateBlue";; });
+                .attr("fill", function (d) { return d.selected ? "DarkOrange" : "DarkSlateBlue"; });
     }
 
     function CreateChart(title, x_label_text, y_label_text, json_text, switch_time) {
