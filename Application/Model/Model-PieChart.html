@@ -2,8 +2,11 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 
-<!-- Load d3.js -->
+<!-- Start model -->
 <script src="https://d3js.org/d3.v5.js"></script>
+<button onclick="Update(data1)">Data 1</button>
+<button onclick="Update(data2)">Data 2</button>
+<!-- End model -->
 
 <!-- Create a div where the graph will take place -->
 <div id="my_dataviz"></div>
@@ -62,13 +65,13 @@
     //----------------------------------------------------------
     const g_short_transition = 200;
     var g_tooltip = d3.select("#my_dataviz")
-        .append("div")
-            .attr('class', 'tool-tip')
-            .style("opacity", "0");
+      .append("div")
+        .attr('class', 'tool-tip')
+        .style("opacity", 0);
 
     function TipShow(d) {
         g_tooltip.transition(g_short_transition)
-            .style("opacity", "1");
+            .style("opacity", 1);
 
         d3.select(this).transition(g_short_transition)
             .style("opacity", 0.8);
@@ -121,21 +124,23 @@
 
         // The "slice" generator
         var slice_generator = d3.arc()
-          .innerRadius(radius * 0.5)
-          .outerRadius(radius * 0.8);
+            .innerRadius(radius * 0.5)
+            .outerRadius(radius * 0.8);
 
         // Build the pie chart: each part of the pie is a path built using the arc function.
+        const ref_transition = d3.transition()
+            .duration(switch_time);
+
         chart.selectAll(".slice")
-            .data(slice_data)
-            .join('path')
-                .on("mouseover", TipShow)
-                .on("mousemove", TipMove)
-                .on("mouseleave", TipHide)
-            .transition()
-                .duration(switch_time)
-                .attr("class", "slice")
-                .attr('d', slice_generator)
-                .attr('fill', function (d) { return d.data.selected ? "DarkOrange" : "DarkSlateBlue"; })
+          .data(slice_data, function (d) { return d.data.category; })
+          .join('path')
+            .on("mouseover", TipShow)
+            .on("mousemove", TipMove)
+            .on("mouseleave", TipHide)
+            .attr("class", "slice")
+          .transition(ref_transition)
+            .attr('d', slice_generator)
+            .attr('fill', function (d) { return d.data.selected ? "DarkOrange" : "DarkSlateBlue"; })
 
         // Arc for label line elbows
         var elbow_generator = d3.arc()
@@ -144,40 +149,38 @@
 
         // Add the polylines between chart and labels
         chart.selectAll('.line')
-            .data(slice_data)
-            .join('polyline')
-            .transition()
-                .duration(switch_time)
-                .attr("class", "line")
-                .attr('points', function (d) {
-                    var slice_centre = slice_generator.centroid(d);
-                    var elbow = elbow_generator.centroid(d);
-                    var text = elbow_generator.centroid(d);
+          .data(slice_data, function (d) { return d.data.category; })
+          .join('polyline')
+            .attr("class", "line")
+          .transition(ref_transition)
+            .attr('points', function (d) {
+                var slice_centre = slice_generator.centroid(d);
+                var elbow = elbow_generator.centroid(d);
+                var text = elbow_generator.centroid(d);
 
-                    // we need the angle to see if the X position will be at the extreme right or extreme left
-                    var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
-                    text[0] = radius * 0.95 * (midangle < Math.PI ? 1 : -1);
-                    return [slice_centre, elbow, text];
-                });
+                // we need the angle to see if the X position will be at the extreme right or extreme left
+                var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                text[0] = radius * 0.95 * (midangle < Math.PI ? 1 : -1);
+                return [slice_centre, elbow, text];
+            });
 
         // Add the labels
         chart.selectAll('.label')
-            .data(slice_data)
-            .join('text')
-            .transition()
-                .duration(switch_time)
-                .attr("class", "label")
-                .text(function (d) { return d.data.category })
-                .attr('transform', function (d) {
-                    var pos = elbow_generator.centroid(d);
-                    var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
-                    pos[0] = radius * 0.99 * (midangle < Math.PI ? 1 : -1);
-                    return 'translate(' + pos + ')';
-                })
-                .style('text-anchor', function (d) {
-                    var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
-                    return (midangle < Math.PI ? 'start' : 'end')
-                });
+          .data(slice_data, function (d) { return d.data.category; })
+          .join('text')
+            .attr("class", "label")
+          .transition(ref_transition)
+            .text(function (d) { return d.data.category; })
+            .attr('transform', function(d) {
+                var pos = elbow_generator.centroid(d);
+                var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                pos[0] = radius * 0.99 * (midangle < Math.PI ? 1 : -1);
+                return 'translate(' + pos + ')';
+            })
+            .style('text-anchor', function (d) {
+                var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                return (midangle < Math.PI ? 'start' : 'end')
+            });
     }
 
     // draw the chart
@@ -199,7 +202,14 @@
 
 
     //----------------------------------------------------------
-    var model_text = '[{ "category": "P=[0.16]", "value": 1151, "selected": false }, { "category": "expire", "value": 1050, "selected": false }, { "category": "P=[0.15]", "value": 829, "selected": false }, { "category": "P=[0.17]", "value": 799, "selected": false }, { "category": "P=[0.09]", "value": 526, "selected": false }, { "category": "P=[0.18]", "value": 267, "selected": false }, { "category": "P=[0.08]", "value": 185, "selected": false }, { "category": "P=[0.19]", "value": 74, "selected": false }, { "category": "Other", "value": 252, "selected": false }]';
-    CreateChart("Title", model_text, 1000);
+    const data1 = '[{"category": "expire", "value": 129722, "selected": false}, {"category": "Other", "value": 4774, "selected": false}]';
+    const data2 = '[{"category": "P=[0.16]", "value": 1360, "selected": false}, {"category": "P=[0.17]", "value": 978, "selected": false}, {"category": "P=[0.15]", "value": 932, "selected": false}, {"category": "P=[0.09]", "value": 512, "selected": false}, {"category": "P=[0.18]", "value": 336, "selected": false}, {"category": "P=[0.08]", "value": 185, "selected": false}, {"category": "P=[0.19]", "value": 101, "selected": false}, {"category": "P=[0.22]", "value": 36, "selected": false}, {"category": "Other", "value": 218, "selected": false}]';
+
+    function Update(json_text) {
+        CreateChart("Title", json_text, 1000);
+    }
+
+    Update(data1);
+    Update(data2);
 
 </script>

@@ -2,8 +2,11 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 
-<!-- Load d3.js -->
+<!-- Start model -->
 <script src="https://d3js.org/d3.v5.js"></script>
+<button onclick="Update(data1)">Data 1</button>
+<button onclick="Update(data2)">Data 2</button>
+<!-- End model -->
 
 <!-- Create a div where the graph will take place -->
 <div id="my_dataviz"></div>
@@ -56,13 +59,13 @@
     //----------------------------------------------------------
     const g_short_transition = 200;
     var g_tooltip = d3.select("#my_dataviz")
-        .append("div")
-            .attr('class', 'tool-tip')
-            .style("opacity", "0");
+      .append("div")
+        .attr('class', 'tool-tip')
+        .style("opacity", 0);
 
     function TipShow(d) {
         g_tooltip.transition(g_short_transition)
-            .style("opacity", "1");
+            .style("opacity", 1);
 
         d3.select(this).transition(g_short_transition)
             .style("stroke", "black")
@@ -102,10 +105,10 @@
             .range([0, width]);
 
         x_axis
-            .call(d3.axisBottom(x_scale))
-            .selectAll("text")
-                .attr("transform", "translate(-10,0)rotate(-45)")
-                .style("text-anchor", "end");
+          .call(d3.axisBottom(x_scale))
+          .selectAll("text")
+            .attr("transform", "translate(-10,0)rotate(-45)")
+            .style("text-anchor", "end");
 
         return x_axis;
     }
@@ -139,20 +142,23 @@
 
     //----------------------------------------------------------
     function DrawChart(title, x_label_text, y_label_text, data, switch_time) {
+        // set the dimensions and margins of the graph
         const min_window = 300, margin = 30, gap = 5, min_col_width = 20, max_col_width = 40;
         const window_width = Math.max(min_window, document.documentElement.clientWidth);
         const window_height = Math.max(min_window, document.documentElement.clientHeight);
 
+        // determine layout sizes of the two axes
         var x_scale = d3.scaleBand()
             .domain(data.map(function (d) { return d.category; }))
             .padding(0.2);
 
         var y_scale = d3.scaleLinear()
-            .domain([0, d3.max(data, function (d) { return d.value })]);
+            .domain([0, d3.max(data, function (d) { return d.value; })]);
 
         const x_axis_height = CalcXAxisHeight(x_scale, window_width * 0.75);
         const y_axis_width = CalcYAxisWidth(y_scale, window_height * 0.75);
 
+        // determine layout sizes of the two labels
         x_label.text(x_label_text);
         const x_label_height = GetHeight(x_label);
 
@@ -161,13 +167,16 @@
             .text(y_label_text);
         const y_label_width = GetHeight(y_label);
 
+        // now determine locations for main elements
         const plot_left = margin + y_label_width + gap + y_axis_width;
         const col_width = Math.min(max_col_width, Math.max(min_col_width, 0.8 * (window_width - margin - plot_left) / data.length));
         const plot_width = data.length * col_width * 1.2;
         const plot_right = plot_left + plot_width;
-
         const plot_height = window_height - (2 * margin) - x_label_height - gap - x_axis_height;
         const plot_bottom = margin + plot_height;
+
+        const ref_transition = d3.transition()
+            .duration(switch_time);
 
         canvas
             .attr("width", window_width - margin)
@@ -175,33 +184,56 @@
 
         x_axis
             .attr("transform", "translate(" + plot_left + "," + plot_bottom + ")")
+          .transition(ref_transition)
             .call(SetupXAxis, x_scale, plot_width);
 
         y_axis
             .attr("transform", "translate(" + plot_left + ", " + margin + ")")
-            .transition()
-                .duration(switch_time)
+          .transition(ref_transition)
             .call(SetupYAxis, y_scale, plot_height);
 
         x_label
+          .transition(ref_transition)
             .attr("x", plot_right)
             .attr("y", plot_bottom + x_axis_height + gap + x_label_height);
 
         chart.selectAll(".column")
-            .data(data)
-            .join("rect")
-                .on("mouseover", TipShow)
-                .on("mousemove", TipMove)
-                .on("mouseleave", TipHide)
-            .transition()
-                .duration(switch_time)
-                .attr("class", "column")
-                .attr("transform", "translate(" + plot_left + ", " + margin + ")")
-                .attr("x", function (d) { return x_scale(d.category); })
-                .attr("y", function (d) { return y_scale(d.value); })
-                .attr("width", x_scale.bandwidth())
-                .attr("height", function (d) { return plot_height - y_scale(d.value); })
-                .attr("fill", function (d) { return d.selected ? "DarkOrange" : "DarkSlateBlue"; });
+          .data(data, function (d) { return d.category; })
+          .join(
+            function (enter) {
+                return enter.append("rect")
+                    .style("opacity", 0)
+                    .attr("x", function (d) { return x_scale(d.category); })
+                    .attr("y", -plot_bottom)
+                    .attr("width", x_scale.bandwidth());
+            },
+            function (update) {
+                return update;
+            },
+            function(exit) {
+                return exit
+                   .call(function(exit) {
+                       return exit.transition(ref_transition)
+                       .style("opacity", 0)
+                       .attr("y", 2 * plot_bottom)
+                       .on('end', function () {
+                           d3.select(this).remove();
+                       })
+                   })
+            }
+          )
+            .on("mouseover", TipShow)
+            .on("mousemove", TipMove)
+            .on("mouseleave", TipHide)
+            .attr("class", "column")
+            .attr("transform", "translate(" + plot_left + ", " + margin + ")")
+          .transition(ref_transition)
+            .style("opacity", 1)
+            .attr("x", function (d) { return x_scale(d.category); })
+            .attr("y", function (d) { return y_scale(d.value); })
+            .attr("width", x_scale.bandwidth())
+            .attr("height", function (d) { return plot_height - y_scale(d.value); })
+            .attr("fill", function (d) { return d.selected ? "DarkOrange" : "DarkSlateBlue"; });
     }
 
     function CreateChart(title, x_label_text, y_label_text, json_text, switch_time) {
@@ -224,7 +256,14 @@
 
 
     //----------------------------------------------------------
-    var model_text = '[{ "category": "P=[0.16]", "value": 1151, "selected": false }, { "category": "expire", "value": 1050, "selected": false }, { "category": "P=[0.15]", "value": 829, "selected": false }, { "category": "P=[0.17]", "value": 799, "selected": false }, { "category": "P=[0.09]", "value": 526, "selected": false }, { "category": "P=[0.18]", "value": 267, "selected": false }, { "category": "P=[0.08]", "value": 185, "selected": false }, { "category": "P=[0.19]", "value": 74, "selected": false }, { "category": "Other", "value": 252, "selected": false }]';
-    CreateChart("Title", "X label", "Y label", model_text, 1000);
+    const data1 = '[{"category":"P=[0.08]","value":185,"selected":false},{"category":"P=[0.09]","value":526,"selected":false},{"category":"P=[0.11]","value":5,"selected":false},{"category":"P=[0.12]","value":2,"selected":false},{"category":"P=[0.13]","value":1,"selected":false},{"category":"P=[0.14]","value":21,"selected":false},{"category":"P=[0.15]","value":829,"selected":false},{"category":"P=[0.16]","value":1151,"selected":false},{"category":"P=[0.17]","value":799,"selected":false},{"category":"P=[0.18]","value":267,"selected":false},{"category":"P=[0.19]","value":74,"selected":false},{"category":"P=[0.1]","value":26,"selected":false},{"category":"P=[0.21]","value":24,"selected":false},{"category":"P=[0.22]","value":21,"selected":false},{"category":"P=[0.23]","value":15,"selected":false},{"category":"P=[0.24]","value":16,"selected":false},{"category":"P=[0.25]","value":12,"selected":false},{"category":"P=[0.26]","value":6,"selected":false},{"category":"P=[0.27]","value":12,"selected":false},{"category":"P=[0.28]","value":4,"selected":false},{"category":"P=[0.29]","value":2,"selected":false},{"category":"P=[0.2]","value":30,"selected":false},{"category":"P=[0.31]","value":2,"selected":false},{"category":"P=[0.32]","value":4,"selected":false},{"category":"P=[0.33]","value":1,"selected":false},{"category":"P=[0.34]","value":6,"selected":false},{"category":"P=[0.35]","value":4,"selected":false},{"category":"P=[0.36]","value":2,"selected":false},{"category":"P=[0.37]","value":2,"selected":false},{"category":"P=[0.38]","value":2,"selected":false},{"category":"P=[0.39]","value":2,"selected":false},{"category":"P=[0.3]","value":4,"selected":false},{"category":"P=[0.42]","value":1,"selected":false},{"category":"P=[0.43]","value":2,"selected":false},{"category":"P=[0.45]","value":1,"selected":false},{"category":"P=[0.46]","value":2,"selected":false},{"category":"P=[0.48]","value":1,"selected":false},{"category":"P=[0.4]","value":1,"selected":false},{"category":"P=[0.51]","value":1,"selected":false},{"category":"P=[0.52]","value":1,"selected":false},{"category":"P=[0.54]","value":2,"selected":false},{"category":"P=[0.56]","value":3,"selected":false},{"category":"P=[0.57]","value":3,"selected":false},{"category":"P=[0.59]","value":1,"selected":false},{"category":"P=[0.61]","value":1,"selected":false},{"category":"P=[0.65]","value":2,"selected":false},{"category":"P=[0.68]","value":1,"selected":false},{"category":"P=[0.71]","value":1,"selected":false},{"category":"P=[1.16]","value":1,"selected":false},{"category":"P=[1.55]","value":1,"selected":false},{"category":"expire","value":1050,"selected":false}]';
+    const data2 = '[{"category":"P=[0.08]","value":185,"selected":false},{"category":"P=[0.09]","value":526,"selected":false},{"category":"P=[0.14]","value":21,"selected":false},{"category":"P=[0.15]","value":829,"selected":false},{"category":"P=[0.16]","value":1151,"selected":false},{"category":"P=[0.17]","value":799,"selected":false},{"category":"P=[0.18]","value":267,"selected":false},{"category":"P=[0.19]","value":74,"selected":false},{"category":"P=[0.1]","value":26,"selected":false},{"category":"P=[0.21]","value":24,"selected":false},{"category":"P=[0.22]","value":21,"selected":false},{"category":"P=[0.23]","value":15,"selected":false},{"category":"P=[0.24]","value":16,"selected":false},{"category":"P=[0.25]","value":12,"selected":false},{"category":"P=[0.26]","value":6,"selected":false},{"category":"P=[0.27]","value":12,"selected":false},{"category":"P=[0.2]","value":30,"selected":false},{"category":"P=[0.34]","value":6,"selected":false}]';
+
+    function Update(json_text) {
+        CreateChart("Title", "X label", "Y label", json_text, 1000);
+    }
+
+    Update(data1);
+    Update(data2);
 
 </script>
