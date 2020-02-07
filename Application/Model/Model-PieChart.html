@@ -133,12 +133,31 @@
 
         chart.selectAll(".slice")
           .data(slice_data, function (d) { return d.data.category; })
-          .join('path')
+          .join(
+            function (enter) {
+                return enter.append("path")
+                    .style("opacity", 0);
+            },
+            function (update) {
+                return update;
+            },
+            function(exit) {
+                return exit
+                   .call(function(exit) {
+                       return exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
             .on("mouseover", TipShow)
             .on("mousemove", TipMove)
             .on("mouseleave", TipHide)
             .attr("class", "slice")
           .transition(ref_transition)
+            .style("opacity", 1)
             .attr('d', slice_generator)
             .attr('fill', function (d) { return d.data.selected ? "DarkOrange" : "DarkSlateBlue"; })
 
@@ -150,9 +169,28 @@
         // Add the polylines between chart and labels
         chart.selectAll('.line')
           .data(slice_data, function (d) { return d.data.category; })
-          .join('polyline')
+          .join(
+            function (enter) {
+                return enter.append("polyline")
+                    .style("opacity", 0);
+            },
+            function (update) {
+                return update;
+            },
+            function(exit) {
+                return exit
+                   .call(function(exit) {
+                       return exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
             .attr("class", "line")
           .transition(ref_transition)
+            .style("opacity", 1)
             .attr('points', function (d) {
                 var slice_centre = slice_generator.centroid(d);
                 var elbow = elbow_generator.centroid(d);
@@ -167,11 +205,28 @@
         // Add the labels
         chart.selectAll('.label')
           .data(slice_data, function (d) { return d.data.category; })
-          .join('text')
+          .join(
+            function (enter) {
+                return enter.append("text")
+                    .style("opacity", 0);
+            },
+            function (update) {
+                return update;
+            },
+            function (exit) {
+                return exit
+                   .call(function (exit) {
+                       return exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
             .attr("class", "label")
-          .transition(ref_transition)
             .text(function (d) { return d.data.category; })
-            .attr('transform', function(d) {
+            .attr('transform', function (d) {
                 var pos = elbow_generator.centroid(d);
                 var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
                 pos[0] = radius * 0.99 * (midangle < Math.PI ? 1 : -1);
@@ -180,7 +235,9 @@
             .style('text-anchor', function (d) {
                 var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
                 return (midangle < Math.PI ? 'start' : 'end')
-            });
+            })
+        .transition(ref_transition)
+          .style("opacity", 1);
     }
 
     // draw the chart

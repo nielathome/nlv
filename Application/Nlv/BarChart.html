@@ -211,11 +211,11 @@
                 return exit
                    .call(function(exit) {
                        return exit.transition(ref_transition)
-                       .style("opacity", 0)
-                       .attr("y", 2 * plot_bottom)
-                       .on('end', function () {
-                           d3.select(this).remove();
-                       })
+                           .style("opacity", 0)
+                           .attr("y", 2 * plot_bottom)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
                    })
             }
           )
