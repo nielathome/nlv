@@ -1,0 +1,144 @@
+﻿<!-- Code originally from d3-graph-gallery.com -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Start model -->
+<script src="https://d3js.org/d3.v5.js"></script>
+<button onclick="Update(data1)">Data 1</button>
+<button onclick="Update(data2)">Data 2</button>
+<!-- End model -->
+
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz"></div>
+
+
+<style>
+    .links line {
+        stroke: #aaa;
+    }
+
+</style>
+
+
+<script>
+    //----------------------------------------------------------
+
+    // retained data
+    var g_data = null;
+
+    // append the svg object to the body of the page
+    var canvas = d3.select("#my_dataviz").append("svg");
+    var chart = canvas.append("g");
+
+
+    //----------------------------------------------------------
+    function DrawChart(title, data, switch_time) {
+        // set the dimensions and margins of the graph
+        const min_window = 300, margin = 30;
+        const window_width = Math.max(min_window, document.documentElement.clientWidth);
+        const window_height = Math.max(min_window, document.documentElement.clientHeight);
+
+        const ref_transition = d3.transition()
+            .duration(switch_time);
+
+        canvas
+            .attr("width", window_width - margin)
+            .attr("height", window_height - margin);
+
+        link = canvas.append("g")
+            .attr("class", "links")
+          .selectAll(".link")
+          .data(data.links)
+          .join(
+            function (enter) {
+                return enter.append("line");
+            },
+            function (update) {
+                return update;
+            },
+            function(exit) {
+                return exit
+                   .call(function(exit) {
+                       return exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
+            .attr("class", "link")
+
+        node = canvas.append("g")
+            .attr("class", "nodes")
+          .selectAll(".node")
+          .data(data.nodes)
+          .join(
+            function (enter) {
+                return enter.append("circle");
+            },
+            function (update) {
+                return update;
+            },
+            function (exit) {
+                return exit
+                   .call(function (exit) {
+                       return exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
+            .attr("class", "node")
+            .attr("r", 2.5)
+
+        simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links).id(function (node) { return node.id; }))
+            .force("charge", d3.forceManyBody())
+            .force("center", d3.forceCenter(window_width / 2, window_height / 2))
+            .on("tick", ticked);
+
+        function ticked() {
+            link
+                .attr("x1", function (d) { return d.source.x; })
+                .attr("y1", function (d) { return d.source.y; })
+                .attr("x2", function (d) { return d.target.x; })
+                .attr("y2", function (d) { return d.target.y; });
+
+            node
+                .attr("cx", function (d) { return d.x; })
+                .attr("cy", function (d) { return d.y; });
+        }
+    }
+
+    function CreateChart(title, json_text, switch_time) {
+        g_data = JSON.parse(json_text);
+        g_title = title;
+        DrawChart(g_title, g_data, switch_time);
+    }
+
+
+    //----------------------------------------------------------
+    function OnResize() {
+        if (g_data !== null) {
+            DrawChart(g_title, g_xlabel, g_ylabel, g_data, 0);
+        }
+    }
+
+//    window.addEventListener("resize", OnResize);
+
+
+    //----------------------------------------------------------
+    const data1 = '{"nodes":[{"id":"Neighbours","group":1,"count":7},{"id":"The Gadget Show","group":1,"count":2},{"id":"Good Will Hunting","group":1,"count":1},{"id":"Casualty","group":1,"count":2},{"id":"Snake Boss","group":1,"count":3},{"id":"Top Gear","group":1,"count":2},{"id":"Celebrity Apprentice USA","group":1,"count":1},{"id":"EastEnders","group":1,"count":4},{"id":"Room 101","group":1,"count":1},{"id":"Nightly Show with Gordon Ramsay","group":1,"count":4},{"id":"MasterChef","group":1,"count":3},{"id":"Come Dine with Me","group":1,"count":1},{"id":"Eddie Stobart","group":1,"count":1},{"id":"Channel-2005","group":2,"count":9},{"id":"Channel-2010","group":2,"count":1},{"id":"Channel-2001","group":2,"count":10},{"id":"Channel-2011","group":2,"count":3},{"id":"Channel-2002","group":2,"count":2},{"id":"Channel-2003","group":2,"count":4},{"id":"Channel-2012","group":2,"count":1},{"id":"Channel-2004","group":2,"count":1},{"id":"Channel-2055","group":2,"count":1},{"id":"CardId-1","group":3,"count":29},{"id":"CardId-2","group":3,"count":1},{"id":"CardId-7","group":3,"count":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Good Will Hunting","target":"Channel-2010"},{"source":"Good Will Hunting","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Snake Boss","target":"Channel-2011"},{"source":"Snake Boss","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"Celebrity Apprentice USA","target":"Channel-2001"},{"source":"Celebrity Apprentice USA","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Come Dine with Me","target":"Channel-2004"},{"source":"Come Dine with Me","target":"CardId-1"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
+    const data2 = '{"nodes":[{"id":"Neighbours","group":1,"count":7},{"id":"The Gadget Show","group":1,"count":2},{"id":"Good Will Hunting","group":1,"count":1},{"id":"Casualty","group":1,"count":2},{"id":"Snake Boss","group":1,"count":3},{"id":"Top Gear","group":1,"count":2},{"id":"Celebrity Apprentice USA","group":1,"count":1},{"id":"EastEnders","group":1,"count":4},{"id":"Room 101","group":1,"count":1},{"id":"Nightly Show with Gordon Ramsay","group":1,"count":4},{"id":"MasterChef","group":1,"count":3},{"id":"Come Dine with Me","group":1,"count":1},{"id":"Eddie Stobart","group":1,"count":1},{"id":"Channel-2005","group":2,"count":9},{"id":"Channel-2010","group":2,"count":1},{"id":"Channel-2001","group":2,"count":10},{"id":"Channel-2011","group":2,"count":3},{"id":"Channel-2002","group":2,"count":2},{"id":"Channel-2003","group":2,"count":4},{"id":"Channel-2012","group":2,"count":1},{"id":"Channel-2004","group":2,"count":1},{"id":"Channel-2055","group":2,"count":1},{"id":"CardId-1","group":3,"count":29},{"id":"CardId-2","group":3,"count":1},{"id":"CardId-7","group":3,"count":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Good Will Hunting","target":"Channel-2010"},{"source":"Good Will Hunting","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Snake Boss","target":"Channel-2011"},{"source":"Snake Boss","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"Celebrity Apprentice USA","target":"Channel-2001"},{"source":"Celebrity Apprentice USA","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Come Dine with Me","target":"Channel-2004"},{"source":"Come Dine with Me","target":"CardId-1"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
+
+    function Update(json_text) {
+        CreateChart("Title", json_text, 1000);
+    }
+
+    Update(data1);
+//    Update(data2);
+
+</script>
