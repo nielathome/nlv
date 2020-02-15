@@ -17,6 +17,11 @@
         stroke: #aaa;
     }
 
+    .nodes circle {
+        stroke: #fff;
+        stroke-width: 1.5px;
+        pointer-events: all;
+    }
 </style>
 
 
@@ -28,6 +33,8 @@
 
     // append the svg object to the body of the page
     var canvas = d3.select("#my_dataviz").append("svg");
+
+    const scale = d3.scaleOrdinal(d3.schemeCategory10);
 
 
     //----------------------------------------------------------
@@ -89,54 +96,59 @@
                    })
             }
           )
-            .attr("r", 2.5)
+            .attr("r", function (node) {
+                return 3 + node.count;
+            })
+            .attr("fill", function (node) {
+                return scale(node.group);
+            })
             .call(d3.drag()
-                .on("start", OnNodeDragStart)
-                .on("drag", OnNodeDrag)
-                .on("end", OnNodeDragEnd));
+                .on("start", function (node) {
+                    if (!d3.event.active)
+                        simulation.alphaTarget(0.3).restart();
+                    node.fx = node.x;
+                    node.fy = node.y;
+                })
+                .on("drag", function (node) {
+                    node.fx = d3.event.x;
+                    node.fy = d3.event.y;
+                })
+                .on("end", function (node) {
+                    if (!d3.event.active)
+                        simulation.alphaTarget(0);
+                    node.fx = null;
+                    node.fy = null;
+                })
+            );
 
         nodes.append("title")
             .text(function (node) { return node.id; });
 
         simulation = d3.forceSimulation(data.nodes)
-            .force("link", d3.forceLink(data.links).id(function (node) { return node.id; }))
+            .force("link", d3.forceLink(data.links)
+                .id(function (node) {
+                    return node.id;
+                })
+                .distance(50)
+            )
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter(window_width / 2, window_height / 2))
-            .on("tick", OnSimulationTick);
+            .on("tick", function OnSimulationTick() {
+                links
+                    .attr("x1", function (link) { return link.source.x; })
+                    .attr("y1", function (link) { return link.source.y; })
+                    .attr("x2", function (link) { return link.target.x; })
+                    .attr("y2", function (link) { return link.target.y; });
 
-        function OnSimulationTick() {
-            links
-                .attr("x1", function (link) { return link.source.x; })
-                .attr("y1", function (link) { return link.source.y; })
-                .attr("x2", function (link) { return link.target.x; })
-                .attr("y2", function (link) { return link.target.y; });
-
-            nodes
-                .attr("cx", function (node) { return node.x; })
-                .attr("cy", function (node) { return node.y; });
-        }
-
-        function OnNodeDragStart(d) {
-            if (!d3.event.active)
-                simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        }
-
-        function OnNodeDrag(d) {
-            d.fx = d3.event.x;
-            d.fy = d3.event.y;
-        }
-
-        function OnNodeDragEnd(d) {
-            if (!d3.event.active)
-                simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        }
-
-
+                nodes
+                    .attr("cx", function (node) { return node.x; })
+                    .attr("cy", function (node) { return node.y; });
+            });
     }
+
+    
+
+    
 
     function CreateChart(title, json_text, switch_time) {
         g_data = JSON.parse(json_text);
