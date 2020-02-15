@@ -28,7 +28,6 @@
 
     // append the svg object to the body of the page
     var canvas = d3.select("#my_dataviz").append("svg");
-    var chart = canvas.append("g");
 
 
     //----------------------------------------------------------
@@ -45,9 +44,9 @@
             .attr("width", window_width - margin)
             .attr("height", window_height - margin);
 
-        link = canvas.append("g")
+        links = canvas.append("g")
             .attr("class", "links")
-          .selectAll(".link")
+          .selectAll("line")
           .data(data.links)
           .join(
             function (enter) {
@@ -56,9 +55,9 @@
             function (update) {
                 return update;
             },
-            function(exit) {
+            function (exit) {
                 return exit
-                   .call(function(exit) {
+                   .call(function (exit) {
                        return exit.transition(ref_transition)
                            .style("opacity", 0)
                            .on('end', function () {
@@ -66,12 +65,11 @@
                            })
                    })
             }
-          )
-            .attr("class", "link")
+          );
 
-        node = canvas.append("g")
+        nodes = canvas.append("g")
             .attr("class", "nodes")
-          .selectAll(".node")
+          .selectAll("circle")
           .data(data.nodes)
           .join(
             function (enter) {
@@ -91,26 +89,53 @@
                    })
             }
           )
-            .attr("class", "node")
             .attr("r", 2.5)
+            .call(d3.drag()
+                .on("start", OnNodeDragStart)
+                .on("drag", OnNodeDrag)
+                .on("end", OnNodeDragEnd));
+
+        nodes.append("title")
+            .text(function (node) { return node.id; });
 
         simulation = d3.forceSimulation(data.nodes)
             .force("link", d3.forceLink(data.links).id(function (node) { return node.id; }))
             .force("charge", d3.forceManyBody())
             .force("center", d3.forceCenter(window_width / 2, window_height / 2))
-            .on("tick", ticked);
+            .on("tick", OnSimulationTick);
 
-        function ticked() {
-            link
-                .attr("x1", function (d) { return d.source.x; })
-                .attr("y1", function (d) { return d.source.y; })
-                .attr("x2", function (d) { return d.target.x; })
-                .attr("y2", function (d) { return d.target.y; });
+        function OnSimulationTick() {
+            links
+                .attr("x1", function (link) { return link.source.x; })
+                .attr("y1", function (link) { return link.source.y; })
+                .attr("x2", function (link) { return link.target.x; })
+                .attr("y2", function (link) { return link.target.y; });
 
-            node
-                .attr("cx", function (d) { return d.x; })
-                .attr("cy", function (d) { return d.y; });
+            nodes
+                .attr("cx", function (node) { return node.x; })
+                .attr("cy", function (node) { return node.y; });
         }
+
+        function OnNodeDragStart(d) {
+            if (!d3.event.active)
+                simulation.alphaTarget(0.3).restart();
+            d.fx = d.x;
+            d.fy = d.y;
+        }
+
+        function OnNodeDrag(d) {
+            d.fx = d3.event.x;
+            d.fy = d3.event.y;
+        }
+
+        function OnNodeDragEnd(d) {
+            if (!d3.event.active)
+                simulation.alphaTarget(0);
+            d.fx = null;
+            d.fy = null;
+        }
+
+
     }
 
     function CreateChart(title, json_text, switch_time) {
