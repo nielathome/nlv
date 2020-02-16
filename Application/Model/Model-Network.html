@@ -22,6 +22,12 @@
         stroke-width: 1.5px;
         pointer-events: all;
     }
+
+    .nodes text {
+        font-family: sans-serif;
+        font-size: x-small;
+        pointer-events: none;
+    }
 </style>
 
 
@@ -50,11 +56,12 @@
         const window_width = Math.max(min_window, document.documentElement.clientWidth);
         const window_height = Math.max(min_window, document.documentElement.clientHeight);
 
+        // reference for zoom transitions
         const ref_transition = d3.transition()
             .duration(switch_time);
 
-        curTransform = d3.zoomIdentity;
-        curZoom = curTransform.k;
+        var curTransform = d3.zoomIdentity;
+        var curZoom = curTransform.k;
 
         svg
             .attr("width", window_width - margin)
@@ -71,15 +78,28 @@
                 })
             );
 
-        links = links_group.selectAll("line")
+        var links = links_group.selectAll("line")
           .data(data.links)
           .join("line");
 
-        nodes = nodes_group.selectAll("circle")
+        // map node counts to a node size
+        const minNodeWeight = d3.min(data.nodes, function (node) {
+            return node.count;
+        });
+        const maxNodeWeight = d3.max(data.nodes, function (node) {
+            return node.count;
+        });
+
+        var nodeScale = d3.scaleLinear()
+            .domain([minNodeWeight, maxNodeWeight])
+            .range([4, 20])
+            .clamp(true);
+
+        var nodes = nodes_group.selectAll("circle")
           .data(data.nodes)
           .join("circle")
             .attr("r", function (node) {
-                return 3 + node.count;
+                return nodeScale(node.count);
             })
             .attr("fill", function (node) {
                 return scale(node.group);
@@ -104,10 +124,17 @@
                 })
             );
 
-        nodes.append("title")
-            .text(function (node) { return node.id; });
+        var labels = nodes_group.selectAll("text")
+          .data(data.nodes)
+          .join("text")
+            .text(function (d) {
+                return d.id;
+            })
+            .attr("x", function (node) {
+                return nodeScale(node.count);
+            });
 
-        simulation = d3.forceSimulation(data.nodes)
+        var simulation = d3.forceSimulation(data.nodes)
             .force("link", d3.forceLink(data.links)
                 .id(function (node) {
                     return node.id;
@@ -141,13 +168,18 @@
                     return curTransform.applyY(link.target.y);
                 });
 
+            function translate(item) {
+                // map model coord system to SVG coord system
+                const x = curTransform.applyX(item.x);
+                const y = curTransform.applyY(item.y);
+                return "translate(" + x + "," + y + ")";
+            }
+
             (doTransition ? nodes.transition(ref_transition) : nodes)
-                .attr("transform", function (node) {
-                    // map model coord system to SVG coord system
-                    x = curTransform.applyX(node.x);
-                    y = curTransform.applyY(node.y);
-                    return "translate(" + x + "," + y + ")";
-                });
+                .attr("transform", translate);
+
+            (doTransition ? labels.transition(ref_transition) : labels)
+                .attr("transform", translate);
         }
     }
 
