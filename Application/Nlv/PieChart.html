@@ -49,13 +49,13 @@
 
     // retained data
     var g_data = null;
-    var g_title = null;
+    var g_title_text = null;
 
     // append the svg object to the body of the page
-    var canvas = d3.select("#my_dataviz").append("svg");
-    var chart = canvas.append("g");
+    var g_svg = d3.select("#my_dataviz").append("svg");
+    var g_chart = g_svg.append("g");
 
-    var title = chart.append("text")
+    var g_title = g_chart.append("text")
         .attr("class", "title");
 
 
@@ -91,23 +91,23 @@
 
 
     //----------------------------------------------------------
-    function DrawChart(title_text, data, switch_time) {
+    function DrawChart(switch_time) {
         // set the dimensions and margins of the graph
         var margin = 30, min_window = 300;
         var window_width = Math.max(min_window, document.documentElement.clientWidth);
         var window_height = Math.max(min_window, document.documentElement.clientHeight);
         var radius = (Math.min(window_width, window_height) - (2 * margin)) / 2;
 
-        canvas
+        g_svg
             .attr("width", window_width - margin)
             .attr("height", window_height - margin);
 
-        chart
+        g_chart
             .attr("transform", "translate(" + window_width / 2 + "," + window_height / 2 + ")");
 
-        title.text(title_text);
-        title_bbox = title.node().getBBox();
-        title
+        g_title.text(g_title_text);
+        var title_bbox = g_title.node().getBBox();
+        g_title
             .attr("x", -title_bbox.width / 2)
             .attr("y", title_bbox.height / 2);
 
@@ -115,9 +115,11 @@
         var pie_generator = d3.pie()
             .startAngle(-0.75)
             .sort(null) // Do not sort by size
-            .value(function (d) { return d.value; });
+            .value(function (d) {
+                return d.value;
+            });
 
-        var slice_data = pie_generator(data);
+        var slice_data = pie_generator(g_data);
 
         // The "slice" generator
         var slice_generator = d3.arc()
@@ -128,8 +130,10 @@
         const ref_transition = d3.transition()
             .duration(switch_time);
 
-        chart.selectAll(".slice")
-          .data(slice_data, function (d) { return d.data.category; })
+        g_chart.selectAll(".slice")
+          .data(slice_data, function (d) {
+              return d.data.category;
+          })
           .join(
             function (enter) {
                 return enter.append("path")
@@ -141,7 +145,7 @@
             function(exit) {
                 return exit
                    .call(function(exit) {
-                       return exit.transition(ref_transition)
+                       exit.transition(ref_transition)
                            .style("opacity", 0)
                            .on('end', function () {
                                d3.select(this).remove();
@@ -156,7 +160,9 @@
           .transition(ref_transition)
             .style("opacity", 1)
             .attr('d', slice_generator)
-            .attr('fill', function (d) { return d.data.selected ? "DarkOrange" : "DarkSlateBlue"; })
+            .attr('fill', function (d) {
+                return d.data.selected ? "DarkOrange" : "DarkSlateBlue";
+            })
 
         // Arc for label line elbows
         var elbow_generator = d3.arc()
@@ -164,8 +170,10 @@
             .outerRadius(radius * 0.9);
 
         // Add the polylines between chart and labels
-        chart.selectAll('.line')
-          .data(slice_data, function (d) { return d.data.category; })
+        g_chart.selectAll('.line')
+          .data(slice_data, function (d) {
+              return d.data.category;
+          })
           .join(
             function (enter) {
                 return enter.append("polyline")
@@ -177,7 +185,7 @@
             function(exit) {
                 return exit
                    .call(function(exit) {
-                       return exit.transition(ref_transition)
+                       exit.transition(ref_transition)
                            .style("opacity", 0)
                            .on('end', function () {
                                d3.select(this).remove();
@@ -200,8 +208,10 @@
             });
 
         // Add the labels
-        chart.selectAll('.label')
-          .data(slice_data, function (d) { return d.data.category; })
+        g_chart.selectAll('.label')
+          .data(slice_data, function (d) {
+              return d.data.category;
+          })
           .join(
             function (enter) {
                 return enter.append("text")
@@ -222,7 +232,9 @@
             }
           )
             .attr("class", "label")
-            .text(function (d) { return d.data.category; })
+            .text(function (d) {
+                return d.data.category;
+            })
             .attr('transform', function (d) {
                 var pos = elbow_generator.centroid(d);
                 var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
@@ -240,15 +252,15 @@
     // draw the chart
     function CreateChart(title, json_text, switch_time) {
         g_data = JSON.parse(json_text);
-        g_title = title;
-        DrawChart(g_title, g_data, switch_time);
+        g_title_text = title;
+        DrawChart(switch_time);
     }
 
 
     //----------------------------------------------------------
     function OnResize() {
         if (g_data !== null) {
-            DrawChart(g_title, g_data, 0);
+            DrawChart(g_data, 0);
         }
     }
 

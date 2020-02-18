@@ -36,21 +36,22 @@
 
     // retained data
     var g_data = null;
+    var g_title_text = null;
 
     // append the svg object to the body of the page
-    var svg = d3.select("#my_dataviz").append("svg");
+    var g_svg = d3.select("#my_dataviz").append("svg");
 
-    var links_group = svg.append("g")
+    var g_links_group = g_svg.append("g")
         .attr("class", "links");
 
-    var nodes_group = svg.append("g")
+    var g_nodes_group = g_svg.append("g")
         .attr("class", "nodes");
 
-    const scale = d3.scaleOrdinal(d3.schemeCategory10);
+    const g_scale = d3.scaleOrdinal(d3.schemeCategory10);
 
 
     //----------------------------------------------------------
-    function DrawChart(title, data, switch_time) {
+    function DrawChart(switch_time) {
         // set the dimensions and margins of the graph
         const min_window = 300, margin = 30;
         const window_width = Math.max(min_window, document.documentElement.clientWidth);
@@ -63,7 +64,7 @@
         var curTransform = d3.zoomIdentity;
         var curZoom = curTransform.k;
 
-        svg
+        g_svg
             .attr("width", window_width - margin)
             .attr("height", window_height - margin)
             .call(d3.zoom()
@@ -78,15 +79,15 @@
                 })
             );
 
-        var links = links_group.selectAll("line")
-          .data(data.links)
+        var links = g_links_group.selectAll("line")
+          .data(g_data.links)
           .join("line");
 
         // map node counts to a node size
-        const minNodeWeight = d3.min(data.nodes, function (node) {
+        const minNodeWeight = d3.min(g_data.nodes, function (node) {
             return node.count;
         });
-        const maxNodeWeight = d3.max(data.nodes, function (node) {
+        const maxNodeWeight = d3.max(g_data.nodes, function (node) {
             return node.count;
         });
 
@@ -95,14 +96,14 @@
             .range([4, 20])
             .clamp(true);
 
-        var nodes = nodes_group.selectAll("circle")
-          .data(data.nodes)
+        var nodes = g_nodes_group.selectAll("circle")
+          .data(g_data.nodes)
           .join("circle")
             .attr("r", function (node) {
                 return nodeScale(node.count);
             })
             .attr("fill", function (node) {
-                return scale(node.group);
+                return g_scale(node.group);
             })
             .call(d3.drag()
                 .on("start", function (node) {
@@ -124,8 +125,8 @@
                 })
             );
 
-        var labels = nodes_group.selectAll("text")
-          .data(data.nodes)
+        var labels = g_nodes_group.selectAll("text")
+          .data(g_data.nodes)
           .join("text")
             .text(function (d) {
                 return d.id;
@@ -134,8 +135,8 @@
                 return nodeScale(node.count);
             });
 
-        var simulation = d3.forceSimulation(data.nodes)
-            .force("link", d3.forceLink(data.links)
+        var simulation = d3.forceSimulation(g_data.nodes)
+            .force("link", d3.forceLink(g_data.links)
                 .id(function (node) {
                     return node.id;
                 })
@@ -186,15 +187,15 @@
     
     function CreateChart(title, json_text, switch_time) {
         g_data = JSON.parse(json_text);
-        g_title = title;
-        DrawChart(g_title, g_data, switch_time);
+        g_title_text = title;
+        DrawChart(switch_time);
     }
 
 
     //----------------------------------------------------------
     function OnResize() {
         if (g_data !== null) {
-            DrawChart(g_title, g_xlabel, g_ylabel, g_data, 0);
+            DrawChart(0);
         }
     }
 
