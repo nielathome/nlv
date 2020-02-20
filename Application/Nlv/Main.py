@@ -63,11 +63,21 @@ if _G_WantProfiling:
 
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
+    # List of callback handlers; allows a chart to call back
+    # into th hosting Python
+    _Callbacks = dict()
+
     # Trident/IE require non-standard MIME type for JavaScript,
     # without this, the JavaScript is not executed
     http.server.SimpleHTTPRequestHandler.extensions_map.update({
         '.js': 'text/javascript'
     })
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def RegisterCallback(cls, name, action):
+        cls._Callbacks[name] = action
 
 
     #-------------------------------------------------------
@@ -89,11 +99,22 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     #-------------------------------------------------------
     def translate_path(self, path):
         install_dir = G_Global.GetInstallDir()
-        candidate = install_dir / path.lstrip("/")
-        if candidate.exists():
-            return str(candidate)
-        else:
-            return ""
+        path = path.lstrip("/")
+        cgi = path.split('?')
+        if len(cgi) == 1:
+            candidate = install_dir / path
+            if candidate.exists():
+                return str(candidate)
+
+        elif len(cgi) == 2:
+            name, args = cgi
+            action = self._Callbacks.get(name)
+            if action is not None:
+                action(args)
+                return install_dir / "empty.json"
+
+        # error, not found
+        return ""
 
 
 
@@ -334,6 +355,8 @@ class G_LogViewFrame(wx.Frame):
         # layout and display
         self._AuiManager.Update()
 
+        self.BindHttpCallback("select", self.TestFunc)
+
         # local HTTPD
         httpd = threading.Thread(target = RunHttpServer)
         httpd.daemon = True
@@ -356,6 +379,14 @@ class G_LogViewFrame(wx.Frame):
     def GetDataExplorerPanel(self):
         return self._DataExplorerPanel
 
+
+    #-------------------------------------------------------
+    @staticmethod
+    def BindHttpCallback(name, action):
+        HttpRequestHandler.RegisterCallback(name, action)
+
+    def TestFunc(self, arg):
+        p = arg
 
     #-------------------------------------------------------
     def OnCloseWindow(self, event):

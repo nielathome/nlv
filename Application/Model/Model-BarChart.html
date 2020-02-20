@@ -38,6 +38,12 @@
 
 <script>
     //----------------------------------------------------------
+    function OnClick(d) {
+        console.log("Column selected: " + d.category);
+    }
+
+
+    //----------------------------------------------------------
 
     // retained data
     var g_data = null;
@@ -63,7 +69,7 @@
         .attr('class', 'tool-tip')
         .style("opacity", 0);
 
-    function TipShow(d) {
+    function OnTipShow(d) {
         g_tooltip.transition(g_short_transition)
             .style("opacity", 1);
 
@@ -72,14 +78,14 @@
             .style("opacity", 0.8);
     }
 
-    function TipMove(d) {
+    function OnTipMove(d) {
         g_tooltip
             .html("<strong>" + d.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
             .style("left", (d3.event.pageX + 15) + "px")
             .style("top", (d3.event.pageY) + "px");
     }
 
-    function TipHide(d) {
+    function OnTipHide(d) {
         g_tooltip.transition(g_short_transition)
             .style("opacity", "0");
 
@@ -230,9 +236,10 @@
                    })
             }
           )
-            .on("mouseover", TipShow)
-            .on("mousemove", TipMove)
-            .on("mouseleave", TipHide)
+            .on("click", OnClick)
+            .on("mouseover", OnTipShow)
+            .on("mousemove", OnTipMove)
+            .on("mouseleave", OnTipHide)
             .attr("class", "column")
             .attr("transform", "translate(" + plot_left + ", " + margin + ")")
           .transition(ref_transition)
