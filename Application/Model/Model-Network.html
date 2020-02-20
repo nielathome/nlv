@@ -1,0 +1,215 @@
+﻿<!-- Code originally from d3-graph-gallery.com -->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Start model -->
+<script src="https://d3js.org/d3.v5.js"></script>
+<button onclick="Update(data1)">Data 1</button>
+<button onclick="Update(data2)">Data 2</button>
+<!-- End model -->
+
+<!-- Create a div where the graph will take place -->
+<div id="my_dataviz"></div>
+
+
+<style>
+    .links line {
+        stroke: #aaa;
+    }
+
+    .nodes circle {
+        stroke: #fff;
+        stroke-width: 1.5px;
+        pointer-events: all;
+    }
+
+    .nodes text {
+        font-family: sans-serif;
+        font-size: x-small;
+        pointer-events: none;
+    }
+</style>
+
+
+<script>
+    //----------------------------------------------------------
+
+    // retained data
+    var g_data = null;
+    var g_title_text = null;
+
+    // append the svg object to the body of the page
+    var g_svg = d3.select("#my_dataviz").append("svg");
+
+    var g_links_group = g_svg.append("g")
+        .attr("class", "links");
+
+    var g_nodes_group = g_svg.append("g")
+        .attr("class", "nodes");
+
+    const g_scale = d3.scaleOrdinal(d3.schemeCategory10);
+
+
+    //----------------------------------------------------------
+    function DrawChart(switch_time) {
+        // set the dimensions and margins of the graph
+        const min_window = 300, margin = 30;
+        const window_width = Math.max(min_window, document.documentElement.clientWidth);
+        const window_height = Math.max(min_window, document.documentElement.clientHeight);
+
+        // reference for zoom transitions
+        const ref_transition = d3.transition()
+            .duration(switch_time);
+
+        var curTransform = d3.zoomIdentity;
+        var curZoom = curTransform.k;
+
+        g_svg
+            .attr("width", window_width - margin)
+            .attr("height", window_height - margin)
+            .call(d3.zoom()
+                .scaleExtent([1, 8])
+                .wheelDelta(function wheelDelta() {
+                    // d3.event here is the underlying WheelEvent
+                    return -d3.event.deltaY * (d3.event.deltaMode === 1 ? 0.25 : d3.event.deltaMode ? 1 : 0.01);
+                })
+                .on("zoom", function() {
+                    curTransform = d3.event.transform;
+                    Layout();
+                })
+            );
+
+        var links = g_links_group.selectAll("line")
+          .data(g_data.links)
+          .join("line");
+
+        // map node counts to a node size
+        const minNodeWeight = d3.min(g_data.nodes, function (node) {
+            return node.count;
+        });
+        const maxNodeWeight = d3.max(g_data.nodes, function (node) {
+            return node.count;
+        });
+
+        var nodeScale = d3.scaleLinear()
+            .domain([minNodeWeight, maxNodeWeight])
+            .range([4, 20])
+            .clamp(true);
+
+        var nodes = g_nodes_group.selectAll("circle")
+          .data(g_data.nodes)
+          .join("circle")
+            .attr("r", function (node) {
+                return nodeScale(node.count);
+            })
+            .attr("fill", function (node) {
+                return g_scale(node.group);
+            })
+            .call(d3.drag()
+                .on("start", function (node) {
+                    if (!d3.event.active)
+                        simulation.alphaTarget(0.3).restart();
+                    node.fx = node.x;
+                    node.fy = node.y;
+                })
+                .on("drag", function (node) {
+                    // map SVG coord system back to model coord system
+                    node.fx += d3.event.dx / curZoom;
+                    node.fy += d3.event.dy / curZoom;
+                })
+                .on("end", function (node) {
+                    if (!d3.event.active)
+                        simulation.alphaTarget(0);
+                    node.fx = null;
+                    node.fy = null;
+                })
+            );
+
+        var labels = g_nodes_group.selectAll("text")
+          .data(g_data.nodes)
+          .join("text")
+            .text(function (d) {
+                return d.id;
+            })
+            .attr("x", function (node) {
+                return nodeScale(node.count);
+            });
+
+        var simulation = d3.forceSimulation(g_data.nodes)
+            .force("link", d3.forceLink(g_data.links)
+                .id(function (node) {
+                    return node.id;
+                })
+                .distance(50)
+            )
+            .force("charge", d3.forceManyBody())
+            .force("center", d3.forceCenter(window_width / 2, window_height / 2))
+            .on("tick", Layout);
+            
+        
+        function Layout() {
+            const doTransition = (curZoom != curTransform.k);
+            curZoom = curTransform.k;
+
+            const ref_transition = d3.transition()
+                .duration(250);
+
+            (doTransition ? links.transition(ref_transition) : links)
+                // map model coord system to SVG coord system
+                .attr("x1", function (link) {
+                    return curTransform.applyX(link.source.x);
+                })
+                .attr("y1", function (link) {
+                    return curTransform.applyY(link.source.y);
+                })
+                .attr("x2", function (link) {
+                    return curTransform.applyX(link.target.x);
+                })
+                .attr("y2", function (link) {
+                    return curTransform.applyY(link.target.y);
+                });
+
+            function translate(item) {
+                // map model coord system to SVG coord system
+                const x = curTransform.applyX(item.x);
+                const y = curTransform.applyY(item.y);
+                return "translate(" + x + "," + y + ")";
+            }
+
+            (doTransition ? nodes.transition(ref_transition) : nodes)
+                .attr("transform", translate);
+
+            (doTransition ? labels.transition(ref_transition) : labels)
+                .attr("transform", translate);
+        }
+    }
+
+    
+    function CreateChart(title, json_text, switch_time) {
+        g_data = JSON.parse(json_text);
+        g_title_text = title;
+        DrawChart(switch_time);
+    }
+
+
+    //----------------------------------------------------------
+    function OnResize() {
+        if (g_data !== null) {
+            DrawChart(0);
+        }
+    }
+
+//    window.addEventListener("resize", OnResize);
+
+
+    //----------------------------------------------------------
+    const data1 = '{"nodes":[{"id":"Neighbours","group":1,"count":7},{"id":"The Gadget Show","group":1,"count":2},{"id":"Good Will Hunting","group":1,"count":1},{"id":"Casualty","group":1,"count":2},{"id":"Snake Boss","group":1,"count":3},{"id":"Top Gear","group":1,"count":2},{"id":"Celebrity Apprentice USA","group":1,"count":1},{"id":"EastEnders","group":1,"count":4},{"id":"Room 101","group":1,"count":1},{"id":"Nightly Show with Gordon Ramsay","group":1,"count":4},{"id":"MasterChef","group":1,"count":3},{"id":"Come Dine with Me","group":1,"count":1},{"id":"Eddie Stobart","group":1,"count":1},{"id":"Channel-2005","group":2,"count":9},{"id":"Channel-2010","group":2,"count":1},{"id":"Channel-2001","group":2,"count":10},{"id":"Channel-2011","group":2,"count":3},{"id":"Channel-2002","group":2,"count":2},{"id":"Channel-2003","group":2,"count":4},{"id":"Channel-2012","group":2,"count":1},{"id":"Channel-2004","group":2,"count":1},{"id":"Channel-2055","group":2,"count":1},{"id":"CardId-1","group":3,"count":29},{"id":"CardId-2","group":3,"count":1},{"id":"CardId-7","group":3,"count":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Good Will Hunting","target":"Channel-2010"},{"source":"Good Will Hunting","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Snake Boss","target":"Channel-2011"},{"source":"Snake Boss","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"Celebrity Apprentice USA","target":"Channel-2001"},{"source":"Celebrity Apprentice USA","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Come Dine with Me","target":"Channel-2004"},{"source":"Come Dine with Me","target":"CardId-1"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
+    const data2 = '{"nodes":[{"id":"Neighbours","group":1,"count":7},{"id":"The Gadget Show","group":1,"count":2},{"id":"Casualty","group":1,"count":2},{"id":"Top Gear","group":1,"count":2},{"id":"EastEnders","group":1,"count":4},{"id":"Room 101","group":1,"count":1},{"id":"Nightly Show with Gordon Ramsay","group":1,"count":4},{"id":"MasterChef","group":1,"count":3},{"id":"Eddie Stobart","group":1,"count":1},{"id":"Channel-2005","group":2,"count":9},{"id":"Channel-2001","group":2,"count":10},{"id":"Channel-2002","group":2,"count":2},{"id":"Channel-2003","group":2,"count":4},{"id":"Channel-2012","group":2,"count":1},{"id":"Channel-2055","group":2,"count":1},{"id":"CardId-1","group":3,"count":29},{"id":"CardId-2","group":3,"count":1},{"id":"CardId-7","group":3,"count":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
+
+    function Update(json_text) {
+        CreateChart("Title", json_text, 1000);
+    }
+
+    Update(data1);
+
+</script>

@@ -15,7 +15,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import Nlv.Chart as ch
+import Nlv.Chart as Chart
 import re
 
 
@@ -334,7 +334,7 @@ def SummaryQuantifier(connection, cursor):
             event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
             summary TEXT,
             count INT,
-            sum INT,
+            duration INT,
             average REAL
         )""")
 
@@ -343,7 +343,7 @@ def SummaryQuantifier(connection, cursor):
         (
             summary,
             count,
-            sum,
+            duration,
             average
         )
         SELECT
@@ -369,37 +369,5 @@ metrics = projection.Quantify(
 )
 
 
-metrics.Chart("By Count", True, ch.PieChart("summary", "count"))
-metrics.Chart("By Duration", True, ch.PieChart("summary", "sum"))
-#metrics.Chart("Durations", True, ch.BarChart("summary", "average"))
-
-
-
-## TimingQuantifier ############################################
-
-#class TimingQuantifier:
-
-#    #-----------------------------------------------------------
-#    @staticmethod
-#    def DefineSchema(schema):
-#        schema.AddField("Category", "text", 150, "left")
-#        schema.AddField("Duration (s)", "uint32", 80, "left")
-
-
-#    #-----------------------------------------------------------
-#    def __init__(self):
-#        self.Name = "Histogram"
-#        self.Charts = [
-#            EventMetrics.HistogramChart("Histogram", 0, 1),
-#        ]
-
-
-#    #-----------------------------------------------------------
-#    def Assemble(self, metrics, num_metrics, collector):
-#        category_id = collector.GetFieldId("Event Summary")
-#        value_id = collector.GetFieldId("Duration (s)")
-
-#        for evt_no in range(num_metrics):
-#            category = metrics.GetFieldText(evt_no, category_id)
-#            value = metrics.GetFieldValueUnsigned(evt_no, value_id)
-#            collector.AddMetric([category, value])
+metrics.Chart("By Count", True, Chart.Bar("Summary", "Count"))
+metrics.Chart("By Duration", True, Chart.Pie("Summary", "Duration (s)"))
