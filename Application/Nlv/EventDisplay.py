@@ -983,6 +983,7 @@ class G_ParameterCollector:
         return self._Params
 
 
+
 ## G_ChartViewCtrlProxy ####################################
 
 class G_ChartViewCtrlProxy:
@@ -1095,7 +1096,7 @@ class G_ChartViewCtrl(wx.Panel):
 
         self._Figure = wx.html2.WebView.New(self)
         self._Figure.EnableHistory(False)
-#        self._Figure.EnableContextMenu(False)
+        self._Figure.EnableContextMenu(False)
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 

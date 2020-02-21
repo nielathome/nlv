@@ -17,7 +17,9 @@
 
 # Python imports
 import argparse
+import base64
 import http.server
+import json
 import logging
 from pathlib import Path
 import socketserver 
@@ -64,7 +66,7 @@ if _G_WantProfiling:
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     # List of callback handlers; allows a chart to call back
-    # into th hosting Python
+    # into the hosting Python
     _Callbacks = dict()
 
     # Trident/IE require non-standard MIME type for JavaScript,
@@ -100,17 +102,21 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     def translate_path(self, path):
         install_dir = G_Global.GetInstallDir()
         path = path.lstrip("/")
-        cgi = path.split('?')
-        if len(cgi) == 1:
+        cgi_list = path.split('?')
+
+        if len(cgi_list) == 1:
             candidate = install_dir / path
             if candidate.exists():
                 return str(candidate)
 
-        elif len(cgi) == 2:
-            name, args = cgi
+        elif len(cgi_list) == 2:
+            name, args_encoded_text = cgi_list
             action = self._Callbacks.get(name)
+
             if action is not None:
-                action(args)
+                args_json_text = base64.urlsafe_b64decode(args_encoded_text)
+                args = json.loads(args_json_text)
+                action(**args)
                 return install_dir / "empty.json"
 
         # error, not found
@@ -385,8 +391,8 @@ class G_LogViewFrame(wx.Frame):
     def BindHttpCallback(name, action):
         HttpRequestHandler.RegisterCallback(name, action)
 
-    def TestFunc(self, arg):
-        p = arg
+    def TestFunc(self, category):
+        p = category
 
     #-------------------------------------------------------
     def OnCloseWindow(self, event):
