@@ -37,10 +37,16 @@
 
 <script>
     //----------------------------------------------------------
-    function HostBridge(name, args_object) {
+    var g_node_id = 0
+
+    function SetNodeId(node_id) {
+        g_node_id = node_id;
+    }
+
+    function HostBridge(method, args_object) {
         args_json_text = JSON.stringify(args_object);
         args_encoded_text = btoa(args_json_text);
-        cgi_text = "/" + name + "?" + args_encoded_text;
+        cgi_text = "/" + g_node_id + "." + method + "?" + args_encoded_text;
 
         d3.json(cgi_text, function (error, json) {
             if (error)
@@ -49,8 +55,10 @@
 
     }
 
+
+    //----------------------------------------------------------
     function OnClick(d) {
-        HostBridge("select", { category: d.category });
+        HostBridge("OnChartSelection", { category: d.category });
     }
 
 

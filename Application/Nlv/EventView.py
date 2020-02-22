@@ -1653,6 +1653,10 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
             self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
 
+    def OnChartSelection(self, category):
+        p = category
+
+
     #-------------------------------------------------------
     def OnDisplayKey(self, key_code, modifiers, view_node):
         handled = False

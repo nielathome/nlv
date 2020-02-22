@@ -1081,7 +1081,7 @@ class G_ChartViewCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_designer, metrics_db_path, table_view_ctrl, error_reporter):
+    def __init__(self, parent, chart_designer, metrics_db_path, table_view_ctrl, error_reporter, node_id):
         super().__init__(parent)
 
         self._ChartDesigner = chart_designer
@@ -1090,7 +1090,7 @@ class G_ChartViewCtrl(wx.Panel):
         self._ErrorReporter = error_reporter
 
         self._ParamaterValues = dict()
-        self._ScriptQueue = []
+        self._ScriptQueue = ["SetNodeId({});".format(node_id)]
 
         self.InitCharting()
 
@@ -1303,7 +1303,7 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
             if pane_sizer.IsEmpty():
                 for chart_info in quantifier_info.Charts:
-                    chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, self._TableViewCtrl, self._ErrorReporter)
+                    chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, self._TableViewCtrl, self._ErrorReporter, node.GetNodeId())
                     pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
 #                    node.InterceptSetFocus(chart_view_ctrl)
 

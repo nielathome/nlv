@@ -22,6 +22,7 @@ import http.server
 import json
 import logging
 from pathlib import Path
+from queue import Queue
 import socketserver 
 import sys
 import threading
@@ -65,9 +66,9 @@ if _G_WantProfiling:
 
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
-    # List of callback handlers; allows a chart to call back
-    # into the hosting Python
-    _Callbacks = dict()
+    # Callback handler; allows a chart to call back into the
+    # hosting Python
+    _Callback = None
 
     # Trident/IE require non-standard MIME type for JavaScript,
     # without this, the JavaScript is not executed
@@ -78,8 +79,8 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     #-------------------------------------------------------
     @classmethod
-    def RegisterCallback(cls, name, action):
-        cls._Callbacks[name] = action
+    def RegisterCallback(cls, callabck):
+        cls._Callback = callabck
 
 
     #-------------------------------------------------------
@@ -104,20 +105,18 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         path = path.lstrip("/")
         cgi_list = path.split('?')
 
-        if len(cgi_list) == 1:
+        if len(cgi_list) == 1 or self._Callback is None:
             candidate = install_dir / path
             if candidate.exists():
                 return str(candidate)
 
         elif len(cgi_list) == 2:
-            name, args_encoded_text = cgi_list
-            action = self._Callbacks.get(name)
-
-            if action is not None:
-                args_json_text = base64.urlsafe_b64decode(args_encoded_text)
-                args = json.loads(args_json_text)
-                action(**args)
-                return install_dir / "empty.json"
+            action, args_encoded_text = cgi_list
+            node_id, method = action.split('.')
+            args_json_text = base64.standard_b64decode(args_encoded_text)
+            args = json.loads(args_json_text)
+            self._Callback(int(node_id), method, args)
+            return install_dir / "empty.json"
 
         # error, not found
         return ""
@@ -361,7 +360,11 @@ class G_LogViewFrame(wx.Frame):
         # layout and display
         self._AuiManager.Update()
 
-        self.BindHttpCallback("select", self.TestFunc)
+        # HTTP callback processors; used to move requests from HTTP clients
+        # from the HTTP thread to the UI thread
+        self._HttpActions = Queue()
+        HttpRequestHandler.RegisterCallback(self.OnHttpAction)
+        self.Bind(wx.EVT_IDLE, self.OnIdle)
 
         # local HTTPD
         httpd = threading.Thread(target = RunHttpServer)
@@ -387,12 +390,14 @@ class G_LogViewFrame(wx.Frame):
 
 
     #-------------------------------------------------------
-    @staticmethod
-    def BindHttpCallback(name, action):
-        HttpRequestHandler.RegisterCallback(name, action)
+    def OnHttpAction(self, node_id, method, args):
+        self._HttpActions.put((node_id, method, args))
 
-    def TestFunc(self, category):
-        p = category
+    def OnIdle(self, event):
+        if not self._HttpActions.empty():
+            node_id, method, args = self._HttpActions.get()
+            self.GetProject().OnHttpAction(node_id, method, args)
+
 
     #-------------------------------------------------------
     def OnCloseWindow(self, event):

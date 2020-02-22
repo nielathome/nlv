@@ -1941,6 +1941,30 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         self.OnDisplayPopupMenu(self._Tree, _Item2Node(event.GetItem()))
 
 
+    #-------------------------------------------------------
+    def OnHttpAction(self, node_id, method, args):
+        """
+        A contained Webpage has called back into the application
+        via the JavaScript -> Python bridge. Forward the request
+        to the correct node/method.
+        """
+
+        node = self.GetRootNode().FindChildNode(self, node_id = node_id, recursive = True)
+        if node is None:
+            logging.error("HTTP bridge: unknown node_id: {}".format(node_id))
+            return
+
+        func = getattr(node, method, None)
+        if func is None:
+            logging.error("HTTP bridge: unknown method: {}".format(method))
+            return
+
+        try:
+            func(**args)
+        except:
+            logging.error("HTTP bridge: exception")
+
+
 
 ## MODULE ##################################################
 
