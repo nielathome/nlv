@@ -149,7 +149,7 @@ class D_Base:
 
             if base_element is not None:
                 gallery_factory_id = base_element.text
-                gallery_node = node.FindChildNode(gallery_factory_id, recursive = True)
+                gallery_node = node.FindChildNode(factory_id = gallery_factory_id, recursive = True)
 
                 # document can be null during application shutdown
                 document = gallery_node.GetDocument()

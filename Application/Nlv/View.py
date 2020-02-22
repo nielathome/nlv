@@ -1090,7 +1090,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
     #-------------------------------------------------------
     def GetTrackInfo(self):
-        return self.FindChildNode(G_Project.NodeID_ViewTracking).GetTrackInfo()
+        return self.FindChildNode(factory_id = G_Project.NodeID_ViewTracking).GetTrackInfo()
 
     def GetNearestUtcTimecode(self, line_no):
         return self._N_View.GetNearestUtcTimecode(line_no)

@@ -175,6 +175,7 @@ class G_Node:
     """Base class for application data held in the project"""
 
     _GetThemeId = None
+    _NodeCount = 100
 
 
     #-------------------------------------------------------
@@ -236,7 +237,10 @@ class G_Node:
         self._WProject = wproject
         self._WItem = witem
         self._Document = None
+
         self._Initialising = True
+        self._NodeId = G_Node._NodeCount
+        G_Node._NodeCount += 1
 
     def PostInitNode(self):
         """
@@ -322,6 +326,9 @@ class G_Node:
     def GetIndex(self):
         """Return the index of this child within the parent container"""
         return self.GetParentNode().GetHrItem().GetChildIndex(self)
+
+    def GetNodeId(self):
+        return self._NodeId
 
     def GetNodeName(self):
         return self.GetHrItem().GetText()
@@ -482,7 +489,7 @@ class G_Node:
 
 
     #-------------------------------------------------------
-    def VisitSubNodes(self, call_back, factory_id = None, recursive = False, depth_first = True, include_self = False):
+    def VisitSubNodes(self, call_back, factory_id = None, node_id = None, recursive = False, depth_first = True, include_self = False):
         """
         Call the callback for each child node.
 
@@ -490,7 +497,10 @@ class G_Node:
             passed to this function is the child node.
 
         :param `factory_id`: only matched children are considered. Set to
-            None (default) to match & call all children
+            None (default) to match & call all children.
+
+        :param `node_id`: only matched children are considered. Set to
+            None (default) to match & call all children.
 
         :param `recursive`: Recurse through the child/grandchild tree. Set
             to False to consider direct children only.
@@ -502,6 +512,7 @@ class G_Node:
         :param `include_self`: include this node in the walk.
         """
 
+        visit_all = factory_id is None and node_id is None
         if depth_first:
             for child_item in self.GetHrItem().GetChildren():
                 child_node = _Item2Node(child_item)
@@ -510,10 +521,10 @@ class G_Node:
     
                 # depth first - descend into grand-children first
                 if recursive:
-                    child_node.VisitSubNodes(call_back, factory_id, recursive, depth_first)
+                    child_node.VisitSubNodes(call_back, factory_id, node_id, recursive, depth_first)
 
                 # then action the child
-                if factory_id is None or child_node.GetFactoryID() == factory_id:
+                if visit_all or child_node.GetFactoryID() == factory_id or child_node.GetNodeId() == node_id:
                     call_back(child_node)
 
             # and finally, this node
@@ -530,16 +541,16 @@ class G_Node:
                     return
     
                 # action the child first
-                if factory_id is None or child_node.GetFactoryID() == factory_id:
+                if visit_all or child_node.GetFactoryID() == factory_id or child_node.GetNodeId() == node_id:
                     call_back(child_node)
 
                 # breadth first - descend into grand-children last
                 if recursive:
-                    child_node.VisitSubNodes(call_back, factory_id, recursive, depth_first)
+                    child_node.VisitSubNodes(call_back, factory_id, node_id, recursive, depth_first)
 
 
     #-------------------------------------------------------
-    def ListSubNodes(self, factory_id = None, recursive = False, depth_first = True, include_self = False):
+    def ListSubNodes(self, factory_id = None, node_id = None, recursive = False, depth_first = True, include_self = False):
         """
         Return a list of child nodes.
 
@@ -555,7 +566,7 @@ class G_Node:
 
         def Work(node):
             ret.append(node)
-        self.VisitSubNodes(Work, factory_id, recursive, depth_first, include_self)
+        self.VisitSubNodes(Work, factory_id, node_id, recursive, depth_first, include_self)
 
         return ret
 
@@ -576,10 +587,10 @@ class G_Node:
 
 
     #-------------------------------------------------------
-    def FindChildNode(self, factory_id, recursive = False):
-        """Find a (single) child node by its factory ID."""
+    def FindChildNode(self, factory_id = None, node_id = None, recursive = False):
+        """Find a (single) child node by its factory ID and/or node ID."""
 
-        nodes = self.ListSubNodes(factory_id, recursive)
+        nodes = self.ListSubNodes(factory_id = factory_id, node_id = node_id, recursive = recursive)
         if len(nodes) == 1:
             return nodes[0]
         else:

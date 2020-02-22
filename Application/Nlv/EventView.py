@@ -578,7 +578,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def GetActiveScriptText(self, update):
-        node = self.FindChildNode(G_Project.NodeID_AnalyserScript, recursive = True)
+        node = self.FindChildNode(factory_id = G_Project.NodeID_AnalyserScript, recursive = True)
         return node.GetActiveScriptText(update)
 
     def GetScriptCtrl(self):
@@ -1296,7 +1296,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         return analysis_results.GetProjectorInfo(self._Name), is_valid
 
     def GetNesting(self):
-        node = self.FindChildNode(G_Project.NodeID_EventProjectorOptions, recursive = True)
+        node = self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions, recursive = True)
         return node.GetNesting()
 
     def GetTableViewCtrl(self):
@@ -1305,7 +1305,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def GetTrackInfo(self):
-        return self.FindChildNode(G_Project.NodeID_EventTracking).GetTrackInfo()
+        return self.FindChildNode(factory_id = G_Project.NodeID_EventTracking).GetTrackInfo()
 
     def GetTimecodeBase(self):
         return self.GetLogfile().GetTimecodeBase()
@@ -1389,7 +1389,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         if analysis_results is not None:
             event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
             settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
-            self.FindChildNode(G_Project.NodeID_EventField).OverrideSettings(settings)
+            self.FindChildNode(factory_id = G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
@@ -1675,7 +1675,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         quantifier_info, is_valid = self.GetQuantifierInfo()
         error_reporter = self.GetErrorReporter()
         self.GetMetricsViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter)
-        self.FindChildNode(G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
+        self.FindChildNode(factory_id = G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
 
     def UpdateValidity(self, valid):
         self.GetTableViewCtrl().UpdateDisplay(valid = valid)

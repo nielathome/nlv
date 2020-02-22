@@ -126,7 +126,7 @@ class G_SessionManager:
         return self._WRootNode()
 
     def GetSessionNode(self):
-        return self.GetRootNode().FindChildNode(G_Project.NodeID_Session)
+        return self.GetRootNode().FindChildNode(factory_id = G_Project.NodeID_Session)
         
     def SessionPathToName(self, path = None):
         if path is None:
