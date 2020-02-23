@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2019 Niel Clausen. All rights reserved.
+// Copyright (C) 2019-2020 Niel Clausen. All rights reserved.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -718,7 +718,7 @@ public:
 public:
 	// SortControl interfaces
 
-	void SqlViewAccessor::SetSort( unsigned col_num, int direction ) override {
+	void SetSort( unsigned col_num, int direction ) override {
 		m_SortColumn = col_num;
 		m_SortDirection = direction;
 		RecordEvent();
@@ -734,6 +734,7 @@ public:
 	bool IsContainer( nlineno_t line_no ) override;
 	std::vector<int> GetChildren( nlineno_t line_no, bool view_flat ) override;
 	int GetParent( nlineno_t line_no ) override;
+	int LookupEventId( int64_t event_id ) override;
 
 	virtual HierarchyAccessor * GetHierarchyAccessor( void ) {
 		return this;
@@ -1024,7 +1025,14 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 }
 
 
-std::vector<nlineno_t> SqlViewAccessor::MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool push_id )
+std::vector<nlineno_t> SqlViewAccessor::MapViewLines
+(
+	const char * projection,
+	nlineno_t num_visit_lines,
+	selector_ptr_a selector,
+	LineAdornmentsProvider * adornments_provider,
+	bool push_id
+)
 {
 	std::vector<nlineno_t> map;
 	map.reserve( num_visit_lines );
@@ -1381,4 +1389,21 @@ int SqlViewAccessor::GetParent( nlineno_t line_no )
 	return -1;
 
 #endif
+}
+
+
+int SqlViewAccessor::LookupEventId( int64_t event_id )
+{
+	std::ostringstream strm;
+	strm << R"__(
+		SELECT
+			rowid
+		FROM
+			display
+		WHERE
+			event_id =)__" << event_id;
+
+	statement_ptr_t statement;
+	Error res{ m_LogAccessor->MakeStatement( strm, true, statement ) };
+	return Ok( res ) ? statement->GetAsInt() - 1 : -1;
 }

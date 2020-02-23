@@ -374,7 +374,7 @@ class G_Recogniser:
 
             # hence find the lineno to the first-event finish candidate in the finish
             # view; negative means "not found"
-            first_finish_lineno = finish_view.LogLineToViewLine(start_log_lineno)
+            first_finish_lineno = finish_view.LogLineToViewLine(start_log_lineno, False)
             if first_finish_lineno < 0:
                 continue
 

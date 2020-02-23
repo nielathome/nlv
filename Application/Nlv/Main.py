@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,9 +17,12 @@
 
 # Python imports
 import argparse
+import base64
 import http.server
+import json
 import logging
 from pathlib import Path
+from queue import Queue
 import socketserver 
 import sys
 import threading
@@ -63,11 +66,21 @@ if _G_WantProfiling:
 
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
+    # Callback handler; allows a chart to call back into the
+    # hosting Python
+    _Callback = None
+
     # Trident/IE require non-standard MIME type for JavaScript,
     # without this, the JavaScript is not executed
     http.server.SimpleHTTPRequestHandler.extensions_map.update({
         '.js': 'text/javascript'
     })
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def RegisterCallback(cls, callabck):
+        cls._Callback = callabck
 
 
     #-------------------------------------------------------
@@ -89,11 +102,24 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     #-------------------------------------------------------
     def translate_path(self, path):
         install_dir = G_Global.GetInstallDir()
-        candidate = install_dir / path.lstrip("/")
-        if candidate.exists():
-            return str(candidate)
-        else:
-            return ""
+        path = path.lstrip("/")
+        cgi_list = path.split('?')
+
+        if len(cgi_list) == 1 or self._Callback is None:
+            candidate = install_dir / path
+            if candidate.exists():
+                return str(candidate)
+
+        elif len(cgi_list) == 2:
+            action, args_encoded_text = cgi_list
+            node_id, method = action.split('.')
+            args_json_text = base64.standard_b64decode(args_encoded_text)
+            args = json.loads(args_json_text)
+            self._Callback(int(node_id), method, args)
+            return install_dir / "empty.json"
+
+        # error, not found
+        return ""
 
 
 
@@ -334,6 +360,12 @@ class G_LogViewFrame(wx.Frame):
         # layout and display
         self._AuiManager.Update()
 
+        # HTTP callback processors; used to move requests from HTTP clients
+        # from the HTTP thread to the UI thread
+        self._HttpActions = Queue()
+        HttpRequestHandler.RegisterCallback(self.OnHttpAction)
+        self.Bind(wx.EVT_IDLE, self.OnIdle)
+
         # local HTTPD
         httpd = threading.Thread(target = RunHttpServer)
         httpd.daemon = True
@@ -355,6 +387,16 @@ class G_LogViewFrame(wx.Frame):
 
     def GetDataExplorerPanel(self):
         return self._DataExplorerPanel
+
+
+    #-------------------------------------------------------
+    def OnHttpAction(self, node_id, method, args):
+        self._HttpActions.put((node_id, method, args))
+
+    def OnIdle(self, event):
+        if not self._HttpActions.empty():
+            node_id, method, args = self._HttpActions.get()
+            self.GetProject().OnHttpAction(node_id, method, args)
 
 
     #-------------------------------------------------------

@@ -360,6 +360,7 @@ struct HierarchyAccessor
 	virtual bool IsContainer( nlineno_t line_no ) = 0;
 	virtual std::vector<int> GetChildren( nlineno_t line_no, bool view_flat ) = 0;
 	virtual int GetParent( nlineno_t line_no ) = 0;
+	virtual int LookupEventId( int64_t event_id ) = 0;
 };
 
 

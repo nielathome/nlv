@@ -1,9 +1,26 @@
-﻿<!-- Code originally from d3-graph-gallery.com -->
+﻿<!--
+Copyright (C) Niel Clausen 2019-2020. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <!DOCTYPE html>
 <meta charset="utf-8">
 
 <!-- Load d3.js -->
-<script src="http://localhost:8000/d3.v5.min.js"></script>
+<script src="polyfill.8.1.3.js"></script>
+<script src="fetch.umd.3.0.0.js"></script>
+<script src="d3.v5.min.js"></script>
 
 <!-- Create a div where the graph will take place -->
 <div id="my_dataviz"></div>
@@ -46,6 +63,31 @@
 
 <script>
     //----------------------------------------------------------
+    var g_node_id = 0
+
+    function SetNodeId(node_id) {
+        g_node_id = node_id;
+    }
+
+    function HostBridge(method, args_object) {
+        args_json_text = JSON.stringify(args_object);
+        args_encoded_text = btoa(args_json_text);
+        cgi_text = "/" + g_node_id + "." + method + "?" + args_encoded_text;
+
+        d3.json(cgi_text, function (error, json) {
+            if (error)
+                throw error;
+        });
+    }
+
+
+    //----------------------------------------------------------
+    function OnClick(d) {
+        HostBridge("OnChartSelection", { event_id: d.data.event_id });
+    }
+
+
+    //----------------------------------------------------------
 
     // retained data
     var g_data = null;
@@ -66,7 +108,7 @@
         .attr('class', 'tool-tip')
         .style("opacity", 0);
 
-    function TipShow(d) {
+    function OnTipShow(d) {
         g_tooltip.transition(g_short_transition)
             .style("opacity", 1);
 
@@ -74,14 +116,14 @@
             .style("opacity", 0.8);
     }
 
-    function TipMove(d) {
+    function OnTipMove(d) {
         g_tooltip
             .html("<strong>" + d.data.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
             .style("left", (d3.event.pageX + 15) + "px")
             .style("top", (d3.event.pageY) + "px");
     }
 
-    function TipHide(d) {
+    function OnTipHide(d) {
         g_tooltip.transition(g_short_transition)
             .style("opacity", "0");
 
@@ -153,9 +195,10 @@
                    })
             }
           )
-            .on("mouseover", TipShow)
-            .on("mousemove", TipMove)
-            .on("mouseleave", TipHide)
+            .on("click", OnClick)
+            .on("mouseover", OnTipShow)
+            .on("mousemove", OnTipMove)
+            .on("mouseleave", OnTipHide)
             .attr("class", "slice")
           .transition(ref_transition)
             .style("opacity", 1)

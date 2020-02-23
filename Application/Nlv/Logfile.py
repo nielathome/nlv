@@ -71,7 +71,7 @@ class G_LogChildNode(G_SessionChildNode):
 
     #-------------------------------------------------------
     def GetLogNodeChildNode(self, factory_id):
-        return self.GetLogNode().FindChildNode(factory_id, True)
+        return self.GetLogNode().FindChildNode(factory_id = factory_id, recursive = True)
 
 
     #-------------------------------------------------------
@@ -365,7 +365,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def UpdateTrackers(self, update_local, update_global_idx, timecodes):
-        master_tracker_node = self.GetSessionNode().FindChildNode(G_Project.NodeID_SessionTrackerOptions)
+        master_tracker_node = self.GetSessionNode().FindChildNode(factory_id = G_Project.NodeID_SessionTrackerOptions)
         master_tracker_node.UpdateTrackers(update_local, update_global_idx, timecodes)
 
 
@@ -380,7 +380,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
         # flush new tracker positions through to all other views
         lognode = self.GetLogNode()
-        for view in self.GetSessionNode().ListSubNodes(G_Project.NodeID_View, recursive = True):
+        for view in self.GetSessionNode().ListSubNodes(factory_id = G_Project.NodeID_View, recursive = True):
             if view is not originator:
                 view.RefreshTracker(lognode, update_local, update_global)
 
@@ -655,7 +655,7 @@ class G_MarkerContainerNode(G_LogChildNode, G_ListContainerNode):
         self.GetLogfile().SetNumAutoMarker(self.GetHrItem().GetChildrenCount()-1)
 
         # ... hence in turn, initialise the markers
-        for marker in self.ListSubNodes(G_Project.NodeID_Marker):
+        for marker in self.ListSubNodes(factory_id = G_Project.NodeID_Marker):
             marker.PostInitMarker()
 
 
@@ -997,7 +997,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
 
 
     def PostInitChildren(self):
-        if len(self.ListSubNodes(G_Project.NodeID_View)) != 0:
+        if len(self.ListSubNodes(factory_id = G_Project.NodeID_View)) != 0:
             return
 
         if self._InitBuilderGuid is None:
@@ -1057,13 +1057,13 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
     #-------------------------------------------------------
     def GetEditors(self):
         """Create a list of all Scintilla editors viewing this logfile"""
-        return [node.GetEditor() for node in self.ListSubNodes(G_Project.NodeID_View)]
+        return [node.GetEditor() for node in self.ListSubNodes(factory_id = G_Project.NodeID_View)]
 
 
     #-------------------------------------------------------
     def GetMarkers(self, factory_id):
         """Create a list of all markers/trackers related to this logfile"""
-        return self.ListSubNodes(factory_id, recursive = True)
+        return self.ListSubNodes(factory_id = factory_id, recursive = True)
 
 
     #-------------------------------------------------------
@@ -1107,7 +1107,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
     def RefreshViews(self, source_view = None):
         """Refresh all views displaying this document"""
 
-        for view in self.ListSubNodes(G_Project.NodeID_View):
+        for view in self.ListSubNodes(factory_id = G_Project.NodeID_View):
             if not view is source_view:
                 view.RefreshView()
 

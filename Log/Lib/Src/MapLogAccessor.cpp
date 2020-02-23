@@ -294,7 +294,8 @@ public:
 		return this;
 	}
 
-	// fetch nearest preceding view line number to the supplied log line
+	// fetch nearest preceding view line number to the supplied log line;
+	// else < 0 if exact is true and no direct match exists
 	nlineno_t LogLineToViewLine( nlineno_t log_line_no, bool exact = false ) const override {
 		return NLine::Lookup( m_LineMap, m_NumLinesOrOne, log_line_no, exact );
 	}

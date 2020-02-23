@@ -20,7 +20,6 @@ import datetime
 import html
 import io
 from pathlib import Path
-from uuid import uuid4
 
 # wxWidgets imports
 import wx
@@ -193,7 +192,6 @@ class G_DataExplorer:
 
     _DataExplorer = None
 
-    _NodePathSplit = "__node_path__"
     _LocationSplit = "__at__"
     _PageSplit = "__page__"
 
@@ -201,19 +199,17 @@ class G_DataExplorer:
     #-------------------------------------------------------
     @classmethod
     def SplitDataUrl(cls, url):
-        # url is node-factory-id<path-split>node-path<loc-split>location<page-split>page
-        factory_id, rem = url.split(cls._NodePathSplit)
-        node_path, rem = rem.split(cls._LocationSplit)
+        # url is node-id<loc-split>location<page-split>page
+        node_id, rem = url.split(cls._LocationSplit)
         location, page = rem.split(cls._PageSplit)
 
-        return factory_id, node_path, location, page
+        return node_id, location, page
 
 
     @classmethod
-    def MakeDataUrl(cls, factory_id, node_path, location, page):
-        return "{factory_id}{node_split}{node_path}{loc_split}{location}{page_split}{page}".format(
-            factory_id = factory_id,
-            node_split = cls._NodePathSplit, node_path = node_path,
+    def MakeDataUrl(cls, node_id, location, page):
+        return "{node_id}{loc_split}{location}{page_split}{page}".format(
+            node_id = node_id,
             loc_split = cls._LocationSplit, location = location,
             page_split = cls._PageSplit, page = page
         )
@@ -275,12 +271,9 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
-    def FindNode(self, factory_id, node_path):
+    def FindNode(self, node_id):
         root_node = self._Frame.GetProject().GetRootNode()
-        for node in root_node.ListSubNodes(factory_id, recursive = True):
-            if node.GetDataExplorerId() == node_path:
-                return node
-        return None
+        return root_node.FindChildNode(node_id = int(node_id), recursive = True)
 
 
     #-------------------------------------------------------
@@ -291,8 +284,8 @@ class G_DataExplorer:
 
     #-------------------------------------------------------
     def CreatePage(self, data_url):
-        factory_id, node_path, location, page = self.SplitDataUrl(data_url)
-        node = self.FindNode(factory_id, node_path)
+        node_id, location, page = self.SplitDataUrl(data_url)
+        node = self.FindNode(node_id)
 
         if node is not None:
             if not self._PageCache.Contains(data_url):
@@ -320,8 +313,8 @@ class G_DataExplorer:
         if field_name is not None:
             builder.AddField(field_name, field_value)
 
-        factory_id, node_path, location, page = self.SplitDataUrl(data_url)
-        builder.AddField("Path", node_path)
+        node_id, location, page = self.SplitDataUrl(data_url)
+        builder.AddField("ID", node_id)
         builder.AddField("Location", location)
         builder.AddField("Page", page)
 
@@ -352,8 +345,8 @@ class G_DataExplorer:
         if not self._PageCache.Contains(data_url):
             self.MakeErrorPage("Page not found", "The data explorer page has dropped from the cache, and its data is no longer available.", data_url)
 
-        factory_id, node_path, location, page = self.SplitDataUrl(data_url)
-        node = self.FindNode(factory_id, node_path)
+        node_id, location, page = self.SplitDataUrl(data_url)
+        node = self.FindNode(node_id)
 
         if node is None:
             self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
@@ -414,11 +407,10 @@ class G_DataExplorerSync:
 class G_DataExplorerChildNode():
 
     """
-    G_DataExplorer integration/support. Nodes will need to
-    implement:
-        GetFactoryID()
+    G_DataExplorer integration/support.
 
-    and if the default provider is used:
+    If the default provider is used, nodes will need to
+    implement:
         CreateDataExplorerPage(builder, location, page)
 
     and if the default sync is used:
@@ -432,12 +424,11 @@ class G_DataExplorerChildNode():
 
     #-------------------------------------------------------
     def MakeDataUrl(self, location = "any", page = "0"):
-        return G_DataExplorer.MakeDataUrl(self.GetFactoryID(), self.GetDataExplorerId(), location, page)
+        return G_DataExplorer.MakeDataUrl(self.GetNodeId(), location, page)
 
 
     #-------------------------------------------------------
     def SetupDataExplorer(self, provider = None, sync = None):
-        self._DataExplorerId = str(uuid4())
         self._DataExplorerProvider = provider
         self._DataExplorerSync = sync
         self.SetDataExplorerValidity("Initialisation")
@@ -453,11 +444,6 @@ class G_DataExplorerChildNode():
             return self
         else:
             return self._DataExplorerSync
-
-
-    #-------------------------------------------------------
-    def GetDataExplorerId(self):
-        return self._DataExplorerId
 
 
     #-------------------------------------------------------

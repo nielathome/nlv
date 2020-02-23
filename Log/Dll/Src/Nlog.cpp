@@ -500,11 +500,13 @@ vint_t NViewLineTranslation::ViewLineToLogLine( vint_t view_line_no ) const
 
 
 // return the view line at or after the supplied log line; otherwise -1
-vint_t NViewLineTranslation::LogLineToViewLine( vint_t log_line_no ) const
+vint_t NViewLineTranslation::LogLineToViewLine( vint_t log_line_no, bool exact ) const
 {
-	vint_t view_line{ m_ViewLineTranslation->LogLineToViewLine( log_line_no ) };
-	const vint_t new_log_line{ ViewLineToLogLine( view_line ) };
+	vint_t view_line{ m_ViewLineTranslation->LogLineToViewLine( log_line_no, exact ) };
+	if( view_line < 0 )
+		return view_line;
 
+	const vint_t new_log_line{ ViewLineToLogLine( view_line ) };
 	if( new_log_line < log_line_no )
 		view_line += 1;
 
@@ -602,6 +604,13 @@ int NEventView::GetParent( vint_t line_no )
 {
 	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
 	return hierarchy ? hierarchy->GetParent( line_no ) : -1;
+}
+
+
+int NEventView::LookupEventId( int64_t event_id )
+{
+	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
+	return hierarchy ? hierarchy->LookupEventId( event_id ) : -1;
 }
 
 
