@@ -500,11 +500,13 @@ vint_t NViewLineTranslation::ViewLineToLogLine( vint_t view_line_no ) const
 
 
 // return the view line at or after the supplied log line; otherwise -1
-vint_t NViewLineTranslation::LogLineToViewLine( vint_t log_line_no ) const
+vint_t NViewLineTranslation::LogLineToViewLine( vint_t log_line_no, bool exact ) const
 {
-	vint_t view_line{ m_ViewLineTranslation->LogLineToViewLine( log_line_no ) };
-	const vint_t new_log_line{ ViewLineToLogLine( view_line ) };
+	vint_t view_line{ m_ViewLineTranslation->LogLineToViewLine( log_line_no, exact ) };
+	if( view_line < 0 )
+		return view_line;
 
+	const vint_t new_log_line{ ViewLineToLogLine( view_line ) };
 	if( new_log_line < log_line_no )
 		view_line += 1;
 

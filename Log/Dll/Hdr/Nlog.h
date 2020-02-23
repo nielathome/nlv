@@ -457,7 +457,7 @@ public:
 
 	// line number translation between the view and the underlying logfile
 	vint_t ViewLineToLogLine( vint_t view_line_no ) const;
-	vint_t LogLineToViewLine( vint_t log_line_no ) const;
+	vint_t LogLineToViewLine( vint_t log_line_no, bool exact ) const;
 };
 
 
