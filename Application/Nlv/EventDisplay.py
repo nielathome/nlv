@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2019. All rights reserved.
+# Copyright (C) Niel Clausen 2019-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -245,7 +245,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if id is None:
             return None
         else:
-            return int(item.GetID()) - 1
+            return int(id) - 1
 
 
     @staticmethod
@@ -503,9 +503,21 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def MapSelectionToEventIds(self, selection):
+    def MapSelectionToEventIds(self, items):
         col_num = self._TableSchema.ColEventId
-        return [self.GetFieldValue(s, col_num) for s in selection]
+        return [self.GetFieldValue(self.ItemToKey(item), col_num) for item in items]
+
+
+    #-------------------------------------------------------
+    def LookupEventId(self, event_id):
+        ret = None
+
+        if self._N_EventView is not None:
+            key = self._N_EventView.LookupEventId(event_id)
+            if key >= 0:
+                ret = self.KeyToItem(key)
+
+        return ret
 
 
     #-------------------------------------------------------
@@ -802,9 +814,21 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
 
     #-------------------------------------------------------
-    def GetSelectedItems(self):
-        selection = [G_TableDataModel.ItemToKey(item) for item in self.GetSelections()]
-        return self.GetModel().MapSelectionToEventIds(selection)
+    def GetSelectedEventIds(self):
+        return self.GetModel().MapSelectionToEventIds(self.GetSelections())
+
+    def ToggleSelectedEvent(self, event_id):
+        item = self.GetModel().LookupEventId(event_id)
+        if item is not None:
+            if self.IsSelected(item):
+                self.Unselect(item)
+            else:
+                self.Select(item)
+
+            # the control does not generate an event, so fake one
+            evt = wx.dataview.DataViewEvent()
+            evt.SetItem(item)
+            self.OnItemActivated(evt)
 
 
     #-------------------------------------------------------
@@ -1188,9 +1212,9 @@ class G_ChartViewCtrl(wx.Panel):
             connection = ConnectDb(self._MetricsDbPath, True)
             if connection is not None:
                 cursor = connection.cursor()
-                selection = self._TableViewCtrl.GetSelectedItems()
+                event_ids = self._TableViewCtrl.GetSelectedEventIds()
                 collector = G_ParameterCollector()
-                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
+                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, event_ids)
                 parameters = collector.Close()
 
         return parameters
@@ -1203,10 +1227,10 @@ class G_ChartViewCtrl(wx.Panel):
             connection = ConnectDb(self._MetricsDbPath, True)
             if connection is not None:
                 cursor = connection.cursor()
-                selection = self._TableViewCtrl.GetSelectedItems()
+                event_ids = self._TableViewCtrl.GetSelectedEventIds()
 
                 figure = G_ChartViewCtrlProxy(self)
-                self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, figure, connection, cursor, self._ParamaterValues, selection)
+                self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, figure, connection, cursor, self._ParamaterValues, event_ids)
 
 
     #-------------------------------------------------------

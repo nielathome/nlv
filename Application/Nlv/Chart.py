@@ -58,9 +58,10 @@ class Bar:
             """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
         data = []
-        for idx, row in enumerate(cursor):
-            selected = row[2] in selection
-            data.append(dict(zip(["category", "value", "selected"], [row[0], row[1], selected])))
+        for row in cursor:
+            event_id = row[2]
+            selected = event_id in selection
+            data.append(dict(zip(["category", "value", "selected", "event_id"], [row[0], row[1], selected, event_id])))
 
         # chart transition time in msec
         switch_time = 1000
@@ -128,7 +129,8 @@ class Pie:
         other_selected = False
 
         for row in cursor:
-            selected = row[2] in selection
+            event_id = row[2]
+            selected = event_id in selection
 
             if accum >= limit:
                 if selected:
@@ -136,11 +138,11 @@ class Pie:
             else:
                 value = row[1]
                 accum += value
-                data.append(dict(zip(["category", "value", "selected"], [row[0], value, selected])))
+                data.append(dict(zip(["category", "value", "selected", "event_id"], [row[0], value, selected, event_id])))
 
         other = sum - accum
         if other > 0:            
-            data.append(dict(zip(["category", "value", "selected"], ["Other", other, other_selected])))
+            data.append(dict(zip(["category", "value", "selected", "event_id"], ["Other", other, other_selected, -1])))
 
         # chart transition time in msec
         switch_time = 1000

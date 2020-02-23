@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1653,8 +1653,8 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
             self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
 
-    def OnChartSelection(self, category):
-        p = category
+    def OnChartSelection(self, event_id):
+        self.GetTableViewCtrl().ToggleSelectedEvent(event_id)
 
 
     #-------------------------------------------------------

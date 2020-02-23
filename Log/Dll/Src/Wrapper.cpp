@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2017-2019 Niel Clausen. All rights reserved.
+// Copyright (C) 2017-2020 Niel Clausen. All rights reserved.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -408,6 +408,7 @@ BOOST_PYTHON_MODULE( Nlog )
 		.def( "IsContainer", &NEventView::IsContainer )
 		.def( "GetChildren", &NEventView::GetChildren )
 		.def( "GetParent", &NEventView::GetParent )
+		.def( "LookupEventId", &NEventView::LookupEventId )
 		;
 
 	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewTimecode, NViewHiliting>>( "LogView", no_init )

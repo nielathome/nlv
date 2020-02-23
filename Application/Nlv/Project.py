@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1961,8 +1961,12 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
         try:
             func(**args)
+
+        except Exception as ex:
+            logging.error( "HTTP bridge: Exception: {}".format(str(ex)) )
+
         except:
-            logging.error("HTTP bridge: exception")
+            logging.error("HTTP bridge: Unknown exception")
 
 
 

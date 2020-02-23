@@ -1,4 +1,19 @@
-﻿<!-- Code originally from d3-graph-gallery.com -->
+﻿<!--
+Copyright (C) Niel Clausen 2019-2020. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
 <!DOCTYPE html>
 <meta charset="utf-8">
 
@@ -49,6 +64,12 @@
 
 <script>
     //----------------------------------------------------------
+    function OnClick(d) {
+        console.log("Column selected: " + d.category);
+    }
+
+
+    //----------------------------------------------------------
 
     // retained data
     var g_data = null;
@@ -69,7 +90,7 @@
         .attr('class', 'tool-tip')
         .style("opacity", 0);
 
-    function TipShow(d) {
+    function OnTipShow(d) {
         g_tooltip.transition(g_short_transition)
             .style("opacity", 1);
 
@@ -77,14 +98,14 @@
             .style("opacity", 0.8);
     }
 
-    function TipMove(d) {
+    function OnTipMove(d) {
         g_tooltip
             .html("<strong>" + d.data.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
             .style("left", (d3.event.pageX + 15) + "px")
             .style("top", (d3.event.pageY) + "px");
     }
 
-    function TipHide(d) {
+    function OnTipHide(d) {
         g_tooltip.transition(g_short_transition)
             .style("opacity", "0");
 
@@ -156,9 +177,10 @@
                    })
             }
           )
-            .on("mouseover", TipShow)
-            .on("mousemove", TipMove)
-            .on("mouseleave", TipHide)
+            .on("click", OnClick)
+            .on("mouseover", OnTipShow)
+            .on("mousemove", OnTipMove)
+            .on("mouseleave", OnTipHide)
             .attr("class", "slice")
           .transition(ref_transition)
             .style("opacity", 1)

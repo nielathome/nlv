@@ -607,6 +607,13 @@ int NEventView::GetParent( vint_t line_no )
 }
 
 
+int NEventView::LookupEventId( int64_t event_id )
+{
+	HierarchyAccessor * hierarchy{ m_ViewAccessor->GetHierarchyAccessor() };
+	return hierarchy ? hierarchy->LookupEventId( event_id ) : -1;
+}
+
+
 
 /*-----------------------------------------------------------------------
  * NLogView
