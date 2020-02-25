@@ -807,27 +807,6 @@ class G_AnalysisResults:
 
 
 
-## G_ProjectionItem ########################################
-
-class G_ProjectionItem:
-
-    #-------------------------------------------------------
-    def __init__(self, event_number = -1, start_line_no = None, finish_line_no = None, event_data = None):
-        if event_data is None:
-            # note, somewhat arbitrary limit (32-bit signed-int-max)
-            max = 2147483647
-            self.LogStartLine = 0
-            self.LogFinishLine = max
-
-        else:
-            self.LogStartLine = start_line_no
-            self.LogFinishLine = finish_line_no
-
-        self.EventNumber = event_number
-        self.EventData = event_data
-
-
-
 ## G_ProjectionContext #####################################
 
 class G_ProjectionContext:
@@ -836,45 +815,7 @@ class G_ProjectionContext:
     #-------------------------------------------------------
     def __init__(self, log_node, col_start):
         self._LogNode = log_node
-        self._EventNo = 0
         self._ColStart = col_start
-
-        # note, somewhat arbitrary limit (32-bit signed-int-max)
-        max = 2147483647
-        self._Stack = [G_ProjectionItem()]
-
-
-    #-------------------------------------------------------
-    def _StackBack(self):
-        return self._Stack[len(self._Stack) - 1]
-
-
-    def _UpdateStack(self, start_line_no, finish_line_no, event_data):
-        cur = G_ProjectionItem(self._EventNo, start_line_no, finish_line_no, event_data)
-        self._EventNo += 1
-
-        # remove any entries that finish before 'cur' starts
-        while cur.LogStartLine > self._StackBack().LogFinishLine:
-            self._Stack.pop()
- 
-        # since events are published in start order, we know that
-        # 'cur' starts after 'prev' (two events can't start on the
-        # same line)
-        self._Stack.append(cur)
- 
-        return cur
- 
- 
-    def CalcParentId(self, start_line_no, finish_line_no, event_data, containment_test):
-        # note: relies on the fact that events are discovered in start order
-        cur = self._UpdateStack(start_line_no, finish_line_no, event_data)
-        for idx in range(len(self._Stack) - 2, 0, -1):
-            prev = self._Stack[idx]
-            if prev.EventData is not None and prev.LogFinishLine >= cur.LogFinishLine:
-                if containment_test(prev.EventData, cur.EventData):
-                    return prev.EventNumber
- 
-        return -1
 
 
     #-------------------------------------------------------
