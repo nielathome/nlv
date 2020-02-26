@@ -796,7 +796,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
     #-------------------------------------------------------
-    def __init__(self, parent, selection_handler, multiple_selection = False, doc_url = None):
+    def __init__(self, parent, selection_handler, multiple_selection, doc_url):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
@@ -909,6 +909,52 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
                 return window
 
         return None
+
+
+
+## G_CommonViewCtrl ########################################
+
+class G_CommonViewCtrl(wx.SplitterWindow):
+    """
+    Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, parent, node_selection_handler, multiple_selection, doc_url = None):
+        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
+        self.SetMinimumPaneSize(150)
+        self.SetSashGravity(0.5)
+
+        self._NodeSelectionHandler = node_selection_handler
+        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, multiple_selection, doc_url)
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self._TableViewCtrl
+
+
+    #-------------------------------------------------------
+    def OnTableSelectionChanged(self, item):
+        self._NodeSelectionHandler(item)
+        self.UpdateSelection()
+
+
+
+
+## G_EventsViewCtrl ########################################
+
+class G_EventsViewCtrl(G_CommonViewCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, node_selection_handler, doc_url):
+        super().__init__(parent, node_selection_handler, False, doc_url)
+        self.Initialize(self._TableViewCtrl)
+
+
+    #-------------------------------------------------------
+    def UpdateSelection(self):
+        pass
 
 
 
@@ -1253,25 +1299,17 @@ class G_ChartViewCtrl(wx.Panel):
 
 ## G_MetricsViewCtrl #######################################
 
-class G_MetricsViewCtrl(wx.SplitterWindow):
+class G_MetricsViewCtrl(G_CommonViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, selection_handler, quantifier_name):
-        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
+    def __init__(self, parent, node_selection_handler, quantifier_name):
+        super().__init__(parent, node_selection_handler, True)
 
-        # the ID distinguishes different tables in the event,
-        # but otherwise, has no real meaning
-        self._SelectionHandler = selection_handler
         self._QuantifierName = quantifier_name
 
         # one-shot lock to inhibit initial Quantification if
         # table data already exists
         self._CollectorLocked = True
-
-        self.SetMinimumPaneSize(150)
-        self.SetSashGravity(0.5)
-
-        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, multiple_selection = True)
 
         self._ChartPane = wx.Panel(self)
         self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
@@ -1301,11 +1339,6 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
             pane_sizer.Layout()
 
         return sizer_items[chart_no].GetWindow()
-
-
-    #-------------------------------------------------------
-    def GetTableViewCtrl(self):
-        return self._TableViewCtrl
 
 
     #-------------------------------------------------------
@@ -1346,12 +1379,6 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
     def UpdateSelection(self):
         return self.UpdateCharts(selection_changed = True)
-
-
-    #-------------------------------------------------------
-    def OnTableSelectionChanged(self, item):
-        self._SelectionHandler(item)
-        self.UpdateSelection()
 
 
     #-------------------------------------------------------

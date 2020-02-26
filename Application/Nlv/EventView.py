@@ -47,8 +47,8 @@ import wx
 
 # Application imports 
 from .Document import D_Document
+from .EventDisplay import G_EventsViewCtrl
 from .EventDisplay import G_MetricsViewCtrl
-from .EventDisplay import G_TableViewCtrl
 from .EventProjector import G_Analyser
 from .EventProjector import G_ScriptGuard
 from .Global import G_Const
@@ -1213,6 +1213,12 @@ class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_H
     def GetDisplayNoteBook(self):
         return self.GetLogAnalysisNode().GetDisplayNoteBook()
 
+    def GetViewCtrl(self):
+        return self._DisplayFocusCtrl
+
+    def GetTableViewCtrl(self):
+        return self.GetViewCtrl().GetTableViewCtrl()
+
 
     #-------------------------------------------------------
     def OnBeginLabelEdit(self):
@@ -1237,6 +1243,16 @@ class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_H
         #    self.InterceptSetFocus(window)            
 
 
+    def RegisterViewCtrl(self, view_ctrl):
+        display_notebook = self.GetDisplayNoteBook()
+        display_notebook.AddPage(view_ctrl, self._Name)
+        self.SetDisplayCtrl(display_notebook, view_ctrl, owns_display_ctrl = False)
+        self.SetupTableViewIntercepts()
+
+        table_ctrl = self.GetTableViewCtrl()
+        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+
+
 
 ## G_EventProjectorNode ####################################
 
@@ -1259,13 +1275,9 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        display_notebook = self.GetDisplayNoteBook()
         doc_url = self.GetLogNode().MakeDataUrl()
-        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self.OnTableSelectionChanged, doc_url = doc_url)
-        display_notebook.AddPage(table_ctrl, self._Name)
-        self.SetDisplayCtrl(display_notebook, table_ctrl, owns_display_ctrl = False)
-        self.SetupTableViewIntercepts()
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        view_ctrl = G_EventsViewCtrl(self.GetDisplayNoteBook(), self.OnTableSelectionChanged, doc_url)
+        self.RegisterViewCtrl(view_ctrl)
 
 
     def PostInitChildren(self):
@@ -1298,9 +1310,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def GetNesting(self):
         node = self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions, recursive = True)
         return node.GetNesting()
-
-    def GetTableViewCtrl(self):
-        return self._TableViewCtrl
 
 
     #-------------------------------------------------------
@@ -1548,7 +1557,7 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
     #-------------------------------------------------------
     def GetChartViewCtrl(self, activate):
         chart_no = self._Field.idxSelectChart.Value
-        return self.GetParentNode().GetMetricsViewCtrl().GetChartViewCtrl(chart_no, activate)
+        return self.GetParentNode().GetViewCtrl().GetChartViewCtrl(chart_no, activate)
 
 
     #-------------------------------------------------------
@@ -1597,13 +1606,8 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        display_notebook = self.GetDisplayNoteBook()
-        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(display_notebook, self.OnTableSelectionChanged, self._Name)
-        display_notebook.AddPage(metrics_viewer, self._Name)
-        self.SetDisplayCtrl(display_notebook, metrics_viewer, owns_display_ctrl = False)
-        self.SetupTableViewIntercepts()
-        table_ctrl = metrics_viewer.GetTableViewCtrl()
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        metrics_viewer = G_MetricsViewCtrl(self.GetDisplayNoteBook(), self.OnTableSelectionChanged, self._Name)
+        self.RegisterViewCtrl(metrics_viewer)
 
 
     #-------------------------------------------------------
@@ -1614,7 +1618,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     #-------------------------------------------------------
     def ReleaseFiles(self):
         """Release all resources owned by the view"""
-        self.GetMetricsViewCtrl().ResetModel()
+        self.GetViewCtrl().ResetModel()
 
     def DoClose(self, delete):
         self.ReleaseFiles()
@@ -1629,12 +1633,6 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         projector_info, is_valid = self.GetEventProjectorNode().GetProjectorInfo()
         return projector_info.GetQuantifierInfo(self._Name), is_valid
 
-    def GetMetricsViewCtrl(self):
-        return self._MetricsViewer
-
-    def GetTableViewCtrl(self):
-        return self.GetMetricsViewCtrl().GetTableViewCtrl()
-
 
     #-------------------------------------------------------
     def GetQuantifierName(self):
@@ -1647,7 +1645,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         if item is None:
             return
 
-        location = self.GetMetricsViewCtrl().GetTableViewCtrl().GetLocation(item)
+        location = self.GetTableViewCtrl().GetLocation(item)
         if location is not None:
             # tell the data explorer
             self.GetDataExplorer().Update(self.MakeDataUrl(location))
@@ -1667,7 +1665,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetMetricsViewCtrl().UpdateMetrics()
+            self.GetViewCtrl().UpdateMetrics()
             return True
         else:
             return False
@@ -1678,7 +1676,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def UpdateMetricContent(self):
         quantifier_info, is_valid = self.GetQuantifierInfo()
         error_reporter = self.GetErrorReporter()
-        self.GetMetricsViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter)
+        self.GetViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter)
         self.FindChildNode(factory_id = G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
 
     def UpdateValidity(self, valid):
