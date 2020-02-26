@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -92,7 +92,7 @@ Recognise(
 
 ## Recognise ###################################################
 
-class SummaryRecogniser:
+class ExpireRecogniser:
 
     #-----------------------------------------------------------
     def Begin(self, connection, cursor):
@@ -136,7 +136,7 @@ class SummaryRecogniser:
 
 
 Recognise(
-    SummaryRecogniser(),
+    ExpireRecogniser(),
     ('LogView Filter', 'function = "CalcParams"'),
     ('LogView Filter', 'function = "HandleAnnounce" and log ~= "adding"')
 )
@@ -249,6 +249,7 @@ def SummaryProjector(connection, cursor, context):
             process
         FROM
             analysis.reschedule
+
         UNION ALL
         SELECT
             event_id INT,
@@ -324,7 +325,7 @@ projection = Project(
 
 
 
-## SummaryQuantifier ###########################################
+## Quantifier ##################################################
 
 def SummaryQuantifier(connection, cursor):
     cursor.execute("DROP TABLE IF EXISTS main.projection")

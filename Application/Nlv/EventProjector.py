@@ -606,7 +606,10 @@ class G_ProjectionFieldSchema:
 ## G_ProjectionSchema ######################################
 
 class G_ProjectionSchema(G_FieldSchemata):
-    """Describe all the projected fields (database 'row')"""
+    """
+    Describes all the projected fields (database 'row').
+    Passed to user script to allow the schema to be built up.
+    """
 
     #-------------------------------------------------------
     def __init__(self, guid = ""):
@@ -810,7 +813,7 @@ class G_AnalysisResults:
 ## G_ProjectionContext #####################################
 
 class G_ProjectionContext:
-    """Collect event data from any number of event analyses"""
+    """Context object passed to user script 'projector' function."""
 
     #-------------------------------------------------------
     def __init__(self, log_node, col_start):
