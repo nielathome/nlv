@@ -912,52 +912,6 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
 
 
-## G_CommonViewCtrl ########################################
-
-class G_CommonViewCtrl(wx.SplitterWindow):
-    """
-    Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
-    """
-
-    #-------------------------------------------------------
-    def __init__(self, parent, node_selection_handler, multiple_selection, doc_url = None):
-        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
-        self.SetMinimumPaneSize(150)
-        self.SetSashGravity(0.5)
-
-        self._NodeSelectionHandler = node_selection_handler
-        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, multiple_selection, doc_url)
-
-
-    #-------------------------------------------------------
-    def GetTableViewCtrl(self):
-        return self._TableViewCtrl
-
-
-    #-------------------------------------------------------
-    def OnTableSelectionChanged(self, item):
-        self._NodeSelectionHandler(item)
-        self.UpdateSelection()
-
-
-
-
-## G_EventsViewCtrl ########################################
-
-class G_EventsViewCtrl(G_CommonViewCtrl):
-
-    #-------------------------------------------------------
-    def __init__(self, parent, node_selection_handler, doc_url):
-        super().__init__(parent, node_selection_handler, False, doc_url)
-        self.Initialize(self._TableViewCtrl)
-
-
-    #-------------------------------------------------------
-    def UpdateSelection(self):
-        pass
-
-
-
 ## G_Param #################################################
 
 class G_Param:
@@ -1151,15 +1105,15 @@ class G_ChartViewCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_designer, metrics_db_path, table_view_ctrl, error_reporter, node_id):
+    def __init__(self, parent, chart_info, db_path, table_view_ctrl, error_reporter, node_id):
         super().__init__(parent)
 
-        self._ChartDesigner = chart_designer
-        self._MetricsDbPath = metrics_db_path
+        self._ChartInfo = chart_info
+        self._DbPath = db_path
         self._TableViewCtrl = table_view_ctrl
         self._ErrorReporter = error_reporter
 
-        self._ParamaterValues = dict()
+        self._ParameterValues = dict()
         self._ScriptQueue = ["SetNodeId({});".format(node_id)]
 
         self.InitCharting()
@@ -1171,7 +1125,7 @@ class G_ChartViewCtrl(wx.Panel):
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 
         with G_ScriptGuard("Setup", self._ErrorReporter):
-            page_name = self._ChartDesigner.Builder.Setup(self._ChartDesigner.Name)
+            page_name = self._ChartInfo.Setup()
             self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
 
         # layout
@@ -1255,12 +1209,12 @@ class G_ChartViewCtrl(wx.Panel):
         parameters = None
 
         with G_ScriptGuard("DefineParameters", self._ErrorReporter):
-            connection = ConnectDb(self._MetricsDbPath, True)
+            connection = ConnectDb(self._DbPath, True)
             if connection is not None:
                 cursor = connection.cursor()
                 event_ids = self._TableViewCtrl.GetSelectedEventIds()
                 collector = G_ParameterCollector()
-                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, event_ids)
+                self._ChartInfo.DefineParameters(collector, connection, cursor, event_ids)
                 parameters = collector.Close()
 
         return parameters
@@ -1268,60 +1222,78 @@ class G_ChartViewCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def Realise(self):
-        """Redraw the chart if needed"""
         with G_ScriptGuard("Realise", self._ErrorReporter):
-            connection = ConnectDb(self._MetricsDbPath, True)
+            connection = ConnectDb(self._DbPath, True)
             if connection is not None:
                 cursor = connection.cursor()
                 event_ids = self._TableViewCtrl.GetSelectedEventIds()
 
                 figure = G_ChartViewCtrlProxy(self)
-                self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, figure, connection, cursor, self._ParamaterValues, event_ids)
+                self._ChartInfo.Realise(figure, connection, cursor, self._ParameterValues, event_ids)
 
 
     #-------------------------------------------------------
-    def Update(self, metrics_changed = False, selection_changed = False, parameters = None):
+    def Update(self, data_changed = False, selection_changed = False, parameters = None):
+        """Redraw the chart if needed"""
+
         do_realize = False
-        if metrics_changed:
+        if data_changed:
             do_realize = True
 
-        if selection_changed and self._ChartDesigner.WantSelection:
+        if selection_changed and self._ChartInfo.WantSelection:
             do_realize = True
 
-        if parameters is not None and parameters != self._ParamaterValues:
+        if parameters is not None and parameters != self._ParameterValues:
             do_realize = True
-            self._ParamaterValues = parameters.copy()
+            self._ParameterValues = parameters.copy()
 
         if do_realize:
             self.Realise()
             
 
 
-## G_MetricsViewCtrl #######################################
+## G_CommonViewCtrl ########################################
 
-class G_MetricsViewCtrl(G_CommonViewCtrl):
+class G_CommonViewCtrl(wx.SplitterWindow):
+    """
+    Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
+    """
 
     #-------------------------------------------------------
-    def __init__(self, parent, node_selection_handler, quantifier_name):
-        super().__init__(parent, node_selection_handler, True)
+    def __init__(self, parent, node_selection_handler, multiple_selection, doc_url = None):
+        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
+        self._NodeSelectionHandler = node_selection_handler
+        self._ChartPane = None
 
-        self._QuantifierName = quantifier_name
+        self.SetMinimumPaneSize(150)
+        self.SetSashGravity(0.5)
 
-        # one-shot lock to inhibit initial Quantification if
-        # table data already exists
-        self._CollectorLocked = True
+        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, multiple_selection, doc_url)
+        self.Initialize(self.GetTableViewCtrl())
 
-        self._ChartPane = wx.Panel(self)
-        self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
 
-        self.SplitHorizontally(self._TableViewCtrl, self._ChartPane)
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self._TableViewCtrl
+
+
+    #-------------------------------------------------------
+    def GetChartPane(self, create = False):
+        if self._ChartPane is None and create:
+            self._ChartPane = wx.Panel(self)
+            self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
+            self.SplitHorizontally(self.GetTableViewCtrl(), self._ChartPane)
+
+        return self._ChartPane
 
 
     #-------------------------------------------------------
     def GetChartViewCtrl(self, chart_no, activate):
-        pane = self._ChartPane
-        pane_sizer = pane.GetSizer()
+        pane = self.GetChartPane()
+        if pane is None:
+            return pane
 
+        pane_sizer = pane.GetSizer()
         if pane_sizer.IsEmpty():
             return None
 
@@ -1342,6 +1314,53 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
 
 
     #-------------------------------------------------------
+    def OnTableSelectionChanged(self, item):
+        self._NodeSelectionHandler(item)
+        self.UpdateChartSelection()
+
+
+    #-------------------------------------------------------
+    def UpdateCharts(self, data_changed = False, selection_changed = False):
+        pane = self.GetChartPane()
+        if pane is not None:
+            for chart_view in pane.GetChildren():
+                chart_view.Update(data_changed, selection_changed)
+
+    def UpdateChartData(self):
+        self.UpdateCharts(data_changed = True)
+
+    def UpdateChartSelection(self):
+        return self.UpdateCharts(selection_changed = True)
+
+
+
+## G_EventsViewCtrl ########################################
+
+class G_EventsViewCtrl(G_CommonViewCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, node_selection_handler, doc_url):
+        super().__init__(parent, node_selection_handler, False, doc_url)
+
+
+
+
+## G_MetricsViewCtrl #######################################
+
+class G_MetricsViewCtrl(G_CommonViewCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, node_selection_handler, quantifier_name):
+        super().__init__(parent, node_selection_handler, True)
+
+        self._QuantifierName = quantifier_name
+
+        # one-shot lock to inhibit initial Quantification if
+        # table data already exists
+        self._CollectorLocked = True
+
+
+    #-------------------------------------------------------
     @G_Global.TimeFunction
     def Quantify(self, node, quantifier_info, valid, error_reporter):
         G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
@@ -1352,39 +1371,30 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             self._CollectorLocked = False
 
             metrics_db_path = quantifier_info.MetricsDbPath
-            self._TableViewCtrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, valid)
-            self._TableViewCtrl.SetFieldMask(-1)
+            table_ctrl = self.GetTableViewCtrl()
+            table_ctrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, valid)
+            table_ctrl.SetFieldMask(-1)
 
-            pane = self._ChartPane
-            pane_sizer = pane.GetSizer()
+            if len(quantifier_info.Charts) != 0:
+                pane = self.GetChartPane(True)
+                pane_sizer = pane.GetSizer()
 
-            if pane_sizer.IsEmpty():
-                for chart_info in quantifier_info.Charts:
-                    chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, self._TableViewCtrl, self._ErrorReporter, node.GetNodeId())
-                    pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
-#                    node.InterceptSetFocus(chart_view_ctrl)
+                if pane_sizer.IsEmpty():
+                    for chart_info in quantifier_info.Charts:
+                        chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, table_ctrl, self._ErrorReporter, node.GetNodeId())
+                        pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
 
-                pane_sizer.ShowItems(False)
+                    pane_sizer.ShowItems(False)
 
-            self.UpdateMetrics()
-
-
-    #-------------------------------------------------------
-    def UpdateCharts(self, metrics_changed = False, selection_changed = False):
-        for chart_view in self._ChartPane.GetChildren():
-            chart_view.Update(metrics_changed, selection_changed)
-
-    def UpdateMetrics(self):
-        self.UpdateCharts(metrics_changed = True)
-
-    def UpdateSelection(self):
-        return self.UpdateCharts(selection_changed = True)
+                self.UpdateChartData()
 
 
     #-------------------------------------------------------
     def ResetModel(self, error_reporter = None):
         self._ErrorReporter = error_reporter
 
-        self._ChartPane.GetSizer().Clear(delete_windows = True)
+        pane = self.GetChartPane()
+        if pane is not None:
+            pane.GetSizer().Clear(delete_windows = True)
 
-        self._TableViewCtrl.ResetModel()
+        self.GetTableViewCtrl().ResetModel()

@@ -731,6 +731,17 @@ class G_ChartInfo:
         self.Builder = builder
 
 
+    #-------------------------------------------------------
+    def Setup(self):
+        return self.Builder.Setup(self.Name)
+
+    def DefineParameters(self, params, connection, cursor, selection):
+        self.Builder.DefineParameters(params, connection, cursor, selection)
+
+    def Realise(self, figure, connection, cursor, param_values, selection):
+        self.Builder.Realise(self.Name, figure, connection, cursor, param_values, selection)
+
+
 
 ## G_QuantifierInfo ########################################
 

@@ -1466,7 +1466,7 @@ class G_ParameterValues:
         return self.GetValues(chart_no).get(param_name)
 
     def SetValue(self, chart_no, param_name, value):
-        self.GetValues(str(chart_no))[param_name] = value
+        self.GetValues(chart_no)[param_name] = value
 
 
     
@@ -1531,12 +1531,16 @@ class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
 
     #-------------------------------------------------------
     def ActivateDynamicPane(self):
-        parameters = self._Parameters = self.GetChartViewCtrl(activate = False).DefineParameters()
         pane = self.DynamicPane
         sizer = pane.GetSizer()
         sizer.Clear(delete_windows = True)
 
+        chart_ctrl = self.GetChartViewCtrl(activate = False)
+        if chart_ctrl is None:
+            return
+
         # build UI controls for the parameters
+        parameters = self._Parameters = chart_ctrl.DefineParameters()
         if parameters is not None:
             info = G_WindowInfo(sizer, pane)
             chart_no = self._Field.idxSelectChart.Value
@@ -1665,7 +1669,7 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetViewCtrl().UpdateMetrics()
+            self.GetViewCtrl().UpdateChartData()
             return True
         else:
             return False
