@@ -1320,6 +1320,35 @@ class G_CommonViewCtrl(wx.SplitterWindow):
 
 
     #-------------------------------------------------------
+    def ResetModel(self):
+        pane = self.GetChartPane()
+        if pane is not None:
+            pane.GetSizer().Clear(delete_windows = True)
+
+        self.GetTableViewCtrl().ResetModel()
+
+
+    #-------------------------------------------------------
+    def CreateCharts(self, chart_list, db_path, error_reporter, node_id):
+        if chart_list is None or len(chart_list) == 0:
+            return
+
+        pane = self.GetChartPane(True)
+        pane_sizer = pane.GetSizer()
+
+        if pane_sizer.IsEmpty():
+            table_ctrl = self.GetTableViewCtrl()
+    
+            for chart_info in chart_list:
+                chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, db_path, table_ctrl, error_reporter, node_id)
+                pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
+
+            pane_sizer.ShowItems(False)
+
+        self.UpdateChartData()
+
+
+    #-------------------------------------------------------
     def UpdateCharts(self, data_changed = False, selection_changed = False):
         pane = self.GetChartPane()
         if pane is not None:
@@ -1362,10 +1391,10 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Quantify(self, node, quantifier_info, valid, error_reporter):
+    def Quantify(self, node_id, quantifier_info, valid, error_reporter):
         G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
-        self.ResetModel(error_reporter)
-        with G_ScriptGuard("Quantify", self._ErrorReporter):
+        self.ResetModel()
+        with G_ScriptGuard("Quantify", error_reporter):
             quantifier = G_Quantifier(quantifier_info)
             quantifier.Run(self._CollectorLocked)
             self._CollectorLocked = False
@@ -1375,26 +1404,4 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             table_ctrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, valid)
             table_ctrl.SetFieldMask(-1)
 
-            if len(quantifier_info.Charts) != 0:
-                pane = self.GetChartPane(True)
-                pane_sizer = pane.GetSizer()
-
-                if pane_sizer.IsEmpty():
-                    for chart_info in quantifier_info.Charts:
-                        chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, table_ctrl, self._ErrorReporter, node.GetNodeId())
-                        pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
-
-                    pane_sizer.ShowItems(False)
-
-                self.UpdateChartData()
-
-
-    #-------------------------------------------------------
-    def ResetModel(self, error_reporter = None):
-        self._ErrorReporter = error_reporter
-
-        pane = self.GetChartPane()
-        if pane is not None:
-            pane.GetSizer().Clear(delete_windows = True)
-
-        self.GetTableViewCtrl().ResetModel()
+            self.CreateCharts(quantifier_info.Charts, metrics_db_path, error_reporter, node_id)

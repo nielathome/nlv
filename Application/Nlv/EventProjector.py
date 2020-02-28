@@ -763,7 +763,7 @@ class G_QuantifierInfo:
 
     #-------------------------------------------------------
     def Chart(self, name, want_selection, builder):
-        """Implements user analyse script Chart() function"""
+        """Implements user analyse script Quantifier.Chart() function"""
         self.Charts.append(G_ChartInfo(name, want_selection, builder))
 
 
@@ -778,6 +778,7 @@ class G_ProjectorInfo:
         self.ProjectionSchema = projection_schema
         self.ProjectionDbPath = DeriveSubPath(base_db_path, name)
         self.Quantifiers = dict()
+        self.Charts = []
 
 
     #-------------------------------------------------------
@@ -789,6 +790,12 @@ class G_ProjectorInfo:
         info = G_QuantifierInfo(name, user_quantifier, metrics_schema, self.ProjectionDbPath, idx)
         self.Quantifiers.update([(name, info)])
         return info
+
+
+    #-------------------------------------------------------
+    def Chart(self, name, want_selection, builder):
+        """Implements user analyse script Quantifier.Chart() function"""
+        self.Charts.append(G_ChartInfo(name, want_selection, builder))
 
 
     #-------------------------------------------------------
