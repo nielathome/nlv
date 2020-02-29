@@ -133,9 +133,29 @@ class G_DisplayControl:
 
 
 
-## G_TabDisplayControl #####################################
+    #-------------------------------------------------------
+    def DestroyDisplayCtrl(self):
+        self.GetParent().DestroyDisplayChildCtrl(self)
 
-class G_TabDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus):
+    def DestroyDisplayChildCtrl(self, child):
+        # note: pass this window upwards, not the child (focus window)
+        self.GetParent().DestroyDisplayChildCtrl(self)
+
+
+
+## G_PanelDisplayControl ###################################
+
+class G_PanelDisplayControl(wx.Notebook, G_DisplayControl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
+        wx.Notebook.__init__(self, parent)
+
+
+
+## G_NotebookDisplayControl ################################
+
+class G_NotebookDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def __init__(self, parent):
@@ -149,6 +169,7 @@ class G_TabDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus):
         if idx != wx.NOT_FOUND:
             self.SetSelection(idx)
 
+# TODO - bin
     def OnSetFocus(self, evt):
         page = self.GetCurrentPage()
         if page is not None:
@@ -275,12 +296,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     def DoClose(self, delete):
         """Remove display control from the UI"""
 
-        if self._OwnsDisplayCtrl and self._DisplayCtrl is not None:
-            # delete the AUI notebook tab (and its child window)
-            aui_notebook = self.GetAuiNotebook()
-            page_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-            aui_notebook.DeletePage(page_index)
-            self._DisplayFocusCtrl = self._DisplayCtrl = None
+        if self._OwnsDisplayCtrl and self._DisplayFocusCtrl is not None:
+            self._DisplayFocusCtrl.DestroyDisplayCtrl()
 
         super().DoClose(delete)
 

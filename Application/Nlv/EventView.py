@@ -55,7 +55,7 @@ from .Global import G_Const
 from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
-from .Logfile import G_TabDisplayControl
+from .Logfile import G_NotebookDisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_TabContainedNode
@@ -493,12 +493,13 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._Field.Add(True, "AnalysisIsValid", replace_existing = False)
 
         # setup UI
-        display_notebook = self._DisplayNotebook = G_TabDisplayControl(self.GetAuiNotebook())
+        display_notebook = self._DisplayNotebook = G_NotebookDisplayControl(self.GetAuiNotebook())
         script_ctrl = self._ScriptCtrl = G_AnalyserScriptCtrl(display_notebook)
         display_notebook.AddPage(script_ctrl, "Script")
 
-        self.SetDisplayCtrl(display_notebook, script_ctrl)
-        self.InterceptSetFocus(script_ctrl.GetEditor())
+        edit_control = script_ctrl.GetEditor()
+        self.SetDisplayCtrl(display_notebook, edit_control)
+        self.InterceptSetFocus(edit_control)
 
 
     @G_Global.TimeFunction

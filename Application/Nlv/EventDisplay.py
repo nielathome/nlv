@@ -33,6 +33,7 @@ import winreg
 # Application imports 
 from .DataExplorer import G_DataExplorerProvider
 from .DataExplorer import G_DataExplorerSync
+from .Logfile import G_DisplayControl
 from .EventProjector import ConnectDb
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
@@ -1254,7 +1255,7 @@ class G_ChartViewCtrl(wx.Panel):
 
 ## G_CommonViewCtrl ########################################
 
-class G_CommonViewCtrl(wx.SplitterWindow):
+class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
     """
     Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
     """

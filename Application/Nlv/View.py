@@ -32,6 +32,7 @@ from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
 from .Logfile import G_DisplayControl
+from .Logfile import G_PanelDisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_TabContainedNode
@@ -56,10 +57,20 @@ import Nlog
 
 
 
+## G_StcView ###############################################
+
+class G_StcView(wx.stc.StyledTextCtrl, G_DisplayControl):
+    """STC editor displays the log data"""
+
+    #-------------------------------------------------------
+    def __init__(self, parent, ID = -1):
+        wx.stc.StyledTextCtrl.__init__(self, parent, ID)
+
+
+
 ## G_ViewControl ###########################################
 
-class G_ViewControl(wx.Panel, G_DisplayControl):
-    """STC editor displays the log data"""
+class G_ViewControl(G_PanelDisplayControl):
 
     #-------------------------------------------------------
     _StyleIdxBase = Nlog.EnumStyle.AnnotationBase
@@ -127,7 +138,7 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
         vsizer.Add(hsizer, proportion = 0, flag = wx.EXPAND)
         vsizer.Show(hsizer, False, recursive = True)
 
-        self._Editor = wx.stc.StyledTextCtrl(self, -1)
+        self._Editor = G_StcView(self, -1)
         vsizer.Add(self._Editor, proportion = 1, flag = wx.EXPAND)
         
         self.SetSizer(vsizer)

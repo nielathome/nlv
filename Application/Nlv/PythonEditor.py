@@ -23,6 +23,8 @@ import wx
 import wx.stc as stc
 
 # Application imports 
+from .Logfile import G_DisplayControl
+from .Logfile import G_PanelDisplayControl
 from .StyleNode import G_ColourTraits
 
 
@@ -38,7 +40,7 @@ faces = {
 }
 
 
-class G_PythonTextCtrl(stc.StyledTextCtrl):
+class G_PythonTextCtrl(stc.StyledTextCtrl, G_DisplayControl):
     """See wxPython StyledTextCtrl_2 demo"""
 
     #-------------------------------------------------------
@@ -251,14 +253,14 @@ The file name is '{}'.\r
 To switch back to the internal editor, navigate to 'Event Name' -> Script and select Load.\r
 You do not need to switch to the iternal editor in order to run the analyser.
 """
-class G_AnalyserScriptCtrl(wx.SplitterWindow):
+class G_AnalyserScriptCtrl(wx.SplitterWindow, G_DisplayControl):
 
     #-------------------------------------------------------
     def __init__(self, parent):
         # build a panel with the Python editor and a message window
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
 
-        panel = wx.Panel(self)
+        panel = G_PanelDisplayControl(self)
         sizer = self._Sizer = wx.BoxSizer(wx.VERTICAL)
 
         self._Editor = G_PythonTextCtrl(panel)
