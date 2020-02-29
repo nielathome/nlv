@@ -187,7 +187,7 @@ class G_Node:
 
         if hilite:
             f = label.GetFont()
-            label.SetFont(f.Italic())
+            label.SetFont(f.Italic().Underlined())
 
         return label
 
