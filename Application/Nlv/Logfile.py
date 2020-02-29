@@ -142,14 +142,23 @@ class G_DisplayControl:
         self.GetParent().DestroyDisplayChildCtrl(self)
 
 
+    #-------------------------------------------------------
+    def SwitchDisplayCtrl(self):
+        self.GetParent().SwitchDisplayChildCtrl(self)
+
+    def SwitchDisplayChildCtrl(self, child):
+        # note: pass this window upwards, not the child (focus window)
+        self.GetParent().SwitchDisplayChildCtrl(self)
+
+    
 
 ## G_PanelDisplayControl ###################################
 
-class G_PanelDisplayControl(wx.Notebook, G_DisplayControl):
+class G_PanelDisplayControl(wx.Panel, G_DisplayControl):
 
     #-------------------------------------------------------
     def __init__(self, parent):
-        wx.Notebook.__init__(self, parent)
+        wx.Panel.__init__(self, parent)
 
 
 
@@ -164,13 +173,17 @@ class G_NotebookDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus
 
 
     #-------------------------------------------------------
+# TODO - bin
     def ActivateSubTab(self, window):
         idx = self.FindPage(window)
         if idx != wx.NOT_FOUND:
             self.SetSelection(idx)
 
-# TODO - bin
     def OnSetFocus(self, evt):
+        """
+        It seems tab control's don't forward input focus, so
+        we do that manually.
+        """
         page = self.GetCurrentPage()
         if page is not None:
             self.SendFocusToCtrl(page)
@@ -219,14 +232,6 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
 
     #-------------------------------------------------------
-    def IsActiveInAuiNotebook(self):
-        aui_notebook = self.GetAuiNotebook()
-        cur_tab_idx = aui_notebook.GetSelection()
-        my_tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-        return cur_tab_idx == my_tab_index
-    
-
-    #-------------------------------------------------------
     def ActivateSubTab(self, window):
             self._DisplayCtrl.ActivateSubTab(window)
 
@@ -268,9 +273,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """A display control associated with this node has received input focus"""
 
         def Work():
-            # where the AUI notebook tab is not already current, switch to it
-            if not self.IsActiveInAuiNotebook():
-                self.GetAuiNotebook().SetSelectionToWindow(self._DisplayCtrl)
+            # ensure containing notebook(s) activated
+            self._DisplayFocusCtrl.SwitchDisplayCtrl()
 
             # switch node in the tree view
             node = self._WLastChild()

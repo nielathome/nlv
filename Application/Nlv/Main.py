@@ -267,6 +267,14 @@ class G_AuiNotebook(aui.AuiNotebook):
         self.DeletePage(self.GetPageIndex(child))
 
 
+    #-------------------------------------------------------
+    def SwitchDisplayChildCtrl(self, child):
+        cur_tab_idx = self.GetSelection()
+        child_tab_index = self.GetPageIndex(child)
+        if cur_tab_idx != child_tab_index:
+            self.SetSelectionToWindow(child)
+
+
 
 ## G_LogViewFrame ##########################################
 
