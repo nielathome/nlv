@@ -262,16 +262,15 @@ class G_AuiNotebook(aui.AuiNotebook):
 
 
     #-------------------------------------------------------
-    def DestroyDisplayChildCtrl(self, child):
-        # delete the AUI notebook tab (and the child window)
-        self.DeletePage(self.GetPageIndex(child))
+    def GetAuiTabInfo(self, child):
+        return self, self.GetPageIndex(child)
 
 
     #-------------------------------------------------------
-    def SwitchDisplayChildCtrl(self, child):
-        cur_tab_idx = self.GetSelection()
-        child_tab_index = self.GetPageIndex(child)
-        if cur_tab_idx != child_tab_index:
+    def SwitchToDisplayChildCtrl(self, child):
+        cur_idx = self.GetSelection()
+        child_index = self.GetPageIndex(child)
+        if cur_idx != child_index:
             self.SetSelectionToWindow(child)
 
 

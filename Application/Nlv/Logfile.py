@@ -103,11 +103,6 @@ class G_DelayedSendFocus:
 
 
     #-------------------------------------------------------
-    def ClearSendFocusToCtrl(self):
-        self._DelayedFocusWindow = None
-
-
-    #-------------------------------------------------------
     def OnSendFocusToWindow(self, event):
         if self._DelayedFocusWindow is not None:
             # one shot delayed event, so disconnect now
@@ -133,21 +128,33 @@ class G_DisplayControl:
     """
 
     #-------------------------------------------------------
-    def DestroyDisplayCtrl(self):
-        self.GetParent().DestroyDisplayChildCtrl(self)
-
-    def DestroyDisplayChildCtrl(self, child):
-        # note: pass this window upwards, not the child (focus window)
-        self.GetParent().DestroyDisplayChildCtrl(self)
+    def GetAuiTabInfo(self, child):
+        """
+        Fetch the AUI tab index of the window containing
+        this child.
+        """
+        return self.GetParent().GetAuiTabInfo(self)
 
 
     #-------------------------------------------------------
-    def SwitchDisplayCtrl(self):
-        self.GetParent().SwitchDisplayChildCtrl(self)
+    def DestroyDisplayCtrl(self):
+        # delete the AUI notebook tab (and this child window)
+        aui_notebook, child_idx = self.GetAuiTabInfo(self)
+        aui_notebook.DeletePage(child_idx)
 
-    def SwitchDisplayChildCtrl(self, child):
-        # note: pass this window upwards, not the child (focus window)
-        self.GetParent().SwitchDisplayChildCtrl(self)
+
+    #-------------------------------------------------------
+    def ShowDisplayCtrl(self, show):
+        aui_notebook, child_idx = self.GetAuiTabInfo(self)
+        aui_notebook.HidePage(child_idx, not show)
+
+
+    #-------------------------------------------------------
+    def SwitchToDisplayCtrl(self):
+        self.GetParent().SwitchToDisplayChildCtrl(self)
+
+    def SwitchToDisplayChildCtrl(self, child):
+        self.GetParent().SwitchToDisplayChildCtrl(self)
 
     
 
@@ -173,7 +180,7 @@ class G_NotebookDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus
 
 
     #-------------------------------------------------------
-    def SwitchDisplayChildCtrl(self, child):
+    def SwitchToDisplayChildCtrl(self, child):
         # if needed, switch this tab first
         idx = self.FindPage(child)
         cur = self.GetSelection()
@@ -181,7 +188,7 @@ class G_NotebookDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus
             self.SetSelection(idx)
 
         # note: pass this window upwards, not the child
-        self.GetParent().SwitchDisplayChildCtrl(self)
+        self.GetParent().SwitchToDisplayChildCtrl(self)
 
 
     #-------------------------------------------------------
@@ -241,7 +248,10 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def EnsureDisplayControlVisible(self):
-        self._DisplayFocusCtrl.SwitchDisplayCtrl()
+        # don't switch aui tab if this node is hidden; it causes
+        # the node to re-appear
+        if self.IsNodeDisplayed():
+            self._DisplayFocusCtrl.SwitchToDisplayCtrl()
 
     def WithFocusLock(self, func):
         """Execute 'func' while holding the focus recursion-lock"""
@@ -343,9 +353,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     def OnEndLabelEdit(self, label):
         # an empty label seems to mean "no change"
         if label != "":
-            aui_notebook = self.GetAuiNotebook()
-            tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-            aui_notebook.SetPageText(tab_index, label)
+            aui_notebook, child_idx = self._DisplayFocusCtrl.GetAuiTabInfo(self._DisplayFocusCtrl)
+            aui_notebook.SetPageText(child_idx, label)
             self._Field.NodeUserLabel.Value = label
 
         return True
@@ -383,10 +392,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def UpdateNodeDisplay(self):
-        show = self.IsNodeDisplayed()
-        aui_notebook = self.GetAuiNotebook()
-        tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-        aui_notebook.HidePage(tab_index, not show)
+        self._DisplayFocusCtrl.ShowDisplayCtrl(self.IsNodeDisplayed())
 
 
     #-------------------------------------------------------
