@@ -87,10 +87,19 @@ class G_LogChildNode(G_SessionChildNode):
 class G_DelayedSendFocus:
 
     #-------------------------------------------------------
+    def __init__(self):
+        self._DelayedFocusWindow = None
+
+
+    #-------------------------------------------------------
     def SendFocusToCtrl(self, ctrl):
         """Delayed forwarding of input focus; safe to use in any event context"""
-        self._DelayedFocusWindow = ctrl
-        self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
+
+        # in practice, we do see recursion (even though that
+        # makes little sense), so defend against that
+        if self._DelayedFocusWindow is None:
+            self._DelayedFocusWindow = ctrl
+            self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
 
 
     #-------------------------------------------------------
@@ -102,11 +111,12 @@ class G_DelayedSendFocus:
     def OnSendFocusToWindow(self, event):
         if self._DelayedFocusWindow is not None:
             # one shot delayed event, so disconnect now
-            self._DelayedFocusWindow.Unbind(wx.EVT_IDLE)
-
-            # move the focus and drop the reference to the window
-            self._DelayedFocusWindow.SetFocus()
+            ctrl = self._DelayedFocusWindow
             self._DelayedFocusWindow = None
+            ctrl.Unbind(wx.EVT_IDLE)
+
+            # move the focus
+            ctrl.SetFocus()
 
         # don't interfere with any use the editor has for idle events
         event.Skip()
@@ -158,6 +168,7 @@ class G_NotebookDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus
     #-------------------------------------------------------
     def __init__(self, parent):
         wx.Notebook.__init__(self, parent, style = wx.NB_TOP)
+        G_DelayedSendFocus.__init__(self)
         self.Bind(wx.EVT_SET_FOCUS, self.OnSetFocus)
 
 
@@ -195,6 +206,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def __init__(self):
+        G_DelayedSendFocus.__init__(self)
+
         # the window contained in the AUI tab
         self._DisplayCtrl = None
         self._OwnsDisplayCtrl = False
