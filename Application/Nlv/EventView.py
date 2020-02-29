@@ -1177,7 +1177,7 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
 
         pane = cls.DynamicPane = wx.Panel(window)
         pane.SetSizer(wx.BoxSizer(wx.VERTICAL))
-        cls._Sizer.Add(pane, flag = wx.EXPAND)
+        cls._Sizer.Add(pane, proportion = 1, flag = wx.EXPAND)
 
 
     #-------------------------------------------------------
