@@ -593,7 +593,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def OnAnalyserError(self, new_text):
         """An error occurred during analysis; display it in the UI"""
         self.SetErrorText(new_text, True)
-        self.ActivateSubTab(self._ScriptCtrl)
+        self.EnsureDisplayControlVisible()
 
 
     #-------------------------------------------------------
@@ -1609,7 +1609,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self.GetViewCtrl().CreateCharts(projector_info.Charts, events_db_path, self.GetErrorReporter(), self.GetNodeId())
         self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions).PushParameterValues(activate_chart = True)
 
-        self.GetLogAnalysisNode().ActivateSubTab(events_view)
+        self.EnsureDisplayControlVisible()
 
         # forward to child metrics views
         self.UpdateMetricContent()

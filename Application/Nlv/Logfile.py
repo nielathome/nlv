@@ -118,20 +118,9 @@ class G_DelayedSendFocus:
 class G_DisplayControl:
     """
     Base class for controls conveying content to the user.
-    Will be a direct child of the main AUI tab. Works in
-    conjunction with a node ownder - G_DisplayNode
+    Will be a direct or indirect child of the main AUI tab.
+    Works in conjunction with a node ownder - G_DisplayNode
     """
-
-    #-------------------------------------------------------
-    def ActivateSubTab(self, window):
-        """
-        Update UI appearance goven that 'window' has been
-        given input focus. Tab controls should use this to
-        ensure the tab for 'window' is the current selection
-        """
-        pass
-
-
 
     #-------------------------------------------------------
     def DestroyDisplayCtrl(self):
@@ -173,12 +162,18 @@ class G_NotebookDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus
 
 
     #-------------------------------------------------------
-# TODO - bin
-    def ActivateSubTab(self, window):
-        idx = self.FindPage(window)
-        if idx != wx.NOT_FOUND:
+    def SwitchDisplayChildCtrl(self, child):
+        # if needed, switch this tab first
+        idx = self.FindPage(child)
+        cur = self.GetSelection()
+        if idx != wx.NOT_FOUND and idx != cur:
             self.SetSelection(idx)
 
+        # note: pass this window upwards, not the child
+        self.GetParent().SwitchDisplayChildCtrl(self)
+
+
+    #-------------------------------------------------------
     def OnSetFocus(self, evt):
         """
         It seems tab control's don't forward input focus, so
@@ -232,8 +227,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
 
     #-------------------------------------------------------
-    def ActivateSubTab(self, window):
-            self._DisplayCtrl.ActivateSubTab(window)
+    def EnsureDisplayControlVisible(self):
+        self._DisplayFocusCtrl.SwitchDisplayCtrl()
 
     def WithFocusLock(self, func):
         """Execute 'func' while holding the focus recursion-lock"""
@@ -247,14 +242,11 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """A child node is activating; update the AuiNotebook accordingly"""
 
         def Work():
-            # switch AUI notebook page
-            nonlocal child, focus_window
-            self.GetAuiNotebook().SetSelectionToWindow(self._DisplayCtrl)
+            # ensure containing notebook(s) set correctly
+            self.EnsureDisplayControlVisible()
 
-            # ensure any sub-tab is visible
-            self.ActivateSubTab(self._DisplayFocusCtrl)
-    
             # forward focus; unless otherwise specified, forward to the display control
+            nonlocal child, focus_window
             if focus_window is None:
                 focus_window = self._DisplayFocusCtrl
             self.SendFocusToWindow(focus_window)
@@ -273,8 +265,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """A display control associated with this node has received input focus"""
 
         def Work():
-            # ensure containing notebook(s) activated
-            self._DisplayFocusCtrl.SwitchDisplayCtrl()
+            # ensure containing notebook(s) set correctly
+            self.EnsureDisplayControlVisible()
 
             # switch node in the tree view
             node = self._WLastChild()
