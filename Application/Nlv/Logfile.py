@@ -251,7 +251,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         # don't switch aui tab if this node is hidden; it causes
         # the node to re-appear
         if self.IsNodeDisplayed():
-            self._DisplayFocusCtrl.SwitchToDisplayCtrl()
+            self._DisplayCtrl.SwitchToDisplayCtrl()
 
     def WithFocusLock(self, func):
         """Execute 'func' while holding the focus recursion-lock"""
@@ -315,8 +315,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     def DoClose(self, delete):
         """Remove display control from the UI"""
 
-        if self._OwnsDisplayCtrl and self._DisplayFocusCtrl is not None:
-            self._DisplayFocusCtrl.DestroyDisplayCtrl()
+        if self._OwnsDisplayCtrl and self._DisplayCtrl is not None:
+            self._DisplayCtrl.DestroyDisplayCtrl()
 
         super().DoClose(delete)
 
@@ -353,7 +353,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     def OnEndLabelEdit(self, label):
         # an empty label seems to mean "no change"
         if label != "":
-            aui_notebook, child_idx = self._DisplayFocusCtrl.GetAuiTabInfo(self._DisplayFocusCtrl)
+            aui_notebook, child_idx = self._DisplayCtrl.GetAuiTabInfo(self._DisplayCtrl)
             aui_notebook.SetPageText(child_idx, label)
             self._Field.NodeUserLabel.Value = label
 
@@ -392,7 +392,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def UpdateNodeDisplay(self):
-        self._DisplayFocusCtrl.ShowDisplayCtrl(self.IsNodeDisplayed())
+        self._DisplayCtrl.ShowDisplayCtrl(self.IsNodeDisplayed())
 
 
     #-------------------------------------------------------

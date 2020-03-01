@@ -322,6 +322,9 @@ class G_AnalyserScriptCtrl(wx.SplitterWindow, G_DisplayControl):
     def GetEditor(self):
         return self._Editor
 
+    def GetErrorDisplay(self):
+        return self._ErrorDisplay
+
     def GetPythonText(self):
         return self._Editor.GetText()
 

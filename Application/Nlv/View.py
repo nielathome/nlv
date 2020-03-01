@@ -923,7 +923,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         aui_notebook = self.GetAuiNotebook()
         view_control = self._ViewControl = G_ViewControl(aui_notebook)
         editor = view_control.GetEditor()
-        self.SetDisplayCtrl(view_control, editor)
+        self.SetDisplayCtrl(editor)
         self.InterceptKeys(editor)
         self.InterceptSetFocus(editor)
         editor.Bind(wx.stc.EVT_STC_UPDATEUI, self.OnUpdateUI)
