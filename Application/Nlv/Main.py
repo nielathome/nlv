@@ -252,14 +252,37 @@ class G_ConsoleLog(wx.Log):
 
 
 
+## G_AuiNotebook ###########################################
+
+class G_AuiNotebook(aui.AuiNotebook):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, agwStyle):
+        super().__init__(parent, agwStyle = agwStyle)
+
+
+    #-------------------------------------------------------
+    def GetAuiTabInfo(self, child):
+        return self, self.GetPageIndex(child)
+
+
+    #-------------------------------------------------------
+    def SwitchToDisplayChildCtrl(self, child):
+        cur_idx = self.GetSelection()
+        child_index = self.GetPageIndex(child)
+        if cur_idx != child_index:
+            self.SetSelectionToWindow(child)
+
+
+
 ## G_LogViewFrame ##########################################
 
 class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------
     def __init__(self, parent, title):
-        wx.Frame.__init__(
-            self, parent, -1, title,
+        super().__init__(
+            parent, -1, title,
             size = (970, 720),
             style = wx.DEFAULT_FRAME_STYLE
                 | wx.NO_FULL_REPAINT_ON_RESIZE
@@ -305,7 +328,7 @@ class G_LogViewFrame(wx.Frame):
 
         # create and initialise child panels
 
-        self._AuiNoteBook = aui.AuiNotebook(self._FramePanel,
+        self._AuiNoteBook = G_AuiNotebook(self._FramePanel,
             agwStyle = aui.AUI_NB_TOP
              | aui.AUI_NB_TAB_SPLIT
              | aui.AUI_NB_TAB_MOVE

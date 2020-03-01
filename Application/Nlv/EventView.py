@@ -55,7 +55,7 @@ from .Global import G_Const
 from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
-from .Logfile import G_TabDisplayControl
+from .Logfile import G_NotebookDisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_TabContainedNode
@@ -493,12 +493,14 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._Field.Add(True, "AnalysisIsValid", replace_existing = False)
 
         # setup UI
-        display_notebook = self._DisplayNotebook = G_TabDisplayControl(self.GetAuiNotebook())
+        display_notebook = self._DisplayNotebook = G_NotebookDisplayControl(self.GetAuiNotebook())
         script_ctrl = self._ScriptCtrl = G_AnalyserScriptCtrl(display_notebook)
         display_notebook.AddPage(script_ctrl, "Script")
 
-        self.SetDisplayCtrl(display_notebook, script_ctrl)
-        self.InterceptSetFocus(script_ctrl.GetEditor())
+        edit_control = script_ctrl.GetEditor()
+        self.SetDisplayCtrl(edit_control)
+        self.InterceptSetFocus(edit_control)
+        self.InterceptSetFocus(script_ctrl.GetErrorDisplay())
 
 
     @G_Global.TimeFunction
@@ -533,7 +535,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def GetDisplayNoteBook(self):
+    def GetDisplayAnalysisNoteBook(self):
         return self._DisplayNotebook
 
 
@@ -592,7 +594,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def OnAnalyserError(self, new_text):
         """An error occurred during analysis; display it in the UI"""
         self.SetErrorText(new_text, True)
-        self.ActivateSubTab(self._ScriptCtrl)
+        self.EnsureDisplayControlVisible()
 
 
     #-------------------------------------------------------
@@ -1390,9 +1392,6 @@ class G_CommonProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTre
 
 
     #-------------------------------------------------------
-    def GetDisplayNoteBook(self):
-        return self.GetLogAnalysisNode().GetDisplayNoteBook()
-
     def GetViewCtrl(self):
         return self._DisplayFocusCtrl
 
@@ -1410,9 +1409,13 @@ class G_CommonProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTre
 
 
     #-------------------------------------------------------
-    def SetupTableViewIntercepts(self):
-        table_control = self.GetTableViewCtrl()
-        inner_ctrl = table_control.GetChildCtrl()
+    def CommonPostInitNode(self, view_ctrl):
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+
+        table_ctrl = self.GetTableViewCtrl()
+        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+
+        inner_ctrl = table_ctrl.GetChildCtrl()
         if inner_ctrl is not None:
             self.InterceptKeys(inner_ctrl)            
             self.InterceptSetFocus(inner_ctrl)            
@@ -1421,16 +1424,6 @@ class G_CommonProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTre
         # destabilise the focus transfers, so leaving out for now
         #for window in table_control.GetChildren():
         #    self.InterceptSetFocus(window)            
-
-
-    def RegisterViewCtrl(self, view_ctrl):
-        display_notebook = self.GetDisplayNoteBook()
-        display_notebook.AddPage(view_ctrl, self._Name)
-        self.SetDisplayCtrl(display_notebook, view_ctrl, owns_display_ctrl = False)
-        self.SetupTableViewIntercepts()
-
-        table_ctrl = self.GetTableViewCtrl()
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
 
 
     #-------------------------------------------------------
@@ -1450,6 +1443,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         G_CommonProjectorNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
         self._Name = name
+        self._DisplayNotebook = None
 
         self._InitAnalysis = False
         if "do_analysis" in kwargs:
@@ -1462,8 +1456,11 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
         # setup UI
         doc_url = self.GetLogNode().MakeDataUrl()
-        view_ctrl = G_EventsViewCtrl(self.GetDisplayNoteBook(), self.OnTableSelectionChanged, doc_url)
-        self.RegisterViewCtrl(view_ctrl)
+        parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
+        view_ctrl = G_EventsViewCtrl(parent_notebook, self.OnTableSelectionChanged, doc_url)
+        parent_notebook.AddPage(view_ctrl, self._Name)
+
+        self.CommonPostInitNode(view_ctrl)
 
 
     def PostInitChildren(self):
@@ -1482,6 +1479,23 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
     def DoClose(self, delete):
         self.ReleaseFiles()
         super().DoClose(delete)
+
+
+    #-------------------------------------------------------
+    def GetDisplayEventNoteBook(self):
+        if self._DisplayNotebook is None:
+            # create new tab control
+            parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
+            display_notebook = self._DisplayNotebook = G_NotebookDisplayControl(parent_notebook)
+            parent_notebook.AddPage(display_notebook, self._Name)
+
+            # re-parent event view into the new tab control
+            view_ctrl = self.GetViewCtrl()
+            parent_notebook.RemovePage(parent_notebook.FindPage(view_ctrl))
+            view_ctrl.Reparent(display_notebook)
+            display_notebook.AddPage(view_ctrl, "Data")
+
+        return self._DisplayNotebook
 
 
     #-------------------------------------------------------
@@ -1608,7 +1622,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self.GetViewCtrl().CreateCharts(projector_info.Charts, events_db_path, self.GetErrorReporter(), self.GetNodeId())
         self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions).PushParameterValues(activate_chart = True)
 
-        self.GetLogAnalysisNode().ActivateSubTab(events_view)
+        self.EnsureDisplayControlVisible()
 
         # forward to child metrics views
         self.UpdateMetricContent()
@@ -1642,8 +1656,11 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        metrics_viewer = G_MetricsViewCtrl(self.GetDisplayNoteBook(), self.OnTableSelectionChanged, self._Name)
-        self.RegisterViewCtrl(metrics_viewer)
+        parent_notebook = self.GetParentNode().GetDisplayEventNoteBook()
+        view_ctrl = G_MetricsViewCtrl(parent_notebook, self.OnTableSelectionChanged, self._Name)
+        parent_notebook.AddPage(view_ctrl, self._Name)
+
+        self.CommonPostInitNode(view_ctrl)
 
 
     #-------------------------------------------------------
