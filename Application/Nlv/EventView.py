@@ -1428,7 +1428,7 @@ class G_CommonProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTre
 
     #-------------------------------------------------------
     def OnChartSelection(self, event_id):
-        """Pass (HTML) chart selection ecent on to table"""
+        """Pass (HTML) chart selection event on to table"""
         self.GetTableViewCtrl().ToggleSelectedEvent(event_id)
 
 

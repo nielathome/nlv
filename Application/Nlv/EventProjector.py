@@ -920,10 +920,11 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def Project(self, name, user_projector, projection_schema):
-        """Implements user analyse script Project() function"""
+    def DoProject(self, name, user_projector, projection_schema, record):
+        projection = None
+        if record:
+            projection = self._Results.Project(name, projection_schema)
 
-        projection = self._Results.Project(name, projection_schema)
         if self._SchemaOnly:
             return projection
 
@@ -948,6 +949,20 @@ class G_Projector:
             connection.close()
 
         return projection
+
+
+    #-------------------------------------------------------
+    def Project(self, name, user_projector, projection_schema):
+        """Implements user analyse script Project() function"""
+        return self.DoProject(name, user_projector, projection_schema, True)
+
+    def Nodes(self, name, user_projector, projection_schema):
+        """Implements user analyse script Nodes() function"""
+        return self.DoProject(name, user_projector, projection_schema, True)
+
+    def Links(self, name, user_projector, projection_schema):
+        """Implements user analyse script Links() function"""
+        return self.DoProject(name, user_projector, projection_schema, True)
 
 
 
@@ -983,6 +998,8 @@ class G_Analyser:
 
         self._Projector = G_Projector(meta_only, log_node, self._Results)
         script_globals.update(Project = self._Projector.Project)
+        script_globals.update(Nodes = self._Projector.Nodes)
+        script_globals.update(Links = self._Projector.Links)
         script_globals.update(MakeDisplaySchema = self.MakeDisplaySchema)
 
         return script_globals
