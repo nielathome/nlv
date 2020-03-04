@@ -1489,6 +1489,9 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
     NodeID_MetricsProjector = "F1BA137E-41B1-4066-95FE-AA5689310209"
     NodeID_MetricsProjectorOptions = "7F164B4B-7276-4F52-89A3-6D90A6C2557E"
 
+    NodeID_NetworkProjector = "1FA0C8AA-2740-4B23-BA78-EAF75FEB293F"
+    NodeID_NetworkDataProjector = "60E5D58E-3363-488A-9FA6-9170F3517044"
+
     ArtCtrlId_None = -1
     ArtCtrlId_Session = wx.ART_GO_HOME
     ArtCtrlId_Open = wx.ART_FILE_OPEN
@@ -1510,6 +1513,8 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
     ArtDocID_Folder = 4
     ArtDocID_EventProjector = 5
     ArtDocID_MetricsProjector = 6
+    ArtDocID_NetworkProjector = 5
+    ArtDocID_NetworkDataProjector = 5
 
     # tree item images, order must match ArtID_*
     _ArtIds = [

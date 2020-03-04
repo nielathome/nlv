@@ -794,7 +794,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 ## G_TableViewCtrl #########################################
 
-class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
+class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
 
     #-------------------------------------------------------
     def __init__(self, parent, selection_handler, multiple_selection, doc_url):
@@ -1374,7 +1374,6 @@ class G_EventsViewCtrl(G_CommonViewCtrl):
 
 
 
-
 ## G_MetricsViewCtrl #######################################
 
 class G_MetricsViewCtrl(G_CommonViewCtrl):
@@ -1406,3 +1405,38 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             table_ctrl.SetFieldMask(-1)
 
             self.CreateCharts(quantifier_info.Charts, metrics_db_path, error_reporter, node_id)
+
+
+
+## G_NetworkViewCtrl #######################################
+
+class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, doc_url = None):
+        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
+
+        self._Tables = [
+            G_TableViewCtrl(self, self.OnTableSelectionChanged, True, doc_url),
+            G_TableViewCtrl(self, self.OnTableSelectionChanged, True, doc_url)
+        ]
+
+        self.SetMinimumPaneSize(150)
+        self.SetSashGravity(0.5)
+        self.SplitHorizontally(self._Tables[0], self._Tables[1])
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self, idx):
+        return self._Tables[idx]
+
+
+    #-------------------------------------------------------
+    def ResetModel(self):
+        self.GetTableViewCtrl(0).ResetModel()
+        self.GetTableViewCtrl(1).ResetModel()
+
+
+    #-------------------------------------------------------
+    def OnTableSelectionChanged(self, item):
+        pass

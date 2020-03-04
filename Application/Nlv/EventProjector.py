@@ -777,6 +777,7 @@ class G_ProjectorInfo:
         self.ProjectionName = name
         self.ProjectionSchema = projection_schema
         self.ProjectionDbPath = DeriveSubPath(base_db_path, name)
+        self.DocumentNodeID = G_Project.NodeID_EventProjector
         self.Quantifiers = dict()
         self.Charts = []
 
@@ -804,6 +805,18 @@ class G_ProjectorInfo:
 
 
 
+## G_NetworkInfo ###########################################
+
+class G_NetworkInfo:
+
+    #-------------------------------------------------------
+    def __init__(self, name, node_projector, link_projector):
+        self.ProjectionName = name
+        self.DocumentNodeID = G_Project.NodeID_NetworkProjector
+        self.NetworkProjector = [node_projector, link_projector]
+
+
+
 ## G_AnalysisResults #######################################
 
 class G_AnalysisResults:
@@ -816,8 +829,16 @@ class G_AnalysisResults:
 
 
     #-------------------------------------------------------
-    def Project(self, name, projection_schema):
+    def Project(self, name, projection_schema, record):
         info = G_ProjectorInfo(name, projection_schema, self.AnalysisDbPath)
+        if record:
+            self.Projectors.update([(name, info)])
+        return info
+
+
+    #-------------------------------------------------------
+    def Network(self, name, node_projector, link_projector):
+        info = G_NetworkInfo(name, node_projector, link_projector)
         self.Projectors.update([(name, info)])
         return info
 
@@ -921,10 +942,7 @@ class G_Projector:
 
     #-------------------------------------------------------
     def DoProject(self, name, user_projector, projection_schema, record):
-        projection = None
-        if record:
-            projection = self._Results.Project(name, projection_schema)
-
+        projection = self._Results.Project(name, projection_schema, record)
         if self._SchemaOnly:
             return projection
 
@@ -958,11 +976,18 @@ class G_Projector:
 
     def Nodes(self, name, user_projector, projection_schema):
         """Implements user analyse script Nodes() function"""
-        return self.DoProject(name, user_projector, projection_schema, True)
+        return self.DoProject(name, user_projector, projection_schema, False)
 
     def Links(self, name, user_projector, projection_schema):
         """Implements user analyse script Links() function"""
-        return self.DoProject(name, user_projector, projection_schema, True)
+        return self.DoProject(name, user_projector, projection_schema, False)
+
+
+    #-------------------------------------------------------
+    def Network(self, name, node_projector, link_projector):
+        """Implements user analyse script Network() function"""
+        return self._Results.Network(name, node_projector, link_projector)
+
 
 
 
@@ -1000,6 +1025,7 @@ class G_Analyser:
         script_globals.update(Project = self._Projector.Project)
         script_globals.update(Nodes = self._Projector.Nodes)
         script_globals.update(Links = self._Projector.Links)
+        script_globals.update(Network = self._Projector.Network)
         script_globals.update(MakeDisplaySchema = self.MakeDisplaySchema)
 
         return script_globals

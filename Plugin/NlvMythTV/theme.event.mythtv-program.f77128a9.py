@@ -118,48 +118,7 @@ projection.Chart("Pie", True, Chart.Pie("Title", "Count"))
 
 
 
-## Projector ###################################################
-
-#def NetworkProjector(connection, cursor, context):
-#    cursor.execute("DROP TABLE IF EXISTS main.projection")
-#    cursor.execute("""
-#        CREATE TABLE projection
-#        (
-#            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
-#            title TEXT,
-#            channel INT,
-#            cardid INT
-#        )""")
-
-#    cursor.execute("""
-#        INSERT INTO projection
-#        (
-#            title,
-#            channel,
-#            cardid
-#        )
-#        SELECT
-#            title,
-#            channel,
-#            cardid
-#        FROM
-#            analysis.program
-#        """)
-
-
-
-#Project(
-#    "Network",
-#    NetworkProjector,
-#    MakeDisplaySchema()
-#        .AddField("Title", "text", 400)
-#        .AddField("Channel", "int", 60)
-#        .AddField("CardID", "int", 60)
-#)
-
-
-
-
+## Network #####################################################
 
 def NodesProjector(connection, cursor, context):
     cursor.execute("DROP TABLE IF EXISTS main.projection")
@@ -210,7 +169,7 @@ def NodesProjector(connection, cursor, context):
         """)
 
 
-Nodes(
+nodes = Nodes(
     "Entities",
     NodesProjector,
     MakeDisplaySchema()
@@ -218,8 +177,6 @@ Nodes(
         .AddField("Title", "text", 200, align = "left")
         .AddField("Size", "int", 60)
 )
-
-
 
 
 def LinksProjector(connection, cursor, context):
@@ -253,7 +210,7 @@ def LinksProjector(connection, cursor, context):
     """)
 
 
-Links(
+links = Links(
     "Relationships",
     LinksProjector,
     MakeDisplaySchema()
@@ -262,64 +219,8 @@ Links(
 )
 
 
-
-
-
-def tomorrow():
-    cursor.execute("DROP TABLE IF EXISTS main.projection")
-    cursor.execute("""
-        CREATE TABLE projection
-        (
-            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
-            name TEXT,
-            type TEXT,
-            count INT
-        )""")
-
-    cursor.execute("""
-        SELECT
-            title as name,
-            'program' as type,
-            count(title) as size
-        FROM
-            display
-        GROUP BY
-            title
-
-        UNION ALL
-        SELECT
-            channel,
-            'channel',
-            count(channel)
-        FROM
-            display
-        GROUP BY
-            channel
-
-        UNION ALL
-        SELECT
-            cardid,
-            'cardid',
-            count(cardid)
-        FROM
-            display
-        GROUP BY
-            cardid
-    """)
-
-
-
-    cursor.execute("""
-        SELECT DISTINCT
-            title as source,
-            channel as target
-        FROM
-            display
-
-        UNION ALL
-        SELECT DISTINCT
-            title as source,
-            cardid as target
-        FROM
-            display
-    """)
+Network(
+    "Recording",
+    nodes,
+    links
+)

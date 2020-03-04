@@ -49,6 +49,7 @@ import wx
 from .Document import D_Document
 from .EventDisplay import G_EventsViewCtrl
 from .EventDisplay import G_MetricsViewCtrl
+from .EventDisplay import G_NetworkViewCtrl
 from .EventProjector import G_Analyser
 from .EventProjector import G_ScriptGuard
 from .Global import G_Const
@@ -521,7 +522,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
                 if self._AnalysisResults is not None:
                     for projector in self._AnalysisResults.Projectors.values():
-                        self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, projector.ProjectionName, do_analysis = self._InitAnalysis)
+                        self.BuildNodeFromDefaults(projector.DocumentNodeID, projector.ProjectionName, do_analysis = self._InitAnalysis)
 
                 self.PostAnalyse()
 
@@ -645,7 +646,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             exec(code, globals)
 
             self.SetErrorText("Analysed OK\n")
-            self._Field.AnalysisIsValid.Value = True
+            if not meta_only:
+                self._Field.AnalysisIsValid.Value = True
 
             self._AnalysisResults = analyser.Close()
             self.GetSessionNode().UpdateEventId(self._AnalysisResults.EventId)
@@ -684,19 +686,16 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def _ForallProjectors(self, func, event, metrics):
-        if event:
-            self.VisitSubNodes(func, factory_id = G_Project.NodeID_EventProjector, recursive = True)
-
-        if metrics:
-            self.VisitSubNodes(func, factory_id = G_Project.NodeID_MetricsProjector, recursive = True)
+    def _ForallProjectors(self, func, factory_ids):
+        for factory_id in factory_ids:
+            self.VisitSubNodes(func, factory_id = factory_id, recursive = True)
 
 
     def PostAnalyse(self):
         def Work(node):
             node.PostAnalyse(self._AnalysisResults)
 
-        self._ForallProjectors(Work, event = True, metrics = False)
+        self._ForallProjectors(Work, [G_Project.NodeID_EventProjector])
 
 
     def ReleaseFiles(self):
@@ -706,7 +705,11 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         def Work(node):
             node.ReleaseFiles()
 
-        self._ForallProjectors(Work, event = True, metrics = True)
+        self._ForallProjectors(Work, [
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_MetricsProjector,
+            G_Project.NodeID_NetworkProjector
+        ])
 
 
     @G_Global.TimeFunction
@@ -718,13 +721,22 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         def Work(node):
             node.UpdateEventContent()
 
-        self._ForallProjectors(Work, event = True, metrics = False)
+        self._ForallProjectors(Work, [
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_NetworkDataProjector
+        ])
 
 
     def UpdateValidity(self, valid):
         def Work(node):
             node.UpdateValidity(valid)
-        self._ForallProjectors(Work, event = True, metrics = True)
+
+        self._ForallProjectors(Work, [
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_MetricsProjector,
+            G_Project.NodeID_NetworkProjector,
+            G_Project.NodeID_NetworkDataProjector
+        ])
 
 
     #-------------------------------------------------------
@@ -1367,13 +1379,9 @@ class G_MetricsProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
 
 
 
-## G_CommonProjectorNode ###################################
+## G_CoreProjectorNode #####################################
 
-class G_CommonProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeChildNode):
-    """
-    Mixin class to extend child *projector* nodes of an analysis node
-    with common behaviour (i.e. G_EventProjectorNode and G_MetricsProjectorNode.
-    """
+class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeChildNode):
 
     #-------------------------------------------------------
     def __init__(self):
@@ -1386,17 +1394,27 @@ class G_CommonProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTre
 
 
     #-------------------------------------------------------
-    def ReleaseFiles(self):
-        """Release all resources owned by the view"""
-        self.GetViewCtrl().ResetModel()
+    def SetupTableCtrl(self, view_ctrl, table_ctrl):
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+
+        inner_ctrl = table_ctrl.GetChildCtrl()
+        if inner_ctrl is not None:
+            self.InterceptKeys(inner_ctrl)            
+            self.InterceptSetFocus(inner_ctrl)            
+
+        # trying to include the table header control seems to
+        # destabilise the focus transfers, so leave out
 
 
     #-------------------------------------------------------
     def GetViewCtrl(self):
-        return self._DisplayFocusCtrl
+        return self._DisplayCtrl
 
-    def GetTableViewCtrl(self):
-        return self.GetViewCtrl().GetTableViewCtrl()
+
+    #-------------------------------------------------------
+    def UpdateValidity(self, valid):
+        self.GetTableViewCtrl().UpdateDisplay(valid = valid)
 
 
     #-------------------------------------------------------
@@ -1409,21 +1427,28 @@ class G_CommonProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTre
 
 
     #-------------------------------------------------------
-    def CommonPostInitNode(self, view_ctrl):
-        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+    def ReleaseFiles(self):
+        """Release all resources owned by the view"""
+        self.GetViewCtrl().ResetModel()
 
-        table_ctrl = self.GetTableViewCtrl()
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
 
-        inner_ctrl = table_ctrl.GetChildCtrl()
-        if inner_ctrl is not None:
-            self.InterceptKeys(inner_ctrl)            
-            self.InterceptSetFocus(inner_ctrl)            
 
-        # trying to include the table header control seems to
-        # destabilise the focus transfers, so leaving out for now
-        #for window in table_control.GetChildren():
-        #    self.InterceptSetFocus(window)            
+## G_CommonProjectorNode ###################################
+
+class G_CommonProjectorNode(G_CoreProjectorNode):
+    """
+    Mixin class to extend child *projector* nodes of an analysis node
+    with common behaviour (i.e. G_EventProjectorNode and G_MetricsProjectorNode.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self):
+        G_CoreProjectorNode.__init__(self)
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self.GetViewCtrl().GetTableViewCtrl()
 
 
     #-------------------------------------------------------
@@ -1460,7 +1485,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         view_ctrl = G_EventsViewCtrl(parent_notebook, self.OnTableSelectionChanged, doc_url)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
-        self.CommonPostInitNode(view_ctrl)
+        self.SetupTableCtrl(view_ctrl, view_ctrl.GetTableViewCtrl())
 
 
     def PostInitChildren(self):
@@ -1514,12 +1539,6 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
     def GetTimecodeBase(self):
         return self.GetLogfile().GetTimecodeBase()
-
-
-    #-------------------------------------------------------
-    def OnDisplayKey(self, key_code, modifiers, view_node):
-        handled = False
-        return handled
 
 
     #-------------------------------------------------------
@@ -1636,9 +1655,6 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
     def UpdateNesting(self, nesting):
         self.GetTableViewCtrl().UpdateDisplay(nesting = nesting)
 
-    def UpdateValidity(self, valid):
-        self.GetTableViewCtrl().UpdateDisplay(valid = valid)
-
 
 
 ## G_MetricsProjectorNode ##################################
@@ -1660,7 +1676,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         view_ctrl = G_MetricsViewCtrl(parent_notebook, self.OnTableSelectionChanged, self._Name)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
-        self.CommonPostInitNode(view_ctrl)
+        self.SetupTableCtrl(view_ctrl, view_ctrl.GetTableViewCtrl())
 
 
     #-------------------------------------------------------
@@ -1696,12 +1712,6 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def OnDisplayKey(self, key_code, modifiers, view_node):
-        handled = False
-        return handled
-
-
-    #-------------------------------------------------------
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
@@ -1719,8 +1729,146 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self.GetViewCtrl().Quantify(self.GetNodeId(), quantifier_info, is_valid, error_reporter)
         self.FindChildNode(factory_id = G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
 
-    def UpdateValidity(self, valid):
-        self.GetTableViewCtrl().UpdateDisplay(valid = valid)
+
+
+## G_NetworkProjectorNode ##################################
+
+class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_CoreProjectorNode.__init__(self)
+        G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self._Name = name
+
+        self._InitAnalysis = False
+        if "do_analysis" in kwargs:
+            self._InitAnalysis = kwargs["do_analysis"]
+
+
+    def PostInitNode(self):
+        # make document fields accessible
+        self._Field = D_Document(self.GetDocument(), self)
+
+        # setup UI
+        doc_url = self.GetLogNode().MakeDataUrl()
+        parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
+        view_ctrl = G_NetworkViewCtrl(parent_notebook, doc_url)
+        parent_notebook.AddPage(view_ctrl, self._Name)
+
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+
+
+    def PostInitChildren(self):
+        if self._InitAnalysis:
+            projector_info, valid = self.GetProjectorInfo()
+            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjector[0].ProjectionName, table_idx = 0)
+            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjector[1].ProjectionName, table_idx = 1)
+
+
+    #def OnTableSelectionChanged(self):
+    #    pass
+
+
+    #-------------------------------------------------------
+    def GetProjectorInfo(self):
+        analysis_results, is_valid = self.GetLogAnalysisNode().GetAnalysisResults()
+        return analysis_results.GetProjectorInfo(self._Name), is_valid
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        """TableView for the network "chart" """
+        class Dummy:
+            def UpdateDisplay(self, valid):
+                pass
+
+        return Dummy()
+
+
+    def GetDataTableViewCtrl(self, idx):
+        """TableView for nodes/links tables"""
+        return self.GetViewCtrl().GetTableViewCtrl(idx)
+
+
+    #-------------------------------------------------------
+    def DoClose(self, delete):
+        self.ReleaseFiles()
+        super().DoClose(delete)
+        pass
+
+
+
+## G_NetworkDataProjectorNode ##############################
+
+class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_CoreProjectorNode.__init__(self)
+        G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self._Name = name
+
+        self._InitTableIndex = None
+        if "table_idx" in kwargs:
+            self._InitTableIndex = kwargs["table_idx"]
+
+
+    def PostInitNode(self):
+        # make document fields accessible
+        self._Field = D_Document(self.GetDocument(), self)
+
+        if self._InitTableIndex is not None:
+            self._Field.Add(self._InitTableIndex, "TableIndex", replace_existing = False)
+
+        self._TableIndex = self._Field.TableIndex.Value
+
+        table_ctrl = self.GetParentNode().GetDataTableViewCtrl(self._TableIndex)
+        self.SetupTableCtrl(table_ctrl, table_ctrl)
+
+
+    #-------------------------------------------------------
+    def Activate(self):
+        self.ActivateContainer()
+
+
+    #-------------------------------------------------------
+    def GetProjectorInfo(self):
+        projector_info, is_valid = self.GetParentNode().GetProjectorInfo()
+        return projector_info.NetworkProjector[self._TableIndex], is_valid
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self.GetViewCtrl()
+
+
+    #-------------------------------------------------------
+    @G_Global.TimeFunction
+    def UpdateEventContent(self):
+        """Load network data into the viewer"""
+
+        # load events into event viewer data control
+        events_view = self.GetTableViewCtrl()
+        projector_info, is_valid = self.GetProjectorInfo()
+        event_schema = projector_info.ProjectionSchema
+        events_db_path = projector_info.ProjectionDbPath
+        events_view.UpdateContent(False, event_schema, events_db_path, is_valid)
+        
+        self.EnsureDisplayControlVisible()
+
+        ## forward to child metrics views
+        #self.UpdateMetricContent()
+
+
+    #-------------------------------------------------------
+    def OnFilterMatch(self, match):
+        """The filter has changed"""
+        if self.GetTableViewCtrl().UpdateFilter(match):
+#            self.GetViewCtrl().UpdateChartData()
+            return True
+        else:
+            return False
 
 
 
@@ -1784,4 +1932,12 @@ G_Project.RegisterNodeFactory(
 
 G_Project.RegisterNodeFactory(
     G_NodeFactory(G_Project.NodeID_MetricsProjector, G_Project.ArtDocID_MetricsProjector, G_MetricsProjectorNode)
+)
+
+G_Project.RegisterNodeFactory(
+    G_NodeFactory(G_Project.NodeID_NetworkProjector, G_Project.ArtDocID_NetworkProjector, G_NetworkProjectorNode)
+)
+
+G_Project.RegisterNodeFactory(
+    G_NodeFactory(G_Project.NodeID_NetworkDataProjector, G_Project.ArtDocID_NetworkDataProjector, G_NetworkDataProjectorNode)
 )
