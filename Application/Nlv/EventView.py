@@ -638,7 +638,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._AnalysisRun = True
 
         self.SetErrorText("Analysing ...\n")
-        with G_ScriptGuard("Analysis", self.OnAnalyserError):
+        with G_ScriptGuard("Analysis", self.GetErrorReporter()):
             event_id = self.GetSessionNode().GetEventId()
             analyser = G_Analyser(self.MakeTemporaryFilename(".db"), event_id)
             globals = analyser.SetEntryPoints(meta_only, log_schema, self.GetLogfile(), self.GetLogNode())
@@ -1236,7 +1236,7 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
             return
 
         # build UI controls for the parameters
-        parameters = self._Parameters = chart_ctrl.DefineParameters()
+        parameters = self._Parameters = chart_ctrl.DefineParameters(self.GetErrorReporter())
         if parameters is not None:
             info = G_WindowInfo(sizer, pane)
             chart_no = self._Field.idxSelectChart.Value
@@ -1271,7 +1271,7 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
         chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
         if chart_ctrl is not None:
             values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
-            chart_ctrl.Update(parameters = values)
+            chart_ctrl.Update(self.GetErrorReporter(), parameters = values)
 
 
     #-------------------------------------------------------
@@ -1550,9 +1550,10 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
 
     def OnTableSelectionChanged(self, item):
+        error_reporter = self.GetErrorReporter()
         if item is None or item.GetID() is None:
             # ignore de-selection events
-            return
+            return error_reporter
 
         # tell the data explorer
         self.GetDataExplorer().Update(self.MakeDataUrl(self.GetTableViewCtrl().GetLocation(item)))
@@ -1566,7 +1567,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         update = update_marker or update_global
 
         if not update:
-            return
+            return error_reporter
 
         # convert range to timecodes
         (start_timecode, finish_timecode) = self.GetTableViewCtrl().GetEventRange(item)
@@ -1594,6 +1595,8 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             # flush any changes through to the GUI
             self.RefreshTrackers(False, True, None)
 
+        return error_reporter
+
 
 
     #-------------------------------------------------------
@@ -1601,7 +1604,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         """The filter has changed"""
         ok = self.GetTableViewCtrl().UpdateFilter(match)
         if ok:
-            self.GetViewCtrl().UpdateChartData()
+            self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed = True)
 
         # propagate new event list to all metrics
         if ok and not self._Initialising:
@@ -1702,20 +1705,23 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
         # ignore de-selection and non-events
+        error_reporter = self.GetErrorReporter()
         if item is None:
-            return
+            return error_reporter
 
         location = self.GetTableViewCtrl().GetLocation(item)
         if location is not None:
             # tell the data explorer
             self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
+        return error_reporter
+
 
     #-------------------------------------------------------
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetViewCtrl().UpdateChartData()
+            self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed = True)
             return True
         else:
             return False
@@ -1725,8 +1731,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
     @G_Global.TimeFunction
     def UpdateMetricContent(self):
         quantifier_info, is_valid = self.GetQuantifierInfo()
-        error_reporter = self.GetErrorReporter()
-        self.GetViewCtrl().Quantify(self.GetNodeId(), quantifier_info, is_valid, error_reporter)
+        self.GetViewCtrl().Quantify(self.GetNodeId(), quantifier_info, is_valid, self.GetErrorReporter())
         self.FindChildNode(factory_id = G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
 
 
@@ -1865,7 +1870,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-#            self.GetViewCtrl().UpdateChartData()
+#            self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed = True)
             return True
         else:
             return False

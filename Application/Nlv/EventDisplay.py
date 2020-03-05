@@ -34,6 +34,7 @@ import winreg
 from .DataExplorer import G_DataExplorerProvider
 from .DataExplorer import G_DataExplorerSync
 from .Logfile import G_DisplayControl
+from .Logfile import G_NotebookDisplayControl
 from .EventProjector import ConnectDb
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
@@ -1009,23 +1010,9 @@ class G_ParameterCollector:
 
 
 
-## G_ChartViewCtrlProxy ####################################
+## G_HtmlHostCtrl ##########################################
 
-class G_ChartViewCtrlProxy:
-
-    #-------------------------------------------------------
-    def __init__(self, view_ctrl):
-        self._ViewCtrl = view_ctrl
-
-
-    def ExecuteScript(self, script):
-        self._ViewCtrl.EnqueueScript(script)
-
-
-
-## G_ChartViewCtrl #########################################
-
-class G_ChartViewCtrl(wx.Panel):
+class G_HtmlHostCtrl(wx.Panel):
 
     #-------------------------------------------------------
     _InitCharting = True
@@ -1078,7 +1065,7 @@ class G_ChartViewCtrl(wx.Panel):
     #-------------------------------------------------------
     @classmethod
     def RegisterConsole(cls, doc):
-        if G_ChartViewCtrl._ConsoleRegistered:
+        if G_HtmlHostCtrl._ConsoleRegistered:
             return
 
         # warning: mixing the two Python COM libraries here.
@@ -1102,18 +1089,14 @@ class G_ChartViewCtrl(wx.Panel):
         IDM_ADDCONSOLEMESSAGERECEIVER = 3800
         OLECMDEXECOPT_DODEFAULT = 0
         icommandtarget.Exec(CGID_MSHTML, IDM_ADDCONSOLEMESSAGERECEIVER, OLECMDEXECOPT_DODEFAULT, iunknown_p)
-        G_ChartViewCtrl._ConsoleRegistered = True
+        G_HtmlHostCtrl._ConsoleRegistered = True
 
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_info, db_path, table_view_ctrl, error_reporter, node_id):
+    def __init__(self, parent, chart_info, error_reporter, node_id):
         super().__init__(parent)
 
         self._ChartInfo = chart_info
-        self._DbPath = db_path
-        self._TableViewCtrl = table_view_ctrl
-        self._ErrorReporter = error_reporter
-
         self._ParameterValues = dict()
         self._ScriptQueue = ["SetNodeId({});".format(node_id)]
 
@@ -1125,7 +1108,7 @@ class G_ChartViewCtrl(wx.Panel):
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 
-        with G_ScriptGuard("Setup", self._ErrorReporter):
+        with G_ScriptGuard("Setup", error_reporter):
             page_name = self._ChartInfo.Setup()
             self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
 
@@ -1206,35 +1189,37 @@ class G_ChartViewCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    def DefineParameters(self):
+    def DefineParameters(self, error_reporter):
         parameters = None
 
-        with G_ScriptGuard("DefineParameters", self._ErrorReporter):
-            connection = ConnectDb(self._DbPath, True)
+        with G_ScriptGuard("DefineParameters", error_reporter):
+            cursor = self.MakeDbCursor()
             if connection is not None:
-                cursor = connection.cursor()
-                event_ids = self._TableViewCtrl.GetSelectedEventIds()
                 collector = G_ParameterCollector()
-                self._ChartInfo.DefineParameters(collector, connection, cursor, event_ids)
+                self._ChartInfo.DefineParameters(collector, connection, cursor, self.GetSelectedEventIds())
                 parameters = collector.Close()
 
         return parameters
 
 
     #-------------------------------------------------------
-    def Realise(self):
-        with G_ScriptGuard("Realise", self._ErrorReporter):
-            connection = ConnectDb(self._DbPath, True)
-            if connection is not None:
-                cursor = connection.cursor()
-                event_ids = self._TableViewCtrl.GetSelectedEventIds()
+    def Realise(self, error_reporter):
+        with G_ScriptGuard("Realise", error_reporter):
+            cursor = self.MakeDbCursor()
+            if cursor is not None:
 
-                figure = G_ChartViewCtrlProxy(self)
-                self._ChartInfo.Realise(figure, connection, cursor, self._ParameterValues, event_ids)
+                class Proxy:
+                    def __init__(self, view_ctrl):
+                        self._ViewCtrl = view_ctrl
+
+                    def ExecuteScript(self, script):
+                        self._ViewCtrl.EnqueueScript(script)
+
+                self._ChartInfo.Realise(Proxy(self), connection, cursor, self._ParameterValues, self.GetSelectedEventIds())
 
 
     #-------------------------------------------------------
-    def Update(self, data_changed = False, selection_changed = False, parameters = None):
+    def Update(self, error_reporter, data_changed = False, selection_changed = False, parameters = None):
         """Redraw the chart if needed"""
 
         do_realize = False
@@ -1249,8 +1234,35 @@ class G_ChartViewCtrl(wx.Panel):
             self._ParameterValues = parameters.copy()
 
         if do_realize:
-            self.Realise()
+            self.Realise(error_reporter)
+
+
             
+## G_HtmlChartCtrl #########################################
+
+class G_HtmlChartCtrl(G_HtmlHostCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, chart_info, db_path, table_view_ctrl, error_reporter, node_id):
+        super().__init__(parent, chart_info, error_reporter, node_id)
+
+        self._DbPath = db_path
+        self._TableViewCtrl = table_view_ctrl
+
+
+    #-------------------------------------------------------
+    def GetSelectedEventIds(self):
+        return self._TableViewCtrl.GetSelectedEventIds()
+
+
+    #-------------------------------------------------------
+    def MakeDbCursor(self):
+        connection = ConnectDb(self._DbPath, True)
+        if connection is None:
+            return None
+        else:
+            return connection.cursor()
+
 
 
 ## G_CommonViewCtrl ########################################
@@ -1316,8 +1328,8 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
-        self._NodeSelectionHandler(item)
-        self.UpdateChartSelection()
+        error_reporter = self._NodeSelectionHandler(item)
+        self.UpdateCharts(error_reporter, selection_changed = True)
 
 
     #-------------------------------------------------------
@@ -1341,26 +1353,20 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
             table_ctrl = self.GetTableViewCtrl()
     
             for chart_info in chart_list:
-                chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, db_path, table_ctrl, error_reporter, node_id)
+                chart_view_ctrl = G_HtmlChartCtrl(pane, chart_info, db_path, table_ctrl, error_reporter, node_id)
                 pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
 
             pane_sizer.ShowItems(False)
 
-        self.UpdateChartData()
+        self.UpdateCharts(error_reporter, data_changed = True)
 
 
     #-------------------------------------------------------
-    def UpdateCharts(self, data_changed = False, selection_changed = False):
+    def UpdateCharts(self, error_reporter, data_changed = False, selection_changed = False):
         pane = self.GetChartPane()
         if pane is not None:
             for chart_view in pane.GetChildren():
-                chart_view.Update(data_changed, selection_changed)
-
-    def UpdateChartData(self):
-        self.UpdateCharts(data_changed = True)
-
-    def UpdateChartSelection(self):
-        return self.UpdateCharts(selection_changed = True)
+                chart_view.Update(error_reporter, data_changed, selection_changed)
 
 
 
@@ -1416,14 +1422,19 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
     def __init__(self, parent, doc_url = None):
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
 
+        self._Notebook = G_NotebookDisplayControl(self)
+
         self._Tables = [
-            G_TableViewCtrl(self, self.OnTableSelectionChanged, True, doc_url),
-            G_TableViewCtrl(self, self.OnTableSelectionChanged, True, doc_url)
+            G_TableViewCtrl(self._Notebook, self.OnTableSelectionChanged, True, doc_url),
+            G_TableViewCtrl(self._Notebook, self.OnTableSelectionChanged, True, doc_url)
         ]
+
+        self._Notebook.AddPage(self._Tables[0], "Nodes")
+        self._Notebook.AddPage(self._Tables[1], "Links")
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
-        self.SplitHorizontally(self._Tables[0], self._Tables[1])
+        self.SplitHorizontally(self._Notebook, wx.Panel(self))
 
 
     #-------------------------------------------------------
