@@ -735,11 +735,11 @@ class G_ChartInfo:
     def Setup(self):
         return self.Builder.Setup(self.Name)
 
-    def DefineParameters(self, params, connection, cursor, selection):
-        self.Builder.DefineParameters(params, connection, cursor, selection)
+    def DefineParameters(self, connection, cursor, context):
+        self.Builder.DefineParameters(connection, cursor, context)
 
-    def Realise(self, figure, connection, cursor, param_values, selection):
-        self.Builder.Realise(self.Name, figure, connection, cursor, param_values, selection)
+    def Realise(self, connection, cursor, context):
+        self.Builder.Realise(self.Name, connection, cursor, context)
 
 
 
@@ -812,8 +812,14 @@ class G_NetworkInfo:
     #-------------------------------------------------------
     def __init__(self, name, node_projector, link_projector):
         self.ProjectionName = name
+        self.ChartInfo = None
         self.DocumentNodeID = G_Project.NodeID_NetworkProjector
-        self.NetworkProjector = [node_projector, link_projector]
+        self.NetworkProjectors = [node_projector, link_projector]
+
+
+    #-------------------------------------------------------
+    def Chart(self, want_selection, builder):
+        self.ChartInfo = G_ChartInfo(self.ProjectionName, want_selection, builder)
 
 
 

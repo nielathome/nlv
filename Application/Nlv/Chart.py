@@ -36,7 +36,7 @@ class Bar:
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
+    def DefineParameters(self, connection, cursor, context):
         pass
 
 
@@ -47,7 +47,7 @@ class Bar:
 
 
     #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
+    def Realise(self, name, connection, cursor, context):
         cursor.execute("""
             SELECT
                 {category},
@@ -57,7 +57,9 @@ class Bar:
                 display
             """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
+        selection = context.GetSelection()
         data = []
+
         for row in cursor:
             event_id = row[2]
             selected = event_id in selection
@@ -69,7 +71,7 @@ class Bar:
             switch_time = 250
 
         json_text = json.dumps(data)
-        figure.ExecuteScript("CreateChart('{}', '{}', '{}', '{}', {});".format(name, self._CategoryField, self._ValueField, json_text, switch_time))
+        context.ExecuteScript("CreateChart('{}', '{}', '{}', '{}', {});".format(name, self._CategoryField, self._ValueField, json_text, switch_time))
 
 
 
@@ -86,8 +88,8 @@ class Pie:
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
-        params.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
+    def DefineParameters(self, connection, cursor, context):
+        context.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
 
 
     #-----------------------------------------------------------
@@ -97,7 +99,7 @@ class Pie:
 
 
     #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
+    def Realise(self, name, connection, cursor, context):
         cursor.execute("""
             SELECT
                 count({value}),
@@ -121,10 +123,11 @@ class Pie:
                 {value} DESC
             """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
-        param = param_values.get("other_pct", 0)
+        param = context.GetParameter("other_pct", 0)
         accum = 0
         limit = sum * (1 - (0.05 * (1 + param)))
 
+        selection = context.GetSelection()
         data = []
         other_selected = False
 
@@ -150,4 +153,66 @@ class Pie:
             switch_time = 250
 
         json_text = json.dumps(data)
-        figure.ExecuteScript("CreateChart('{}', '{}', '{}');".format(self._ValueField, json_text, switch_time))
+        context.ExecuteScript("CreateChart('{}', '{}', '{}');".format(self._ValueField, json_text, switch_time))
+
+
+
+## Network #####################################################
+
+class Network:
+
+    #-----------------------------------------------------------
+    def DefineParameters(self, connection, cursor, context):
+        pass
+
+
+    #-----------------------------------------------------------
+    @classmethod
+    def Setup(cls, name):
+        return "Network.html"
+
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
+        cursor.execute("""
+            SELECT
+                event_id,
+                type,
+                title,
+                size
+            FROM
+                main.display
+            """)
+
+#        selection = context.GetSelection()
+        nodes = []
+        for row in cursor:
+            event_id = row[0]
+#            selected = event_id in selection
+            nodes.append(dict(zip(["event_id", "type", "title", "size"], [event_id, row[1], row[2], row[3]])))
+
+
+        cursor.execute("""
+            SELECT
+                event_id,
+                source,
+                target
+            FROM
+                links.display
+            """)
+
+        links = []
+        for row in cursor:
+            event_id = row[0]
+#            selected = event_id in selection
+            links.append(dict(zip(["event_id", "source", "target"], [event_id, row[1], row[2]])))
+
+        network = dict(nodes = nodes, links = links)
+
+        # chart transition time in msec
+        switch_time = 1000
+        #if len(selection) != 0:
+        #    switch_time = 250
+
+        json_text = json.dumps(network)
+        context.ExecuteScript("CreateChart('{}', '{}', {});".format(name, json_text, switch_time))

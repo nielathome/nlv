@@ -17,11 +17,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <!DOCTYPE html>
 <meta charset="utf-8">
 
-<!-- Start model -->
-<script src="https://d3js.org/d3.v5.js"></script>
-<button onclick="Update(data1)">Data 1</button>
-<button onclick="Update(data2)">Data 2</button>
-<!-- End model -->
+<!-- Load d3.js -->
+<script src="polyfill.8.1.3.js"></script>
+<script src="fetch.umd.3.0.0.js"></script>
+<script src="d3.v5.min.js"></script>
 
 <!-- Create a div where the graph will take place -->
 <div id="my_dataviz"></div>
@@ -47,6 +46,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 <script>
+    //----------------------------------------------------------
+    var g_node_id = 0
+
+    function SetNodeId(node_id) {
+        g_node_id = node_id;
+    }
+
+
     //----------------------------------------------------------
 
     // retained data
@@ -215,16 +222,5 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 //    window.addEventListener("resize", OnResize);
-
-
-    //----------------------------------------------------------
-    const data1 = '{"nodes":[{"title":"Neighbours","type":1,"size":7},{"title":"The Gadget Show","type":1,"size":2},{"title":"Good Will Hunting","type":1,"size":1},{"title":"Casualty","type":1,"size":2},{"title":"Snake Boss","type":1,"size":3},{"title":"Top Gear","type":1,"size":2},{"title":"Celebrity Apprentice USA","type":1,"size":1},{"title":"EastEnders","type":1,"size":4},{"title":"Room 101","type":1,"size":1},{"title":"Nightly Show with Gordon Ramsay","type":1,"size":4},{"title":"MasterChef","type":1,"size":3},{"title":"Come Dine with Me","type":1,"size":1},{"title":"Eddie Stobart","type":1,"size":1},{"title":"Channel-2005","type":2,"size":9},{"title":"Channel-2010","type":2,"size":1},{"title":"Channel-2001","type":2,"size":10},{"title":"Channel-2011","type":2,"size":3},{"title":"Channel-2002","type":2,"size":2},{"title":"Channel-2003","type":2,"size":4},{"title":"Channel-2012","type":2,"size":1},{"title":"Channel-2004","type":2,"size":1},{"title":"Channel-2055","type":2,"size":1},{"title":"CardId-1","type":3,"size":29},{"title":"CardId-2","type":3,"size":1},{"title":"CardId-7","type":3,"size":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Good Will Hunting","target":"Channel-2010"},{"source":"Good Will Hunting","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Snake Boss","target":"Channel-2011"},{"source":"Snake Boss","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"Celebrity Apprentice USA","target":"Channel-2001"},{"source":"Celebrity Apprentice USA","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Come Dine with Me","target":"Channel-2004"},{"source":"Come Dine with Me","target":"CardId-1"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
-    const data2 = '{"nodes":[{"title":"Neighbours","type":1,"size":7},{"title":"The Gadget Show","type":1,"size":2},{"title":"Casualty","type":1,"size":2},{"title":"Top Gear","type":1,"size":2},{"title":"EastEnders","type":1,"size":4},{"title":"Room 101","type":1,"size":1},{"title":"Nightly Show with Gordon Ramsay","type":1,"size":4},{"title":"MasterChef","type":1,"size":3},{"title":"Eddie Stobart","type":1,"size":1},{"title":"Channel-2005","type":2,"size":9},{"title":"Channel-2001","type":2,"size":10},{"title":"Channel-2002","type":2,"size":2},{"title":"Channel-2003","type":2,"size":4},{"title":"Channel-2012","type":2,"size":1},{"title":"Channel-2055","type":2,"size":1},{"title":"CardId-1","type":3,"size":29},{"id":"CardId-2","type":3,"size":1},{"id":"CardId-7","type":3,"size":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
-
-    function Update(json_text) {
-        CreateChart("Title", json_text, 1000);
-    }
-
-    Update(data1);
 
 </script>

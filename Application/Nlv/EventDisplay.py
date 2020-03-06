@@ -984,32 +984,6 @@ class G_ChoiceParam(G_Param):
 
 
 
-## G_ParameterCollector ####################################
-
-class G_ParameterCollector:
-    """Collect parameter data from a chart"""
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self._Params = []
-
-
-    #-------------------------------------------------------
-    def AddChoice(self, name, title, default, values):
-        self._Params.append(G_ChoiceParam(name, title, default, values))
-
-
-    #-------------------------------------------------------
-    def AddBool(self, name, title, default):
-        self._Params.append(G_BoolParam(name, title, default))
-
-
-    #-------------------------------------------------------
-    def Close(self):
-        return self._Params
-
-
-
 ## G_HtmlHostCtrl ##########################################
 
 class G_HtmlHostCtrl(wx.Panel):
@@ -1192,30 +1166,62 @@ class G_HtmlHostCtrl(wx.Panel):
     def DefineParameters(self, error_reporter):
         parameters = None
 
+        class Context:
+            """Collect parameter data from a chart"""
+
+            #-----------------------------------------------
+            def __init__(self, host):
+                self._Host = host
+                self._Params = []
+
+            def Close(self):
+                return self._Params
+
+            #-----------------------------------------------
+            def AddChoice(self, name, title, default, values):
+                self._Params.append(G_ChoiceParam(name, title, default, values))
+
+            def AddBool(self, name, title, default):
+                self._Params.append(G_BoolParam(name, title, default))
+
+            #-------------------------------------------------------
+            def GetSelection(self):
+                return self._Host.GetSelectedEventIds()
+
+
         with G_ScriptGuard("DefineParameters", error_reporter):
-            cursor = self.MakeDbCursor()
+            connection, cursor = self.MakeDbCursor()
             if connection is not None:
-                collector = G_ParameterCollector()
-                self._ChartInfo.DefineParameters(collector, connection, cursor, self.GetSelectedEventIds())
-                parameters = collector.Close()
+                context = Context(self)
+                self._ChartInfo.DefineParameters(connection, cursor, context)
+                parameters = context.Close()
 
         return parameters
 
 
     #-------------------------------------------------------
     def Realise(self, error_reporter):
+        class Context:
+            #-----------------------------------------------
+            def __init__(self, host):
+                self._Host = host
+
+            #-----------------------------------------------
+            def GetSelection(self):
+                return self._Host.GetSelectedEventIds()
+
+            def GetParameter(self, name, default):
+                return self._Host._ParameterValues.get(name, default)
+
+            #-----------------------------------------------
+            def ExecuteScript(self, script):
+                self._Host.EnqueueScript(script)
+
+
         with G_ScriptGuard("Realise", error_reporter):
-            cursor = self.MakeDbCursor()
+            connection, cursor = self.MakeDbCursor()
             if cursor is not None:
-
-                class Proxy:
-                    def __init__(self, view_ctrl):
-                        self._ViewCtrl = view_ctrl
-
-                    def ExecuteScript(self, script):
-                        self._ViewCtrl.EnqueueScript(script)
-
-                self._ChartInfo.Realise(Proxy(self), connection, cursor, self._ParameterValues, self.GetSelectedEventIds())
+                self._ChartInfo.Realise(connection, cursor, Context(self))
 
 
     #-------------------------------------------------------
@@ -1259,9 +1265,38 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
     def MakeDbCursor(self):
         connection = ConnectDb(self._DbPath, True)
         if connection is None:
-            return None
+            return None, none
         else:
-            return connection.cursor()
+            return connection, connection.cursor()
+
+
+
+## G_HtmlNetworkCtrl #######################################
+
+class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, chart_info, db_paths, table_view_ctrls, error_reporter, node_id):
+        super().__init__(parent, chart_info, error_reporter, node_id)
+
+        self._DbPaths = db_paths
+        self._TableViewCtrls = table_view_ctrls
+
+
+    #-------------------------------------------------------
+    def GetSelectedEventIds(self):
+        return self._TableViewCtrls[0].GetSelectedEventIds()
+
+
+    #-------------------------------------------------------
+    def MakeDbCursor(self):
+        connection = ConnectDb(self._DbPaths[0], True)
+        if connection is None:
+            return None, none
+        else:
+            cursor = connection.cursor()
+            cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._DbPaths[1]))
+            return connection, cursor
 
 
 
@@ -1423,23 +1458,24 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
 
         self._Notebook = G_NotebookDisplayControl(self)
+        self._ChartView = None
 
-        self._Tables = [
+        self._TableViewCtrls = [
             G_TableViewCtrl(self._Notebook, self.OnTableSelectionChanged, True, doc_url),
             G_TableViewCtrl(self._Notebook, self.OnTableSelectionChanged, True, doc_url)
         ]
 
-        self._Notebook.AddPage(self._Tables[0], "Nodes")
-        self._Notebook.AddPage(self._Tables[1], "Links")
+        self._Notebook.AddPage(self._TableViewCtrls[0], "Nodes")
+        self._Notebook.AddPage(self._TableViewCtrls[1], "Links")
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
-        self.SplitHorizontally(self._Notebook, wx.Panel(self))
+        self.Initialize(self._Notebook)
 
 
     #-------------------------------------------------------
     def GetTableViewCtrl(self, idx):
-        return self._Tables[idx]
+        return self._TableViewCtrls[idx]
 
 
     #-------------------------------------------------------
@@ -1451,3 +1487,20 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
         pass
+
+
+    #-------------------------------------------------------
+    def UpdateChart(self, node_id, projector_info, error_reporter):
+        if projector_info.Chart is None:
+            return
+
+        if self._ChartView is None:
+            db_paths = [projector.ProjectionDbPath for projector in projector_info.NetworkProjectors]
+            self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, db_paths, self._TableViewCtrls, error_reporter, node_id)
+            self.SplitHorizontally(self._Notebook, self._ChartView)
+
+#todo update table tab names
+
+        self._ChartView.Update(error_reporter, True)
+
+

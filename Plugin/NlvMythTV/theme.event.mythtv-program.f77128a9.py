@@ -223,4 +223,5 @@ Network(
     "Recording",
     nodes,
     links
-)
+).Chart(True, Chart.Network())
+

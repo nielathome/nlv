@@ -723,7 +723,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         self._ForallProjectors(Work, [
             G_Project.NodeID_EventProjector,
-            G_Project.NodeID_NetworkDataProjector
+            G_Project.NodeID_NetworkDataProjector,
+            G_Project.NodeID_NetworkProjector # must be after NodeID_NetworkDataProjector
         ])
 
 
@@ -1767,8 +1768,8 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     def PostInitChildren(self):
         if self._InitAnalysis:
             projector_info, valid = self.GetProjectorInfo()
-            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjector[0].ProjectionName, table_idx = 0)
-            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjector[1].ProjectionName, table_idx = 1)
+            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjectors[0].ProjectionName, table_idx = 0)
+            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjectors[1].ProjectionName, table_idx = 1)
 
 
     #def OnTableSelectionChanged(self):
@@ -1801,6 +1802,18 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         self.ReleaseFiles()
         super().DoClose(delete)
         pass
+
+
+    #-------------------------------------------------------
+    def UpdateChart(self):
+        projector_info, is_valid = self.GetProjectorInfo()
+        self.GetViewCtrl().UpdateChart(self.GetNodeId(), projector_info, self.GetErrorReporter())
+
+    @G_Global.TimeFunction
+    def UpdateEventContent(self):
+        # relies on caller to ensure child data node are
+        # run first
+        self.UpdateChart()
 
 
 
@@ -1840,7 +1853,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     def GetProjectorInfo(self):
         projector_info, is_valid = self.GetParentNode().GetProjectorInfo()
-        return projector_info.NetworkProjector[self._TableIndex], is_valid
+        return projector_info.NetworkProjectors[self._TableIndex], is_valid
 
 
     #-------------------------------------------------------
