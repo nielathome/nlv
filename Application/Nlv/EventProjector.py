@@ -787,7 +787,6 @@ class G_ProjectorInfo:
         """Implements user analyse script Quantify() function"""
 
         idx = len(self.Quantifiers)
-        name = "{}.{}".format(self.ProjectionName, name)
         info = G_QuantifierInfo(name, user_quantifier, metrics_schema, self.ProjectionDbPath, idx)
         self.Quantifiers.update([(name, info)])
         return info

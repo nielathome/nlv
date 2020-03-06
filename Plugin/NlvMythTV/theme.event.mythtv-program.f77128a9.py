@@ -220,7 +220,7 @@ links = Links(
 
 
 Network(
-    "Recording",
+    "Recordings",
     nodes,
     links
 ).Chart(True, Chart.Network())

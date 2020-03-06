@@ -216,10 +216,11 @@ class G_TableFieldFormatter:
 class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
-    def __init__(self, doc_url):
+    def __init__(self, name, doc_url):
         super().__init__()
 
         self._ViewFlat = True
+        self._Name = name
         self._DocumentUrl = doc_url
         self._RawFieldMask = 0
         self._IsValid = True
@@ -329,7 +330,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if schema.UserDataExplorerOpen is not None:
             schema.UserDataExplorerOpen(builder)
 
-        builder.AddPageHeading("Event")
+        builder.AddPageHeading("{} Item".format(self._Name))
         if self._DocumentUrl is not None:
             builder.AddLink(self._DocumentUrl, "Show log ...")
 
@@ -718,7 +719,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, flags, doc_url):
+    def __init__(self, parent, flags, name, doc_url):
         super().__init__(
             parent,
             style = wx.dataview.DV_ROW_LINES
@@ -726,7 +727,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
             | flags
         )
 
-        self.AssociateModel(G_TableDataModel(doc_url))
+        self.AssociateModel(G_TableDataModel(name, doc_url))
         self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
@@ -798,14 +799,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, selection_handler, multiple_selection, doc_url):
+    def __init__(self, parent, multiple_selection, name, doc_url):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        super().__init__(parent, flags, doc_url)
+        super().__init__(parent, flags, name, doc_url)
 
-        self._SelectionHandler = selection_handler
+        self._SelectionHandler = None
         self._IsMultipleSelection = multiple_selection
         self.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED, self.OnItemActivated)
 
@@ -899,8 +900,14 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
     def GetEventRange(self, event_no):
         return self.GetModel().GetEventRange(event_no)
 
+
+    #-------------------------------------------------------
+    def SetSelectionhandler(self, selection_handler):
+        self._SelectionHandler = selection_handler
+
     def OnItemActivated(self, evt):
-        self._SelectionHandler(evt.GetItem())
+        if self._SelectionHandler is not None:
+            self._SelectionHandler(evt.GetItem())
 
 
     #-------------------------------------------------------
@@ -1308,15 +1315,14 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
     """
 
     #-------------------------------------------------------
-    def __init__(self, parent, node_selection_handler, multiple_selection, doc_url = None):
+    def __init__(self, parent, multiple_selection, name, doc_url = None):
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
-        self._NodeSelectionHandler = node_selection_handler
         self._ChartPane = None
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, multiple_selection, doc_url)
+        self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name, doc_url)
         self.Initialize(self.GetTableViewCtrl())
 
 
@@ -1362,12 +1368,6 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def OnTableSelectionChanged(self, item):
-        error_reporter = self._NodeSelectionHandler(item)
-        self.UpdateCharts(error_reporter, selection_changed = True)
-
-
-    #-------------------------------------------------------
     def ResetModel(self):
         pane = self.GetChartPane()
         if pane is not None:
@@ -1410,8 +1410,8 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
 class G_EventsViewCtrl(G_CommonViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, node_selection_handler, doc_url):
-        super().__init__(parent, node_selection_handler, False, doc_url)
+    def __init__(self, parent, name, doc_url):
+        super().__init__(parent, False, name, doc_url)
 
 
 
@@ -1420,8 +1420,8 @@ class G_EventsViewCtrl(G_CommonViewCtrl):
 class G_MetricsViewCtrl(G_CommonViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, node_selection_handler, quantifier_name):
-        super().__init__(parent, node_selection_handler, True)
+    def __init__(self, parent, quantifier_name):
+        super().__init__(parent, True, quantifier_name)
 
         self._QuantifierName = quantifier_name
 
@@ -1459,18 +1459,18 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
         self._Notebook = G_NotebookDisplayControl(self)
         self._ChartView = None
-
-        self._TableViewCtrls = [
-            G_TableViewCtrl(self._Notebook, self.OnTableSelectionChanged, True, doc_url),
-            G_TableViewCtrl(self._Notebook, self.OnTableSelectionChanged, True, doc_url)
-        ]
-
-        self._Notebook.AddPage(self._TableViewCtrls[0], "Nodes")
-        self._Notebook.AddPage(self._TableViewCtrls[1], "Links")
+        self._TableViewCtrls = [None, None]
+        self._DocumentUrl = doc_url
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
         self.Initialize(self._Notebook)
+
+
+    def SetupDataTable(self, idx, name):
+        self._TableViewCtrls[idx] = table_ctrl = G_TableViewCtrl(self._Notebook, True, name, self._DocumentUrl)
+        self._Notebook.AddPage(table_ctrl, name)
+        return table_ctrl
 
 
     #-------------------------------------------------------
@@ -1498,8 +1498,6 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
             db_paths = [projector.ProjectionDbPath for projector in projector_info.NetworkProjectors]
             self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, db_paths, self._TableViewCtrls, error_reporter, node_id)
             self.SplitHorizontally(self._Notebook, self._ChartView)
-
-#todo update table tab names
 
         self._ChartView.Update(error_reporter, True)
 

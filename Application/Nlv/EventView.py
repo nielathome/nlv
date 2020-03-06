@@ -735,7 +735,6 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._ForallProjectors(Work, [
             G_Project.NodeID_EventProjector,
             G_Project.NodeID_MetricsProjector,
-            G_Project.NodeID_NetworkProjector,
             G_Project.NodeID_NetworkDataProjector
         ])
 
@@ -1398,6 +1397,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
     def SetupTableCtrl(self, view_ctrl, table_ctrl):
         self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
         self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        table_ctrl.SetSelectionhandler(self.OnTableSelectionChanged)
 
         inner_ctrl = table_ctrl.GetChildCtrl()
         if inner_ctrl is not None:
@@ -1483,7 +1483,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         # setup UI
         doc_url = self.GetLogNode().MakeDataUrl()
         parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
-        view_ctrl = G_EventsViewCtrl(parent_notebook, self.OnTableSelectionChanged, doc_url)
+        view_ctrl = G_EventsViewCtrl(parent_notebook, self._Name, doc_url)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
         self.SetupTableCtrl(view_ctrl, view_ctrl.GetTableViewCtrl())
@@ -1551,10 +1551,10 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
 
     def OnTableSelectionChanged(self, item):
-        error_reporter = self.GetErrorReporter()
+        self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), selection_changed = True)
         if item is None or item.GetID() is None:
             # ignore de-selection events
-            return error_reporter
+            return
 
         # tell the data explorer
         self.GetDataExplorer().Update(self.MakeDataUrl(self.GetTableViewCtrl().GetLocation(item)))
@@ -1568,7 +1568,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         update = update_marker or update_global
 
         if not update:
-            return error_reporter
+            return
 
         # convert range to timecodes
         (start_timecode, finish_timecode) = self.GetTableViewCtrl().GetEventRange(item)
@@ -1595,8 +1595,6 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
             # flush any changes through to the GUI
             self.RefreshTrackers(False, True, None)
-
-        return error_reporter
 
 
 
@@ -1677,7 +1675,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
         # setup UI
         parent_notebook = self.GetParentNode().GetDisplayEventNoteBook()
-        view_ctrl = G_MetricsViewCtrl(parent_notebook, self.OnTableSelectionChanged, self._Name)
+        view_ctrl = G_MetricsViewCtrl(parent_notebook, self._Name)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
         self.SetupTableCtrl(view_ctrl, view_ctrl.GetTableViewCtrl())
@@ -1705,17 +1703,16 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
+        self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), selection_changed = True)
+
         # ignore de-selection and non-events
-        error_reporter = self.GetErrorReporter()
         if item is None:
-            return error_reporter
+            return
 
         location = self.GetTableViewCtrl().GetLocation(item)
         if location is not None:
             # tell the data explorer
             self.GetDataExplorer().Update(self.MakeDataUrl(location))
-
-        return error_reporter
 
 
     #-------------------------------------------------------
@@ -1772,29 +1769,10 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
             self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjectors[1].ProjectionName, table_idx = 1)
 
 
-    #def OnTableSelectionChanged(self):
-    #    pass
-
-
     #-------------------------------------------------------
     def GetProjectorInfo(self):
         analysis_results, is_valid = self.GetLogAnalysisNode().GetAnalysisResults()
         return analysis_results.GetProjectorInfo(self._Name), is_valid
-
-
-    #-------------------------------------------------------
-    def GetTableViewCtrl(self):
-        """TableView for the network "chart" """
-        class Dummy:
-            def UpdateDisplay(self, valid):
-                pass
-
-        return Dummy()
-
-
-    def GetDataTableViewCtrl(self, idx):
-        """TableView for nodes/links tables"""
-        return self.GetViewCtrl().GetTableViewCtrl(idx)
 
 
     #-------------------------------------------------------
@@ -1841,7 +1819,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
         self._TableIndex = self._Field.TableIndex.Value
 
-        table_ctrl = self.GetParentNode().GetDataTableViewCtrl(self._TableIndex)
+        table_ctrl = self.GetParentNode().GetViewCtrl().SetupDataTable(self._TableIndex, self._Name)
         self.SetupTableCtrl(table_ctrl, table_ctrl)
 
 
@@ -1859,6 +1837,18 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     def GetTableViewCtrl(self):
         return self.GetViewCtrl()
+
+
+    #-------------------------------------------------------
+    def OnTableSelectionChanged(self, item):
+        # ignore de-selection and non-events
+        if item is None:
+            return
+
+        location = self.GetTableViewCtrl().GetLocation(item)
+        if location is not None:
+            # tell the data explorer
+            self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
 
     #-------------------------------------------------------
