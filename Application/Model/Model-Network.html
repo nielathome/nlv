@@ -19,8 +19,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <!-- Start model -->
 <script src="https://d3js.org/d3.v5.js"></script>
-<button onclick="Update(data1)">Data 1</button>
-<button onclick="Update(data2)">Data 2</button>
+<button onclick="Update1()">Data 1</button>
+<button onclick="Update2()">Data 2</button>
 <!-- End model -->
 
 <!-- Create a div where the graph will take place -->
@@ -53,12 +53,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_data = null;
     var g_title_text = null;
 
+    var g_simulation = null;
+    var g_curZoom = 0;
+    var g_curTransform = d3.zoomIdentity;
+
     // append the svg object to the body of the page
     var g_svg = d3.select("#my_dataviz").append("svg");
 
+    var g_joined_links = null;
     var g_links_group = g_svg.append("g")
         .attr("class", "links");
 
+    var g_joined_nodes = null;
+    var g_joined_labels = null;
     var g_nodes_group = g_svg.append("g")
         .attr("class", "nodes");
 
@@ -66,22 +73,77 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
-    function DrawChart(switch_time) {
-        // set the dimensions and margins of the graph
+
+    // selection support
+    var g_has_selection = false;
+    var g_selected_nodes = new Set();
+    var g_selected_links = new Set();
+
+    function GetNodeOpacity(id) {
+        return (!g_has_selection || g_selected_nodes.has(id)) ? 1.0 : 0.5;
+    }
+
+    function GetLinkOpacity(id) {
+        return (!g_has_selection || g_selected_links.has(id)) ? 1.0 : 0.5;
+    }
+
+
+    //----------------------------------------------------------
+    function GetWindowWidth() {
         const min_window = 300, margin = 30;
-        const window_width = Math.max(min_window, document.documentElement.clientWidth);
-        const window_height = Math.max(min_window, document.documentElement.clientHeight);
+        return Math.max(min_window, document.documentElement.clientWidth);
+    }
 
-        // reference for zoom transitions
+    function GetWindowHeight() {
+        const min_window = 300, margin = 30;
+        return Math.max(min_window, document.documentElement.clientHeight);
+    }
+
+
+    //----------------------------------------------------------
+    function Layout() {
+        const doTransition = (g_curZoom != g_curTransform.k);
+        g_curZoom = g_curTransform.k;
+
         const ref_transition = d3.transition()
-            .duration(switch_time);
+            .duration(250);
 
-        var curTransform = d3.zoomIdentity;
-        var curZoom = curTransform.k;
+        (doTransition ? g_joined_links.transition(ref_transition) : g_joined_links)
+            // map model coord system to SVG coord system
+            .attr("x1", function (link) {
+                return g_curTransform.applyX(link.source.x);
+            })
+            .attr("y1", function (link) {
+                return g_curTransform.applyY(link.source.y);
+            })
+            .attr("x2", function (link) {
+                return g_curTransform.applyX(link.target.x);
+            })
+            .attr("y2", function (link) {
+                return g_curTransform.applyY(link.target.y);
+            });
+
+        function translate(item) {
+            // map model coord system to SVG coord system
+            const x = g_curTransform.applyX(item.x);
+            const y = g_curTransform.applyY(item.y);
+            return "translate(" + x + "," + y + ")";
+        }
+
+        (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
+            .attr("transform", translate);
+
+        (doTransition ? g_joined_labels.transition(ref_transition) : g_joined_labels)
+            .attr("transform", translate);
+    }
+
+
+    function DoCreateChart() {
+        g_curZoom = g_curTransform.k;
 
         g_svg
-            .attr("width", window_width - margin)
-            .attr("height", window_height - margin)
+            .attr("width", GetWindowWidth())
+            .attr("height", GetWindowHeight())
             .call(d3.zoom()
                 .scaleExtent([1, 8])
                 .wheelDelta(function wheelDelta() {
@@ -89,12 +151,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     return -d3.event.deltaY * (d3.event.deltaMode === 1 ? 0.25 : d3.event.deltaMode ? 1 : 0.01);
                 })
                 .on("zoom", function() {
-                    curTransform = d3.event.transform;
+                    g_curTransform = d3.event.transform;
                     Layout();
                 })
             );
 
-        var links = g_links_group.selectAll("line")
+        g_joined_links = g_links_group.selectAll("line")
           .data(g_data.links)
           .join("line");
 
@@ -111,7 +173,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .range([4, 20])
             .clamp(true);
 
-        var nodes = g_nodes_group.selectAll("circle")
+        g_joined_nodes = g_nodes_group.selectAll("circle")
           .data(g_data.nodes)
           .join("circle")
             .attr("r", function (node) {
@@ -123,24 +185,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .call(d3.drag()
                 .on("start", function (node) {
                     if (!d3.event.active)
-                        simulation.alphaTarget(0.3).restart();
+                        g_simulation.alphaTarget(0.3).restart();
                     node.fx = node.x;
                     node.fy = node.y;
                 })
                 .on("drag", function (node) {
                     // map SVG coord system back to model coord system
-                    node.fx += d3.event.dx / curZoom;
-                    node.fy += d3.event.dy / curZoom;
+                    node.fx += d3.event.dx / g_curZoom;
+                    node.fy += d3.event.dy / g_curZoom;
                 })
                 .on("end", function (node) {
                     if (!d3.event.active)
-                        simulation.alphaTarget(0);
+                        g_simulation.alphaTarget(0);
                     node.fx = null;
                     node.fy = null;
                 })
             );
 
-        var labels = g_nodes_group.selectAll("text")
+        g_joined_labels = g_nodes_group.selectAll("text")
           .data(g_data.nodes)
           .join("text")
             .text(function (d) {
@@ -149,8 +211,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("x", function (node) {
                 return nodeScale(node.size);
             });
+    }
 
-        var simulation = d3.forceSimulation(g_data.nodes)
+
+    function DoSimulation() {
+        g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
                 .id(function (node) {
                     return node.title;
@@ -158,73 +223,72 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 .distance(50)
             )
             .force("charge", d3.forceManyBody())
-            .force("center", d3.forceCenter(window_width / 2, window_height / 2))
+            .force("center", d3.forceCenter(GetWindowWidth() / 2, GetWindowHeight() / 2))
             .on("tick", Layout);
-            
-        
-        function Layout() {
-            const doTransition = (curZoom != curTransform.k);
-            curZoom = curTransform.k;
-
-            const ref_transition = d3.transition()
-                .duration(250);
-
-            (doTransition ? links.transition(ref_transition) : links)
-                // map model coord system to SVG coord system
-                .attr("x1", function (link) {
-                    return curTransform.applyX(link.source.x);
-                })
-                .attr("y1", function (link) {
-                    return curTransform.applyY(link.source.y);
-                })
-                .attr("x2", function (link) {
-                    return curTransform.applyX(link.target.x);
-                })
-                .attr("y2", function (link) {
-                    return curTransform.applyY(link.target.y);
-                });
-
-            function translate(item) {
-                // map model coord system to SVG coord system
-                const x = curTransform.applyX(item.x);
-                const y = curTransform.applyY(item.y);
-                return "translate(" + x + "," + y + ")";
-            }
-
-            (doTransition ? nodes.transition(ref_transition) : nodes)
-                .attr("transform", translate);
-
-            (doTransition ? labels.transition(ref_transition) : labels)
-                .attr("transform", translate);
         }
-    }
 
     
-    function CreateChart(title, json_text, switch_time) {
+    function CreateChart(title, json_text) {
         g_data = JSON.parse(json_text);
         g_title_text = title;
-        DrawChart(switch_time);
+        DoCreateChart();
+        DoSimulation();
     }
 
 
     //----------------------------------------------------------
-    function OnResize() {
-        if (g_data !== null) {
-            DrawChart(0);
-        }
+    function DoSetSelection() {
+        g_joined_nodes.transition(250)
+            .attr("opacity", function (node) {
+                return GetNodeOpacity(node.event_id);
+            })
+
+        g_joined_labels.transition(250)
+            .attr("opacity", function (node) {
+                return GetNodeOpacity(node.event_id);
+            })
+
+        g_joined_links.transition(250)
+            .attr("opacity", function (node) {
+                return GetLinkOpacity(node.event_id);
+            })
     }
 
-//    window.addEventListener("resize", OnResize);
 
+    function SetSelection(json_text) {
+        selection = JSON.parse(json_text);
+
+        g_selected_nodes = new Set();
+        selection.nodes.forEach(function (event_id) {
+            g_selected_nodes.add(event_id);
+        });
+
+        g_selected_links = new Set();
+        selection.links.forEach(function (event_id) {
+            g_selected_links.add(event_id);
+        });
+
+        g_has_selection = g_selected_nodes.size != 0 || g_selected_links.size != 0;
+
+        DoSetSelection();
+    }
 
     //----------------------------------------------------------
-    const data1 = '{"nodes":[{"title":"Neighbours","type":1,"size":7},{"title":"The Gadget Show","type":1,"size":2},{"title":"Good Will Hunting","type":1,"size":1},{"title":"Casualty","type":1,"size":2},{"title":"Snake Boss","type":1,"size":3},{"title":"Top Gear","type":1,"size":2},{"title":"Celebrity Apprentice USA","type":1,"size":1},{"title":"EastEnders","type":1,"size":4},{"title":"Room 101","type":1,"size":1},{"title":"Nightly Show with Gordon Ramsay","type":1,"size":4},{"title":"MasterChef","type":1,"size":3},{"title":"Come Dine with Me","type":1,"size":1},{"title":"Eddie Stobart","type":1,"size":1},{"title":"Channel-2005","type":2,"size":9},{"title":"Channel-2010","type":2,"size":1},{"title":"Channel-2001","type":2,"size":10},{"title":"Channel-2011","type":2,"size":3},{"title":"Channel-2002","type":2,"size":2},{"title":"Channel-2003","type":2,"size":4},{"title":"Channel-2012","type":2,"size":1},{"title":"Channel-2004","type":2,"size":1},{"title":"Channel-2055","type":2,"size":1},{"title":"CardId-1","type":3,"size":29},{"title":"CardId-2","type":3,"size":1},{"title":"CardId-7","type":3,"size":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Good Will Hunting","target":"Channel-2010"},{"source":"Good Will Hunting","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Snake Boss","target":"Channel-2011"},{"source":"Snake Boss","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"Celebrity Apprentice USA","target":"Channel-2001"},{"source":"Celebrity Apprentice USA","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Come Dine with Me","target":"Channel-2004"},{"source":"Come Dine with Me","target":"CardId-1"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
-    const data2 = '{"nodes":[{"title":"Neighbours","type":1,"size":7},{"title":"The Gadget Show","type":1,"size":2},{"title":"Casualty","type":1,"size":2},{"title":"Top Gear","type":1,"size":2},{"title":"EastEnders","type":1,"size":4},{"title":"Room 101","type":1,"size":1},{"title":"Nightly Show with Gordon Ramsay","type":1,"size":4},{"title":"MasterChef","type":1,"size":3},{"title":"Eddie Stobart","type":1,"size":1},{"title":"Channel-2005","type":2,"size":9},{"title":"Channel-2001","type":2,"size":10},{"title":"Channel-2002","type":2,"size":2},{"title":"Channel-2003","type":2,"size":4},{"title":"Channel-2012","type":2,"size":1},{"title":"Channel-2055","type":2,"size":1},{"title":"CardId-1","type":3,"size":29},{"id":"CardId-2","type":3,"size":1},{"id":"CardId-7","type":3,"size":2}],"links":[{"source":"Neighbours","target":"Channel-2005"},{"source":"Neighbours","target":"CardId-1"},{"source":"The Gadget Show","target":"Channel-2005"},{"source":"The Gadget Show","target":"CardId-1"},{"source":"Casualty","target":"Channel-2001"},{"source":"Casualty","target":"CardId-1"},{"source":"Top Gear","target":"Channel-2002"},{"source":"Top Gear","target":"CardId-1"},{"source":"EastEnders","target":"Channel-2001"},{"source":"EastEnders","target":"CardId-1"},{"source":"EastEnders","target":"CardId-7"},{"source":"Room 101","target":"Channel-2012"},{"source":"Room 101","target":"CardId-7"},{"source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"source":"MasterChef","target":"Channel-2001"},{"source":"MasterChef","target":"CardId-1"},{"source":"MasterChef","target":"CardId-2"},{"source":"Eddie Stobart","target":"Channel-2055" },{"source":"Eddie Stobart","target":"CardId-1"}]}';
 
-    function Update(json_text) {
-        CreateChart("Title", json_text, 1000);
+    
+    function Update1() {
+        const data = '{"nodes":[{"event_id":1, "title":"Neighbours","type":1,"size":7},{"event_id":100, "title":"The Gadget Show","type":1,"size":2},{"event_id":3, "title":"Casualty","type":1,"size":2},{"event_id":4, "title":"Top Gear","type":1,"size":2},{"event_id":5, "title":"EastEnders","type":1,"size":4},{"event_id":6, "title":"Room 101","type":1,"size":1},{"event_id":7, "title":"Nightly Show with Gordon Ramsay","type":1,"size":4},{"event_id":8, "title":"MasterChef","type":1,"size":3},{"event_id":9, "title":"Eddie Stobart","type":1,"size":1},{"event_id":10, "title":"Channel-2005","type":2,"size":9},{"event_id":11, "title":"Channel-2001","type":2,"size":10},{"event_id":12, "title":"Channel-2002","type":2,"size":2},{"event_id":13, "title":"Channel-2003","type":2,"size":4},{"event_id":14, "title":"Channel-2012","type":2,"size":1},{"event_id":15, "title":"Channel-2055","type":2,"size":1},{"event_id":16, "title":"CardId-1","type":3,"size":29},{"event_id":17, "title":"CardId-2","type":3,"size":1},{"event_id":18, "title":"CardId-7","type":3,"size":2}],"links":[{"event_id":19, "source":"Neighbours","target":"Channel-2005"},{"event_id":20, "source":"Neighbours","target":"CardId-1"},{"event_id":21, "source":"The Gadget Show","target":"Channel-2005"},{"event_id":22, "source":"The Gadget Show","target":"CardId-1"},{"event_id":23, "source":"Casualty","target":"Channel-2001"},{"event_id":24, "source":"Casualty","target":"CardId-1"},{"event_id":25, "source":"Top Gear","target":"Channel-2002"},{"event_id":26, "source":"Top Gear","target":"CardId-1"},{"event_id":27, "source":"EastEnders","target":"Channel-2001"},{"event_id":28, "source":"EastEnders","target":"CardId-1"},{"event_id":29, "source":"EastEnders","target":"CardId-7"},{"event_id":30, "source":"Room 101","target":"Channel-2012"},{"event_id":31, "source":"Room 101","target":"CardId-7"},{"event_id":32, "source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"event_id":33, "source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"event_id":34, "source":"MasterChef","target":"Channel-2001"},{"event_id":35, "source":"MasterChef","target":"CardId-1"},{"event_id":36, "source":"MasterChef","target":"CardId-2"},{"event_id":37, "source":"Eddie Stobart","target":"Channel-2055" },{"event_id":38, "source":"Eddie Stobart","target":"CardId-1"}]}';
+        CreateChart("Title", data);
     }
 
-    Update(data1);
+    function Update2() {
+        const data = '{"nodes": [{"event_id": 1, "type": "Program", "title": "Casualty", "size": 2}, {"event_id": 2, "type": "Program", "title": "Celebrity Apprentice USA", "size": 1}, {"event_id": 3, "type": "Program", "title": "Come Dine with Me", "size": 1}, {"event_id": 4, "type": "Program", "title": "EastEnders", "size": 4}, {"event_id": 5, "type": "Program", "title": "Eddie Stobart", "size": 1}, {"event_id": 6, "type": "Program", "title": "Good Will Hunting", "size": 1}, {"event_id": 7, "type": "Program", "title": "MasterChef", "size": 3}, {"event_id": 8, "type": "Program", "title": "Neighbours", "size": 7}, {"event_id": 9, "type": "Program", "title": "Nightly Show with Gordon Ramsay", "size": 4}, {"event_id": 10, "type": "Program", "title": "Room 101", "size": 1}, {"event_id": 11, "type": "Program", "title": "Snake Boss", "size": 2}, {"event_id": 12, "type": "Program", "title": "The Gadget Show", "size": 2}, {"event_id": 13, "type": "Program", "title": "Top Gear", "size": 2}, {"event_id": 14, "type": "Channel", "title": "Channel-2001", "size": 10}, {"event_id": 15, "type": "Channel", "title": "Channel-2002", "size": 2}, {"event_id": 16, "type": "Channel", "title": "Channel-2003", "size": 4}, {"event_id": 17, "type": "Channel", "title": "Channel-2004", "size": 1}, {"event_id": 18, "type": "Channel", "title": "Channel-2005", "size": 9}, {"event_id": 19, "type": "Channel", "title": "Channel-2010", "size": 1}, {"event_id": 20, "type": "Channel", "title": "Channel-2011", "size": 2}, {"event_id": 21, "type": "Channel", "title": "Channel-2012", "size": 1}, {"event_id": 22, "type": "Channel", "title": "Channel-2055", "size": 1}, {"event_id": 23, "type": "CardID", "title": "CardID-1", "size": 28}, {"event_id": 24, "type": "CardID", "title": "CardID-2", "size": 1}, {"event_id": 25, "type": "CardID", "title": "CardID-7", "size": 2}], "links": [{"event_id": 14, "source": "Neighbours", "target": "CardID-1"}, {"event_id": 15, "source": "The Gadget Show", "target": "CardID-1"}, {"event_id": 16, "source": "Good Will Hunting", "target": "CardID-1"}, {"event_id": 17, "source": "Casualty", "target": "CardID-1"}, {"event_id": 18, "source": "Snake Boss", "target": "CardID-1"}, {"event_id": 19, "source": "Top Gear", "target": "CardID-1"}, {"event_id": 20, "source": "Celebrity Apprentice USA", "target": "CardID-1"}, {"event_id": 21, "source": "EastEnders", "target": "CardID-1"}, {"event_id": 23, "source": "Nightly Show with Gordon Ramsay", "target": "CardID-1"}, {"event_id": 24, "source": "MasterChef", "target": "CardID-1"}, {"event_id": 27, "source": "Come Dine with Me", "target": "CardID-1"}, {"event_id": 28, "source": "Eddie Stobart", "target": "CardID-1"}, {"event_id": 25, "source": "MasterChef", "target": "CardID-2"}, {"event_id": 22, "source": "Room 101", "target": "CardID-7"}, {"event_id": 26, "source": "EastEnders", "target": "CardID-7"}, {"event_id": 4, "source": "Casualty", "target": "Channel-2001"}, {"event_id": 7, "source": "Celebrity Apprentice USA", "target": "Channel-2001"}, {"event_id": 8, "source": "EastEnders", "target": "Channel-2001"}, {"event_id": 11, "source": "MasterChef", "target": "Channel-2001"}, {"event_id": 6, "source": "Top Gear", "target": "Channel-2002"}, {"event_id": 10, "source": "Nightly Show with Gordon Ramsay", "target": "Channel-2003"}, {"event_id": 12, "source": "Come Dine with Me", "target": "Channel-2004"}, {"event_id": 1, "source": "Neighbours", "target": "Channel-2005"}, {"event_id": 2, "source": "The Gadget Show", "target": "Channel-2005"}, {"event_id": 3, "source": "Good Will Hunting", "target": "Channel-2010"}, {"event_id": 5, "source": "Snake Boss", "target": "Channel-2011"}, {"event_id": 9, "source": "Room 101", "target": "Channel-2012"}, {"event_id": 13, "source": "Eddie Stobart", "target": "Channel-2055"}]}';
+        CreateChart("Title", data);
+
+        const selection = '{"nodes": [25, 10, 21], "links": [9, 22]}';
+        SetSelection(selection);
+    }
+
+    Update1();
 
 </script>

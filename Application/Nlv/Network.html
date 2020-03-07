@@ -60,12 +60,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_data = null;
     var g_title_text = null;
 
+    var g_simulation = null;
+    var g_curZoom = 0;
+    var g_curTransform = d3.zoomIdentity;
+
     // append the svg object to the body of the page
     var g_svg = d3.select("#my_dataviz").append("svg");
 
+    var g_joined_links = null;
     var g_links_group = g_svg.append("g")
         .attr("class", "links");
 
+    var g_joined_nodes = null;
+    var g_joined_labels = null;
     var g_nodes_group = g_svg.append("g")
         .attr("class", "nodes");
 
@@ -73,22 +80,77 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
-    function DrawChart(switch_time) {
-        // set the dimensions and margins of the graph
+
+    // selection support
+    var g_has_selection = false;
+    var g_selected_nodes = new Set();
+    var g_selected_links = new Set();
+
+    function GetNodeOpacity(id) {
+        return (!g_has_selection || g_selected_nodes.has(id)) ? 1.0 : 0.5;
+    }
+
+    function GetLinkOpacity(id) {
+        return (!g_has_selection || g_selected_links.has(id)) ? 1.0 : 0.5;
+    }
+
+
+    //----------------------------------------------------------
+    function GetWindowWidth() {
         const min_window = 300, margin = 30;
-        const window_width = Math.max(min_window, document.documentElement.clientWidth);
-        const window_height = Math.max(min_window, document.documentElement.clientHeight);
+        return Math.max(min_window, document.documentElement.clientWidth);
+    }
 
-        // reference for zoom transitions
+    function GetWindowHeight() {
+        const min_window = 300, margin = 30;
+        return Math.max(min_window, document.documentElement.clientHeight);
+    }
+
+
+    //----------------------------------------------------------
+    function Layout() {
+        const doTransition = (g_curZoom != g_curTransform.k);
+        g_curZoom = g_curTransform.k;
+
         const ref_transition = d3.transition()
-            .duration(switch_time);
+            .duration(250);
 
-        var curTransform = d3.zoomIdentity;
-        var curZoom = curTransform.k;
+        (doTransition ? g_joined_links.transition(ref_transition) : g_joined_links)
+            // map model coord system to SVG coord system
+            .attr("x1", function (link) {
+                return g_curTransform.applyX(link.source.x);
+            })
+            .attr("y1", function (link) {
+                return g_curTransform.applyY(link.source.y);
+            })
+            .attr("x2", function (link) {
+                return g_curTransform.applyX(link.target.x);
+            })
+            .attr("y2", function (link) {
+                return g_curTransform.applyY(link.target.y);
+            });
+
+        function translate(item) {
+            // map model coord system to SVG coord system
+            const x = g_curTransform.applyX(item.x);
+            const y = g_curTransform.applyY(item.y);
+            return "translate(" + x + "," + y + ")";
+        }
+
+        (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
+            .attr("transform", translate);
+
+        (doTransition ? g_joined_labels.transition(ref_transition) : g_joined_labels)
+            .attr("transform", translate);
+    }
+
+
+    function DoCreateChart() {
+        g_curZoom = g_curTransform.k;
 
         g_svg
-            .attr("width", window_width - margin)
-            .attr("height", window_height - margin)
+            .attr("width", GetWindowWidth())
+            .attr("height", GetWindowHeight())
             .call(d3.zoom()
                 .scaleExtent([1, 8])
                 .wheelDelta(function wheelDelta() {
@@ -96,12 +158,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     return -d3.event.deltaY * (d3.event.deltaMode === 1 ? 0.25 : d3.event.deltaMode ? 1 : 0.01);
                 })
                 .on("zoom", function() {
-                    curTransform = d3.event.transform;
+                    g_curTransform = d3.event.transform;
                     Layout();
                 })
             );
 
-        var links = g_links_group.selectAll("line")
+        g_joined_links = g_links_group.selectAll("line")
           .data(g_data.links)
           .join("line");
 
@@ -118,7 +180,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .range([4, 20])
             .clamp(true);
 
-        var nodes = g_nodes_group.selectAll("circle")
+        g_joined_nodes = g_nodes_group.selectAll("circle")
           .data(g_data.nodes)
           .join("circle")
             .attr("r", function (node) {
@@ -130,24 +192,24 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .call(d3.drag()
                 .on("start", function (node) {
                     if (!d3.event.active)
-                        simulation.alphaTarget(0.3).restart();
+                        g_simulation.alphaTarget(0.3).restart();
                     node.fx = node.x;
                     node.fy = node.y;
                 })
                 .on("drag", function (node) {
                     // map SVG coord system back to model coord system
-                    node.fx += d3.event.dx / curZoom;
-                    node.fy += d3.event.dy / curZoom;
+                    node.fx += d3.event.dx / g_curZoom;
+                    node.fy += d3.event.dy / g_curZoom;
                 })
                 .on("end", function (node) {
                     if (!d3.event.active)
-                        simulation.alphaTarget(0);
+                        g_simulation.alphaTarget(0);
                     node.fx = null;
                     node.fy = null;
                 })
             );
 
-        var labels = g_nodes_group.selectAll("text")
+        g_joined_labels = g_nodes_group.selectAll("text")
           .data(g_data.nodes)
           .join("text")
             .text(function (d) {
@@ -156,8 +218,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("x", function (node) {
                 return nodeScale(node.size);
             });
+    }
 
-        var simulation = d3.forceSimulation(g_data.nodes)
+
+    function DoSimulation() {
+        g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
                 .id(function (node) {
                     return node.title;
@@ -165,62 +230,55 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 .distance(50)
             )
             .force("charge", d3.forceManyBody())
-            .force("center", d3.forceCenter(window_width / 2, window_height / 2))
+            .force("center", d3.forceCenter(GetWindowWidth() / 2, GetWindowHeight() / 2))
             .on("tick", Layout);
-            
-        
-        function Layout() {
-            const doTransition = (curZoom != curTransform.k);
-            curZoom = curTransform.k;
-
-            const ref_transition = d3.transition()
-                .duration(250);
-
-            (doTransition ? links.transition(ref_transition) : links)
-                // map model coord system to SVG coord system
-                .attr("x1", function (link) {
-                    return curTransform.applyX(link.source.x);
-                })
-                .attr("y1", function (link) {
-                    return curTransform.applyY(link.source.y);
-                })
-                .attr("x2", function (link) {
-                    return curTransform.applyX(link.target.x);
-                })
-                .attr("y2", function (link) {
-                    return curTransform.applyY(link.target.y);
-                });
-
-            function translate(item) {
-                // map model coord system to SVG coord system
-                const x = curTransform.applyX(item.x);
-                const y = curTransform.applyY(item.y);
-                return "translate(" + x + "," + y + ")";
-            }
-
-            (doTransition ? nodes.transition(ref_transition) : nodes)
-                .attr("transform", translate);
-
-            (doTransition ? labels.transition(ref_transition) : labels)
-                .attr("transform", translate);
         }
-    }
 
     
-    function CreateChart(title, json_text, switch_time) {
+    function CreateChart(title, json_text) {
         g_data = JSON.parse(json_text);
         g_title_text = title;
-        DrawChart(switch_time);
+        DoCreateChart();
+        DoSimulation();
     }
 
 
     //----------------------------------------------------------
-    function OnResize() {
-        if (g_data !== null) {
-            DrawChart(0);
-        }
+    function DoSetSelection() {
+        g_joined_nodes.transition(250)
+            .attr("opacity", function (node) {
+                return GetNodeOpacity(node.event_id);
+            })
+
+        g_joined_labels.transition(250)
+            .attr("opacity", function (node) {
+                return GetNodeOpacity(node.event_id);
+            })
+
+        g_joined_links.transition(250)
+            .attr("opacity", function (node) {
+                return GetLinkOpacity(node.event_id);
+            })
     }
 
-//    window.addEventListener("resize", OnResize);
+
+    function SetSelection(json_text) {
+        selection = JSON.parse(json_text);
+
+        g_selected_nodes = new Set();
+        selection.nodes.forEach(function (event_id) {
+            g_selected_nodes.add(event_id);
+        });
+
+        g_selected_links = new Set();
+        selection.links.forEach(function (event_id) {
+            g_selected_links.add(event_id);
+        });
+
+        g_has_selection = g_selected_nodes.size != 0 || g_selected_links.size != 0;
+
+        DoSetSelection();
+    }
+
 
 </script>

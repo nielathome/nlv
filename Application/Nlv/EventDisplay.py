@@ -1192,8 +1192,8 @@ class G_HtmlHostCtrl(wx.Panel):
                 self._Params.append(G_BoolParam(name, title, default))
 
             #-------------------------------------------------------
-            def GetSelection(self):
-                return self._Host.GetSelectedEventIds()
+            def GetSelection(self, set = None):
+                return self._Host.GetSelectedEventIds(set)
 
 
         with G_ScriptGuard("DefineParameters", error_reporter):
@@ -1207,15 +1207,30 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    def Realise(self, error_reporter):
+    def Realise(self, error_reporter, data_changed = False, selection_changed = False, parameters = None):
+        """Redraw the chart if needed"""
+
         class Context:
             #-----------------------------------------------
-            def __init__(self, host):
+            def __init__(self, host, data_changed, selection_changed, parameters_changed):
                 self._Host = host
+                self._DataChanged = data_changed
+                self._SelectionChanged = selection_changed
+                self._ParametersChanged = parameters_changed
 
             #-----------------------------------------------
-            def GetSelection(self):
-                return self._Host.GetSelectedEventIds()
+            def DataChanged(self):
+                return self._DataChanged
+
+            def SelectionChanged(self):
+                return self._SelectionChanged
+
+            def ParamatersChanged(self):
+                return self._ParametersChanged
+
+            #-----------------------------------------------
+            def GetSelection(self, set = None):
+                return self._Host.GetSelectedEventIds(set)
 
             def GetParameter(self, name, default):
                 return self._Host._ParameterValues.get(name, default)
@@ -1225,17 +1240,8 @@ class G_HtmlHostCtrl(wx.Panel):
                 self._Host.EnqueueScript(script)
 
 
-        with G_ScriptGuard("Realise", error_reporter):
-            connection, cursor = self.MakeDbCursor()
-            if cursor is not None:
-                self._ChartInfo.Realise(connection, cursor, Context(self))
-
-
-    #-------------------------------------------------------
-    def Update(self, error_reporter, data_changed = False, selection_changed = False, parameters = None):
-        """Redraw the chart if needed"""
-
         do_realize = False
+        parameters_changed = False
         if data_changed:
             do_realize = True
 
@@ -1244,10 +1250,15 @@ class G_HtmlHostCtrl(wx.Panel):
 
         if parameters is not None and parameters != self._ParameterValues:
             do_realize = True
+            parameters_changed = true
             self._ParameterValues = parameters.copy()
 
         if do_realize:
-            self.Realise(error_reporter)
+            with G_ScriptGuard("Realise", error_reporter):
+                connection, cursor = self.MakeDbCursor()
+                if cursor is not None:
+                    context = Context(self, data_changed, selection_changed, parameters_changed)
+                    self._ChartInfo.Realise(connection, cursor, context)
 
 
             
@@ -1264,7 +1275,7 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def GetSelectedEventIds(self):
+    def GetSelectedEventIds(self, set):
         return self._TableViewCtrl.GetSelectedEventIds()
 
 
@@ -1272,7 +1283,7 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
     def MakeDbCursor(self):
         connection = ConnectDb(self._DbPath, True)
         if connection is None:
-            return None, none
+            return None, None
         else:
             return connection, connection.cursor()
 
@@ -1291,15 +1302,15 @@ class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def GetSelectedEventIds(self):
-        return self._TableViewCtrls[0].GetSelectedEventIds()
+    def GetSelectedEventIds(self, set):
+        return self._TableViewCtrls[set].GetSelectedEventIds()
 
 
     #-------------------------------------------------------
     def MakeDbCursor(self):
         connection = ConnectDb(self._DbPaths[0], True)
         if connection is None:
-            return None, none
+            return None, None
         else:
             cursor = connection.cursor()
             cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._DbPaths[1]))
@@ -1401,7 +1412,7 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
         pane = self.GetChartPane()
         if pane is not None:
             for chart_view in pane.GetChildren():
-                chart_view.Update(error_reporter, data_changed, selection_changed)
+                chart_view.Realise(error_reporter, data_changed, selection_changed)
 
 
 
@@ -1490,15 +1501,15 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def UpdateChart(self, node_id, projector_info, error_reporter):
+    def UpdateChart(self, node_id, projector_info, error_reporter, data_changed, selection_changed):
         if projector_info.Chart is None:
             return
 
         if self._ChartView is None:
             db_paths = [projector.ProjectionDbPath for projector in projector_info.NetworkProjectors]
             self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, db_paths, self._TableViewCtrls, error_reporter, node_id)
-            self.SplitHorizontally(self._Notebook, self._ChartView)
+            self.SplitVertically(self._Notebook, self._ChartView)
 
-        self._ChartView.Update(error_reporter, True)
+        self._ChartView.Realise(error_reporter, data_changed, selection_changed)
 
 

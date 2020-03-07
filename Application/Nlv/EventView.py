@@ -1271,7 +1271,7 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
         chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
         if chart_ctrl is not None:
             values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
-            chart_ctrl.Update(self.GetErrorReporter(), parameters = values)
+            chart_ctrl.Realise(self.GetErrorReporter(), parameters = values)
 
 
     #-------------------------------------------------------
@@ -1706,13 +1706,11 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), selection_changed = True)
 
         # ignore de-selection and non-events
-        if item is None:
-            return
-
-        location = self.GetTableViewCtrl().GetLocation(item)
-        if location is not None:
-            # tell the data explorer
-            self.GetDataExplorer().Update(self.MakeDataUrl(location))
+        if item is not None:
+            location = self.GetTableViewCtrl().GetLocation(item)
+            if location is not None:
+                # tell the data explorer
+                self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
 
     #-------------------------------------------------------
@@ -1783,15 +1781,15 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def UpdateChart(self):
+    def UpdateChart(self, data_changed = False, selection_changed = False):
         projector_info, is_valid = self.GetProjectorInfo()
-        self.GetViewCtrl().UpdateChart(self.GetNodeId(), projector_info, self.GetErrorReporter())
+        self.GetViewCtrl().UpdateChart(self.GetNodeId(), projector_info, self.GetErrorReporter(), data_changed, selection_changed)
 
     @G_Global.TimeFunction
     def UpdateEventContent(self):
         # relies on caller to ensure child data node are
         # run first
-        self.UpdateChart()
+        self.UpdateChart(data_changed = True)
 
 
 
@@ -1841,14 +1839,14 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
-        # ignore de-selection and non-events
-        if item is None:
-            return
+        self.GetParentNode().UpdateChart(selection_changed = True)
 
-        location = self.GetTableViewCtrl().GetLocation(item)
-        if location is not None:
-            # tell the data explorer
-            self.GetDataExplorer().Update(self.MakeDataUrl(location))
+        # ignore de-selection and non-events
+        if item is not None:
+            location = self.GetTableViewCtrl().GetLocation(item)
+            if location is not None:
+                # tell the data explorer
+                self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
 
     #-------------------------------------------------------
@@ -1873,7 +1871,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-#            self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed = True)
+            self.GetParentNode().UpdateChart(data_changed = True)
             return True
         else:
             return False

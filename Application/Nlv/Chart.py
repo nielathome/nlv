@@ -173,7 +173,62 @@ class Network:
 
 
     #-----------------------------------------------------------
-    def Realise(self, name, connection, cursor, context):
+    def SetSelection(self, connection, cursor, context):
+        selected_nodes = set(context.GetSelection(0))
+        selected_links = set(context.GetSelection(1))
+
+        have_nodes = len(selected_nodes) != 0
+        have_links = len(selected_links) != 0
+
+        if have_nodes or have_links:
+            where = ""
+            if have_nodes:
+                nodes = ", ".join([str(node) for node in selected_nodes])
+                where = "source_event_id IN ({nodes}) OR target_event_id IN ({nodes})".format(nodes = nodes)
+
+            if have_links:
+                if have_nodes:
+                    where = where + " OR "
+                links = ", ".join([str(link) for link in selected_links])
+                text = " link_event_id IN ({links})".format(links = links)
+                where = where + text
+
+            # find everything "reachable" from the selection
+            cursor.execute("""
+                SELECT
+                    link_data.event_id AS link_event_id,
+                    source_data.event_id AS source_event_id,
+                    target_data.event_id AS target_event_id
+                FROM
+                    links.display AS link_data
+                JOIN
+                    main.display
+                    AS
+                        source_data
+                    ON
+                        link_data.source = source_data.title 
+                JOIN
+                    main.display
+                    AS
+                        target_data
+                    ON
+                        link_data.target = target_data.title 
+                WHERE
+                    {where}
+                """.format(where = where))
+
+            for row in cursor:
+                selected_links.add(row[0])
+                selected_nodes.add(row[1])
+                selected_nodes.add(row[2])
+
+        selection = dict(nodes = [node for node in selected_nodes], links = [link for link in selected_links])
+        json_text = json.dumps(selection)
+        context.ExecuteScript("SetSelection('{}');".format(json_text))
+
+
+    #-----------------------------------------------------------
+    def CreateChart(self, connection, cursor, context):
         cursor.execute("""
             SELECT
                 event_id,
@@ -184,12 +239,9 @@ class Network:
                 main.display
             """)
 
-#        selection = context.GetSelection()
         nodes = []
         for row in cursor:
-            event_id = row[0]
-#            selected = event_id in selection
-            nodes.append(dict(zip(["event_id", "type", "title", "size"], [event_id, row[1], row[2], row[3]])))
+            nodes.append(dict(zip(["event_id", "type", "title", "size"], [row[0], row[1], row[2], row[3]])))
 
 
         cursor.execute("""
@@ -199,20 +251,26 @@ class Network:
                 target
             FROM
                 links.display
+            WHERE
+                source IN (SELECT title FROM main.display) AND
+                target IN (SELECT title FROM main.display)
             """)
 
         links = []
         for row in cursor:
-            event_id = row[0]
-#            selected = event_id in selection
-            links.append(dict(zip(["event_id", "source", "target"], [event_id, row[1], row[2]])))
+            links.append(dict(zip(["event_id", "source", "target"], [row[0], row[1], row[2]])))
 
         network = dict(nodes = nodes, links = links)
-
-        # chart transition time in msec
-        switch_time = 1000
-        #if len(selection) != 0:
-        #    switch_time = 250
-
         json_text = json.dumps(network)
-        context.ExecuteScript("CreateChart('{}', '{}', {});".format(name, json_text, switch_time))
+        context.ExecuteScript("CreateChart('Title', '{}');".format(json_text))
+
+        self.SetSelection(connection, cursor, context)
+
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
+        if context.DataChanged():
+            self.CreateChart(connection, cursor, context)
+
+        elif context.SelectionChanged():
+            self.SetSelection(connection, cursor, context)
