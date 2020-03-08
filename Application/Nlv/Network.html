@@ -47,10 +47,40 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <script>
     //----------------------------------------------------------
-    var g_node_id = 0
+    var g_chart_node_id = 0,
+        g_nodes_table_node_id = 0,
+        g_links_table_node_id = 0;
 
     function SetNodeId(node_id) {
         g_node_id = node_id;
+    }
+
+    function SetTableNodeIds(nodes_table_node_id, links_table_node_id) {
+        g_nodes_table_node_id = nodes_table_node_id;
+        g_links_table_node_id = links_table_node_id;
+    }
+
+    function CallPython(target_node_id, method, args_object) {
+        args_json_text = JSON.stringify(args_object);
+        args_encoded_text = btoa(args_json_text);
+        cgi_text = "/" + target_node_id + "." + method + "?" + args_encoded_text;
+
+        d3.json(cgi_text, function (error, json) {
+            if (error)
+                throw error;
+        });
+    }
+
+
+    //----------------------------------------------------------
+    function OnNodeClick(d) {
+        if (! d.dragged) {
+            CallPython(g_nodes_table_node_id, "OnChartSelection", { event_id: d.event_id, ctrl_key: d3.event.ctrlKey });
+        }
+    }
+
+    function OnLinkClick(d) {
+        CallPython(g_links_table_node_id, "OnChartSelection", { event_id: d.event_id, ctrl_key: d3.event.ctrlKey });
     }
 
 
@@ -165,7 +195,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         g_joined_links = g_links_group.selectAll("line")
           .data(g_data.links)
-          .join("line");
+          .join("line")
+            .on("click", OnLinkClick)
 
         // map node counts to a node size
         const minNodeWeight = d3.min(g_data.nodes, function (node) {
@@ -189,17 +220,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("fill", function (node) {
                 return g_scale(node.type);
             })
+            .on("click", OnNodeClick)
             .call(d3.drag()
                 .on("start", function (node) {
                     if (!d3.event.active)
                         g_simulation.alphaTarget(0.3).restart();
                     node.fx = node.x;
                     node.fy = node.y;
+                    node.dragged = false;
                 })
                 .on("drag", function (node) {
                     // map SVG coord system back to model coord system
                     node.fx += d3.event.dx / g_curZoom;
                     node.fy += d3.event.dy / g_curZoom;
+                    node.dragged = true;
                 })
                 .on("end", function (node) {
                     if (!d3.event.active)

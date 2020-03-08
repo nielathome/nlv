@@ -71,7 +71,7 @@ class Bar:
             switch_time = 250
 
         json_text = json.dumps(data)
-        context.ExecuteScript("CreateChart('{}', '{}', '{}', '{}', {});".format(name, self._CategoryField, self._ValueField, json_text, switch_time))
+        context.CallJavaScript("CreateChart", name, self._CategoryField, self._ValueField, json_text, switch_time)
 
 
 
@@ -153,7 +153,7 @@ class Pie:
             switch_time = 250
 
         json_text = json.dumps(data)
-        context.ExecuteScript("CreateChart('{}', '{}', '{}');".format(self._ValueField, json_text, switch_time))
+        context.CallJavaScript("CreateChart", self._ValueField, json_text, switch_time)
 
 
 
@@ -224,7 +224,7 @@ class Network:
 
         selection = dict(nodes = [node for node in selected_nodes], links = [link for link in selected_links])
         json_text = json.dumps(selection)
-        context.ExecuteScript("SetSelection('{}');".format(json_text))
+        context.CallJavaScript("SetSelection", json_text)
 
 
     #-----------------------------------------------------------
@@ -262,7 +262,7 @@ class Network:
 
         network = dict(nodes = nodes, links = links)
         json_text = json.dumps(network)
-        context.ExecuteScript("CreateChart('Title', '{}');".format(json_text))
+        context.CallJavaScript("CreateChart", "Title", json_text)
 
         self.SetSelection(connection, cursor, context)
 

@@ -1428,6 +1428,12 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
+    def OnChartSelection(self, event_id, ctrl_key):
+        """Pass (HTML) chart selection event on to table"""
+        self.GetTableViewCtrl().OnChartSelection(event_id, ctrl_key)
+
+
+    #-------------------------------------------------------
     def ReleaseFiles(self):
         """Release all resources owned by the view"""
         self.GetViewCtrl().ResetModel()
@@ -1450,12 +1456,6 @@ class G_CommonProjectorNode(G_CoreProjectorNode):
     #-------------------------------------------------------
     def GetTableViewCtrl(self):
         return self.GetViewCtrl().GetTableViewCtrl()
-
-
-    #-------------------------------------------------------
-    def OnChartSelection(self, event_id):
-        """Pass (HTML) chart selection event on to table"""
-        self.GetTableViewCtrl().ToggleSelectedEvent(event_id)
 
 
 
@@ -1552,7 +1552,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
     def OnTableSelectionChanged(self, item):
         self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), selection_changed = True)
-        if item is None or item.GetID() is None:
+        if item is None or not item.IsOk():
             # ignore de-selection events
             return
 
@@ -1706,7 +1706,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), selection_changed = True)
 
         # ignore de-selection and non-events
-        if item is not None:
+        if item is not None and item.IsOk():
             location = self.GetTableViewCtrl().GetLocation(item)
             if location is not None:
                 # tell the data explorer
@@ -1817,7 +1817,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
         self._TableIndex = self._Field.TableIndex.Value
 
-        table_ctrl = self.GetParentNode().GetViewCtrl().SetupDataTable(self._TableIndex, self._Name)
+        table_ctrl = self.GetParentNode().GetViewCtrl().SetupDataTable(self._TableIndex, self._Name, self.GetNodeId())
         self.SetupTableCtrl(table_ctrl, table_ctrl)
 
 
@@ -1842,7 +1842,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         self.GetParentNode().UpdateChart(selection_changed = True)
 
         # ignore de-selection and non-events
-        if item is not None:
+        if item is not None and item.IsOk():
             location = self.GetTableViewCtrl().GetLocation(item)
             if location is not None:
                 # tell the data explorer

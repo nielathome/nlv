@@ -820,17 +820,23 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
     def GetSelectedEventIds(self):
         return self.GetModel().MapSelectionToEventIds(self.GetSelections())
 
-    def ToggleSelectedEvent(self, event_id):
+    def OnChartSelection(self, event_id, ctrl_key):
         item = self.GetModel().LookupEventId(event_id)
         if item is not None:
-            if self.IsSelected(item):
-                self.Unselect(item)
+            if ctrl_key:
+                if self.IsSelected(item):
+                    self.Unselect(item)
+                    item = None
+                else:
+                    self.Select(item)
             else:
+                self.UnselectAll()
                 self.Select(item)
 
             # the control does not generate an event, so fake one
             evt = wx.dataview.DataViewEvent()
-            evt.SetItem(item)
+            if item is not None:
+                evt.SetItem(item)
             self.OnItemActivated(evt)
 
 
@@ -1135,6 +1141,18 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
+    def CallJavaScript(self, method, *args):
+        def ConvertArg(arg):
+            if isinstance(arg, str):
+                return "'{}'".format(arg)
+            else:
+                return str(arg)
+
+        arg_text = ",".join([ConvertArg(arg) for arg in args])
+        script = "{method}({args});".format(method = method, args = arg_text)
+        self.EnqueueScript(script)
+
+
     def EnqueueScript(self, script):
         last_script = None
         last_idx = len(self._ScriptQueue) - 1
@@ -1236,8 +1254,8 @@ class G_HtmlHostCtrl(wx.Panel):
                 return self._Host._ParameterValues.get(name, default)
 
             #-----------------------------------------------
-            def ExecuteScript(self, script):
-                self._Host.EnqueueScript(script)
+            def CallJavaScript(self, method, *args):
+                self._Host.CallJavaScript(method, *args)
 
 
         do_realize = False
@@ -1471,6 +1489,7 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
         self._Notebook = G_NotebookDisplayControl(self)
         self._ChartView = None
         self._TableViewCtrls = [None, None]
+        self._TableNodeIds = [None, None]
         self._DocumentUrl = doc_url
 
         self.SetMinimumPaneSize(150)
@@ -1478,7 +1497,8 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
         self.Initialize(self._Notebook)
 
 
-    def SetupDataTable(self, idx, name):
+    def SetupDataTable(self, idx, name, node_id):
+        self._TableNodeIds[idx] = node_id
         self._TableViewCtrls[idx] = table_ctrl = G_TableViewCtrl(self._Notebook, True, name, self._DocumentUrl)
         self._Notebook.AddPage(table_ctrl, name)
         return table_ctrl
@@ -1507,8 +1527,9 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
         if self._ChartView is None:
             db_paths = [projector.ProjectionDbPath for projector in projector_info.NetworkProjectors]
-            self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, db_paths, self._TableViewCtrls, error_reporter, node_id)
-            self.SplitVertically(self._Notebook, self._ChartView)
+            chart = self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, db_paths, self._TableViewCtrls, error_reporter, node_id)
+            chart.CallJavaScript("SetTableNodeIds", self._TableNodeIds[0], self._TableNodeIds[1])
+            self.SplitVertically(self._Notebook, chart)
 
         self._ChartView.Realise(error_reporter, data_changed, selection_changed)
 

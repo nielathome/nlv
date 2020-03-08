@@ -63,16 +63,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <script>
     //----------------------------------------------------------
-    var g_node_id = 0
+    var g_node_id = 0;
 
     function SetNodeId(node_id) {
         g_node_id = node_id;
     }
 
-    function HostBridge(method, args_object) {
+    function CallPython(target_node_id, method, args_object) {
         args_json_text = JSON.stringify(args_object);
         args_encoded_text = btoa(args_json_text);
-        cgi_text = "/" + g_node_id + "." + method + "?" + args_encoded_text;
+        cgi_text = "/" + target_node_id + "." + method + "?" + args_encoded_text;
 
         d3.json(cgi_text, function (error, json) {
             if (error)
@@ -83,7 +83,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
     function OnClick(d) {
-        HostBridge("OnChartSelection", { event_id: d.data.event_id });
+        CallPython(g_node_id, "OnChartSelection", { event_id: d.data.event_id, ctrl_key: d3.event.ctrlKey });
     }
 
 
