@@ -1379,6 +1379,31 @@ class G_MetricsProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
 
 
 
+## G_NetworkProjectorOptionsNode ###########################
+
+class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContainedNode):
+
+    #-------------------------------------------------------
+    def BuildPage(parent):
+        # class static function
+        me = __class__
+        me._Sizer = parent.GetSizer()
+
+        G_CommonProjectorOptionsNode.BuildCommon(me, parent)
+
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_TabContainedNode.__init__(self, factory, wproject, witem)
+
+
+    #-------------------------------------------------------
+    def Activate(self):
+        self.ActivateCommon()
+        self.ActivateDynamicPane()
+
+
+
 ## G_CoreProjectorNode #####################################
 
 class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeChildNode):
@@ -1633,14 +1658,11 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         """Load event/feature data into the viewer"""
 
         # load events into event viewer data control
-        events_view = self.GetTableViewCtrl()
         projector_info, is_valid = self.GetProjectorInfo()
-        event_schema = projector_info.ProjectionSchema
-        events_db_path = projector_info.ProjectionDbPath
-        events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, is_valid)
+        self.GetTableViewCtrl().UpdateContent(self.GetNesting(), projector_info, is_valid)
         
         # make any required charts
-        self.GetViewCtrl().CreateCharts(projector_info.Charts, events_db_path, self.GetErrorReporter(), self.GetNodeId())
+        self.GetViewCtrl().CreateCharts(projector_info.Charts, self.GetErrorReporter(), self.GetNodeId())
         self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions).PushParameterValues(activate_chart = True)
 
         self.EnsureDisplayControlVisible()
@@ -1768,9 +1790,8 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def GetProjectorInfo(self):
-        analysis_results, is_valid = self.GetLogAnalysisNode().GetAnalysisResults()
-        return analysis_results.GetProjectorInfo(self._Name), is_valid
+    def Activate(self):
+        self.ActivateContainer()
 
 
     #-------------------------------------------------------
@@ -1778,6 +1799,17 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         self.ReleaseFiles()
         super().DoClose(delete)
         pass
+
+
+    #-------------------------------------------------------
+    def GetChartViewCtrl(self, activate):
+        return self.GetViewCtrl().GetChartViewCtrl()
+
+
+    #-------------------------------------------------------
+    def GetProjectorInfo(self):
+        analysis_results, is_valid = self.GetLogAnalysisNode().GetAnalysisResults()
+        return analysis_results.GetProjectorInfo(self._Name), is_valid
 
 
     #-------------------------------------------------------
@@ -1855,12 +1887,8 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         """Load network data into the viewer"""
 
         # load events into event viewer data control
-        events_view = self.GetTableViewCtrl()
         projector_info, is_valid = self.GetProjectorInfo()
-        event_schema = projector_info.ProjectionSchema
-        events_db_path = projector_info.ProjectionDbPath
-        events_view.UpdateContent(False, event_schema, events_db_path, is_valid)
-        
+        self.GetTableViewCtrl().UpdateContent(False, projector_info, is_valid)
         self.EnsureDisplayControlVisible()
 
         ## forward to child metrics views
@@ -1938,6 +1966,10 @@ G_Project.RegisterNodeFactory(
 
 G_Project.RegisterNodeFactory(
     G_NodeFactory(G_Project.NodeID_MetricsProjector, G_Project.ArtDocID_MetricsProjector, G_MetricsProjectorNode)
+)
+
+G_Project.RegisterNodeFactory(
+    G_NodeFactory(G_Project.NodeID_NetworkProjectorOptions, G_Project.ArtCtrlId_Options, G_NetworkProjectorOptionsNode)
 )
 
 G_Project.RegisterNodeFactory(

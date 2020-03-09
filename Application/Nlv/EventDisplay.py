@@ -564,14 +564,16 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     @G_Global.TimeFunction
-    def UpdateContent(self, nesting, table_schema, filename, valid):
+    def UpdateContent(self, nesting, table_info, valid):
+        table_schema, db_path = table_info.GetSchemaAndDbPath()
+
         self.Reset(table_schema)
         self.UpdateNesting(nesting, False)
         self.UpdateValidity(valid)
 
         num_fields = self.GetColumnCount()
-        if Path(filename).exists() and num_fields != 0:
-            self._N_Logfile = Nlog.MakeLogfile(filename, table_schema, G_Global.PulseProgressMeter)
+        if Path(db_path).exists() and num_fields != 0:
+            self._N_Logfile = Nlog.MakeLogfile(db_path, table_schema, G_Global.PulseProgressMeter)
 
         # robustness, for broken logfiles ...
         if self._N_Logfile is not None:
@@ -757,14 +759,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateContent(self, nesting, table_schema, filename, valid):
+    def UpdateContent(self, nesting, table_info, valid):
         """Update the data view with new content"""
 
         # note: number of DataView columns is not the same as the number of
         # model columns; as some are hidden for internal use
         try:
             self.ClearColumns()
-            self.GetModel().UpdateContent(nesting, table_schema, filename, valid)
+            self.GetModel().UpdateContent(nesting, table_info, valid)
             self.UpdateColumns()
 
         except FileNotFoundError as ex:
@@ -1268,7 +1270,7 @@ class G_HtmlHostCtrl(wx.Panel):
 
         if parameters is not None and parameters != self._ParameterValues:
             do_realize = True
-            parameters_changed = true
+            parameters_changed = True
             self._ParameterValues = parameters.copy()
 
         if do_realize:
@@ -1285,10 +1287,9 @@ class G_HtmlHostCtrl(wx.Panel):
 class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_info, db_path, table_view_ctrl, error_reporter, node_id):
+    def __init__(self, parent, chart_info, table_view_ctrl, error_reporter, node_id):
         super().__init__(parent, chart_info, error_reporter, node_id)
 
-        self._DbPath = db_path
         self._TableViewCtrl = table_view_ctrl
 
 
@@ -1299,7 +1300,7 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
     #-------------------------------------------------------
     def MakeDbCursor(self):
-        connection = ConnectDb(self._DbPath, True)
+        connection = ConnectDb(self._ChartInfo.ChartDbPath, True)
         if connection is None:
             return None, None
         else:
@@ -1312,10 +1313,9 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
 class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_info, db_paths, table_view_ctrls, error_reporter, node_id):
+    def __init__(self, parent, chart_info, table_view_ctrls, error_reporter, node_id):
         super().__init__(parent, chart_info, error_reporter, node_id)
 
-        self._DbPaths = db_paths
         self._TableViewCtrls = table_view_ctrls
 
 
@@ -1326,12 +1326,12 @@ class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
     #-------------------------------------------------------
     def MakeDbCursor(self):
-        connection = ConnectDb(self._DbPaths[0], True)
+        connection = ConnectDb(self._ChartInfo.NodesDbPath, True)
         if connection is None:
             return None, None
         else:
             cursor = connection.cursor()
-            cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._DbPaths[1]))
+            cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._ChartInfo.LinksDbPath))
             return connection, cursor
 
 
@@ -1406,7 +1406,7 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def CreateCharts(self, chart_list, db_path, error_reporter, node_id):
+    def CreateCharts(self, chart_list, error_reporter, node_id):
         if chart_list is None or len(chart_list) == 0:
             return
 
@@ -1417,7 +1417,7 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
             table_ctrl = self.GetTableViewCtrl()
     
             for chart_info in chart_list:
-                chart_view_ctrl = G_HtmlChartCtrl(pane, chart_info, db_path, table_ctrl, error_reporter, node_id)
+                chart_view_ctrl = G_HtmlChartCtrl(pane, chart_info, table_ctrl, error_reporter, node_id)
                 pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
 
             pane_sizer.ShowItems(False)
@@ -1469,12 +1469,11 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             quantifier.Run(self._CollectorLocked)
             self._CollectorLocked = False
 
-            metrics_db_path = quantifier_info.MetricsDbPath
             table_ctrl = self.GetTableViewCtrl()
-            table_ctrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, valid)
+            table_ctrl.UpdateContent(False, quantifier_info, valid)
             table_ctrl.SetFieldMask(-1)
 
-            self.CreateCharts(quantifier_info.Charts, metrics_db_path, error_reporter, node_id)
+            self.CreateCharts(quantifier_info.Charts, error_reporter, node_id)
 
 
 
@@ -1505,6 +1504,9 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
 
     #-------------------------------------------------------
+    def GetChartViewCtrl(self, chart_no, activate):
+        return self._ChartView
+
     def GetTableViewCtrl(self, idx):
         return self._TableViewCtrls[idx]
 
@@ -1526,8 +1528,7 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
             return
 
         if self._ChartView is None:
-            db_paths = [projector.ProjectionDbPath for projector in projector_info.NetworkProjectors]
-            chart = self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, db_paths, self._TableViewCtrls, error_reporter, node_id)
+            chart = self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, self._TableViewCtrls, error_reporter, node_id)
             chart.CallJavaScript("SetTableNodeIds", self._TableNodeIds[0], self._TableNodeIds[1])
             self.SplitVertically(self._Notebook, chart)
 

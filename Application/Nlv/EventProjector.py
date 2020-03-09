@@ -725,10 +725,11 @@ class G_ProjectionSchema(G_FieldSchemata):
 class G_ChartInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, want_selection, builder):
+    def __init__(self, name, want_selection, builder, chart_db_path):
         self.Name = name
         self.WantSelection = want_selection
         self.Builder = builder
+        self.ChartDbPath = chart_db_path
 
 
     #-------------------------------------------------------
@@ -764,7 +765,12 @@ class G_QuantifierInfo:
     #-------------------------------------------------------
     def Chart(self, name, want_selection, builder):
         """Implements user analyse script Quantifier.Chart() function"""
-        self.Charts.append(G_ChartInfo(name, want_selection, builder))
+        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.MetricsDbPath))
+
+
+    #-------------------------------------------------------
+    def GetSchemaAndDbPath(self):
+        return self.MetricsSchema, self.MetricsDbPath
 
 
 
@@ -794,13 +800,41 @@ class G_ProjectorInfo:
 
     #-------------------------------------------------------
     def Chart(self, name, want_selection, builder):
-        """Implements user analyse script Quantifier.Chart() function"""
-        self.Charts.append(G_ChartInfo(name, want_selection, builder))
+        """Implements user analyse script Projector.Chart() function"""
+        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.ProjectionDbPath))
 
 
     #-------------------------------------------------------
     def GetQuantifierInfo(self, name):
         return self.Quantifiers[name]
+
+    def GetSchemaAndDbPath(self):
+        return self.ProjectionSchema, self.ProjectionDbPath
+
+
+
+## G_NetworkChartInfo ######################################
+
+class G_NetworkChartInfo:
+
+    #-------------------------------------------------------
+    def __init__(self, name, want_selection, builder, nodes_db_path, links_db_path):
+        self.Name = name
+        self.WantSelection = want_selection
+        self.Builder = builder
+        self.NodesDbPath = nodes_db_path
+        self.LinksDbPath = links_db_path
+
+
+    #-------------------------------------------------------
+    def Setup(self):
+        return self.Builder.Setup(self.Name)
+
+    def DefineParameters(self, connection, cursor, context):
+        self.Builder.DefineParameters(connection, cursor, context)
+
+    def Realise(self, connection, cursor, context):
+        self.Builder.Realise(self.Name, connection, cursor, context)
 
 
 
@@ -809,16 +843,23 @@ class G_ProjectorInfo:
 class G_NetworkInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, node_projector, link_projector):
+    def __init__(self, name, nodes_projector, links_projector):
         self.ProjectionName = name
         self.ChartInfo = None
         self.DocumentNodeID = G_Project.NodeID_NetworkProjector
-        self.NetworkProjectors = [node_projector, link_projector]
+        self.NetworkProjectors = [nodes_projector, links_projector]
 
 
     #-------------------------------------------------------
     def Chart(self, want_selection, builder):
-        self.ChartInfo = G_ChartInfo(self.ProjectionName, want_selection, builder)
+        nodes_db_path = self.NetworkProjectors[0].ProjectionDbPath
+        links_db_path = self.NetworkProjectors[1].ProjectionDbPath
+        self.ChartInfo = G_NetworkChartInfo(self.ProjectionName, want_selection, builder, nodes_db_path, links_db_path)
+
+
+    #-------------------------------------------------------
+    def GetDbPaths(self):
+        return [self.ProjectionDbPath for projector in self.NetworkProjectors]
 
 
 
