@@ -1491,6 +1491,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
     NodeID_NetworkProjector = "1FA0C8AA-2740-4B23-BA78-EAF75FEB293F"
     NodeID_NetworkDataProjector = "60E5D58E-3363-488A-9FA6-9170F3517044"
+    NodeID_NetworkProjectorOptions = "64BF4F35-8890-495C-8985-31506341FD8E"
 
     ArtCtrlId_None = -1
     ArtCtrlId_Session = wx.ART_GO_HOME

@@ -1404,6 +1404,29 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
 
 
 
+## G_ChartCreateContext ####################################
+
+class G_ChartCreateContext:
+
+    #-------------------------------------------------------
+    def __init__(self, node):
+        self._Node = node
+
+
+    #-------------------------------------------------------
+    def GetErrorReporter(self):
+       self._Node.GetErrorReporter() 
+
+    def GetNodeId(self):
+        return self._Node.GetNodeId()
+
+
+    #-------------------------------------------------------
+    def OnChartCreate(self, chart_view, html_window):
+        self._Node.OnChartCreate(chart_view, html_window)
+
+
+
 ## G_CoreProjectorNode #####################################
 
 class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeChildNode):
@@ -1419,8 +1442,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
-    def SetupTableCtrl(self, view_ctrl, table_ctrl):
-        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+    def SetupTableCtrl(self, table_ctrl):
         self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
         table_ctrl.SetSelectionhandler(self.OnTableSelectionChanged)
 
@@ -1453,6 +1475,12 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
+    def MakeChartCreateContext(self):
+        return G_ChartCreateContext(self)
+
+    def OnChartCreate(self, chart_view, html_window):
+        self.InterceptSetFocus(html_window)
+
     def OnChartSelection(self, event_id, ctrl_key):
         """Pass (HTML) chart selection event on to table"""
         self.GetTableViewCtrl().OnChartSelection(event_id, ctrl_key)
@@ -1511,7 +1539,8 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         view_ctrl = G_EventsViewCtrl(parent_notebook, self._Name, doc_url)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
-        self.SetupTableCtrl(view_ctrl, view_ctrl.GetTableViewCtrl())
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+        self.SetupTableCtrl(view_ctrl.GetTableViewCtrl())
 
 
     def PostInitChildren(self):
@@ -1662,7 +1691,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self.GetTableViewCtrl().UpdateContent(self.GetNesting(), projector_info, is_valid)
         
         # make any required charts
-        self.GetViewCtrl().CreateCharts(projector_info.Charts, self.GetErrorReporter(), self.GetNodeId())
+        self.GetViewCtrl().CreateCharts(self.MakeChartCreateContext(), projector_info.Charts)
         self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions).PushParameterValues(activate_chart = True)
 
         self.EnsureDisplayControlVisible()
@@ -1700,7 +1729,8 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         view_ctrl = G_MetricsViewCtrl(parent_notebook, self._Name)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
-        self.SetupTableCtrl(view_ctrl, view_ctrl.GetTableViewCtrl())
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+        self.SetupTableCtrl(view_ctrl.GetTableViewCtrl())
 
 
     #-------------------------------------------------------
@@ -1749,7 +1779,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
     @G_Global.TimeFunction
     def UpdateMetricContent(self):
         quantifier_info, is_valid = self.GetQuantifierInfo()
-        self.GetViewCtrl().Quantify(self.GetNodeId(), quantifier_info, is_valid, self.GetErrorReporter())
+        self.GetViewCtrl().Quantify(self.MakeChartCreateContext(), quantifier_info, is_valid)
         self.FindChildNode(factory_id = G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
 
 
@@ -1779,6 +1809,7 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         view_ctrl = G_NetworkViewCtrl(parent_notebook, doc_url)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
+        # the focus control will be updated later when the chart window is created
         self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
 
 
@@ -1787,6 +1818,18 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
             projector_info, valid = self.GetProjectorInfo()
             self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjectors[0].ProjectionName, table_idx = 0)
             self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjectors[1].ProjectionName, table_idx = 1)
+
+
+    #-------------------------------------------------------
+    def OnChartCreate(self, chart_view, html_window):
+        # effectively, throw the input focus away when the node is activated;
+        # if the focus is sent to the view control, then it will be forwarded
+        # to the current child data projector node - which in turn, drives
+        # an activation into the project, and this node gets de-activated ...
+        self.SetDisplayFocusCtrl(html_window)
+
+        # there's no obvious node to activate when a chart control receives
+        # focus, so no InterceptSetFocus here
 
 
     #-------------------------------------------------------
@@ -1815,7 +1858,7 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     def UpdateChart(self, data_changed = False, selection_changed = False):
         projector_info, is_valid = self.GetProjectorInfo()
-        self.GetViewCtrl().UpdateChart(self.GetNodeId(), projector_info, self.GetErrorReporter(), data_changed, selection_changed)
+        self.GetViewCtrl().UpdateChart(self.MakeChartCreateContext(), projector_info, data_changed, selection_changed)
 
     @G_Global.TimeFunction
     def UpdateEventContent(self):
@@ -1850,7 +1893,8 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         self._TableIndex = self._Field.TableIndex.Value
 
         table_ctrl = self.GetParentNode().GetViewCtrl().SetupDataTable(self._TableIndex, self._Name, self.GetNodeId())
-        self.SetupTableCtrl(table_ctrl, table_ctrl)
+        self.SetDisplayCtrl(table_ctrl, owns_display_ctrl = False)
+        self.SetupTableCtrl(table_ctrl)
 
 
     #-------------------------------------------------------

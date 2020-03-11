@@ -1082,12 +1082,13 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_info, error_reporter, node_id):
+    def __init__(self, parent, context, chart_info):
         super().__init__(parent)
 
         self._ChartInfo = chart_info
+        self._CreateContext = context
         self._ParameterValues = dict()
-        self._ScriptQueue = ["SetNodeId({});".format(node_id)]
+        self._ScriptQueue = []
 
         self.InitCharting()
 
@@ -1097,15 +1098,13 @@ class G_HtmlHostCtrl(wx.Panel):
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
 
-        with G_ScriptGuard("Setup", error_reporter):
-            page_name = self._ChartInfo.Setup()
-            self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
+        page_name = self._ChartInfo.HtmlPage
+        self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
 
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
         vsizer.Add(self._Figure, proportion = 1, flag = wx.EXPAND)
         self.SetSizer(vsizer)
-
 
 
     #-------------------------------------------------------
@@ -1117,7 +1116,7 @@ class G_HtmlHostCtrl(wx.Panel):
     #-------------------------------------------------------
     def GetIHTMLDocument2(self):
 
-        data = [None]
+        data = [None, None]
 
         def enum_callback(hwnd, data):
             cls =  win32gui.GetClassName(hwnd)
@@ -1127,6 +1126,7 @@ class G_HtmlHostCtrl(wx.Panel):
                 if result != 0:
                     object = pythoncom.ObjectFromLresult(result, pythoncom.IID_IDispatch, 0)
                     if object is not None:
+
                         # have to force the class ID - not really clear why; without this though,
                         # the returned value is a generic CDispatch for class ID 
                         # '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
@@ -1134,11 +1134,26 @@ class G_HtmlHostCtrl(wx.Panel):
                         document = win32com.client.Dispatch(object, resultCLSID = clsid)
                         if document is not None:
                             data[0] = document
+                            data[1] = hwnd
                             return False
 
             return True
                 
         win32gui.EnumChildWindows(self._Figure.GetHandle(), enum_callback, data)
+
+        # once off setup, now that the visible chart display control is known
+        if data[0] is not None and self._CreateContext is not None:
+            context = self._CreateContext
+            self._CreateContext = None
+
+            self.EnqueueScript("SetNodeId({});".format(context.GetNodeId()), False)
+
+            # keep the Python/wxWidgets window alive while we (the parent)
+            # window is remains
+            html_window = self._HtmlWindow = wx.Window()
+            html_window.AssociateHandle(data[1])
+            context.OnChartCreate(self, html_window)
+
         return data[0]
 
 
@@ -1155,15 +1170,18 @@ class G_HtmlHostCtrl(wx.Panel):
         self.EnqueueScript(script)
 
 
-    def EnqueueScript(self, script):
+    def EnqueueScript(self, script, run_queue = True):
         last_script = None
         last_idx = len(self._ScriptQueue) - 1
 
         if last_idx >= 0:
             last_script = self._ScriptQueue[last_idx]
 
-        if script != last_script:
+        append = script != last_script
+        if append:
             self._ScriptQueue.append(script)
+
+        if append and run_queue:
             self.RunScriptQueue()
         
 
@@ -1287,8 +1305,8 @@ class G_HtmlHostCtrl(wx.Panel):
 class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_info, table_view_ctrl, error_reporter, node_id):
-        super().__init__(parent, chart_info, error_reporter, node_id)
+    def __init__(self, parent, context, chart_info, table_view_ctrl):
+        super().__init__(parent, context, chart_info)
 
         self._TableViewCtrl = table_view_ctrl
 
@@ -1313,8 +1331,8 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
 class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, chart_info, table_view_ctrls, error_reporter, node_id):
-        super().__init__(parent, chart_info, error_reporter, node_id)
+    def __init__(self, parent, context, chart_info, table_view_ctrls):
+        super().__init__(parent, context, chart_info)
 
         self._TableViewCtrls = table_view_ctrls
 
@@ -1406,7 +1424,7 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def CreateCharts(self, chart_list, error_reporter, node_id):
+    def CreateCharts(self, context, chart_list):
         if chart_list is None or len(chart_list) == 0:
             return
 
@@ -1417,12 +1435,12 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
             table_ctrl = self.GetTableViewCtrl()
     
             for chart_info in chart_list:
-                chart_view_ctrl = G_HtmlChartCtrl(pane, chart_info, table_ctrl, error_reporter, node_id)
+                chart_view_ctrl = G_HtmlChartCtrl(pane, context, chart_info, table_ctrl)
                 pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
 
             pane_sizer.ShowItems(False)
 
-        self.UpdateCharts(error_reporter, data_changed = True)
+        self.UpdateCharts(context.GetErrorReporter(), data_changed = True)
 
 
     #-------------------------------------------------------
@@ -1461,10 +1479,10 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Quantify(self, node_id, quantifier_info, valid, error_reporter):
+    def Quantify(self, context, quantifier_info, valid):
         G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
         self.ResetModel()
-        with G_ScriptGuard("Quantify", error_reporter):
+        with G_ScriptGuard("Quantify", context.GetErrorReporter()):
             quantifier = G_Quantifier(quantifier_info)
             quantifier.Run(self._CollectorLocked)
             self._CollectorLocked = False
@@ -1473,7 +1491,7 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             table_ctrl.UpdateContent(False, quantifier_info, valid)
             table_ctrl.SetFieldMask(-1)
 
-            self.CreateCharts(quantifier_info.Charts, error_reporter, node_id)
+            self.CreateCharts(context, quantifier_info.Charts)
 
 
 
@@ -1518,20 +1536,15 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def OnTableSelectionChanged(self, item):
-        pass
-
-
-    #-------------------------------------------------------
-    def UpdateChart(self, node_id, projector_info, error_reporter, data_changed, selection_changed):
+    def UpdateChart(self, context, projector_info, data_changed, selection_changed):
         if projector_info.Chart is None:
             return
 
         if self._ChartView is None:
-            chart = self._ChartView = G_HtmlNetworkCtrl(self, projector_info.ChartInfo, self._TableViewCtrls, error_reporter, node_id)
+            chart = self._ChartView = G_HtmlNetworkCtrl(self,context,  projector_info.ChartInfo, self._TableViewCtrls)
             chart.CallJavaScript("SetTableNodeIds", self._TableNodeIds[0], self._TableNodeIds[1])
             self.SplitVertically(self._Notebook, chart)
 
-        self._ChartView.Realise(error_reporter, data_changed, selection_changed)
+        self._ChartView.Realise(context.GetErrorReporter(), data_changed, selection_changed)
 
 

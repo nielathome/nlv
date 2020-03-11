@@ -371,6 +371,9 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
 
     #-------------------------------------------------------
+    def SetDisplayFocusCtrl(self, display_focus_ctrl):
+        self._DisplayFocusCtrl = display_focus_ctrl
+
     def SetDisplayCtrl(self, display_ctrl, display_focus_ctrl = None, owns_display_ctrl = True):
         self._DisplayFocusCtrl = self._DisplayCtrl = display_ctrl
         self._OwnsDisplayCtrl = owns_display_ctrl

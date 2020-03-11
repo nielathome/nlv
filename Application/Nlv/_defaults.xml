@@ -399,8 +399,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
   <!-- Network diagram node -->
   <node factory="1FA0C8AA-2740-4B23-BA78-EAF75FEB293F" name="Network">
-  
-  
+
+    <!-- Options node-->
+    <node factory="64BF4F35-8890-495C-8985-31506341FD8E" name="Setup">
+      <field name="ParameterValues" type="Str"/>
+    </node>
+
   </node>
 
 

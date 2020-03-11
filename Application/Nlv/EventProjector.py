@@ -730,12 +730,10 @@ class G_ChartInfo:
         self.WantSelection = want_selection
         self.Builder = builder
         self.ChartDbPath = chart_db_path
+        self.HtmlPage = builder.Setup(name)
 
 
     #-------------------------------------------------------
-    def Setup(self):
-        return self.Builder.Setup(self.Name)
-
     def DefineParameters(self, connection, cursor, context):
         self.Builder.DefineParameters(connection, cursor, context)
 
@@ -824,12 +822,10 @@ class G_NetworkChartInfo:
         self.Builder = builder
         self.NodesDbPath = nodes_db_path
         self.LinksDbPath = links_db_path
+        self.HtmlPage = builder.Setup(name)
 
 
     #-------------------------------------------------------
-    def Setup(self):
-        return self.Builder.Setup(self.Name)
-
     def DefineParameters(self, connection, cursor, context):
         self.Builder.DefineParameters(connection, cursor, context)
 
