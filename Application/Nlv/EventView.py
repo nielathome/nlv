@@ -1186,48 +1186,68 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
         window = parent.GetWindow()
 
         cls._ChartOptionsSubtitle = cls.BuildSubtitle(parent, "Chart options", True)
+
+        cls._LocateChartCtl = wx.Choice(window, choices = [
+            "Below the data table",
+            "Above the data table",
+            "Left of the data table",
+            "Right of the data table"
+        ])
+        cls._LocateChartSizer = cls.BuildLabelledRow(parent, "Show chart", cls._LocateChartCtl)
+
         cls._SelectChartCtl = wx.Choice(window)
         cls._SelectChartSizer = cls.BuildLabelledRow(parent, "Select chart", cls._SelectChartCtl)
 
-        pane = cls.DynamicPane = wx.Panel(window)
+        pane = cls._DynamicPane = wx.Panel(window)
         pane.SetSizer(wx.BoxSizer(wx.VERTICAL))
         cls._Sizer.Add(pane, proportion = 1, flag = wx.EXPAND)
 
 
     #-------------------------------------------------------
+    def __init__(self):
+        self.GetProjectorNode().RegisterOptionsNode(self.GetFactoryID())
+
+
     def PostInitNode(self):
         self._Field = D_Document(self.GetDocument(), self)
 
         self._Field.Add("", "ParameterValues", replace_existing = False)
         self._Field.Add(0, "idxSelectChart", replace_existing = False)
+        self._Field.Add(0, "idxLocateChart", replace_existing = False)
 
         self._ParameterValues = G_ParameterValues(self._Field.ParameterValues.Value)
 
 
     #-------------------------------------------------------
-    def ActivateSelectChart(self, chart_names):
+    def ActivateSelectChart(self, chart_names = [""]):
         num_charts = len(chart_names)
         if num_charts != 0:
-            self._SelectChartCtl.Set(chart_names)
-
-            self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
-
             chart_no = self._Field.idxSelectChart.Value
             if chart_no >= num_charts:
                 chart_no = self._Field.idxSelectChart.Value = 0
+
+            location = self._Field.idxLocateChart.Value
+            self.Rebind(self._LocateChartCtl, wx.EVT_CHOICE, self.OnLocateChart)
+            self._LocateChartCtl.SetSelection(location)
+
+            self._SelectChartCtl.Set(chart_names)
+            self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
             self._SelectChartCtl.SetSelection(chart_no)
 
         else:
+            self._LocateChartCtl.Unbind(wx.EVT_CHOICE)
+
             self._SelectChartCtl.Clear()
             self._SelectChartCtl.Unbind(wx.EVT_CHOICE)
 
         self._Sizer.Show(self._ChartOptionsSubtitle, num_charts != 0, True)
+        self._Sizer.Show(self._LocateChartSizer, num_charts != 0, True)
         self._Sizer.Show(self._SelectChartSizer, num_charts > 1, True)
 
 
     #-------------------------------------------------------
     def ActivateDynamicPane(self):
-        pane = self.DynamicPane
+        pane = self._DynamicPane
         sizer = pane.GetSizer()
         sizer.Clear(delete_windows = True)
 
@@ -1248,16 +1268,24 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
 
 
     #-------------------------------------------------------
+    def GetViewCtrl(self):
+        return self.GetParentNode().GetViewCtrl()
+
     def GetChartViewCtrl(self, activate):
         chart_no = self._Field.idxSelectChart.Value
-        return self.GetParentNode().GetViewCtrl().GetChartViewCtrl(chart_no, activate)
+        return self.GetViewCtrl().GetChartViewCtrl(chart_no, activate)
 
 
     #-------------------------------------------------------
+    def OnLocateChart(self, event):
+        self._Field.idxLocateChart.Value = self._LocateChartCtl.GetSelection()
+        self.PushChartLocation()
+
+
     def OnSelectChart(self, event):
         self._Field.idxSelectChart.Value = self._SelectChartCtl.GetSelection()
 
-        pane = self.DynamicPane
+        pane = self._DynamicPane
         pane.Freeze()
         self.ActivateDynamicPane()
         pane.GetSizer().Layout()
@@ -1267,9 +1295,14 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
 
 
     #-------------------------------------------------------
+    def PushChartLocation(self):
+        location = self._Field.idxLocateChart.Value
+        self.GetViewCtrl().SetChartLocation(location)
+
     def PushParameterValues(self, activate_chart):
         chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
         if chart_ctrl is not None:
+            self.PushChartLocation()
             values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
             chart_ctrl.Realise(self.GetErrorReporter(), parameters = values)
 
@@ -1308,6 +1341,7 @@ class G_EventProjectorOptionsNode(G_CommonProjectorOptionsNode, G_ThemeNode, G_T
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_TabContainedNode.__init__(self, factory, wproject, witem)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainEvent)
+        G_CommonProjectorOptionsNode.__init__(self)
 
 
     #-------------------------------------------------------
@@ -1366,6 +1400,7 @@ class G_MetricsProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_TabContainedNode.__init__(self, factory, wproject, witem)
+        G_CommonProjectorOptionsNode.__init__(self)
 
 
     #-------------------------------------------------------
@@ -1395,11 +1430,13 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_TabContainedNode.__init__(self, factory, wproject, witem)
+        G_CommonProjectorOptionsNode.__init__(self)
 
 
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateCommon()
+        self.ActivateSelectChart()
         self.ActivateDynamicPane()
 
 
@@ -1434,6 +1471,10 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
     #-------------------------------------------------------
     def __init__(self):
         G_DisplayNode.__init__(self)
+        self._OptionsNodeFactoryId = None
+
+    def RegisterOptionsNode(self, factory_id):
+        self._OptionsNodeFactoryId = factory_id
 
 
     #-------------------------------------------------------
@@ -1456,6 +1497,9 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
+    def GetOptionsNode(self):
+        return self.FindChildNode(factory_id = self._OptionsNodeFactoryId, recursive = True)
+
     def GetViewCtrl(self):
         return self._DisplayCtrl
 
@@ -1584,8 +1628,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         return analysis_results.GetProjectorInfo(self._Name), is_valid
 
     def GetNesting(self):
-        node = self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions, recursive = True)
-        return node.GetNesting()
+        return self.GetOptionsNode().GetNesting()
 
 
     #-------------------------------------------------------
@@ -1692,8 +1735,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         
         # make any required charts
         self.GetViewCtrl().CreateCharts(self.MakeChartCreateContext(), projector_info.Charts)
-        self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions).PushParameterValues(activate_chart = True)
-
+        self.GetOptionsNode().PushParameterValues(activate_chart = True)
         self.EnsureDisplayControlVisible()
 
         # forward to child metrics views
@@ -1780,7 +1822,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
     def UpdateMetricContent(self):
         quantifier_info, is_valid = self.GetQuantifierInfo()
         self.GetViewCtrl().Quantify(self.MakeChartCreateContext(), quantifier_info, is_valid)
-        self.FindChildNode(factory_id = G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
+        self.GetOptionsNode().PushParameterValues(activate_chart = True)
 
 
 
@@ -1845,11 +1887,6 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def GetChartViewCtrl(self, activate):
-        return self.GetViewCtrl().GetChartViewCtrl()
-
-
-    #-------------------------------------------------------
     def GetProjectorInfo(self):
         analysis_results, is_valid = self.GetLogAnalysisNode().GetAnalysisResults()
         return analysis_results.GetProjectorInfo(self._Name), is_valid
@@ -1865,7 +1902,8 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         # relies on caller to ensure child data node are
         # run first
         self.UpdateChart(data_changed = True)
-
+        self.GetOptionsNode().PushParameterValues(activate_chart = True)
+        
 
 
 ## G_NetworkDataProjectorNode ##############################

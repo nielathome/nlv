@@ -1354,23 +1354,75 @@ class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
 
 
+## G_CoreViewCtrl ##########################################
+
+class G_CoreViewCtrl(wx.SplitterWindow, G_DisplayControl):
+    """
+    Common behaviour for G_EventsViewCtrl,  G_MetricsViewCtrl
+    and G_NetworkViewCtrl.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
+        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
+        self._ChartPane = None
+        self._TablePane = None
+        self._ChartLocation = 0
+
+        self.SetMinimumPaneSize(150)
+        self.SetSashGravity(0.5)
+
+
+    #-------------------------------------------------------
+    def ArrangeChildren(self):
+        location = self._ChartLocation
+        table = self._TablePane
+        chart = self._ChartPane
+
+        self.Unsplit()
+        if chart is None:
+            self.Initialize(table)
+
+        elif location == 0:
+            self.SplitHorizontally(table, chart)
+
+        elif location == 1:
+            self.SplitHorizontally(chart, table)
+
+        elif location == 2:
+            self.SplitVertically(chart, table)
+
+        elif location == 3:
+            self.SplitVertically(table, chart)
+
+
+    #-------------------------------------------------------
+    def SetChartLocation(self, location):
+        if location == self._ChartLocation:
+            return
+
+        self._ChartLocation = location
+        self.ArrangeChildren()
+
+
+
+
 ## G_CommonViewCtrl ########################################
 
-class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
+class G_CommonViewCtrl(G_CoreViewCtrl):
     """
     Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
     """
 
     #-------------------------------------------------------
     def __init__(self, parent, multiple_selection, name, doc_url = None):
-        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
-        self._ChartPane = None
+        super().__init__(parent)
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name, doc_url)
-        self.Initialize(self.GetTableViewCtrl())
+        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name, doc_url)
+        self.ArrangeChildren()
 
 
     #-------------------------------------------------------
@@ -1383,7 +1435,7 @@ class G_CommonViewCtrl(wx.SplitterWindow, G_DisplayControl):
         if self._ChartPane is None and create:
             self._ChartPane = wx.Panel(self)
             self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
-            self.SplitHorizontally(self.GetTableViewCtrl(), self._ChartPane)
+            self.ArrangeChildren()
 
         return self._ChartPane
 
@@ -1497,21 +1549,19 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
 
 ## G_NetworkViewCtrl #######################################
 
-class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
+class G_NetworkViewCtrl(G_CoreViewCtrl):
 
     #-------------------------------------------------------
     def __init__(self, parent, doc_url = None):
-        super().__init__(parent, style = wx.SP_LIVE_UPDATE)
+        super().__init__(parent)
 
-        self._Notebook = G_NotebookDisplayControl(self)
+        self._Notebook = self._TablePane = G_NotebookDisplayControl(self)
         self._ChartView = None
         self._TableViewCtrls = [None, None]
         self._TableNodeIds = [None, None]
         self._DocumentUrl = doc_url
 
-        self.SetMinimumPaneSize(150)
-        self.SetSashGravity(0.5)
-        self.Initialize(self._Notebook)
+        self.ArrangeChildren()
 
 
     def SetupDataTable(self, idx, name, node_id):
@@ -1541,9 +1591,9 @@ class G_NetworkViewCtrl(wx.SplitterWindow, G_DisplayControl):
             return
 
         if self._ChartView is None:
-            chart = self._ChartView = G_HtmlNetworkCtrl(self,context,  projector_info.ChartInfo, self._TableViewCtrls)
+            chart = self._ChartView = self._ChartPane = G_HtmlNetworkCtrl(self,context,  projector_info.ChartInfo, self._TableViewCtrls)
             chart.CallJavaScript("SetTableNodeIds", self._TableNodeIds[0], self._TableNodeIds[1])
-            self.SplitVertically(self._Notebook, chart)
+            self.ArrangeChildren()
 
         self._ChartView.Realise(context.GetErrorReporter(), data_changed, selection_changed)
 
