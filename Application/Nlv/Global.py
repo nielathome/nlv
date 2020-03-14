@@ -393,7 +393,7 @@ class G_Global:
     def ProgressMeter(func):
         """
         Decorator to allow permit a progress meter to be
-        displayed if teh function runs for more than 0.5s
+        displayed if the function runs for more than 0.5s
         """
         def ProgressMeterWrapper(*args, **kwargs):
             with G_ProgressMeterScope("NLV is busy ..."):

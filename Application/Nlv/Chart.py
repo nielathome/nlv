@@ -36,7 +36,7 @@ class Bar:
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
+    def DefineParameters(self, connection, cursor, context):
         pass
 
 
@@ -47,7 +47,7 @@ class Bar:
 
 
     #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
+    def Realise(self, name, connection, cursor, context):
         cursor.execute("""
             SELECT
                 {category},
@@ -57,7 +57,9 @@ class Bar:
                 display
             """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
+        selection = context.GetSelection()
         data = []
+
         for row in cursor:
             event_id = row[2]
             selected = event_id in selection
@@ -68,8 +70,8 @@ class Bar:
         if len(selection) != 0:
             switch_time = 250
 
-        json_text = json.dumps(data)
-        figure.ExecuteScript("CreateChart('{}', '{}', '{}', '{}', {});".format(name, self._CategoryField, self._ValueField, json_text, switch_time))
+        data_json = json.dumps(data)
+        context.CallJavaScript("CreateChart", name, self._CategoryField, self._ValueField, data_json, switch_time)
 
 
 
@@ -86,8 +88,8 @@ class Pie:
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
-        params.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
+    def DefineParameters(self, connection, cursor, context):
+        context.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
 
 
     #-----------------------------------------------------------
@@ -97,7 +99,7 @@ class Pie:
 
 
     #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
+    def Realise(self, name, connection, cursor, context):
         cursor.execute("""
             SELECT
                 count({value}),
@@ -121,10 +123,11 @@ class Pie:
                 {value} DESC
             """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
-        param = param_values.get("other_pct", 0)
+        param = context.GetParameter("other_pct", 0)
         accum = 0
         limit = sum * (1 - (0.05 * (1 + param)))
 
+        selection = context.GetSelection()
         data = []
         other_selected = False
 
@@ -149,5 +152,128 @@ class Pie:
         if len(selection) != 0:
             switch_time = 250
 
-        json_text = json.dumps(data)
-        figure.ExecuteScript("CreateChart('{}', '{}', '{}');".format(self._ValueField, json_text, switch_time))
+        data_json = json.dumps(data)
+        context.CallJavaScript("CreateChart", self._ValueField, data_json, switch_time)
+
+
+
+## Network #####################################################
+
+class Network:
+
+    #-----------------------------------------------------------
+    def DefineParameters(self, connection, cursor, context):
+        context.AddBool("graph_is_disjoint", "Network is disjoint", False)
+        
+
+    #-----------------------------------------------------------
+    @classmethod
+    def Setup(cls, name):
+        return "Network.html"
+
+
+    #-----------------------------------------------------------
+    def SetSelection(self, connection, cursor, context):
+        selected_nodes = set(context.GetSelection(0))
+        selected_links = set(context.GetSelection(1))
+
+        have_nodes = len(selected_nodes) != 0
+        have_links = len(selected_links) != 0
+
+        if have_nodes or have_links:
+            where = ""
+            if have_nodes:
+                nodes = ", ".join([str(node) for node in selected_nodes])
+                where = "source_event_id IN ({nodes}) OR target_event_id IN ({nodes})".format(nodes = nodes)
+
+            if have_links:
+                if have_nodes:
+                    where = where + " OR "
+                links = ", ".join([str(link) for link in selected_links])
+                text = " link_event_id IN ({links})".format(links = links)
+                where = where + text
+
+            # find everything "reachable" from the selection
+            cursor.execute("""
+                SELECT
+                    link_data.event_id AS link_event_id,
+                    source_data.event_id AS source_event_id,
+                    target_data.event_id AS target_event_id
+                FROM
+                    links.display AS link_data
+                JOIN
+                    main.display
+                    AS
+                        source_data
+                    ON
+                        link_data.source = source_data.title 
+                JOIN
+                    main.display
+                    AS
+                        target_data
+                    ON
+                        link_data.target = target_data.title 
+                WHERE
+                    {where}
+                """.format(where = where))
+
+            for row in cursor:
+                selected_links.add(row[0])
+                selected_nodes.add(row[1])
+                selected_nodes.add(row[2])
+
+        selection = dict(nodes = [node for node in selected_nodes], links = [link for link in selected_links])
+        selection_json = json.dumps(selection)
+        context.CallJavaScript("SetSelection", selection_json)
+
+
+    #-----------------------------------------------------------
+    def CreateChart(self, connection, cursor, context):
+        cursor.execute("""
+            SELECT
+                event_id,
+                type,
+                title,
+                size
+            FROM
+                main.display
+            """)
+
+        nodes = []
+        for row in cursor:
+            nodes.append(dict(zip(["event_id", "type", "title", "size"], [row[0], row[1], row[2], row[3]])))
+
+
+        cursor.execute("""
+            SELECT
+                event_id,
+                source,
+                target
+            FROM
+                links.display
+            WHERE
+                source IN (SELECT title FROM main.display) AND
+                target IN (SELECT title FROM main.display)
+            """)
+
+        links = []
+        for row in cursor:
+            links.append(dict(zip(["event_id", "source", "target"], [row[0], row[1], row[2]])))
+
+        config = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
+        config_json = json.dumps(config)
+
+        network = dict(nodes = nodes, links = links)
+        data_json = json.dumps(network)
+        context.CallJavaScript("CreateChart", data_json, config_json)
+
+        self.SetSelection(connection, cursor, context)
+
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
+        if context.DataChanged() or context.ParamatersChanged():
+            self.CreateChart(connection, cursor, context)
+
+        elif context.SelectionChanged():
+            self.SetSelection(connection, cursor, context)

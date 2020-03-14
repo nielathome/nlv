@@ -47,15 +47,16 @@ import wx
 
 # Application imports 
 from .Document import D_Document
+from .EventDisplay import G_EventsViewCtrl
 from .EventDisplay import G_MetricsViewCtrl
-from .EventDisplay import G_TableViewCtrl
+from .EventDisplay import G_NetworkViewCtrl
 from .EventProjector import G_Analyser
 from .EventProjector import G_ScriptGuard
 from .Global import G_Const
 from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
-from .Logfile import G_TabDisplayControl
+from .Logfile import G_NotebookDisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_TabContainedNode
@@ -493,12 +494,14 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._Field.Add(True, "AnalysisIsValid", replace_existing = False)
 
         # setup UI
-        display_notebook = self._DisplayNotebook = G_TabDisplayControl(self.GetAuiNotebook())
+        display_notebook = self._DisplayNotebook = G_NotebookDisplayControl(self.GetAuiNotebook())
         script_ctrl = self._ScriptCtrl = G_AnalyserScriptCtrl(display_notebook)
         display_notebook.AddPage(script_ctrl, "Script")
 
-        self.SetDisplayCtrl(display_notebook, script_ctrl)
-        self.InterceptSetFocus(script_ctrl.GetEditor())
+        edit_control = script_ctrl.GetEditor()
+        self.SetDisplayCtrl(edit_control)
+        self.InterceptSetFocus(edit_control)
+        self.InterceptSetFocus(script_ctrl.GetErrorDisplay())
 
 
     @G_Global.TimeFunction
@@ -519,7 +522,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
                 if self._AnalysisResults is not None:
                     for projector in self._AnalysisResults.Projectors.values():
-                        self.BuildNodeFromDefaults(G_Project.NodeID_EventProjector, projector.ProjectionName, do_analysis = self._InitAnalysis)
+                        self.BuildNodeFromDefaults(projector.DocumentNodeID, projector.ProjectionName, do_analysis = self._InitAnalysis)
 
                 self.PostAnalyse()
 
@@ -533,7 +536,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def GetDisplayNoteBook(self):
+    def GetDisplayAnalysisNoteBook(self):
         return self._DisplayNotebook
 
 
@@ -592,7 +595,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def OnAnalyserError(self, new_text):
         """An error occurred during analysis; display it in the UI"""
         self.SetErrorText(new_text, True)
-        self.ActivateSubTab(self._ScriptCtrl)
+        self.EnsureDisplayControlVisible()
 
 
     #-------------------------------------------------------
@@ -635,7 +638,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._AnalysisRun = True
 
         self.SetErrorText("Analysing ...\n")
-        with G_ScriptGuard("Analysis", self.OnAnalyserError):
+        with G_ScriptGuard("Analysis", self.GetErrorReporter()):
             event_id = self.GetSessionNode().GetEventId()
             analyser = G_Analyser(self.MakeTemporaryFilename(".db"), event_id)
             globals = analyser.SetEntryPoints(meta_only, log_schema, self.GetLogfile(), self.GetLogNode())
@@ -643,7 +646,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             exec(code, globals)
 
             self.SetErrorText("Analysed OK\n")
-            self._Field.AnalysisIsValid.Value = True
+            if not meta_only:
+                self._Field.AnalysisIsValid.Value = True
 
             self._AnalysisResults = analyser.Close()
             self.GetSessionNode().UpdateEventId(self._AnalysisResults.EventId)
@@ -682,19 +686,16 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def _ForallProjectors(self, func, event, metrics):
-        if event:
-            self.VisitSubNodes(func, factory_id = G_Project.NodeID_EventProjector, recursive = True)
-
-        if metrics:
-            self.VisitSubNodes(func, factory_id = G_Project.NodeID_MetricsProjector, recursive = True)
+    def _ForallProjectors(self, func, factory_ids):
+        for factory_id in factory_ids:
+            self.VisitSubNodes(func, factory_id = factory_id, recursive = True)
 
 
     def PostAnalyse(self):
         def Work(node):
             node.PostAnalyse(self._AnalysisResults)
 
-        self._ForallProjectors(Work, event = True, metrics = False)
+        self._ForallProjectors(Work, [G_Project.NodeID_EventProjector])
 
 
     def ReleaseFiles(self):
@@ -704,7 +705,11 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         def Work(node):
             node.ReleaseFiles()
 
-        self._ForallProjectors(Work, event = True, metrics = True)
+        self._ForallProjectors(Work, [
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_MetricsProjector,
+            G_Project.NodeID_NetworkProjector
+        ])
 
 
     @G_Global.TimeFunction
@@ -716,13 +721,22 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         def Work(node):
             node.UpdateEventContent()
 
-        self._ForallProjectors(Work, event = True, metrics = False)
+        self._ForallProjectors(Work, [
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_NetworkDataProjector,
+            G_Project.NodeID_NetworkProjector # must be after NodeID_NetworkDataProjector
+        ])
 
 
     def UpdateValidity(self, valid):
         def Work(node):
             node.UpdateValidity(valid)
-        self._ForallProjectors(Work, event = True, metrics = True)
+
+        self._ForallProjectors(Work, [
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_MetricsProjector,
+            G_Project.NodeID_NetworkDataProjector
+        ])
 
 
     #-------------------------------------------------------
@@ -1132,9 +1146,181 @@ class G_EventFieldNode(G_ProjectorChildNode, G_ThemeNode, G_EnabledColourNode, G
 
 
 
+## G_ParameterValues #######################################
+
+class G_ParameterValues:
+    """Accessor for the chart parameter values dictionary"""
+
+    #-------------------------------------------------------
+    def __init__(self, param_values_str):
+        try:
+            self._Values = json.loads(param_values_str)
+        except json.decoder.JSONDecodeError as ex:
+            self._Values = dict()
+
+    def GetAsString(self):
+        return json.dumps(self._Values)
+
+
+    #-------------------------------------------------------
+    def GetValues(self, chart_no):
+        # for JSON compatibility, dictionary key has to be string
+        return self._Values.setdefault(str(chart_no), dict())
+
+
+    #-------------------------------------------------------
+    def GetValue(self, chart_no, param_name):
+        return self.GetValues(chart_no).get(param_name)
+
+    def SetValue(self, chart_no, param_name, value):
+        self.GetValues(chart_no)[param_name] = value
+
+
+    
+## G_CommonProjectorOptionsNode ############################
+
+class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
+
+    #-------------------------------------------------------
+    def BuildCommon(cls, parent):
+        window = parent.GetWindow()
+
+        cls._ChartOptionsSubtitle = cls.BuildSubtitle(parent, "Chart options", True)
+
+        cls._LocateChartCtl = wx.Choice(window, choices = [
+            "Below the data table",
+            "Above the data table",
+            "Left of the data table",
+            "Right of the data table"
+        ])
+        cls._LocateChartSizer = cls.BuildLabelledRow(parent, "Show chart", cls._LocateChartCtl)
+
+        cls._SelectChartCtl = wx.Choice(window)
+        cls._SelectChartSizer = cls.BuildLabelledRow(parent, "Select chart", cls._SelectChartCtl)
+
+        pane = cls._DynamicPane = wx.Panel(window)
+        pane.SetSizer(wx.BoxSizer(wx.VERTICAL))
+        cls._Sizer.Add(pane, proportion = 1, flag = wx.EXPAND)
+
+
+    #-------------------------------------------------------
+    def __init__(self):
+        self.GetProjectorNode().RegisterOptionsNode(self.GetFactoryID())
+
+
+    def PostInitNode(self):
+        self._Field = D_Document(self.GetDocument(), self)
+
+        self._Field.Add("", "ParameterValues", replace_existing = False)
+        self._Field.Add(0, "idxSelectChart", replace_existing = False)
+        self._Field.Add(0, "idxLocateChart", replace_existing = False)
+
+        self._ParameterValues = G_ParameterValues(self._Field.ParameterValues.Value)
+
+
+    #-------------------------------------------------------
+    def ActivateSelectChart(self, chart_names = [""]):
+        num_charts = len(chart_names)
+        if num_charts != 0:
+            chart_no = self._Field.idxSelectChart.Value
+            if chart_no >= num_charts:
+                chart_no = self._Field.idxSelectChart.Value = 0
+
+            location = self._Field.idxLocateChart.Value
+            self.Rebind(self._LocateChartCtl, wx.EVT_CHOICE, self.OnLocateChart)
+            self._LocateChartCtl.SetSelection(location)
+
+            self._SelectChartCtl.Set(chart_names)
+            self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
+            self._SelectChartCtl.SetSelection(chart_no)
+
+        else:
+            self._LocateChartCtl.Unbind(wx.EVT_CHOICE)
+
+            self._SelectChartCtl.Clear()
+            self._SelectChartCtl.Unbind(wx.EVT_CHOICE)
+
+        self._Sizer.Show(self._ChartOptionsSubtitle, num_charts != 0, True)
+        self._Sizer.Show(self._LocateChartSizer, num_charts != 0, True)
+        self._Sizer.Show(self._SelectChartSizer, num_charts > 1, True)
+
+
+    #-------------------------------------------------------
+    def ActivateDynamicPane(self):
+        pane = self._DynamicPane
+        sizer = pane.GetSizer()
+        sizer.Clear(delete_windows = True)
+
+        chart_ctrl = self.GetChartViewCtrl(activate = False)
+        if chart_ctrl is None:
+            return
+
+        # build UI controls for the parameters
+        parameters = self._Parameters = chart_ctrl.DefineParameters(self.GetErrorReporter())
+        if parameters is not None:
+            info = G_WindowInfo(sizer, pane)
+            chart_no = self._Field.idxSelectChart.Value
+
+            for param in parameters:
+                value = self._ParameterValues.GetValue(chart_no, param.Name)
+                ctrl = param.MakeControl(pane, value, self.OnDynamicCtrl)
+                self.BuildLabelledRow(info, param.Title, ctrl)
+
+
+    #-------------------------------------------------------
+    def GetViewCtrl(self):
+        return self.GetParentNode().GetViewCtrl()
+
+    def GetChartViewCtrl(self, activate):
+        chart_no = self._Field.idxSelectChart.Value
+        return self.GetViewCtrl().GetChartViewCtrl(chart_no, activate)
+
+
+    #-------------------------------------------------------
+    def OnLocateChart(self, event):
+        self._Field.idxLocateChart.Value = self._LocateChartCtl.GetSelection()
+        self.PushChartLocation()
+
+
+    def OnSelectChart(self, event):
+        self._Field.idxSelectChart.Value = self._SelectChartCtl.GetSelection()
+
+        pane = self._DynamicPane
+        pane.Freeze()
+        self.ActivateDynamicPane()
+        pane.GetSizer().Layout()
+        pane.Thaw()
+
+        self.PushParameterValues(activate_chart = True)
+
+
+    #-------------------------------------------------------
+    def PushChartLocation(self):
+        location = self._Field.idxLocateChart.Value
+        self.GetViewCtrl().SetChartLocation(location)
+
+    def PushParameterValues(self, activate_chart):
+        chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
+        if chart_ctrl is not None:
+            self.PushChartLocation()
+            values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
+            chart_ctrl.Realise(self.GetErrorReporter(), parameters = values)
+
+
+    #-------------------------------------------------------
+    def OnDynamicCtrl(self, event = None):
+        chart_no = self._Field.idxSelectChart.Value
+        for param in self._Parameters:
+            self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
+
+        self._Field.ParameterValues.Value = self._ParameterValues.GetAsString()
+        self.PushParameterValues(activate_chart = False)
+
+
+
 ## G_EventProjectorOptionsNode #############################
 
-class G_EventProjectorOptionsNode(G_ProjectorChildNode, G_ThemeNode, G_TabContainedNode):
+class G_EventProjectorOptionsNode(G_CommonProjectorOptionsNode, G_ThemeNode, G_TabContainedNode):
 
     #-------------------------------------------------------
     def BuildPage(parent):
@@ -1144,17 +1330,18 @@ class G_EventProjectorOptionsNode(G_ProjectorChildNode, G_ThemeNode, G_TabContai
 
         window = parent.GetWindow()
 
+        me._DataOptionsSubtitle = me.BuildSubtitle(parent, "Data options", True)
+
         me._ChkNesting = wx.CheckBox(window)
         me.BuildLabelledRow(parent, "Display nested events as indented", me._ChkNesting)
+        G_CommonProjectorOptionsNode.BuildCommon(me, parent)
 
 
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_TabContainedNode.__init__(self, factory, wproject, witem)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainEvent)
-
-    def PostInitNode(self):
-        self._Field = D_Document(self.GetDocument(), self)
+        G_CommonProjectorOptionsNode.__init__(self)
 
 
     #-------------------------------------------------------
@@ -1170,6 +1357,12 @@ class G_EventProjectorOptionsNode(G_ProjectorChildNode, G_ThemeNode, G_TabContai
         self._ChkNesting.SetValue(display_nesting)
         self._ChkNesting.Bind(wx.EVT_CHECKBOX, self.OnChkNesting)
         self._ChkNesting.Enable(permit_nesting)
+
+        projector_info, is_valid = self.GetProjectorNode().GetProjectorInfo()
+        chart_names = [c.Name for c in projector_info.Charts]
+
+        self.ActivateSelectChart(chart_names)
+        self.ActivateDynamicPane()
 
 
     #-------------------------------------------------------
@@ -1191,17 +1384,97 @@ class G_EventProjectorOptionsNode(G_ProjectorChildNode, G_ThemeNode, G_TabContai
 
 
 
-## G_LogAnalysisChildProjectorNode #########################
+## G_MetricsProjectorOptionsNode ###########################
 
-class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeChildNode):
-    """
-    Mixin class to extend child *projector* nodes of an analysis node
-    with common behaviour (i.e. G_EventProjectorNode and G_MetricsProjectorNode.
-    """
+class G_MetricsProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContainedNode):
+
+    #-------------------------------------------------------
+    def BuildPage(parent):
+        # class static function
+        me = __class__
+        me._Sizer = parent.GetSizer()
+
+        G_CommonProjectorOptionsNode.BuildCommon(me, parent)
+
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_TabContainedNode.__init__(self, factory, wproject, witem)
+        G_CommonProjectorOptionsNode.__init__(self)
+
+
+    #-------------------------------------------------------
+    def Activate(self):
+        quantifier_info, is_valid = self.GetProjectorNode().GetQuantifierInfo()
+        chart_names = [c.Name for c in quantifier_info.Charts]
+
+        self.ActivateCommon()
+        self.ActivateSelectChart(chart_names)
+        self.ActivateDynamicPane()
+
+
+
+## G_NetworkProjectorOptionsNode ###########################
+
+class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContainedNode):
+
+    #-------------------------------------------------------
+    def BuildPage(parent):
+        # class static function
+        me = __class__
+        me._Sizer = parent.GetSizer()
+
+        G_CommonProjectorOptionsNode.BuildCommon(me, parent)
+
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_TabContainedNode.__init__(self, factory, wproject, witem)
+        G_CommonProjectorOptionsNode.__init__(self)
+
+
+    #-------------------------------------------------------
+    def Activate(self):
+        self.ActivateCommon()
+        self.ActivateSelectChart()
+        self.ActivateDynamicPane()
+
+
+
+## G_ChartCreateContext ####################################
+
+class G_ChartCreateContext:
+
+    #-------------------------------------------------------
+    def __init__(self, node):
+        self._Node = node
+
+
+    #-------------------------------------------------------
+    def GetErrorReporter(self):
+       self._Node.GetErrorReporter() 
+
+    def GetNodeId(self):
+        return self._Node.GetNodeId()
+
+
+    #-------------------------------------------------------
+    def OnChartCreate(self, chart_view, html_window):
+        self._Node.OnChartCreate(chart_view, html_window)
+
+
+
+## G_CoreProjectorNode #####################################
+
+class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeChildNode):
 
     #-------------------------------------------------------
     def __init__(self):
         G_DisplayNode.__init__(self)
+        self._OptionsNodeFactoryId = None
+
+    def RegisterOptionsNode(self, factory_id):
+        self._OptionsNodeFactoryId = factory_id
 
 
     #-------------------------------------------------------
@@ -1210,8 +1483,30 @@ class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_H
 
 
     #-------------------------------------------------------
-    def GetDisplayNoteBook(self):
-        return self.GetLogAnalysisNode().GetDisplayNoteBook()
+    def SetupTableCtrl(self, table_ctrl):
+        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        table_ctrl.SetSelectionhandler(self.OnTableSelectionChanged)
+
+        inner_ctrl = table_ctrl.GetChildCtrl()
+        if inner_ctrl is not None:
+            self.InterceptKeys(inner_ctrl)            
+            self.InterceptSetFocus(inner_ctrl)            
+
+        # trying to include the table header control seems to
+        # destabilise the focus transfers, so leave out
+
+
+    #-------------------------------------------------------
+    def GetOptionsNode(self):
+        return self.FindChildNode(factory_id = self._OptionsNodeFactoryId, recursive = True)
+
+    def GetViewCtrl(self):
+        return self._DisplayCtrl
+
+
+    #-------------------------------------------------------
+    def UpdateValidity(self, valid):
+        self.GetTableViewCtrl().UpdateDisplay(valid = valid)
 
 
     #-------------------------------------------------------
@@ -1224,30 +1519,54 @@ class G_LogAnalysisChildProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_H
 
 
     #-------------------------------------------------------
-    def SetupTableViewIntercepts(self):
-        table_control = self.GetTableViewCtrl()
-        inner_ctrl = table_control.GetChildCtrl()
-        if inner_ctrl is not None:
-            self.InterceptKeys(inner_ctrl)            
-            self.InterceptSetFocus(inner_ctrl)            
+    def MakeChartCreateContext(self):
+        return G_ChartCreateContext(self)
 
-        # trying to include the table header control seems to
-        # destabilise the focus transfers, so leaving out for now
-        #for window in table_control.GetChildren():
-        #    self.InterceptSetFocus(window)            
+    def OnChartCreate(self, chart_view, html_window):
+        self.InterceptSetFocus(html_window)
+
+    def OnChartSelection(self, event_id, ctrl_key):
+        """Pass (HTML) chart selection event on to table"""
+        self.GetTableViewCtrl().OnChartSelection(event_id, ctrl_key)
+
+
+    #-------------------------------------------------------
+    def ReleaseFiles(self):
+        """Release all resources owned by the view"""
+        self.GetViewCtrl().ResetModel()
+
+
+
+## G_CommonProjectorNode ###################################
+
+class G_CommonProjectorNode(G_CoreProjectorNode):
+    """
+    Mixin class to extend child *projector* nodes of an analysis node
+    with common behaviour (i.e. G_EventProjectorNode and G_MetricsProjectorNode.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self):
+        G_CoreProjectorNode.__init__(self)
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self.GetViewCtrl().GetTableViewCtrl()
 
 
 
 ## G_EventProjectorNode ####################################
 
-class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
+class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
     """Class that implements a list of events"""
 
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
-        G_LogAnalysisChildProjectorNode.__init__(self)
+        G_CommonProjectorNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
         self._Name = name
+        self._DisplayNotebook = None
 
         self._InitAnalysis = False
         if "do_analysis" in kwargs:
@@ -1259,13 +1578,13 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        display_notebook = self.GetDisplayNoteBook()
         doc_url = self.GetLogNode().MakeDataUrl()
-        table_ctrl = self._TableViewCtrl = G_TableViewCtrl(display_notebook, self.OnTableSelectionChanged, doc_url = doc_url)
-        display_notebook.AddPage(table_ctrl, self._Name)
-        self.SetDisplayCtrl(display_notebook, table_ctrl, owns_display_ctrl = False)
-        self.SetupTableViewIntercepts()
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
+        view_ctrl = G_EventsViewCtrl(parent_notebook, self._Name, doc_url)
+        parent_notebook.AddPage(view_ctrl, self._Name)
+
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+        self.SetupTableCtrl(view_ctrl.GetTableViewCtrl())
 
 
     def PostInitChildren(self):
@@ -1281,13 +1600,26 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def ReleaseFiles(self):
-        """Release all resources owned by the view"""
-        self.GetTableViewCtrl().ResetModel()
-
     def DoClose(self, delete):
         self.ReleaseFiles()
         super().DoClose(delete)
+
+
+    #-------------------------------------------------------
+    def GetDisplayEventNoteBook(self):
+        if self._DisplayNotebook is None:
+            # create new tab control
+            parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
+            display_notebook = self._DisplayNotebook = G_NotebookDisplayControl(parent_notebook)
+            parent_notebook.AddPage(display_notebook, self._Name)
+
+            # re-parent event view into the new tab control
+            view_ctrl = self.GetViewCtrl()
+            parent_notebook.RemovePage(parent_notebook.FindPage(view_ctrl))
+            view_ctrl.Reparent(display_notebook)
+            display_notebook.AddPage(view_ctrl, "Data")
+
+        return self._DisplayNotebook
 
 
     #-------------------------------------------------------
@@ -1296,11 +1628,7 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         return analysis_results.GetProjectorInfo(self._Name), is_valid
 
     def GetNesting(self):
-        node = self.FindChildNode(factory_id = G_Project.NodeID_EventProjectorOptions, recursive = True)
-        return node.GetNesting()
-
-    def GetTableViewCtrl(self):
-        return self._TableViewCtrl
+        return self.GetOptionsNode().GetNesting()
 
 
     #-------------------------------------------------------
@@ -1312,12 +1640,6 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def OnDisplayKey(self, key_code, modifiers, view_node):
-        handled = False
-        return handled
-
-
-    #-------------------------------------------------------
     def TimecodeText(self, timecode):
         # not entirely clear this will work for all locales
         timecode.Normalise()
@@ -1326,7 +1648,8 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
 
 
     def OnTableSelectionChanged(self, item):
-        if item is None or item.GetID() is None:
+        self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), selection_changed = True)
+        if item is None or not item.IsOk():
             # ignore de-selection events
             return
 
@@ -1376,6 +1699,8 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def OnFilterMatch(self, match):
         """The filter has changed"""
         ok = self.GetTableViewCtrl().UpdateFilter(match)
+        if ok:
+            self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed = True)
 
         # propagate new event list to all metrics
         if ok and not self._Initialising:
@@ -1405,13 +1730,13 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
         """Load event/feature data into the viewer"""
 
         # load events into event viewer data control
-        events_view = self.GetTableViewCtrl()
         projector_info, is_valid = self.GetProjectorInfo()
-        event_schema = projector_info.ProjectionSchema
-        events_db_path = projector_info.ProjectionDbPath
-        events_view.UpdateContent(self.GetNesting(), event_schema, events_db_path, is_valid)
+        self.GetTableViewCtrl().UpdateContent(self.GetNesting(), projector_info, is_valid)
         
-        self.GetLogAnalysisNode().ActivateSubTab(events_view)
+        # make any required charts
+        self.GetViewCtrl().CreateCharts(self.MakeChartCreateContext(), projector_info.Charts)
+        self.GetOptionsNode().PushParameterValues(activate_chart = True)
+        self.EnsureDisplayControlVisible()
 
         # forward to child metrics views
         self.UpdateMetricContent()
@@ -1425,170 +1750,15 @@ class G_EventProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
     def UpdateNesting(self, nesting):
         self.GetTableViewCtrl().UpdateDisplay(nesting = nesting)
 
-    def UpdateValidity(self, valid):
-        self.GetTableViewCtrl().UpdateDisplay(valid = valid)
-
-
-
-## G_ParameterValues #######################################
-
-class G_ParameterValues:
-    """Accessor for the parameter values dictionary"""
-
-    #-------------------------------------------------------
-    def __init__(self, param_values_str):
-        try:
-            self._Values = json.loads(param_values_str)
-        except json.decoder.JSONDecodeError as ex:
-            self._Values = dict()
-
-    def GetAsString(self):
-        return json.dumps(self._Values)
-
-
-    #-------------------------------------------------------
-    def GetValues(self, chart_no):
-        # for JSON compatibility, dictionary key has to be string
-        return self._Values.setdefault(str(chart_no), dict())
-
-
-    #-------------------------------------------------------
-    def GetValue(self, chart_no, param_name):
-        return self.GetValues(chart_no).get(param_name)
-
-    def SetValue(self, chart_no, param_name, value):
-        self.GetValues(str(chart_no))[param_name] = value
-
-
-    
-## G_MetricsProjectorOptionsNode ###########################
-
-class G_MetricsProjectorOptionsNode(G_ProjectorChildNode, G_TabContainedNode):
-
-    #-------------------------------------------------------
-    def BuildPage(parent):
-        # class static function
-        me = __class__
-        me._Sizer = parent.GetSizer()
-
-        window = parent.GetWindow()
-
-        me._SelectChartCtl = wx.Choice(window)
-        me._SelectChartSizer = me.BuildLabelledRow(parent, "Select chart", me._SelectChartCtl)
-
-        pane = me.DynamicPane = wx.Panel(window)
-        pane.SetSizer(wx.BoxSizer(wx.VERTICAL))
-        me._Sizer.Add(pane, flag = wx.EXPAND)
-
-
-    #-------------------------------------------------------
-    def __init__(self, factory, wproject, witem, name, **kwargs):
-        G_TabContainedNode.__init__(self, factory, wproject, witem)
-        G_ThemeNode.__init__(self, G_ThemeNode.DomainEvent)
-
-
-    def PostInitNode(self):
-        self._Field = D_Document(self.GetDocument(), self)
-        self._ParameterValues = G_ParameterValues(self._Field.ParameterValues.Value)
-        self._QuantifierName = self.GetParentNode().GetQuantifierName()
-
-
-
-    #-------------------------------------------------------
-    def ActivateSelectChart(self):
-        error_reporter = self.GetProjectorNode().GetErrorReporter()
-        with G_ScriptGuard("ActivateSelectChart", error_reporter):
-            quantifier_info, is_valid = self.GetProjectorNode().GetQuantifierInfo()
-            num_charts = 0
-
-            if quantifier_info is not None:
-                chart_names = [c.Name for c in quantifier_info.Charts]
-                num_charts = len(chart_names)
-                self._SelectChartCtl.Set(chart_names)
-
-                self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
-
-                chart_no = self._Field.idxSelectChart.Value
-                if chart_no >= num_charts:
-                    chart_no = self._Field.idxSelectChart.Value = 0
-                self._SelectChartCtl.SetSelection(chart_no)
-
-            else:
-                self._SelectChartCtl.Clear()
-                self._SelectChartCtl.Unbind(wx.EVT_CHOICE)
-
-            self._Sizer.Show(self._SelectChartSizer, num_charts > 1, True)
-
-
-    #-------------------------------------------------------
-    def ActivateDynamicPane(self):
-        parameters = self._Parameters = self.GetChartViewCtrl(activate = False).DefineParameters()
-        pane = self.DynamicPane
-        sizer = pane.GetSizer()
-        sizer.Clear(delete_windows = True)
-
-        # build UI controls for the parameters
-        if parameters is not None:
-            info = G_WindowInfo(sizer, pane)
-            chart_no = self._Field.idxSelectChart.Value
-
-            for param in parameters:
-                value = self._ParameterValues.GetValue(chart_no, param.Name)
-                ctrl = param.MakeControl(pane, value, self.OnDynamicCtrl)
-                self.BuildLabelledRow(info, param.Title, ctrl)
-
-
-    #-------------------------------------------------------
-    def Activate(self):
-        self.ActivateCommon()
-        self.ActivateSelectChart()
-        self.ActivateDynamicPane()
-
-
-    #-------------------------------------------------------
-    def GetChartViewCtrl(self, activate):
-        chart_no = self._Field.idxSelectChart.Value
-        return self.GetParentNode().GetMetricsViewCtrl().GetChartViewCtrl(chart_no, activate)
-
-
-    #-------------------------------------------------------
-    def OnSelectChart(self, event):
-        self._Field.idxSelectChart.Value = self._SelectChartCtl.GetSelection()
-
-        pane = self.DynamicPane
-        pane.Freeze()
-        self.ActivateDynamicPane()
-        pane.GetSizer().Layout()
-        pane.Thaw()
-
-        self.PushParameterValues(activate_chart = True)
-
-
-    #-------------------------------------------------------
-    def PushParameterValues(self, activate_chart):
-        chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
-        if chart_ctrl is not None:
-            values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
-            chart_ctrl.Update(parameters = values)
-
-
-    def OnDynamicCtrl(self, event = None):
-        chart_no = self._Field.idxSelectChart.Value
-        for param in self._Parameters:
-            self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
-
-        self._Field.ParameterValues.Value = self._ParameterValues.GetAsString()
-        self.PushParameterValues(activate_chart = False)
-
 
 
 ## G_MetricsProjectorNode ##################################
 
-class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode):
+class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
-        G_LogAnalysisChildProjectorNode.__init__(self)
+        G_CommonProjectorNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
         self._Name = name
 
@@ -1597,13 +1767,12 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        display_notebook = self.GetDisplayNoteBook()
-        metrics_viewer = self._MetricsViewer = G_MetricsViewCtrl(display_notebook, self.OnTableSelectionChanged, self._Name)
-        display_notebook.AddPage(metrics_viewer, self._Name)
-        self.SetDisplayCtrl(display_notebook, metrics_viewer, owns_display_ctrl = False)
-        self.SetupTableViewIntercepts()
-        table_ctrl = metrics_viewer.GetTableViewCtrl()
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        parent_notebook = self.GetParentNode().GetDisplayEventNoteBook()
+        view_ctrl = G_MetricsViewCtrl(parent_notebook, self._Name)
+        parent_notebook.AddPage(view_ctrl, self._Name)
+
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+        self.SetupTableCtrl(view_ctrl.GetTableViewCtrl())
 
 
     #-------------------------------------------------------
@@ -1612,10 +1781,6 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
 
 
     #-------------------------------------------------------
-    def ReleaseFiles(self):
-        """Release all resources owned by the view"""
-        self.GetMetricsViewCtrl().ResetModel()
-
     def DoClose(self, delete):
         self.ReleaseFiles()
         super().DoClose(delete)
@@ -1629,45 +1794,24 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
         projector_info, is_valid = self.GetEventProjectorNode().GetProjectorInfo()
         return projector_info.GetQuantifierInfo(self._Name), is_valid
 
-    def GetMetricsViewCtrl(self):
-        return self._MetricsViewer
-
-    def GetTableViewCtrl(self):
-        return self.GetMetricsViewCtrl().GetTableViewCtrl()
-
-
-    #-------------------------------------------------------
-    def GetQuantifierName(self):
-        return self._Name
-
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
+        self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), selection_changed = True)
+
         # ignore de-selection and non-events
-        if item is None:
-            return
-
-        location = self.GetMetricsViewCtrl().GetTableViewCtrl().GetLocation(item)
-        if location is not None:
-            # tell the data explorer
-            self.GetDataExplorer().Update(self.MakeDataUrl(location))
-
-
-    def OnChartSelection(self, event_id):
-        self.GetTableViewCtrl().ToggleSelectedEvent(event_id)
-
-
-    #-------------------------------------------------------
-    def OnDisplayKey(self, key_code, modifiers, view_node):
-        handled = False
-        return handled
+        if item is not None and item.IsOk():
+            location = self.GetTableViewCtrl().GetLocation(item)
+            if location is not None:
+                # tell the data explorer
+                self.GetDataExplorer().Update(self.MakeDataUrl(location))
 
 
     #-------------------------------------------------------
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetMetricsViewCtrl().UpdateMetrics()
+            self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed = True)
             return True
         else:
             return False
@@ -1677,12 +1821,170 @@ class G_MetricsProjectorNode(G_LogAnalysisChildProjectorNode, G_TabContainerNode
     @G_Global.TimeFunction
     def UpdateMetricContent(self):
         quantifier_info, is_valid = self.GetQuantifierInfo()
-        error_reporter = self.GetErrorReporter()
-        self.GetMetricsViewCtrl().Quantify(self, quantifier_info, is_valid, error_reporter)
-        self.FindChildNode(factory_id = G_Project.NodeID_MetricsProjectorOptions).PushParameterValues(activate_chart = True)
+        self.GetViewCtrl().Quantify(self.MakeChartCreateContext(), quantifier_info, is_valid)
+        self.GetOptionsNode().PushParameterValues(activate_chart = True)
 
-    def UpdateValidity(self, valid):
-        self.GetTableViewCtrl().UpdateDisplay(valid = valid)
+
+
+## G_NetworkProjectorNode ##################################
+
+class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_CoreProjectorNode.__init__(self)
+        G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self._Name = name
+
+        self._InitAnalysis = False
+        if "do_analysis" in kwargs:
+            self._InitAnalysis = kwargs["do_analysis"]
+
+
+    def PostInitNode(self):
+        # make document fields accessible
+        self._Field = D_Document(self.GetDocument(), self)
+
+        # setup UI
+        doc_url = self.GetLogNode().MakeDataUrl()
+        parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
+        view_ctrl = G_NetworkViewCtrl(parent_notebook, doc_url)
+        parent_notebook.AddPage(view_ctrl, self._Name)
+
+        # the focus control will be updated later when the chart window is created
+        self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
+
+
+    def PostInitChildren(self):
+        if self._InitAnalysis:
+            projector_info, valid = self.GetProjectorInfo()
+            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjectors[0].ProjectionName, table_idx = 0)
+            self.BuildNodeFromDefaults(G_Project.NodeID_NetworkDataProjector, projector_info.NetworkProjectors[1].ProjectionName, table_idx = 1)
+
+
+    #-------------------------------------------------------
+    def OnChartCreate(self, chart_view, html_window):
+        # effectively, throw the input focus away when the node is activated;
+        # if the focus is sent to the view control, then it will be forwarded
+        # to the current child data projector node - which in turn, drives
+        # an activation into the project, and this node gets de-activated ...
+        self.SetDisplayFocusCtrl(html_window)
+
+        # there's no obvious node to activate when a chart control receives
+        # focus, so no InterceptSetFocus here
+
+
+    #-------------------------------------------------------
+    def Activate(self):
+        self.ActivateContainer()
+
+
+    #-------------------------------------------------------
+    def DoClose(self, delete):
+        self.ReleaseFiles()
+        super().DoClose(delete)
+        pass
+
+
+    #-------------------------------------------------------
+    def GetProjectorInfo(self):
+        analysis_results, is_valid = self.GetLogAnalysisNode().GetAnalysisResults()
+        return analysis_results.GetProjectorInfo(self._Name), is_valid
+
+
+    #-------------------------------------------------------
+    def UpdateChart(self, data_changed = False, selection_changed = False):
+        projector_info, is_valid = self.GetProjectorInfo()
+        self.GetViewCtrl().UpdateChart(self.MakeChartCreateContext(), projector_info, data_changed, selection_changed)
+
+    @G_Global.TimeFunction
+    def UpdateEventContent(self):
+        # relies on caller to ensure child data node are
+        # run first
+        self.UpdateChart(data_changed = True)
+        self.GetOptionsNode().PushParameterValues(activate_chart = True)
+        
+
+
+## G_NetworkDataProjectorNode ##############################
+
+class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
+
+    #-------------------------------------------------------
+    def __init__(self, factory, wproject, witem, name, **kwargs):
+        G_CoreProjectorNode.__init__(self)
+        G_TabContainerNode.__init__(self, factory, wproject, witem)
+        self._Name = name
+
+        self._InitTableIndex = None
+        if "table_idx" in kwargs:
+            self._InitTableIndex = kwargs["table_idx"]
+
+
+    def PostInitNode(self):
+        # make document fields accessible
+        self._Field = D_Document(self.GetDocument(), self)
+
+        if self._InitTableIndex is not None:
+            self._Field.Add(self._InitTableIndex, "TableIndex", replace_existing = False)
+
+        self._TableIndex = self._Field.TableIndex.Value
+
+        table_ctrl = self.GetParentNode().GetViewCtrl().SetupDataTable(self._TableIndex, self._Name, self.GetNodeId())
+        self.SetDisplayCtrl(table_ctrl, owns_display_ctrl = False)
+        self.SetupTableCtrl(table_ctrl)
+
+
+    #-------------------------------------------------------
+    def Activate(self):
+        self.ActivateContainer()
+
+
+    #-------------------------------------------------------
+    def GetProjectorInfo(self):
+        projector_info, is_valid = self.GetParentNode().GetProjectorInfo()
+        return projector_info.NetworkProjectors[self._TableIndex], is_valid
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self.GetViewCtrl()
+
+
+    #-------------------------------------------------------
+    def OnTableSelectionChanged(self, item):
+        self.GetParentNode().UpdateChart(selection_changed = True)
+
+        # ignore de-selection and non-events
+        if item is not None and item.IsOk():
+            location = self.GetTableViewCtrl().GetLocation(item)
+            if location is not None:
+                # tell the data explorer
+                self.GetDataExplorer().Update(self.MakeDataUrl(location))
+
+
+    #-------------------------------------------------------
+    @G_Global.TimeFunction
+    def UpdateEventContent(self):
+        """Load network data into the viewer"""
+
+        # load events into event viewer data control
+        projector_info, is_valid = self.GetProjectorInfo()
+        self.GetTableViewCtrl().UpdateContent(False, projector_info, is_valid)
+        self.EnsureDisplayControlVisible()
+
+        ## forward to child metrics views
+        #self.UpdateMetricContent()
+
+
+    #-------------------------------------------------------
+    def OnFilterMatch(self, match):
+        """The filter has changed"""
+        if self.GetTableViewCtrl().UpdateFilter(match):
+            self.GetParentNode().UpdateChart(data_changed = True)
+            return True
+        else:
+            return False
 
 
 
@@ -1746,4 +2048,16 @@ G_Project.RegisterNodeFactory(
 
 G_Project.RegisterNodeFactory(
     G_NodeFactory(G_Project.NodeID_MetricsProjector, G_Project.ArtDocID_MetricsProjector, G_MetricsProjectorNode)
+)
+
+G_Project.RegisterNodeFactory(
+    G_NodeFactory(G_Project.NodeID_NetworkProjectorOptions, G_Project.ArtCtrlId_Options, G_NetworkProjectorOptionsNode)
+)
+
+G_Project.RegisterNodeFactory(
+    G_NodeFactory(G_Project.NodeID_NetworkProjector, G_Project.ArtDocID_NetworkProjector, G_NetworkProjectorNode)
+)
+
+G_Project.RegisterNodeFactory(
+    G_NodeFactory(G_Project.NodeID_NetworkDataProjector, G_Project.ArtDocID_NetworkDataProjector, G_NetworkDataProjectorNode)
 )

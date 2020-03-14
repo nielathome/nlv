@@ -23,11 +23,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <button onclick="Update(data2)">Data 2</button>
 <!-- End model -->
 
-<!-- Create a div where the graph will take place -->
-<div id="my_dataviz"></div>
-
-
 <style>
+    html, body {
+        height: 100%;
+        margin: 0;
+    }
+
+    .full-height {
+        height: 99%;
+        overflow: hidden;
+    }
+
     .tool-tip {
         position: absolute;
         padding: 8px;
@@ -51,6 +57,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 </style>
 
 
+<!-- Create a div for the SVG graph -->
+<div id="graph" class="full-height"></div>
+
+
+
 <script>
     //----------------------------------------------------------
     function OnClick(d) {
@@ -60,12 +71,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
 
+    var myElement = document.getElementById("graph");
+
+
     // retained data
     var g_data = null;
     var g_title_text = null, g_x_label_text = null, g_y_label_text = null;
 
     // append the svg object to the body of the page
-    var g_svg = d3.select("#my_dataviz").append("svg");
+    var g_svg = d3.select("#graph")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%");
+
     var g_chart = g_svg.append("g");
     var g_x_axis = g_chart.append("g");
     var g_y_axis = g_chart.append("g");
@@ -79,7 +97,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
     const g_short_transition = 200;
-    var g_tooltip = d3.select("#my_dataviz")
+    var g_tooltip = d3.select("#graph")
       .append("div")
         .attr('class', 'tool-tip')
         .style("opacity", 0);
@@ -203,10 +221,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         const ref_transition = d3.transition()
             .duration(switch_time);
 
-        g_svg
-            .attr("width", window_width - margin)
-            .attr("height", window_height - margin);
-
         g_x_axis
             .attr("transform", "translate(" + plot_left + "," + plot_bottom + ")")
           .transition(ref_transition)
@@ -274,8 +288,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
-    function CreateChart(title, x_label_text, y_label_text, json_text, switch_time) {
-        g_data = JSON.parse(json_text);
+    function CreateChart(title, x_label_text, y_label_text, data_json, switch_time) {
+        g_data = JSON.parse(data_json);
         g_title_text = title;
         g_x_label_text = x_label_text;
         g_y_label_text = y_label_text;
