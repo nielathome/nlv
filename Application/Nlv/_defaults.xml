@@ -393,9 +393,63 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
       <field name="idxSelectChart" type="Int">0</field>
       <field name="ParameterValues" type="Str"/>
     </node>
-    -->
     
   </node>
 
+
+  <!-- Network diagram node -->
+  <node factory="1FA0C8AA-2740-4B23-BA78-EAF75FEB293F" name="Network">
+
+    <!-- Options node-->
+    <node factory="64BF4F35-8890-495C-8985-31506341FD8E" name="Setup">
+      <field name="ParameterValues" type="Str"/>
+    </node>
+
+  </node>
+
+
+  <!-- Network data node -->
+  <node factory="60E5D58E-3363-488A-9FA6-9170F3517044" name="Data">
+
+    <!-- Hiliter container and defined hiliters -->
+    <node factory="187B89FD-8E79-4F6C-B513-2211B82B6029" name="Search">
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(1) Bad">
+        <field name="ColourName" type="Str">LIGHT SALMON</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(2) Unsure">
+        <field name="ColourName" type="Str">THISTLE</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+      <node factory="40C0412B-8AE8-4576-8519-D71BC6DB3C50" name="(3) Check">
+        <field name="ColourName" type="Str">PALE GOLDENROD</field>
+        <field name="MatchText" type="Str"/>
+        <field name="MatchCase" type="Bool">True</field>
+        <field name="MatchType" type="Str">Literal</field>
+        <field name="MatchEdit" type="Bool">True</field>
+      </node>
+    </node>
+
+    <!-- Filter node-->
+    <node factory="9913F5A0-C726-4A4C-974A-B5A92E71ECEB" name="Filter">
+      <field name="MatchText" type="Str"/>
+      <field name="MatchCase" type="Bool">True</field>
+      <field name="MatchType" type="Str">Literal</field>
+      <field name="MatchEdit" type="Bool">True</field>
+    </node>
+
+    <!-- Field node-->
+    <node factory="3DDAF4B3-8B58-496B-888A-855CB78C59ED" name="Fields">
+      <field name="ColourNames" type="StrArray">BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK;BLACK</field>
+      <field name="Visibility" type="BoolArray">True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True;True</field>
+    </node>
+
+  </node>
 
 </root>

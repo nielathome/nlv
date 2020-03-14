@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,12 +24,14 @@ from weakref import ref as MakeWeakRef
 import wx
 
 # Application imports
+from .DataExplorer import G_DataExplorerProvider
+from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
+from .Global import G_Const
+from .Global import G_Global
 from .Logmeta import GetLogSchema
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
-from .Project import G_Const
-from .Project import G_Global
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_ListContainedNode
@@ -37,8 +39,6 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
-from .Session import G_DataExplorerProvider
-from .Session import G_DataExplorerSync
 from .Session import G_SessionChildNode
 from .StyleNode import G_ColourNode
 from .StyleNode import G_MarkerStyleNode
@@ -71,7 +71,7 @@ class G_LogChildNode(G_SessionChildNode):
 
     #-------------------------------------------------------
     def GetLogNodeChildNode(self, factory_id):
-        return self.GetLogNode().FindChildNode(factory_id, True)
+        return self.GetLogNode().FindChildNode(factory_id = factory_id, recursive = True)
 
 
     #-------------------------------------------------------
@@ -87,26 +87,31 @@ class G_LogChildNode(G_SessionChildNode):
 class G_DelayedSendFocus:
 
     #-------------------------------------------------------
-    def SendFocusToCtrl(self, ctrl):
-        """Delayed forwarding of input focus; safe to use in any event context"""
-        self._DelayedFocusWindow = ctrl
-        self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
+    def __init__(self):
+        self._DelayedFocusWindow = None
 
 
     #-------------------------------------------------------
-    def ClearSendFocusToCtrl(self):
-        self._DelayedFocusWindow = None
+    def SendFocusToCtrl(self, ctrl):
+        """Delayed forwarding of input focus; safe to use in any event context"""
+
+        # in practice, we do see recursion (even though that
+        # makes little sense), so defend against that
+        if self._DelayedFocusWindow is None:
+            self._DelayedFocusWindow = ctrl
+            self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
 
 
     #-------------------------------------------------------
     def OnSendFocusToWindow(self, event):
         if self._DelayedFocusWindow is not None:
             # one shot delayed event, so disconnect now
-            self._DelayedFocusWindow.Unbind(wx.EVT_IDLE)
-
-            # move the focus and drop the reference to the window
-            self._DelayedFocusWindow.SetFocus()
+            ctrl = self._DelayedFocusWindow
             self._DelayedFocusWindow = None
+            ctrl.Unbind(wx.EVT_IDLE)
+
+            # move the focus
+            ctrl.SetFocus()
 
         # don't interfere with any use the editor has for idle events
         event.Skip()
@@ -118,38 +123,80 @@ class G_DelayedSendFocus:
 class G_DisplayControl:
     """
     Base class for controls conveying content to the user.
-    Will be a direct child of the main AUI tab. Works in
-    conjunction with a node ownder - G_DisplayNode
+    Will be a direct or indirect child of the main AUI tab.
+    Works in conjunction with a node ownder - G_DisplayNode
     """
 
     #-------------------------------------------------------
-    def ActivateSubTab(self, window):
+    def GetAuiTabInfo(self, child):
         """
-        Update UI appearance goven that 'window' has been
-        given input focus. Tab controls should use this to
-        ensure the tab for 'window' is the current selection
+        Fetch the AUI tab index of the window containing
+        this child.
         """
-        pass
+        return self.GetParent().GetAuiTabInfo(self)
+
+
+    #-------------------------------------------------------
+    def DestroyDisplayCtrl(self):
+        # delete the AUI notebook tab (and this child window)
+        aui_notebook, child_idx = self.GetAuiTabInfo(self)
+        aui_notebook.DeletePage(child_idx)
+
+
+    #-------------------------------------------------------
+    def ShowDisplayCtrl(self, show):
+        aui_notebook, child_idx = self.GetAuiTabInfo(self)
+        aui_notebook.HidePage(child_idx, not show)
+
+
+    #-------------------------------------------------------
+    def SwitchToDisplayCtrl(self):
+        self.GetParent().SwitchToDisplayChildCtrl(self)
+
+    def SwitchToDisplayChildCtrl(self, child):
+        self.GetParent().SwitchToDisplayChildCtrl(self)
+
+    
+
+## G_PanelDisplayControl ###################################
+
+class G_PanelDisplayControl(wx.Panel, G_DisplayControl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
+        wx.Panel.__init__(self, parent)
 
 
 
-## G_TabDisplayControl #####################################
+## G_NotebookDisplayControl ################################
 
-class G_TabDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus):
+class G_NotebookDisplayControl(wx.Notebook, G_DisplayControl, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def __init__(self, parent):
         wx.Notebook.__init__(self, parent, style = wx.NB_TOP)
+        G_DelayedSendFocus.__init__(self)
         self.Bind(wx.EVT_SET_FOCUS, self.OnSetFocus)
 
 
     #-------------------------------------------------------
-    def ActivateSubTab(self, window):
-        idx = self.FindPage(window)
-        if idx != wx.NOT_FOUND:
+    def SwitchToDisplayChildCtrl(self, child):
+        # if needed, switch this tab first
+        idx = self.FindPage(child)
+        cur = self.GetSelection()
+        if idx != wx.NOT_FOUND and idx != cur:
             self.SetSelection(idx)
 
+        # note: pass this window upwards, not the child
+        self.GetParent().SwitchToDisplayChildCtrl(self)
+
+
+    #-------------------------------------------------------
     def OnSetFocus(self, evt):
+        """
+        It seems tab control's don't forward input focus, so
+        we do that manually.
+        """
         page = self.GetCurrentPage()
         if page is not None:
             self.SendFocusToCtrl(page)
@@ -166,6 +213,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def __init__(self):
+        G_DelayedSendFocus.__init__(self)
+
         # the window contained in the AUI tab
         self._DisplayCtrl = None
         self._OwnsDisplayCtrl = False
@@ -198,16 +247,11 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
 
     #-------------------------------------------------------
-    def IsActiveInAuiNotebook(self):
-        aui_notebook = self.GetAuiNotebook()
-        cur_tab_idx = aui_notebook.GetSelection()
-        my_tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-        return cur_tab_idx == my_tab_index
-    
-
-    #-------------------------------------------------------
-    def ActivateSubTab(self, window):
-            self._DisplayCtrl.ActivateSubTab(window)
+    def EnsureDisplayControlVisible(self):
+        # don't switch aui tab if this node is hidden; it causes
+        # the node to re-appear
+        if self.IsNodeDisplayed():
+            self._DisplayCtrl.SwitchToDisplayCtrl()
 
     def WithFocusLock(self, func):
         """Execute 'func' while holding the focus recursion-lock"""
@@ -221,14 +265,11 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """A child node is activating; update the AuiNotebook accordingly"""
 
         def Work():
-            # switch AUI notebook page
-            nonlocal child, focus_window
-            self.GetAuiNotebook().SetSelectionToWindow(self._DisplayCtrl)
+            # ensure containing notebook(s) set correctly
+            self.EnsureDisplayControlVisible()
 
-            # ensure any sub-tab is visible
-            self.ActivateSubTab(self._DisplayFocusCtrl)
-    
             # forward focus; unless otherwise specified, forward to the display control
+            nonlocal child, focus_window
             if focus_window is None:
                 focus_window = self._DisplayFocusCtrl
             self.SendFocusToWindow(focus_window)
@@ -247,9 +288,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """A display control associated with this node has received input focus"""
 
         def Work():
-            # where the AUI notebook tab is not already current, switch to it
-            if not self.IsActiveInAuiNotebook():
-                self.GetAuiNotebook().SetSelectionToWindow(self._DisplayCtrl)
+            # ensure containing notebook(s) set correctly
+            self.EnsureDisplayControlVisible()
 
             # switch node in the tree view
             node = self._WLastChild()
@@ -276,11 +316,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """Remove display control from the UI"""
 
         if self._OwnsDisplayCtrl and self._DisplayCtrl is not None:
-            # delete the AUI notebook tab (and its child window)
-            aui_notebook = self.GetAuiNotebook()
-            page_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-            aui_notebook.DeletePage(page_index)
-            self._DisplayFocusCtrl = self._DisplayCtrl = None
+            self._DisplayCtrl.DestroyDisplayCtrl()
 
         super().DoClose(delete)
 
@@ -317,9 +353,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     def OnEndLabelEdit(self, label):
         # an empty label seems to mean "no change"
         if label != "":
-            aui_notebook = self.GetAuiNotebook()
-            tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-            aui_notebook.SetPageText(tab_index, label)
+            aui_notebook, child_idx = self._DisplayCtrl.GetAuiTabInfo(self._DisplayCtrl)
+            aui_notebook.SetPageText(child_idx, label)
             self._Field.NodeUserLabel.Value = label
 
         return True
@@ -336,6 +371,9 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
 
     #-------------------------------------------------------
+    def SetDisplayFocusCtrl(self, display_focus_ctrl):
+        self._DisplayFocusCtrl = display_focus_ctrl
+
     def SetDisplayCtrl(self, display_ctrl, display_focus_ctrl = None, owns_display_ctrl = True):
         self._DisplayFocusCtrl = self._DisplayCtrl = display_ctrl
         self._OwnsDisplayCtrl = owns_display_ctrl
@@ -357,15 +395,12 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
     #-------------------------------------------------------
     def UpdateNodeDisplay(self):
-        show = self.IsNodeDisplayed()
-        aui_notebook = self.GetAuiNotebook()
-        tab_index = aui_notebook.GetPageIndex(self._DisplayCtrl)
-        aui_notebook.HidePage(tab_index, not show)
+        self._DisplayCtrl.ShowDisplayCtrl(self.IsNodeDisplayed())
 
 
     #-------------------------------------------------------
     def UpdateTrackers(self, update_local, update_global_idx, timecodes):
-        master_tracker_node = self.GetSessionNode().FindChildNode(G_Project.NodeID_SessionTrackerOptions)
+        master_tracker_node = self.GetSessionNode().FindChildNode(factory_id = G_Project.NodeID_SessionTrackerOptions)
         master_tracker_node.UpdateTrackers(update_local, update_global_idx, timecodes)
 
 
@@ -380,7 +415,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
 
         # flush new tracker positions through to all other views
         lognode = self.GetLogNode()
-        for view in self.GetSessionNode().ListSubNodes(G_Project.NodeID_View, recursive = True):
+        for view in self.GetSessionNode().ListSubNodes(factory_id = G_Project.NodeID_View, recursive = True):
             if view is not originator:
                 view.RefreshTracker(lognode, update_local, update_global)
 
@@ -655,7 +690,7 @@ class G_MarkerContainerNode(G_LogChildNode, G_ListContainerNode):
         self.GetLogfile().SetNumAutoMarker(self.GetHrItem().GetChildrenCount()-1)
 
         # ... hence in turn, initialise the markers
-        for marker in self.ListSubNodes(G_Project.NodeID_Marker):
+        for marker in self.ListSubNodes(factory_id = G_Project.NodeID_Marker):
             marker.PostInitMarker()
 
 
@@ -997,7 +1032,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
 
 
     def PostInitChildren(self):
-        if len(self.ListSubNodes(G_Project.NodeID_View)) != 0:
+        if len(self.ListSubNodes(factory_id = G_Project.NodeID_View)) != 0:
             return
 
         if self._InitBuilderGuid is None:
@@ -1057,13 +1092,13 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
     #-------------------------------------------------------
     def GetEditors(self):
         """Create a list of all Scintilla editors viewing this logfile"""
-        return [node.GetEditor() for node in self.ListSubNodes(G_Project.NodeID_View)]
+        return [node.GetEditor() for node in self.ListSubNodes(factory_id = G_Project.NodeID_View)]
 
 
     #-------------------------------------------------------
     def GetMarkers(self, factory_id):
         """Create a list of all markers/trackers related to this logfile"""
-        return self.ListSubNodes(factory_id, recursive = True)
+        return self.ListSubNodes(factory_id = factory_id, recursive = True)
 
 
     #-------------------------------------------------------
@@ -1107,7 +1142,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
     def RefreshViews(self, source_view = None):
         """Refresh all views displaying this document"""
 
-        for view in self.ListSubNodes(G_Project.NodeID_View):
+        for view in self.ListSubNodes(factory_id = G_Project.NodeID_View):
             if not view is source_view:
                 view.RefreshView()
 

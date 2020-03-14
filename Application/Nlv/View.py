@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -24,14 +24,17 @@ import wx.stc
 from wx.lib.expando import ExpandoTextCtrl
 
 # Application imports 
+from .DataExplorer import G_DataExplorerProvider
+from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
+from .Global import G_Const
+from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
 from .Logfile import G_DisplayControl
+from .Logfile import G_PanelDisplayControl
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
-from .Project import G_Const
-from .Project import G_Global
 from .Project import G_TabContainedNode
 from .Project import G_TabContainerNode
 from .Project import G_ListContainedNode
@@ -39,8 +42,6 @@ from .Project import G_ListContainerNode
 from .Project import G_HideableTreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
-from .Session import G_DataExplorerProvider
-from .Session import G_DataExplorerSync
 from .StyleNode import G_ColourNode
 from .StyleNode import G_ColourTraits
 from .StyleNode import G_EnabledColourNode
@@ -56,10 +57,20 @@ import Nlog
 
 
 
+## G_StcView ###############################################
+
+class G_StcView(wx.stc.StyledTextCtrl, G_DisplayControl):
+    """STC editor displays the log data"""
+
+    #-------------------------------------------------------
+    def __init__(self, parent, ID = -1):
+        wx.stc.StyledTextCtrl.__init__(self, parent, ID)
+
+
+
 ## G_ViewControl ###########################################
 
-class G_ViewControl(wx.Panel, G_DisplayControl):
-    """STC editor displays the log data"""
+class G_ViewControl(G_PanelDisplayControl):
 
     #-------------------------------------------------------
     _StyleIdxBase = Nlog.EnumStyle.AnnotationBase
@@ -127,7 +138,7 @@ class G_ViewControl(wx.Panel, G_DisplayControl):
         vsizer.Add(hsizer, proportion = 0, flag = wx.EXPAND)
         vsizer.Show(hsizer, False, recursive = True)
 
-        self._Editor = wx.stc.StyledTextCtrl(self, -1)
+        self._Editor = G_StcView(self, -1)
         vsizer.Add(self._Editor, proportion = 1, flag = wx.EXPAND)
         
         self.SetSizer(vsizer)
@@ -912,7 +923,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         aui_notebook = self.GetAuiNotebook()
         view_control = self._ViewControl = G_ViewControl(aui_notebook)
         editor = view_control.GetEditor()
-        self.SetDisplayCtrl(view_control, editor)
+        self.SetDisplayCtrl(editor)
         self.InterceptKeys(editor)
         self.InterceptSetFocus(editor)
         editor.Bind(wx.stc.EVT_STC_UPDATEUI, self.OnUpdateUI)
@@ -1090,7 +1101,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
     #-------------------------------------------------------
     def GetTrackInfo(self):
-        return self.FindChildNode(G_Project.NodeID_ViewTracking).GetTrackInfo()
+        return self.FindChildNode(factory_id = G_Project.NodeID_ViewTracking).GetTrackInfo()
 
     def GetNearestUtcTimecode(self, line_no):
         return self._N_View.GetNearestUtcTimecode(line_no)

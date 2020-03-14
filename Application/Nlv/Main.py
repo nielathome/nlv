@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,8 +17,15 @@
 
 # Python imports
 import argparse
+import base64
+import http.server
+import json
+import logging
 from pathlib import Path
+from queue import Queue
+import socketserver 
 import sys
+import threading
 
 # the only *reliable* way for Nlog to find and link against the sqlite3.dll
 # is to import the Python module first; in particular, this works around the fact
@@ -31,14 +38,14 @@ import wx
 import wx.lib.agw.aui as aui
 
 # Application imports
+from Nlv.Global import G_Global
+from Nlv.Global import G_PerfTimerScope
 import Nlv.Session
 import Nlv.Logfile
 import Nlv.View
 import Nlv.EventView
 from Nlv.Extension import LoadExtensions
-from Nlv.Project import G_Global
 from Nlv.Project import G_Project
-from Nlv.Project import G_PerfTimerScope
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
 
@@ -52,6 +59,81 @@ _G_Profiler = None
 if _G_WantProfiling:
     import cProfile
     _G_Profiler = cProfile.Profile()
+
+
+
+## HttpRequestHandler ######################################
+
+class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
+
+    # Callback handler; allows a chart to call back into the
+    # hosting Python
+    _Callback = None
+
+    # Trident/IE require non-standard MIME type for JavaScript,
+    # without this, the JavaScript is not executed
+    http.server.SimpleHTTPRequestHandler.extensions_map.update({
+        '.js': 'text/javascript'
+    })
+
+
+    #-------------------------------------------------------
+    @classmethod
+    def RegisterCallback(cls, callabck):
+        cls._Callback = callabck
+
+
+    #-------------------------------------------------------
+    def log_message(self, format, *args):
+        logging.debug("HTTPD: {} - {}".format(self.address_string(), format % args))
+
+    def log_error(self, format, *args):
+        logging.error("HTTPD: {} - {}".format(self.address_string(), format % args))
+
+
+    #-------------------------------------------------------
+    def end_headers(self):
+        # exert control over browser cacheing, otherwise
+        # changes to local files can go unnoticed
+        self.send_header("Cache-Control", "no-cache")
+        super().end_headers()
+
+
+    #-------------------------------------------------------
+    def translate_path(self, path):
+        install_dir = G_Global.GetInstallDir()
+        path = path.lstrip("/")
+        cgi_list = path.split('?')
+
+        if len(cgi_list) == 1 or self._Callback is None:
+            candidate = install_dir / path
+            if candidate.exists():
+                return str(candidate)
+
+        elif len(cgi_list) == 2:
+            action, args_encoded_text = cgi_list
+            node_id, method = action.split('.')
+            args_json = base64.standard_b64decode(args_encoded_text)
+            args = json.loads(args_json)
+            self._Callback(int(node_id), method, args)
+            return install_dir / "empty.json"
+
+        # error, not found
+        return ""
+
+
+
+## HttpServer ##############################################
+
+def RunHttpServer(name = "localhost", port = 8000):
+    class MyHttpServer(socketserver.ThreadingMixIn, http.server.HTTPServer):
+        def __init__(self, server_addres, handler_cls):
+            self.daemon_threads = True
+            http.server.HTTPServer.__init__(self, server_addres, handler_cls)
+
+    server_address = (name, port)
+    server = MyHttpServer(server_address, HttpRequestHandler)
+    server.serve_forever()
 
 
 
@@ -170,14 +252,37 @@ class G_ConsoleLog(wx.Log):
 
 
 
+## G_AuiNotebook ###########################################
+
+class G_AuiNotebook(aui.AuiNotebook):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, agwStyle):
+        super().__init__(parent, agwStyle = agwStyle)
+
+
+    #-------------------------------------------------------
+    def GetAuiTabInfo(self, child):
+        return self, self.GetPageIndex(child)
+
+
+    #-------------------------------------------------------
+    def SwitchToDisplayChildCtrl(self, child):
+        cur_idx = self.GetSelection()
+        child_index = self.GetPageIndex(child)
+        if cur_idx != child_index:
+            self.SetSelectionToWindow(child)
+
+
+
 ## G_LogViewFrame ##########################################
 
 class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------
     def __init__(self, parent, title):
-        wx.Frame.__init__(
-            self, parent, -1, title,
+        super().__init__(
+            parent, -1, title,
             size = (970, 720),
             style = wx.DEFAULT_FRAME_STYLE
                 | wx.NO_FULL_REPAINT_ON_RESIZE
@@ -223,7 +328,7 @@ class G_LogViewFrame(wx.Frame):
 
         # create and initialise child panels
 
-        self._AuiNoteBook = aui.AuiNotebook(self._FramePanel,
+        self._AuiNoteBook = G_AuiNotebook(self._FramePanel,
             agwStyle = aui.AUI_NB_TOP
              | aui.AUI_NB_TAB_SPLIT
              | aui.AUI_NB_TAB_MOVE
@@ -257,9 +362,9 @@ class G_LogViewFrame(wx.Frame):
                 Name("Info")
         )
 
-        self._DataExplorer = wx.Panel(self._FramePanel)
+        self._DataExplorerPanel = wx.Panel(self._FramePanel)
         self._AuiManager.AddPane(
-            self._DataExplorer,
+            self._DataExplorerPanel,
             aui.AuiPaneInfo().
                 Right().Layer(2).BestSize((300, 700)).MinSize((240, -1)).
                 Floatable(True).FloatingSize((300, 700)).
@@ -278,6 +383,17 @@ class G_LogViewFrame(wx.Frame):
         # layout and display
         self._AuiManager.Update()
 
+        # HTTP callback processors; used to move requests from HTTP clients
+        # from the HTTP thread to the UI thread
+        self._HttpActions = Queue()
+        HttpRequestHandler.RegisterCallback(self.OnHttpAction)
+        self.Bind(wx.EVT_IDLE, self.OnIdle)
+
+        # local HTTPD
+        httpd = threading.Thread(target = RunHttpServer)
+        httpd.daemon = True
+        httpd.start()
+
 
     #-------------------------------------------------------
     def GetAuiManager(self):
@@ -292,8 +408,18 @@ class G_LogViewFrame(wx.Frame):
     def GetInfoPanel(self):
         return self._InfoPanel
 
-    def GetDataExplorer(self):
-        return self._DataExplorer
+    def GetDataExplorerPanel(self):
+        return self._DataExplorerPanel
+
+
+    #-------------------------------------------------------
+    def OnHttpAction(self, node_id, method, args):
+        self._HttpActions.put((node_id, method, args))
+
+    def OnIdle(self, event):
+        if not self._HttpActions.empty():
+            node_id, method, args = self._HttpActions.get()
+            self.GetProject().OnHttpAction(node_id, method, args)
 
 
     #-------------------------------------------------------

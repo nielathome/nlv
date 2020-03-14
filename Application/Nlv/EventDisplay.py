@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2019. All rights reserved.
+# Copyright (C) Niel Clausen 2019-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,42 +17,152 @@
 
 # Python imports
 
+import comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0
+from comtypes import COMObject, GUID, COMMETHOD
+from ctypes import c_int, c_ulong, c_wchar_p, HRESULT
 import logging
-import matplotlib
-from matplotlib.backends.backend_wxagg import FigureCanvasWxAgg
-from matplotlib.backends.backend_wx import NavigationToolbar2Wx
-from matplotlib.figure import Figure
+import os
 from pathlib import Path
-
-# has to be before import wx
-matplotlib.use('WXAgg')
+import pythoncom
+import sys
+import win32com
+import win32con
+import win32gui
+import winreg
 
 # Application imports 
+from .DataExplorer import G_DataExplorerProvider
+from .DataExplorer import G_DataExplorerSync
+from .Logfile import G_DisplayControl
+from .Logfile import G_NotebookDisplayControl
 from .EventProjector import ConnectDb
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
 from .EventProjector import G_ScriptGuard
-from .Project import G_Global
-from .Project import G_PerfTimerScope
+from .Global import G_Global
+from .Global import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
-from .Session import G_DataExplorerProvider
-from .Session import G_DataExplorerSync
 
 # wxWidgets imports
 import wx
+import wx.html2
 
 # Content provider interface
 import Nlog
 
 
-## GLOBAL ##################################################
 
-# Set the default sans-serif font
-matplotlib.rcParams['font.sans-serif'] = "Comic Sans MS"
+## IDeveloperConsoleMessageReceiver ########################
 
-# Set the default font to teh sans-serif font
-matplotlib.rcParams['font.family'] = "sans-serif"
+#
+# Copied/edited from comtypes generated code:
+#   >>> import comtypes
+#   >>> from comtypes.client import GetModule
+#   >>> GetModule("c:/Windows/System32/mshtml.tlb")
+#   <module 'comtypes.gen._3050F1C5_98B5_11CF_BB82_00AA00BDCE0B_0_4_0' from 'lib\site-packages\comtypes\gen\_3050F1C5_98B5_11CF_BB82_00AA00BDCE0B_0_4_0.py'>
+#
+
+class IDeveloperConsoleMessageReceiver(comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0.IUnknown):
+    _case_insensitive_ = True
+    'IDeveloperConsoleMessageReceiver interface'
+    _iid_ = GUID('{30510808-98B5-11CF-BB82-00AA00BDCE0B}')
+    _idlflags_ = []
+
+    WSTRING = c_wchar_p
+
+    # values for enumeration '_DEV_CONSOLE_MESSAGE_LEVEL'
+    DCML_INFORMATIONAL = 0
+    DCML_WARNING = 1
+    DCML_ERROR = 2
+    DEV_CONSOLE_MESSAGE_LEVEL_Max = 2147483647
+    _DEV_CONSOLE_MESSAGE_LEVEL = c_int # enum
+
+    _methods_ = [
+        COMMETHOD([], HRESULT, 'write',
+                  ( ['in'], WSTRING, 'source' ),
+                  ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+                  ( ['in'], c_int, 'messageId' ),
+                  ( ['in'], WSTRING, 'messageText' )),
+        COMMETHOD([], HRESULT, 'WriteWithUrl',
+                  ( ['in'], WSTRING, 'source' ),
+                  ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+                  ( ['in'], c_int, 'messageId' ),
+                  ( ['in'], WSTRING, 'messageText' ),
+                  ( ['in'], WSTRING, 'fileUrl' )),
+        COMMETHOD([], HRESULT, 'WriteWithUrlAndLine',
+                  ( ['in'], WSTRING, 'source' ),
+                  ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+                  ( ['in'], c_int, 'messageId' ),
+                  ( ['in'], WSTRING, 'messageText' ),
+                  ( ['in'], WSTRING, 'fileUrl' ),
+                  ( ['in'], c_ulong, 'line' )),
+        COMMETHOD([], HRESULT, 'WriteWithUrlLineAndColumn',
+                  ( ['in'], WSTRING, 'source' ),
+                  ( ['in'], _DEV_CONSOLE_MESSAGE_LEVEL, 'level' ),
+                  ( ['in'], c_int, 'messageId' ),
+                  ( ['in'], WSTRING, 'messageText' ),
+                  ( ['in'], WSTRING, 'fileUrl' ),
+                  ( ['in'], c_ulong, 'line' ),
+                  ( ['in'], c_ulong, 'column' ))
+    ]
+
+
+
+## G_DeveloperConsoleMessageReceiver #######################
+
+class G_DeveloperConsoleMessageReceiver(COMObject):
+    #-------------------------------------------------------
+    WantNoisy = False
+    Noisy = [
+        "Navigation occurred.",
+        "The code on this page disabled back and forward caching." # see http://go.microsoft.com/fwlink/?LinkID=291337 
+    ]
+
+    @classmethod
+    def LevelToText(cls, level):
+        if level == IDeveloperConsoleMessageReceiver.DCML_INFORMATIONAL:
+            return "info"
+        elif level == IDeveloperConsoleMessageReceiver.DCML_WARNING:
+            return "warning"
+        elif level == IDeveloperConsoleMessageReceiver.DCML_ERROR:
+            return "error"
+        else:
+            return "unknown"
+
+
+    @classmethod
+    def LogMessage(cls, source, level, messageId, messageText, fileUrl = "", line = 0, column = 0):
+        if not cls.WantNoisy:
+            for text in cls.Noisy:
+                if text in messageText:
+                    return
+
+        ltext = cls.LevelToText(level)
+        ftext = "{}(level:{} id:{} line:{} col:{}) {} {}".format(source, ltext, messageId, line, column, messageText, fileUrl)
+
+        if source == "CONSOLE":
+            logging.info(ftext)
+        else:
+            logging.debug(ftext)
+
+
+    #-------------------------------------------------------
+    _com_interfaces_ = [IDeveloperConsoleMessageReceiver]
+
+
+    #-------------------------------------------------------
+    def write(self, source, level, messageId, messageText):
+        self.LogMessage(source, level, messageId, messageText)
+
+    def WriteWithUrl(self, source, level, messageId, messageText, fileUrl):
+        self.LogMessage(source, level, messageId, messageText, fileUrl)
+
+    def WriteWithUrlAndLine(self, source, level, messageId, messageText, fileUrl, line):
+        self.LogMessage(source, level, messageId, messageText, fileUrl, line)
+
+    def WriteWithUrlLineAndColumn(self, source, level, messageId, messageText, fileUrl, line, column):
+        self.LogMessage(source, level, messageId, messageText, fileUrl, line, column)
 
 
 
@@ -106,10 +216,11 @@ class G_TableFieldFormatter:
 class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
-    def __init__(self, doc_url):
+    def __init__(self, name, doc_url):
         super().__init__()
 
         self._ViewFlat = True
+        self._Name = name
         self._DocumentUrl = doc_url
         self._RawFieldMask = 0
         self._IsValid = True
@@ -133,7 +244,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         # in SQL terms, the key is the entry's line number in
         # the display table (where line number is one less than
         # the "rowid"); note, items cannot be zero, so offset here
-        return int(item.GetID()) - 1
+        id = item.GetID()
+        if id is None:
+            return None
+        else:
+            return int(id) - 1
 
 
     @staticmethod
@@ -200,7 +315,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
     def GetLocation(self, item):
-        return str(self.ItemToKey(item))
+        key = self.ItemToKey(item)
+        if key is None:
+            return key
+        else:
+            return str(key)
 
     def SetHistoryKey(self, key):
         self._HistoryKey = key
@@ -211,7 +330,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if schema.UserDataExplorerOpen is not None:
             schema.UserDataExplorerOpen(builder)
 
-        builder.AddPageHeading("Event")
+        builder.AddPageHeading("{} Item".format(self._Name))
         if self._DocumentUrl is not None:
             builder.AddLink(self._DocumentUrl, "Show log ...")
 
@@ -387,9 +506,21 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def MapSelectionToEventIds(self, selection):
+    def MapSelectionToEventIds(self, items):
         col_num = self._TableSchema.ColEventId
-        return [self.GetFieldValue(s, col_num) for s in selection]
+        return [self.GetFieldValue(self.ItemToKey(item), col_num) for item in items]
+
+
+    #-------------------------------------------------------
+    def LookupEventId(self, event_id):
+        ret = None
+
+        if self._N_EventView is not None:
+            key = self._N_EventView.LookupEventId(event_id)
+            if key >= 0:
+                ret = self.KeyToItem(key)
+
+        return ret
 
 
     #-------------------------------------------------------
@@ -433,14 +564,16 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     @G_Global.TimeFunction
-    def UpdateContent(self, nesting, table_schema, filename, valid):
+    def UpdateContent(self, nesting, table_info, valid):
+        table_schema, db_path = table_info.GetSchemaAndDbPath()
+
         self.Reset(table_schema)
         self.UpdateNesting(nesting, False)
         self.UpdateValidity(valid)
 
         num_fields = self.GetColumnCount()
-        if Path(filename).exists() and num_fields != 0:
-            self._N_Logfile = Nlog.MakeLogfile(filename, table_schema, G_Global.PulseProgressMeter)
+        if Path(db_path).exists() and num_fields != 0:
+            self._N_Logfile = Nlog.MakeLogfile(db_path, table_schema, G_Global.PulseProgressMeter)
 
         # robustness, for broken logfiles ...
         if self._N_Logfile is not None:
@@ -588,7 +721,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, flags, doc_url):
+    def __init__(self, parent, flags, name, doc_url):
         super().__init__(
             parent,
             style = wx.dataview.DV_ROW_LINES
@@ -596,7 +729,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
             | flags
         )
 
-        self.AssociateModel(G_TableDataModel(doc_url))
+        self.AssociateModel(G_TableDataModel(name, doc_url))
         self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
@@ -626,14 +759,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateContent(self, nesting, table_schema, filename, valid):
+    def UpdateContent(self, nesting, table_info, valid):
         """Update the data view with new content"""
 
         # note: number of DataView columns is not the same as the number of
         # model columns; as some are hidden for internal use
         try:
             self.ClearColumns()
-            self.GetModel().UpdateContent(nesting, table_schema, filename, valid)
+            self.GetModel().UpdateContent(nesting, table_info, valid)
             self.UpdateColumns()
 
         except FileNotFoundError as ex:
@@ -665,17 +798,17 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 ## G_TableViewCtrl #########################################
 
-class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
+class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, selection_handler, multiple_selection = False, doc_url = None):
+    def __init__(self, parent, multiple_selection, name, doc_url):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        super().__init__(parent, flags, doc_url)
+        super().__init__(parent, flags, name, doc_url)
 
-        self._SelectionHandler = selection_handler
+        self._SelectionHandler = None
         self._IsMultipleSelection = multiple_selection
         self.Bind(wx.dataview.EVT_DATAVIEW_SELECTION_CHANGED, self.OnItemActivated)
 
@@ -686,9 +819,27 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
 
 
     #-------------------------------------------------------
-    def GetSelectedItems(self):
-        selection = [G_TableDataModel.ItemToKey(item) for item in self.GetSelections()]
-        return self.GetModel().MapSelectionToEventIds(selection)
+    def GetSelectedEventIds(self):
+        return self.GetModel().MapSelectionToEventIds(self.GetSelections())
+
+    def OnChartSelection(self, event_id, ctrl_key):
+        item = self.GetModel().LookupEventId(event_id)
+        if item is not None:
+            if ctrl_key:
+                if self.IsSelected(item):
+                    self.Unselect(item)
+                    item = None
+                else:
+                    self.Select(item)
+            else:
+                self.UnselectAll()
+                self.Select(item)
+
+            # the control does not generate an event, so fake one
+            evt = wx.dataview.DataViewEvent()
+            if item is not None:
+                evt.SetItem(item)
+            self.OnItemActivated(evt)
 
 
     #-------------------------------------------------------
@@ -757,8 +908,14 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync):
     def GetEventRange(self, event_no):
         return self.GetModel().GetEventRange(event_no)
 
+
+    #-------------------------------------------------------
+    def SetSelectionhandler(self, selection_handler):
+        self._SelectionHandler = selection_handler
+
     def OnItemActivated(self, evt):
-        self._SelectionHandler(evt.GetItem())
+        if self._SelectionHandler is not None:
+            self._SelectionHandler(evt.GetItem())
 
 
     #-------------------------------------------------------
@@ -842,155 +999,460 @@ class G_ChoiceParam(G_Param):
 
 
 
-## G_ParameterCollector ####################################
+## G_HtmlHostCtrl ##########################################
 
-class G_ParameterCollector:
-    """Collect parameter data from a chart"""
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self._Params = []
-
+class G_HtmlHostCtrl(wx.Panel):
 
     #-------------------------------------------------------
-    def AddChoice(self, name, title, default, values):
-        self._Params.append(G_ChoiceParam(name, title, default, values))
+    _InitCharting = True
+    _IIDMap = None
+    _ConsoleRegistered = False
 
 
-    #-------------------------------------------------------
-    def AddBool(self, name, title, default):
-        self._Params.append(G_BoolParam(name, title, default))
+    @classmethod
+    def _SetRegistryValue(cls, name, reg_path, value):
+        try:
+            winreg.CreateKey(winreg.HKEY_CURRENT_USER, reg_path)
+            registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_WRITE)
+            winreg.SetValueEx(registry_key, name, 0, winreg.REG_DWORD, value)
+            winreg.CloseKey(registry_key)
+            return True
+        except WindowsError:
+            return False
 
 
-    #-------------------------------------------------------
-    def Close(self):
-        return self._Params
-
-
-
-## G_ChartViewCtrl #########################################
-
-class G_ChartViewCtrl(FigureCanvasWxAgg):
-
-    #-------------------------------------------------------
-    def __init__(self, parent, chart_designer, metrics_db_path, table_view_ctrl, error_reporter):
-        self._Figure = Figure(frameon = True)
-        super().__init__(parent, -1, self._Figure)
-
-        self._ChartDesigner = chart_designer
-        self._MetricsDbPath = metrics_db_path
-        self._TableViewCtrl = table_view_ctrl
-        self._ErrorReporter = error_reporter
-
-        self._DoRealise = True
-        self._ParamaterValues = dict()
-
-        handler = wx.EvtHandler()
-        handler.Bind(wx.EVT_PAINT, self.OnPaint)
-        self.PushEventHandler(handler)
+    @classmethod
+    def _GetRegistryValue(cls,name, reg_path):
+        try:
+            registry_key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, reg_path, 0, winreg.KEY_READ)
+            value, regtype = winreg.QueryValueEx(registry_key, name)
+            winreg.CloseKey(registry_key)
+            return value
+        except WindowsError:
+            return None
 
 
     #-------------------------------------------------------
-    def PreClose(self):
-        self.PopEventHandler(True)
+    @classmethod
+    def InitCharting(cls):
+        if not cls._InitCharting:
+            return
 
-    def OnPaint(self, evt):
-        if self._DoRealise:
-            self._DoRealise = False
-            self.Realise()
+        # Ensure JavaScript runs in embedded browser. Can be simplified
+        # after wxPython-4.1.0. See https://github.com/wxWidgets/Phoenix/issues/1256.
+        reg_path = r"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"
+        cls._SetRegistryValue(os.path.basename(sys.executable), reg_path, 11001)
 
-        evt.Skip()
+        # makepy.py -i
+        # {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
+        module = win32com.client.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
+        cls._IIDMap = module.NamesToIIDMap
+
+        cls._InitCharting = False
 
 
     #-------------------------------------------------------
-    def DefineParameters(self):
+    @classmethod
+    def RegisterConsole(cls, doc):
+        if G_HtmlHostCtrl._ConsoleRegistered:
+            return
+
+        # warning: mixing the two Python COM libraries here.
+        # pythoncom/win32com is good for Dispatch/OLE interfaces
+        # and comtypes is good for custom interfaces
+
+        # use comtypes to link a IDeveloperConsoleMessageReceiver
+        # interface to a Python object, and wrap it into a
+        # pythoncom PyIUnknown class
+        pyobj = G_DeveloperConsoleMessageReceiver()
+        iunknown_c = pyobj.QueryInterface(comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0.IUnknown)
+        c_ptr = super(comtypes._compointer_base, iunknown_c).value
+        iunknown_p = pythoncom.ObjectFromAddress(c_ptr)
+
+        # access embedded browser's command target interface
+        from win32com.axcontrol import axcontrol
+        icommandtarget = doc._oleobj_.QueryInterface(axcontrol.IID_IOleCommandTarget)
+
+        # and register our interface as a console
+        CGID_MSHTML = pythoncom.MakeIID("{DE4BA900-59CA-11CF-9592-444553540000}")
+        IDM_ADDCONSOLEMESSAGERECEIVER = 3800
+        OLECMDEXECOPT_DODEFAULT = 0
+        icommandtarget.Exec(CGID_MSHTML, IDM_ADDCONSOLEMESSAGERECEIVER, OLECMDEXECOPT_DODEFAULT, iunknown_p)
+        G_HtmlHostCtrl._ConsoleRegistered = True
+
+
+    #-------------------------------------------------------
+    def __init__(self, parent, context, chart_info):
+        super().__init__(parent)
+
+        self._ChartInfo = chart_info
+        self._CreateContext = context
+        self._ParameterValues = dict()
+        self._ScriptQueue = []
+
+        self.InitCharting()
+
+        self._Figure = wx.html2.WebView.New(self)
+        self._Figure.EnableHistory(False)
+        self._Figure.EnableContextMenu(False)
+
+        self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
+
+        page_name = self._ChartInfo.HtmlPage
+        self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
+
+        # layout
+        vsizer = wx.BoxSizer(wx.VERTICAL)
+        vsizer.Add(self._Figure, proportion = 1, flag = wx.EXPAND)
+        self.SetSizer(vsizer)
+
+
+    #-------------------------------------------------------
+    def OnPageLoaded(self, event):
+        if not "about:" in event.URL:
+            self.RunScriptQueue()
+
+
+    #-------------------------------------------------------
+    def GetIHTMLDocument2(self):
+
+        data = [None, None]
+
+        def enum_callback(hwnd, data):
+            cls =  win32gui.GetClassName(hwnd)
+            if cls in ['TabWindowClass', 'Shell DocObject View', 'Internet Explorer_Server']:
+                msg = win32gui.RegisterWindowMessage("WM_HTML_GETOBJECT")
+                rc, result = win32gui.SendMessageTimeout(hwnd, msg, 0, 0, win32con.SMTO_ABORTIFHUNG, 1000)
+                if result != 0:
+                    object = pythoncom.ObjectFromLresult(result, pythoncom.IID_IDispatch, 0)
+                    if object is not None:
+
+                        # have to force the class ID - not really clear why; without this though,
+                        # the returned value is a generic CDispatch for class ID 
+                        # '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
+                        clsid = self._IIDMap["IHTMLDocument2"]
+                        document = win32com.client.Dispatch(object, resultCLSID = clsid)
+                        if document is not None:
+                            data[0] = document
+                            data[1] = hwnd
+                            return False
+
+            return True
+                
+        win32gui.EnumChildWindows(self._Figure.GetHandle(), enum_callback, data)
+
+        # once off setup, now that the visible chart display control is known
+        if data[0] is not None and self._CreateContext is not None:
+            context = self._CreateContext
+            self._CreateContext = None
+
+            self.EnqueueScript("SetNodeId({});".format(context.GetNodeId()), False)
+
+            # keep the Python/wxWidgets window alive while we (the parent)
+            # window is remains
+            html_window = self._HtmlWindow = wx.Window()
+            html_window.AssociateHandle(data[1])
+            context.OnChartCreate(self, html_window)
+
+        return data[0]
+
+
+    #-------------------------------------------------------
+    def CallJavaScript(self, method, *args):
+        def ConvertArg(arg):
+            if isinstance(arg, str):
+                return "'{}'".format(arg)
+            else:
+                return str(arg)
+
+        arg_text = ",".join([ConvertArg(arg) for arg in args])
+        script = "{method}({args});".format(method = method, args = arg_text)
+        self.EnqueueScript(script)
+
+
+    def EnqueueScript(self, script, run_queue = True):
+        last_script = None
+        last_idx = len(self._ScriptQueue) - 1
+
+        if last_idx >= 0:
+            last_script = self._ScriptQueue[last_idx]
+
+        append = script != last_script
+        if append:
+            self._ScriptQueue.append(script)
+
+        if append and run_queue:
+            self.RunScriptQueue()
+        
+
+    def RunScriptQueue(self):
+        doc = self.GetIHTMLDocument2()
+        if doc is None:
+            return
+
+        self.RegisterConsole(doc)
+
+        for script_text in self._ScriptQueue:
+            elem = doc.createElement("script")
+            script_elem = win32com.client.Dispatch(elem, resultCLSID = self._IIDMap["IHTMLScriptElement"])
+            script_elem.text = script_text
+
+            # add script to DOM; will execute
+            node = win32com.client.Dispatch(doc.body, resultCLSID = self._IIDMap["IHTMLDOMNode"])
+            script_node = node.appendChild(script_elem)
+
+            # remove script from DOM; don't need it any more
+            node.removeChild(script_node)
+
+        self._ScriptQueue = []
+
+
+    #-------------------------------------------------------
+    def DefineParameters(self, error_reporter):
         parameters = None
 
-        with G_ScriptGuard("DefineParameters", self._ErrorReporter):
-            connection = ConnectDb(self._MetricsDbPath, True)
+        class Context:
+            """Collect parameter data from a chart"""
+
+            #-----------------------------------------------
+            def __init__(self, host):
+                self._Host = host
+                self._Params = []
+
+            def Close(self):
+                return self._Params
+
+            #-----------------------------------------------
+            def AddChoice(self, name, title, default, values):
+                self._Params.append(G_ChoiceParam(name, title, default, values))
+
+            def AddBool(self, name, title, default):
+                self._Params.append(G_BoolParam(name, title, default))
+
+            #-------------------------------------------------------
+            def GetSelection(self, set = None):
+                return self._Host.GetSelectedEventIds(set)
+
+
+        with G_ScriptGuard("DefineParameters", error_reporter):
+            connection, cursor = self.MakeDbCursor()
             if connection is not None:
-                cursor = connection.cursor()
-                selection = self._TableViewCtrl.GetSelectedItems()
-                collector = G_ParameterCollector()
-                self._ChartDesigner.Builder.DefineParameters(collector, connection, cursor, selection)
-                parameters = collector.Close()
+                context = Context(self)
+                self._ChartInfo.DefineParameters(connection, cursor, context)
+                parameters = context.Close()
 
         return parameters
 
 
     #-------------------------------------------------------
-    @G_Global.TimeFunction
-    def Realise(self):
+    def Realise(self, error_reporter, data_changed = False, selection_changed = False, parameters = None):
         """Redraw the chart if needed"""
-        G_Global.GetCurrentTimer().AddArgument(self._ChartDesigner.Name)
-        with G_ScriptGuard("Realise", self._ErrorReporter):
-            connection = ConnectDb(self._MetricsDbPath, True)
-            if connection is not None:
-                cursor = connection.cursor()
-                selection = self._TableViewCtrl.GetSelectedItems()
-                self._Figure.clear()
 
-                with G_PerfTimerScope("Design"):
-                    self._ChartDesigner.Builder.Realise(self._ChartDesigner.Name, self._Figure, connection, cursor, self._ParamaterValues, selection)
+        class Context:
+            #-----------------------------------------------
+            def __init__(self, host, data_changed, selection_changed, parameters_changed):
+                self._Host = host
+                self._DataChanged = data_changed
+                self._SelectionChanged = selection_changed
+                self._ParametersChanged = parameters_changed
 
-                with G_PerfTimerScope("Draw"):
-                    self.draw()
+            #-----------------------------------------------
+            def DataChanged(self):
+                return self._DataChanged
+
+            def SelectionChanged(self):
+                return self._SelectionChanged
+
+            def ParamatersChanged(self):
+                return self._ParametersChanged
+
+            #-----------------------------------------------
+            def GetSelection(self, set = None):
+                return self._Host.GetSelectedEventIds(set)
+
+            def GetParameter(self, name, default):
+                return self._Host._ParameterValues.get(name, default)
+
+            #-----------------------------------------------
+            def CallJavaScript(self, method, *args):
+                self._Host.CallJavaScript(method, *args)
 
 
-    #-------------------------------------------------------
-    def Update(self, metrics_changed = False, selection_changed = False, parameters = None):
-        if metrics_changed:
-            self._DoRealise = True
+        do_realize = False
+        parameters_changed = False
+        if data_changed:
+            do_realize = True
 
-        if selection_changed and self._ChartDesigner.WantSelection:
-            self._DoRealise = True
+        if selection_changed and self._ChartInfo.WantSelection:
+            do_realize = True
 
-        if parameters is not None and parameters != self._ParamaterValues:
-            self._DoRealise = True
-            self._ParamaterValues = parameters.copy()
+        if parameters is not None and parameters != self._ParameterValues:
+            do_realize = True
+            parameters_changed = True
+            self._ParameterValues = parameters.copy()
 
-        if self.IsShown():
-            self.Refresh()
+        if do_realize:
+            with G_ScriptGuard("Realise", error_reporter):
+                connection, cursor = self.MakeDbCursor()
+                if cursor is not None:
+                    context = Context(self, data_changed, selection_changed, parameters_changed)
+                    self._ChartInfo.Realise(connection, cursor, context)
+
+
             
+## G_HtmlChartCtrl #########################################
 
-
-## G_MetricsViewCtrl #######################################
-
-class G_MetricsViewCtrl(wx.SplitterWindow):
+class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, selection_handler, quantifier_name):
+    def __init__(self, parent, context, chart_info, table_view_ctrl):
+        super().__init__(parent, context, chart_info)
+
+        self._TableViewCtrl = table_view_ctrl
+
+
+    #-------------------------------------------------------
+    def GetSelectedEventIds(self, set):
+        return self._TableViewCtrl.GetSelectedEventIds()
+
+
+    #-------------------------------------------------------
+    def MakeDbCursor(self):
+        connection = ConnectDb(self._ChartInfo.ChartDbPath, True)
+        if connection is None:
+            return None, None
+        else:
+            return connection, connection.cursor()
+
+
+
+## G_HtmlNetworkCtrl #######################################
+
+class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, context, chart_info, table_view_ctrls):
+        super().__init__(parent, context, chart_info)
+
+        self._TableViewCtrls = table_view_ctrls
+
+
+    #-------------------------------------------------------
+    def GetSelectedEventIds(self, set):
+        return self._TableViewCtrls[set].GetSelectedEventIds()
+
+
+    #-------------------------------------------------------
+    def MakeDbCursor(self):
+        connection = ConnectDb(self._ChartInfo.NodesDbPath, True)
+        if connection is None:
+            return None, None
+        else:
+            cursor = connection.cursor()
+            cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._ChartInfo.LinksDbPath))
+            return connection, cursor
+
+
+
+## G_CoreViewCtrl ##########################################
+
+class G_CoreViewCtrl(wx.SplitterWindow, G_DisplayControl):
+    """
+    Common behaviour for G_EventsViewCtrl,  G_MetricsViewCtrl
+    and G_NetworkViewCtrl.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, parent):
         super().__init__(parent, style = wx.SP_LIVE_UPDATE)
-
-        # the ID distinguishes different tables in the event,
-        # but otherwise, has no real meaning
-        self._SelectionHandler = selection_handler
-        self._QuantifierName = quantifier_name
-
-        # one-shot lock to inhibit initial Quantification if
-        # table data already exists
-        self._CollectorLocked = True
+        self._ChartPane = None
+        self._TablePane = None
+        self._ChartLocation = 0
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TableViewCtrl = G_TableViewCtrl(self, self.OnTableSelectionChanged, multiple_selection = True)
 
-        self._ChartPane = wx.Panel(self)
-        self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
+    #-------------------------------------------------------
+    def ArrangeChildren(self):
+        location = self._ChartLocation
+        table = self._TablePane
+        chart = self._ChartPane
 
-        self.SplitHorizontally(self._TableViewCtrl, self._ChartPane)
+        self.Unsplit()
+        if chart is None:
+            self.Initialize(table)
+
+        elif location == 0:
+            self.SplitHorizontally(table, chart)
+
+        elif location == 1:
+            self.SplitHorizontally(chart, table)
+
+        elif location == 2:
+            self.SplitVertically(chart, table)
+
+        elif location == 3:
+            self.SplitVertically(table, chart)
+
+
+    #-------------------------------------------------------
+    def SetChartLocation(self, location):
+        if location == self._ChartLocation:
+            return
+
+        self._ChartLocation = location
+        self.ArrangeChildren()
+
+
+
+
+## G_CommonViewCtrl ########################################
+
+class G_CommonViewCtrl(G_CoreViewCtrl):
+    """
+    Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, parent, multiple_selection, name, doc_url = None):
+        super().__init__(parent)
+
+        self.SetMinimumPaneSize(150)
+        self.SetSashGravity(0.5)
+
+        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name, doc_url)
+        self.ArrangeChildren()
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self._TableViewCtrl
+
+
+    #-------------------------------------------------------
+    def GetChartPane(self, create = False):
+        if self._ChartPane is None and create:
+            self._ChartPane = wx.Panel(self)
+            self._ChartPane.SetSizer(wx.BoxSizer(wx.VERTICAL))
+            self.ArrangeChildren()
+
+        return self._ChartPane
 
 
     #-------------------------------------------------------
     def GetChartViewCtrl(self, chart_no, activate):
-        pane = self._ChartPane
-        pane_sizer = pane.GetSizer()
+        pane = self.GetChartPane()
+        if pane is None:
+            return pane
 
+        pane_sizer = pane.GetSizer()
         if pane_sizer.IsEmpty():
-            return
+            return None
 
         sizer_items = pane_sizer.GetChildren()
+        if chart_no >= len(sizer_items):
+            return None
 
         if activate:
             pane_sizer.ShowItems(True)
@@ -1005,64 +1467,134 @@ class G_MetricsViewCtrl(wx.SplitterWindow):
 
 
     #-------------------------------------------------------
-    def GetTableViewCtrl(self):
-        return self._TableViewCtrl
+    def ResetModel(self):
+        pane = self.GetChartPane()
+        if pane is not None:
+            pane.GetSizer().Clear(delete_windows = True)
+
+        self.GetTableViewCtrl().ResetModel()
+
+
+    #-------------------------------------------------------
+    def CreateCharts(self, context, chart_list):
+        if chart_list is None or len(chart_list) == 0:
+            return
+
+        pane = self.GetChartPane(True)
+        pane_sizer = pane.GetSizer()
+
+        if pane_sizer.IsEmpty():
+            table_ctrl = self.GetTableViewCtrl()
+    
+            for chart_info in chart_list:
+                chart_view_ctrl = G_HtmlChartCtrl(pane, context, chart_info, table_ctrl)
+                pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
+
+            pane_sizer.ShowItems(False)
+
+        self.UpdateCharts(context.GetErrorReporter(), data_changed = True)
+
+
+    #-------------------------------------------------------
+    def UpdateCharts(self, error_reporter, data_changed = False, selection_changed = False):
+        pane = self.GetChartPane()
+        if pane is not None:
+            for chart_view in pane.GetChildren():
+                chart_view.Realise(error_reporter, data_changed, selection_changed)
+
+
+
+## G_EventsViewCtrl ########################################
+
+class G_EventsViewCtrl(G_CommonViewCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, name, doc_url):
+        super().__init__(parent, False, name, doc_url)
+
+
+
+## G_MetricsViewCtrl #######################################
+
+class G_MetricsViewCtrl(G_CommonViewCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, quantifier_name):
+        super().__init__(parent, True, quantifier_name)
+
+        self._QuantifierName = quantifier_name
+
+        # one-shot lock to inhibit initial Quantification if
+        # table data already exists
+        self._CollectorLocked = True
 
 
     #-------------------------------------------------------
     @G_Global.TimeFunction
-    def Quantify(self, node, quantifier_info, valid, error_reporter):
+    def Quantify(self, context, quantifier_info, valid):
         G_Global.GetCurrentTimer().AddArgument(self._QuantifierName)
-        self.ResetModel(error_reporter)
-        with G_ScriptGuard("Quantify", self._ErrorReporter):
+        self.ResetModel()
+        with G_ScriptGuard("Quantify", context.GetErrorReporter()):
             quantifier = G_Quantifier(quantifier_info)
             quantifier.Run(self._CollectorLocked)
             self._CollectorLocked = False
 
-            metrics_db_path = quantifier_info.MetricsDbPath
-            self._TableViewCtrl.UpdateContent(False, quantifier_info.MetricsSchema, metrics_db_path, valid)
-            self._TableViewCtrl.SetFieldMask(-1)
+            table_ctrl = self.GetTableViewCtrl()
+            table_ctrl.UpdateContent(False, quantifier_info, valid)
+            table_ctrl.SetFieldMask(-1)
 
-            pane = self._ChartPane
-            pane_sizer = pane.GetSizer()
+            self.CreateCharts(context, quantifier_info.Charts)
 
-            if pane_sizer.IsEmpty():
-                for chart_info in quantifier_info.Charts:
-                    chart_view_ctrl = G_ChartViewCtrl(pane, chart_info, metrics_db_path, self._TableViewCtrl, self._ErrorReporter)
-                    pane_sizer.Add(chart_view_ctrl, flag = wx.EXPAND | wx.ALIGN_CENTER)
-                    node.InterceptSetFocus(chart_view_ctrl)
 
-                pane_sizer.ShowItems(False)
 
-            self.UpdateMetrics()
+## G_NetworkViewCtrl #######################################
+
+class G_NetworkViewCtrl(G_CoreViewCtrl):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, doc_url = None):
+        super().__init__(parent)
+
+        self._Notebook = self._TablePane = G_NotebookDisplayControl(self)
+        self._ChartView = None
+        self._TableViewCtrls = [None, None]
+        self._TableNodeIds = [None, None]
+        self._DocumentUrl = doc_url
+
+        self.ArrangeChildren()
+
+
+    def SetupDataTable(self, idx, name, node_id):
+        self._TableNodeIds[idx] = node_id
+        self._TableViewCtrls[idx] = table_ctrl = G_TableViewCtrl(self._Notebook, True, name, self._DocumentUrl)
+        self._Notebook.AddPage(table_ctrl, name)
+        return table_ctrl
 
 
     #-------------------------------------------------------
-    def UpdateCharts(self, metrics_changed = False, selection_changed = False):
-        for chart_view in self._ChartPane.GetChildren():
-            chart_view.Update(metrics_changed, selection_changed)
+    def GetChartViewCtrl(self, chart_no, activate):
+        return self._ChartView
 
-    def UpdateMetrics(self):
-        self.UpdateCharts(metrics_changed = True)
-
-    def UpdateSelection(self):
-        return self.UpdateCharts(selection_changed = True)
+    def GetTableViewCtrl(self, idx):
+        return self._TableViewCtrls[idx]
 
 
     #-------------------------------------------------------
-    def OnTableSelectionChanged(self, item):
-        self._SelectionHandler(item)
-        self.UpdateSelection()
+    def ResetModel(self):
+        self.GetTableViewCtrl(0).ResetModel()
+        self.GetTableViewCtrl(1).ResetModel()
 
 
     #-------------------------------------------------------
-    def ResetModel(self, error_reporter = None):
-        self._ErrorReporter = error_reporter
+    def UpdateChart(self, context, projector_info, data_changed, selection_changed):
+        if projector_info.Chart is None:
+            return
 
-        chartpane_sizer = self._ChartPane.GetSizer()
-        for item in chartpane_sizer.GetChildren():
-            item.GetWindow().PreClose()
+        if self._ChartView is None:
+            chart = self._ChartView = self._ChartPane = G_HtmlNetworkCtrl(self,context,  projector_info.ChartInfo, self._TableViewCtrls)
+            chart.CallJavaScript("SetTableNodeIds", self._TableNodeIds[0], self._TableNodeIds[1])
+            self.ArrangeChildren()
 
-        chartpane_sizer.Clear(delete_windows = True)
+        self._ChartView.Realise(context.GetErrorReporter(), data_changed, selection_changed)
 
-        self._TableViewCtrl.ResetModel()
+

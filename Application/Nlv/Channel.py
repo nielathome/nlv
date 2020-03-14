@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,6 @@ import logging
 
 # pywin32 imports
 import pywintypes
-import win32api
 import win32file
 import win32event
 import win32pipe

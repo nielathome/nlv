@@ -22,11 +22,11 @@ from pathlib import Path
 import sqlite3
 
 # Application imports 
+from .Global import G_Global
+from .Global import G_PerfTimerScope
 from .Logmeta import G_FieldSchemata
-from .Project import G_Project
 from .MatchNode import G_MatchItem
-from .Project import G_Global
-from .Project import G_PerfTimerScope
+from .Project import G_Project
 
 # wxWidgets imports
 import wx
@@ -374,7 +374,7 @@ class G_Recogniser:
 
             # hence find the lineno to the first-event finish candidate in the finish
             # view; negative means "not found"
-            first_finish_lineno = finish_view.LogLineToViewLine(start_log_lineno)
+            first_finish_lineno = finish_view.LogLineToViewLine(start_log_lineno, False)
             if first_finish_lineno < 0:
                 continue
 
@@ -606,7 +606,10 @@ class G_ProjectionFieldSchema:
 ## G_ProjectionSchema ######################################
 
 class G_ProjectionSchema(G_FieldSchemata):
-    """Describe all the projected fields (database 'row')"""
+    """
+    Describes all the projected fields (database 'row').
+    Passed to user script to allow the schema to be built up.
+    """
 
     #-------------------------------------------------------
     def __init__(self, guid = ""):
@@ -722,10 +725,20 @@ class G_ProjectionSchema(G_FieldSchemata):
 class G_ChartInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, want_selection, builder):
+    def __init__(self, name, want_selection, builder, chart_db_path):
         self.Name = name
         self.WantSelection = want_selection
         self.Builder = builder
+        self.ChartDbPath = chart_db_path
+        self.HtmlPage = builder.Setup(name)
+
+
+    #-------------------------------------------------------
+    def DefineParameters(self, connection, cursor, context):
+        self.Builder.DefineParameters(connection, cursor, context)
+
+    def Realise(self, connection, cursor, context):
+        self.Builder.Realise(self.Name, connection, cursor, context)
 
 
 
@@ -749,8 +762,13 @@ class G_QuantifierInfo:
 
     #-------------------------------------------------------
     def Chart(self, name, want_selection, builder):
-        """Implements user analyse script Chart() function"""
-        self.Charts.append(G_ChartInfo(name, want_selection, builder))
+        """Implements user analyse script Quantifier.Chart() function"""
+        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.MetricsDbPath))
+
+
+    #-------------------------------------------------------
+    def GetSchemaAndDbPath(self):
+        return self.MetricsSchema, self.MetricsDbPath
 
 
 
@@ -763,7 +781,9 @@ class G_ProjectorInfo:
         self.ProjectionName = name
         self.ProjectionSchema = projection_schema
         self.ProjectionDbPath = DeriveSubPath(base_db_path, name)
+        self.DocumentNodeID = G_Project.NodeID_EventProjector
         self.Quantifiers = dict()
+        self.Charts = []
 
 
     #-------------------------------------------------------
@@ -771,15 +791,71 @@ class G_ProjectorInfo:
         """Implements user analyse script Quantify() function"""
 
         idx = len(self.Quantifiers)
-        name = "{}.{}".format(self.ProjectionName, name)
         info = G_QuantifierInfo(name, user_quantifier, metrics_schema, self.ProjectionDbPath, idx)
         self.Quantifiers.update([(name, info)])
         return info
 
 
     #-------------------------------------------------------
+    def Chart(self, name, want_selection, builder):
+        """Implements user analyse script Projector.Chart() function"""
+        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.ProjectionDbPath))
+
+
+    #-------------------------------------------------------
     def GetQuantifierInfo(self, name):
         return self.Quantifiers[name]
+
+    def GetSchemaAndDbPath(self):
+        return self.ProjectionSchema, self.ProjectionDbPath
+
+
+
+## G_NetworkChartInfo ######################################
+
+class G_NetworkChartInfo:
+
+    #-------------------------------------------------------
+    def __init__(self, name, want_selection, builder, nodes_db_path, links_db_path):
+        self.Name = name
+        self.WantSelection = want_selection
+        self.Builder = builder
+        self.NodesDbPath = nodes_db_path
+        self.LinksDbPath = links_db_path
+        self.HtmlPage = builder.Setup(name)
+
+
+    #-------------------------------------------------------
+    def DefineParameters(self, connection, cursor, context):
+        self.Builder.DefineParameters(connection, cursor, context)
+
+    def Realise(self, connection, cursor, context):
+        self.Builder.Realise(self.Name, connection, cursor, context)
+
+
+
+## G_NetworkInfo ###########################################
+
+class G_NetworkInfo:
+
+    #-------------------------------------------------------
+    def __init__(self, name, nodes_projector, links_projector):
+        self.ProjectionName = name
+        self.ChartInfo = None
+        self.DocumentNodeID = G_Project.NodeID_NetworkProjector
+        self.NetworkProjectors = [nodes_projector, links_projector]
+
+
+    #-------------------------------------------------------
+    def Chart(self, want_selection, builder):
+        nodes_db_path = self.NetworkProjectors[0].ProjectionDbPath
+        links_db_path = self.NetworkProjectors[1].ProjectionDbPath
+        self.ChartInfo = G_NetworkChartInfo(self.ProjectionName, want_selection, builder, nodes_db_path, links_db_path)
+
+
+    #-------------------------------------------------------
+    def GetDbPaths(self):
+        return [self.ProjectionDbPath for projector in self.NetworkProjectors]
 
 
 
@@ -795,8 +871,16 @@ class G_AnalysisResults:
 
 
     #-------------------------------------------------------
-    def Project(self, name, projection_schema):
+    def Project(self, name, projection_schema, record):
         info = G_ProjectorInfo(name, projection_schema, self.AnalysisDbPath)
+        if record:
+            self.Projectors.update([(name, info)])
+        return info
+
+
+    #-------------------------------------------------------
+    def Network(self, name, node_projector, link_projector):
+        info = G_NetworkInfo(name, node_projector, link_projector)
         self.Projectors.update([(name, info)])
         return info
 
@@ -807,74 +891,15 @@ class G_AnalysisResults:
 
 
 
-## G_ProjectionItem ########################################
-
-class G_ProjectionItem:
-
-    #-------------------------------------------------------
-    def __init__(self, event_number = -1, start_line_no = None, finish_line_no = None, event_data = None):
-        if event_data is None:
-            # note, somewhat arbitrary limit (32-bit signed-int-max)
-            max = 2147483647
-            self.LogStartLine = 0
-            self.LogFinishLine = max
-
-        else:
-            self.LogStartLine = start_line_no
-            self.LogFinishLine = finish_line_no
-
-        self.EventNumber = event_number
-        self.EventData = event_data
-
-
-
 ## G_ProjectionContext #####################################
 
 class G_ProjectionContext:
-    """Collect event data from any number of event analyses"""
+    """Context object passed to user script 'projector' function."""
 
     #-------------------------------------------------------
     def __init__(self, log_node, col_start):
         self._LogNode = log_node
-        self._EventNo = 0
         self._ColStart = col_start
-
-        # note, somewhat arbitrary limit (32-bit signed-int-max)
-        max = 2147483647
-        self._Stack = [G_ProjectionItem()]
-
-
-    #-------------------------------------------------------
-    def _StackBack(self):
-        return self._Stack[len(self._Stack) - 1]
-
-
-    def _UpdateStack(self, start_line_no, finish_line_no, event_data):
-        cur = G_ProjectionItem(self._EventNo, start_line_no, finish_line_no, event_data)
-        self._EventNo += 1
-
-        # remove any entries that finish before 'cur' starts
-        while cur.LogStartLine > self._StackBack().LogFinishLine:
-            self._Stack.pop()
- 
-        # since events are published in start order, we know that
-        # 'cur' starts after 'prev' (two events can't start on the
-        # same line)
-        self._Stack.append(cur)
- 
-        return cur
- 
- 
-    def CalcParentId(self, start_line_no, finish_line_no, event_data, containment_test):
-        # note: relies on the fact that events are discovered in start order
-        cur = self._UpdateStack(start_line_no, finish_line_no, event_data)
-        for idx in range(len(self._Stack) - 2, 0, -1):
-            prev = self._Stack[idx]
-            if prev.EventData is not None and prev.LogFinishLine >= cur.LogFinishLine:
-                if containment_test(prev.EventData, cur.EventData):
-                    return prev.EventNumber
- 
-        return -1
 
 
     #-------------------------------------------------------
@@ -958,10 +983,8 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def Project(self, name, user_projector, projection_schema):
-        """Implements user analyse script Project() function"""
-
-        projection = self._Results.Project(name, projection_schema)
+    def DoProject(self, name, user_projector, projection_schema, record):
+        projection = self._Results.Project(name, projection_schema, record)
         if self._SchemaOnly:
             return projection
 
@@ -986,6 +1009,27 @@ class G_Projector:
             connection.close()
 
         return projection
+
+
+    #-------------------------------------------------------
+    def Project(self, name, user_projector, projection_schema):
+        """Implements user analyse script Project() function"""
+        return self.DoProject(name, user_projector, projection_schema, True)
+
+    def Nodes(self, name, user_projector, projection_schema):
+        """Implements user analyse script Nodes() function"""
+        return self.DoProject(name, user_projector, projection_schema, False)
+
+    def Links(self, name, user_projector, projection_schema):
+        """Implements user analyse script Links() function"""
+        return self.DoProject(name, user_projector, projection_schema, False)
+
+
+    #-------------------------------------------------------
+    def Network(self, name, node_projector, link_projector):
+        """Implements user analyse script Network() function"""
+        return self._Results.Network(name, node_projector, link_projector)
+
 
 
 
@@ -1021,6 +1065,9 @@ class G_Analyser:
 
         self._Projector = G_Projector(meta_only, log_node, self._Results)
         script_globals.update(Project = self._Projector.Project)
+        script_globals.update(Nodes = self._Projector.Nodes)
+        script_globals.update(Links = self._Projector.Links)
+        script_globals.update(Network = self._Projector.Network)
         script_globals.update(MakeDisplaySchema = self.MakeDisplaySchema)
 
         return script_globals

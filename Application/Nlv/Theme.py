@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2019. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,8 +25,8 @@ import xml.etree.ElementTree as et
 import wx
 
 # Application imports
-from .Project import G_Const
-from .Project import G_Global
+from .Global import G_Const
+from .Global import G_Global
 
 
 
@@ -261,8 +261,7 @@ class D_ThemeStore:
         self._DirList = [Path(G_Global.GetConfigDir())]
 
         # field_id name map
-        inst_dir = Path(__file__).parent
-        self._FieldIdToNameMap = et.parse(inst_dir / "_field_names.xml").getroot()
+        self._FieldIdToNameMap = et.parse(G_Global.GetInstallDir() / "_field_names.xml").getroot()
 
 
     #-------------------------------------------------------

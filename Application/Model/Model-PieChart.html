@@ -1,0 +1,316 @@
+﻿<!--
+Copyright (C) Niel Clausen 2019-2020. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<!-- Start model -->
+<script src="https://d3js.org/d3.v5.js"></script>
+<button onclick="Update(data1)">Data 1</button>
+<button onclick="Update(data2)">Data 2</button>
+<!-- End model -->
+
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+    }
+
+    .full-height {
+        height: 99%;
+        overflow: hidden;
+    }
+
+    .tool-tip {
+        position: absolute;
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.8);
+        color: bisque;
+        border-radius: 2px;
+        font-family: sans-serif;
+        font-size: x-small;
+        text-align: center;
+    }
+
+    .title {
+        font-family: sans-serif;
+        font-size: small;
+    }
+
+    .slice {
+        stroke: white;
+        stroke-width: 2px;
+    }
+
+    .line {
+        stroke: black;
+        fill: none;
+        stroke-width: 1;
+    }
+
+    .label {
+        font-family: sans-serif;
+        font-size: x-small;
+    }
+</style>
+
+
+<!-- Create a div for the SVG graph -->
+<div id="graph" class="full-height"></div>
+
+
+<script>
+    //----------------------------------------------------------
+    function OnClick(d) {
+        console.log("Column selected: " + d.category);
+    }
+
+
+    //----------------------------------------------------------
+
+    // retained data
+    var g_data = null;
+    var g_title_text = null;
+
+    // append the svg object to the body of the page
+    var g_svg = d3.select("#graph")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%");
+
+    var g_chart = g_svg.append("g");
+
+    var g_title = g_chart.append("text")
+        .attr("class", "title");
+
+
+    //----------------------------------------------------------
+    const g_short_transition = 200;
+    var g_tooltip = d3.select("#graph")
+      .append("div")
+        .attr('class', 'tool-tip')
+        .style("opacity", 0);
+
+    function OnTipShow(d) {
+        g_tooltip.transition(g_short_transition)
+            .style("opacity", 1);
+
+        d3.select(this).transition(g_short_transition)
+            .style("opacity", 0.8);
+    }
+
+    function OnTipMove(d) {
+        g_tooltip
+            .html("<strong>" + d.data.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
+            .style("left", (d3.event.pageX + 15) + "px")
+            .style("top", (d3.event.pageY) + "px");
+    }
+
+    function OnTipHide(d) {
+        g_tooltip.transition(g_short_transition)
+            .style("opacity", "0");
+
+        d3.select(this).transition(g_short_transition)
+            .style("opacity", 1);
+    }
+
+
+    //----------------------------------------------------------
+    function DrawChart(switch_time) {
+        // set the dimensions and margins of the graph
+        var margin = 30, min_window = 300;
+        var window_width = Math.max(min_window, document.documentElement.clientWidth);
+        var window_height = Math.max(min_window, document.documentElement.clientHeight);
+        var radius = (Math.min(window_width, window_height) - (2 * margin)) / 2;
+
+        g_chart
+            .attr("transform", "translate(" + window_width / 2 + "," + window_height / 2 + ")");
+
+        g_title.text(g_title_text);
+        var title_bbox = g_title.node().getBBox();
+        g_title
+            .attr("x", -title_bbox.width / 2)
+            .attr("y", title_bbox.height / 2);
+
+        // Compute the angle data for each slice in the pie
+        var pie_generator = d3.pie()
+            .startAngle(-0.75)
+            .sort(null) // Do not sort by size
+            .value(function (d) {
+                return d.value;
+            });
+
+        var slice_data = pie_generator(g_data);
+
+        // The "slice" generator
+        var slice_generator = d3.arc()
+            .innerRadius(radius * 0.5)
+            .outerRadius(radius * 0.8);
+
+        // Build the pie chart: each part of the pie is a path built using the arc function.
+        const ref_transition = d3.transition()
+            .duration(switch_time);
+
+        g_chart.selectAll(".slice")
+          .data(slice_data, function (d) {
+              return d.data.category;
+          })
+          .join(
+            function (enter) {
+                return enter.append("path")
+                    .style("opacity", 0);
+            },
+            function (update) {
+                return update;
+            },
+            function(exit) {
+                return exit
+                   .call(function(exit) {
+                       exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
+            .on("click", OnClick)
+            .on("mouseover", OnTipShow)
+            .on("mousemove", OnTipMove)
+            .on("mouseleave", OnTipHide)
+            .attr("class", "slice")
+          .transition(ref_transition)
+            .style("opacity", 1)
+            .attr('d', slice_generator)
+            .attr('fill', function (d) {
+                return d.data.selected ? "DarkOrange" : "DarkSlateBlue";
+            })
+
+        // Arc for label line elbows
+        var elbow_generator = d3.arc()
+            .innerRadius(radius * 0.9)
+            .outerRadius(radius * 0.9);
+
+        // Add the polylines between chart and labels
+        g_chart.selectAll('.line')
+          .data(slice_data, function (d) {
+              return d.data.category;
+          })
+          .join(
+            function (enter) {
+                return enter.append("polyline")
+                    .style("opacity", 0);
+            },
+            function (update) {
+                return update;
+            },
+            function(exit) {
+                return exit
+                   .call(function(exit) {
+                       exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
+            .attr("class", "line")
+          .transition(ref_transition)
+            .style("opacity", 1)
+            .attr('points', function (d) {
+                var slice_centre = slice_generator.centroid(d);
+                var elbow = elbow_generator.centroid(d);
+                var text = elbow_generator.centroid(d);
+
+                // we need the angle to see if the X position will be at the extreme right or extreme left
+                var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                text[0] = radius * 0.95 * (midangle < Math.PI ? 1 : -1);
+                return [slice_centre, elbow, text];
+            });
+
+        // Add the labels
+        g_chart.selectAll('.label')
+          .data(slice_data, function (d) {
+              return d.data.category;
+          })
+          .join(
+            function (enter) {
+                return enter.append("text")
+                    .style("opacity", 0);
+            },
+            function (update) {
+                return update;
+            },
+            function (exit) {
+                return exit
+                   .call(function (exit) {
+                       return exit.transition(ref_transition)
+                           .style("opacity", 0)
+                           .on('end', function () {
+                               d3.select(this).remove();
+                           })
+                   })
+            }
+          )
+            .attr("class", "label")
+            .text(function (d) {
+                return d.data.category;
+            })
+            .attr('transform', function (d) {
+                var pos = elbow_generator.centroid(d);
+                var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                pos[0] = radius * 0.99 * (midangle < Math.PI ? 1 : -1);
+                return 'translate(' + pos + ')';
+            })
+            .style('text-anchor', function (d) {
+                var midangle = d.startAngle + (d.endAngle - d.startAngle) / 2;
+                return (midangle < Math.PI ? 'start' : 'end')
+            })
+        .transition(ref_transition)
+          .style("opacity", 1);
+    }
+
+    // draw the chart
+    function CreateChart(title, data_json, switch_time) {
+        g_data = JSON.parse(data_json);
+        g_title_text = title;
+        DrawChart(switch_time);
+    }
+
+
+    //----------------------------------------------------------
+    function OnResize() {
+        if (g_data !== null) {
+            DrawChart(g_data, 0);
+        }
+    }
+
+    window.addEventListener("resize", OnResize);
+
+
+    //----------------------------------------------------------
+    const data1 = '[{"category": "expire", "value": 129722, "selected": false}, {"category": "Other", "value": 4774, "selected": false}]';
+    const data2 = '[{"category": "P=[0.16]", "value": 1360, "selected": false}, {"category": "P=[0.17]", "value": 978, "selected": false}, {"category": "P=[0.15]", "value": 932, "selected": false}, {"category": "P=[0.09]", "value": 512, "selected": false}, {"category": "P=[0.18]", "value": 336, "selected": false}, {"category": "P=[0.08]", "value": 185, "selected": false}, {"category": "P=[0.19]", "value": 101, "selected": false}, {"category": "P=[0.22]", "value": 36, "selected": false}, {"category": "Other", "value": 218, "selected": false}]';
+
+    function Update(json_text) {
+        CreateChart("Title", json_text, 1000);
+    }
+
+    Update(data1);
+    Update(data2);
+
+</script>

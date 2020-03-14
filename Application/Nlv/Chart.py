@@ -15,72 +15,69 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import collections
-from matplotlib import cm
-import numpy as np
+# Python imports
+import json
+
+        
+
+## Bar #########################################################
+
+def ReduceFieldName(name):
+    """Convert a 'long' field name to a 'short' field name"""
+    return name.split(" ")[0].lower()
 
 
-
-## BarChart ####################################################
-
-class BarChart:
+class Bar:
 
     #-----------------------------------------------------------
-    def __init__(self, category_field, value_field, std_field = None):
+    def __init__(self, category_field, value_field):
         self._CategoryField = category_field
         self._ValueField = value_field
-        self._StdField = std_field
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
-        params.AddBool("show_std", "Show error bars", True)
+    def DefineParameters(self, connection, cursor, context):
+        pass
 
 
     #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
-        labels = []
-        values = []
-        stds = None
+    @classmethod
+    def Setup(cls, name):
+        return "BarChart.html"
 
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
         cursor.execute("""
             SELECT
                 {category},
                 {value},
-                log_row_no
+                event_id
             FROM
-                filtered_projection
-            """.format(category = self._CategoryField, value = self._ValueField))
+                display
+            """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
-        hilites = []
-        for idx, row in enumerate(cursor):
-            labels.append(row[0])
-            values.append(row[1])
-            if row[2] in selection:
-                hilites.append(idx)
-#            stds.append(metrics.GetFieldValueFloat(i, self._StdField))
+        selection = context.GetSelection()
+        data = []
 
-        #if not param_values.get("show_std", True):
-        #    stds = None
+        for row in cursor:
+            event_id = row[2]
+            selected = event_id in selection
+            data.append(dict(zip(["category", "value", "selected", "event_id"], [row[0], row[1], selected, event_id])))
 
-        x = np.arange(len(labels))
-        axes = figure.add_subplot(111)
-        axes.tick_params(labelsize = "small")
-        bars = axes.bar(x, values, yerr = stds)
-        axes.set_ylabel('Average (s)')
-        axes.set_xticks(x)
-        axes.set_xticklabels(labels, {"rotation": 75})
+        # chart transition time in msec
+        switch_time = 1000
+        if len(selection) != 0:
+            switch_time = 250
 
-        for col in hilites:
-            bars[col].set_edgecolor("black")
-
-        figure.subplots_adjust(bottom = 0.25)
+        data_json = json.dumps(data)
+        context.CallJavaScript("CreateChart", name, self._CategoryField, self._ValueField, data_json, switch_time)
 
 
 
-## PieChart ####################################################
+## Pie #########################################################
 
-class PieChart:
+class Pie:
 
     #-----------------------------------------------------------
     c_OtherPcts = ["5%", "10%", "15%"]
@@ -91,19 +88,25 @@ class PieChart:
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection, cursor, selection):
-        params.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
+    def DefineParameters(self, connection, cursor, context):
+        context.AddChoice("other_pct", "Approx. limit for 'Other'", 0, self.c_OtherPcts)
 
 
     #-----------------------------------------------------------
-    def Realise(self, name, figure, connection, cursor, param_values, selection):
+    @classmethod
+    def Setup(cls, name):
+        return "PieChart.html"
+
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
         cursor.execute("""
             SELECT
                 count({value}),
                 sum({value})
             FROM
                 display
-            """.format(value = self._ValueField))
+            """.format(value = ReduceFieldName(self._ValueField)))
 
         (count, sum) = cursor.fetchone()
         if count == 0:
@@ -118,106 +121,159 @@ class PieChart:
                 display
             ORDER BY
                 {value} DESC
-            """.format(category = self._CategoryField, value = self._ValueField))
+            """.format(category = ReduceFieldName(self._CategoryField), value = ReduceFieldName(self._ValueField)))
 
-        param = param_values.get("other_pct", 0)
+        param = context.GetParameter("other_pct", 0)
         accum = 0
         limit = sum * (1 - (0.05 * (1 + param)))
 
-        labels = []
-        values = []
-        explodes = []
-        other_explode = 0
+        selection = context.GetSelection()
+        data = []
+        other_selected = False
 
         for row in cursor:
-            selected = row[2] in selection
+            event_id = row[2]
+            selected = event_id in selection
 
             if accum >= limit:
                 if selected:
-                    other_explode = 0.1
-
+                    other_selected = True
             else:
                 value = row[1]
                 accum += value
+                data.append(dict(zip(["category", "value", "selected", "event_id"], [row[0], value, selected, event_id])))
 
-                labels.append(row[0])
-                values.append(value)
-            
-                explode = 0.0
-                if selected:
-                    explode = 0.1
-                explodes.append(explode)
-            
         other = sum - accum
         if other > 0:            
-            labels.append("Other")
-            values.append(other)
-            explodes.append(other_explode)
+            data.append(dict(zip(["category", "value", "selected", "event_id"], ["Other", other, other_selected, -1])))
 
-        cmap = cm.get_cmap('tab20c', len(values))
-        axes = figure.add_subplot(111)
-        axes.pie(values, labels = labels, autopct = '%1.1f%%', startangle = 90,
-            explode = explodes, colors = cmap.colors, shadow = True
-        )
+        # chart transition time in msec
+        switch_time = 1000
+        if len(selection) != 0:
+            switch_time = 250
 
-        figure.suptitle(name, x = 0.02, y = 0.5,
-            horizontalalignment = 'left', verticalalignment = 'center'
-        )
+        data_json = json.dumps(data)
+        context.CallJavaScript("CreateChart", self._ValueField, data_json, switch_time)
 
 
 
-## HistogramChart ##############################################
+## Network #####################################################
 
-class HistogramChart:
+class Network:
 
     #-----------------------------------------------------------
-    def __init__(self, category_field, value_field):
-        self._CategoryField = category_field
-        self._ValueField = value_field
-        self._CachedCategoryLengths = None
-
+    def DefineParameters(self, connection, cursor, context):
+        context.AddBool("graph_is_disjoint", "Network is disjoint", False)
+        
 
     #-----------------------------------------------------------
-    def _GetCategoryLengths(self, metrics, num_metrics, force = False):
-        if self._CachedCategoryLengths is not None and not force:
-            return self._CachedCategoryLengths
-
-        lengths = self._CachedCategoryLengths = collections.Counter()
-        for i in range(num_metrics):
-            category = metrics.GetFieldText(i, self._CategoryField)
-            lengths[category] += 1
-
-        return lengths
+    @classmethod
+    def Setup(cls, name):
+        return "Network.html"
 
 
     #-----------------------------------------------------------
-    def DefineParameters(self, params, connection):
-        lengths = self._GetCategoryLengths(metrics, num_metrics)
-        for category in lengths.keys():
-            params.AddBool(category, category, True)
+    def SetSelection(self, connection, cursor, context):
+        selected_nodes = set(context.GetSelection(0))
+        selected_links = set(context.GetSelection(1))
+
+        have_nodes = len(selected_nodes) != 0
+        have_links = len(selected_links) != 0
+
+        if have_nodes or have_links:
+            where = ""
+            if have_nodes:
+                nodes = ", ".join([str(node) for node in selected_nodes])
+                where = "source_event_id IN ({nodes}) OR target_event_id IN ({nodes})".format(nodes = nodes)
+
+            if have_links:
+                if have_nodes:
+                    where = where + " OR "
+                links = ", ".join([str(link) for link in selected_links])
+                text = " link_event_id IN ({links})".format(links = links)
+                where = where + text
+
+            # find everything "reachable" from the selection
+            cursor.execute("""
+                SELECT
+                    link_data.event_id AS link_event_id,
+                    source_data.event_id AS source_event_id,
+                    target_data.event_id AS target_event_id
+                FROM
+                    links.display AS link_data
+                JOIN
+                    main.display
+                    AS
+                        source_data
+                    ON
+                        link_data.source = source_data.title 
+                JOIN
+                    main.display
+                    AS
+                        target_data
+                    ON
+                        link_data.target = target_data.title 
+                WHERE
+                    {where}
+                """.format(where = where))
+
+            for row in cursor:
+                selected_links.add(row[0])
+                selected_nodes.add(row[1])
+                selected_nodes.add(row[2])
+
+        selection = dict(nodes = [node for node in selected_nodes], links = [link for link in selected_links])
+        selection_json = json.dumps(selection)
+        context.CallJavaScript("SetSelection", selection_json)
 
 
     #-----------------------------------------------------------
-    def Realise(self, figure, connection, param_values, selection):
-        lengths = self._GetCategoryLengths(metrics, num_metrics, True)
+    def CreateChart(self, connection, cursor, context):
+        cursor.execute("""
+            SELECT
+                event_id,
+                type,
+                title,
+                size
+            FROM
+                main.display
+            """)
 
-        data = dict()
-        for (category, length) in lengths.items():
-            if param_values.get(category, True):
-                data[category] = [0, np.empty(length, dtype = np.uint32)]
-                
-        for i in range(num_metrics):
-            category = metrics.GetFieldText(i, self._CategoryField)
-            entry = data.get(category, None)
-            if entry is not None:
-                (idx, array) = entry
-                array[idx] = metrics.GetFieldValueUnsigned(idx, self._ValueField)
-                entry[0] += 1
-
-        series = [a for (i, a) in data.values()]
-        axes = figure.add_subplot(111)
-        axes.hist(series, 20, histtype='bar', label = data.keys())
-        axes.legend()
+        nodes = []
+        for row in cursor:
+            nodes.append(dict(zip(["event_id", "type", "title", "size"], [row[0], row[1], row[2], row[3]])))
 
 
+        cursor.execute("""
+            SELECT
+                event_id,
+                source,
+                target
+            FROM
+                links.display
+            WHERE
+                source IN (SELECT title FROM main.display) AND
+                target IN (SELECT title FROM main.display)
+            """)
 
+        links = []
+        for row in cursor:
+            links.append(dict(zip(["event_id", "source", "target"], [row[0], row[1], row[2]])))
+
+        config = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
+        config_json = json.dumps(config)
+
+        network = dict(nodes = nodes, links = links)
+        data_json = json.dumps(network)
+        context.CallJavaScript("CreateChart", data_json, config_json)
+
+        self.SetSelection(connection, cursor, context)
+
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
+        if context.DataChanged() or context.ParamatersChanged():
+            self.CreateChart(connection, cursor, context)
+
+        elif context.SelectionChanged():
+            self.SetSelection(connection, cursor, context)

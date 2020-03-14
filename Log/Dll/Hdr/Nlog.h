@@ -457,7 +457,7 @@ public:
 
 	// line number translation between the view and the underlying logfile
 	vint_t ViewLineToLogLine( vint_t view_line_no ) const;
-	vint_t LogLineToViewLine( vint_t log_line_no ) const;
+	vint_t LogLineToViewLine( vint_t log_line_no, bool exact ) const;
 };
 
 
@@ -552,6 +552,7 @@ public:
 	bool IsContainer( vint_t line_no );
 	std::vector<int> GetChildren( vint_t line_no, bool view_flat );
 	int GetParent( vint_t line_no );
+	int LookupEventId( int64_t event_id );
 };
 
 

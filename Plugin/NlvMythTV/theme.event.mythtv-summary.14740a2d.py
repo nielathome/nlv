@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,7 +15,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import Nlv.Chart as ch
+import Nlv.Chart as Chart
 import re
 
 
@@ -92,7 +92,7 @@ Recognise(
 
 ## Recognise ###################################################
 
-class SummaryRecogniser:
+class ExpireRecogniser:
 
     #-----------------------------------------------------------
     def Begin(self, connection, cursor):
@@ -136,7 +136,7 @@ class SummaryRecogniser:
 
 
 Recognise(
-    SummaryRecogniser(),
+    ExpireRecogniser(),
     ('LogView Filter', 'function = "CalcParams"'),
     ('LogView Filter', 'function = "HandleAnnounce" and log ~= "adding"')
 )
@@ -249,6 +249,7 @@ def SummaryProjector(connection, cursor, context):
             process
         FROM
             analysis.reschedule
+
         UNION ALL
         SELECT
             event_id INT,
@@ -324,7 +325,7 @@ projection = Project(
 
 
 
-## SummaryQuantifier ###########################################
+## Quantifier ##################################################
 
 def SummaryQuantifier(connection, cursor):
     cursor.execute("DROP TABLE IF EXISTS main.projection")
@@ -334,7 +335,7 @@ def SummaryQuantifier(connection, cursor):
             event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
             summary TEXT,
             count INT,
-            sum INT,
+            duration INT,
             average REAL
         )""")
 
@@ -343,7 +344,7 @@ def SummaryQuantifier(connection, cursor):
         (
             summary,
             count,
-            sum,
+            duration,
             average
         )
         SELECT
@@ -369,37 +370,5 @@ metrics = projection.Quantify(
 )
 
 
-metrics.Chart("By Count", True, ch.PieChart("summary", "count"))
-metrics.Chart("By Duration", True, ch.PieChart("summary", "sum"))
-#metrics.Chart("Durations", True, ch.BarChart("summary", "average"))
-
-
-
-## TimingQuantifier ############################################
-
-#class TimingQuantifier:
-
-#    #-----------------------------------------------------------
-#    @staticmethod
-#    def DefineSchema(schema):
-#        schema.AddField("Category", "text", 150, "left")
-#        schema.AddField("Duration (s)", "uint32", 80, "left")
-
-
-#    #-----------------------------------------------------------
-#    def __init__(self):
-#        self.Name = "Histogram"
-#        self.Charts = [
-#            EventMetrics.HistogramChart("Histogram", 0, 1),
-#        ]
-
-
-#    #-----------------------------------------------------------
-#    def Assemble(self, metrics, num_metrics, collector):
-#        category_id = collector.GetFieldId("Event Summary")
-#        value_id = collector.GetFieldId("Duration (s)")
-
-#        for evt_no in range(num_metrics):
-#            category = metrics.GetFieldText(evt_no, category_id)
-#            value = metrics.GetFieldValueUnsigned(evt_no, value_id)
-#            collector.AddMetric([category, value])
+metrics.Chart("By Count", True, Chart.Bar("Summary", "Count"))
+metrics.Chart("By Duration", True, Chart.Pie("Summary", "Duration (s)"))
