@@ -63,7 +63,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         args_encoded_text = btoa(args_json_text);
         cgi_text = "/" + target_node_id + "." + method + "?" + args_encoded_text;
 
-        d3.json(cgi_text, function (error, json) {
+        d3.json(cgi_text, function (error, results_json) {
             if (error)
                 throw error;
         });
@@ -292,8 +292,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
-    function CreateChart(title, x_label_text, y_label_text, json_text, switch_time) {
-        g_data = JSON.parse(json_text);
+    function CreateChart(title, x_label_text, y_label_text, data_json, switch_time) {
+        g_data = JSON.parse(data_json);
         g_title_text = title;
         g_x_label_text = x_label_text;
         g_y_label_text = y_label_text;

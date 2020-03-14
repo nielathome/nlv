@@ -70,8 +70,8 @@ class Bar:
         if len(selection) != 0:
             switch_time = 250
 
-        json_text = json.dumps(data)
-        context.CallJavaScript("CreateChart", name, self._CategoryField, self._ValueField, json_text, switch_time)
+        data_json = json.dumps(data)
+        context.CallJavaScript("CreateChart", name, self._CategoryField, self._ValueField, data_json, switch_time)
 
 
 
@@ -152,8 +152,8 @@ class Pie:
         if len(selection) != 0:
             switch_time = 250
 
-        json_text = json.dumps(data)
-        context.CallJavaScript("CreateChart", self._ValueField, json_text, switch_time)
+        data_json = json.dumps(data)
+        context.CallJavaScript("CreateChart", self._ValueField, data_json, switch_time)
 
 
 
@@ -163,8 +163,8 @@ class Network:
 
     #-----------------------------------------------------------
     def DefineParameters(self, connection, cursor, context):
-        pass
-
+        context.AddBool("graph_is_disjoint", "Network is disjoint", False)
+        
 
     #-----------------------------------------------------------
     @classmethod
@@ -223,8 +223,8 @@ class Network:
                 selected_nodes.add(row[2])
 
         selection = dict(nodes = [node for node in selected_nodes], links = [link for link in selected_links])
-        json_text = json.dumps(selection)
-        context.CallJavaScript("SetSelection", json_text)
+        selection_json = json.dumps(selection)
+        context.CallJavaScript("SetSelection", selection_json)
 
 
     #-----------------------------------------------------------
@@ -260,16 +260,19 @@ class Network:
         for row in cursor:
             links.append(dict(zip(["event_id", "source", "target"], [row[0], row[1], row[2]])))
 
+        config = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
+        config_json = json.dumps(config)
+
         network = dict(nodes = nodes, links = links)
-        json_text = json.dumps(network)
-        context.CallJavaScript("CreateChart", "Title", json_text)
+        data_json = json.dumps(network)
+        context.CallJavaScript("CreateChart", data_json, config_json)
 
         self.SetSelection(connection, cursor, context)
 
 
     #-----------------------------------------------------------
     def Realise(self, name, connection, cursor, context):
-        if context.DataChanged():
+        if context.DataChanged() or context.ParamatersChanged():
             self.CreateChart(connection, cursor, context)
 
         elif context.SelectionChanged():

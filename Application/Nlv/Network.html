@@ -65,7 +65,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         args_encoded_text = btoa(args_json_text);
         cgi_text = "/" + target_node_id + "." + method + "?" + args_encoded_text;
 
-        d3.json(cgi_text, function (error, json) {
+        d3.json(cgi_text, function (error, results_json) {
             if (error)
                 throw error;
         });
@@ -88,7 +88,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     // retained data
     var g_data = null;
-    var g_title_text = null;
+    var g_config = null;
 
     var g_simulation = null;
     var g_curZoom = 0;
@@ -264,14 +264,27 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 .distance(50)
             )
             .force("charge", d3.forceManyBody())
-            .force("center", d3.forceCenter(GetWindowWidth() / 2, GetWindowHeight() / 2))
-            .on("tick", Layout);
+            .on("tick", Layout)
+            .stop();
+
+        if ("graph_is_disjoint" in g_config && g_config.graph_is_disjoint) {
+            g_simulation
+                .force("x", d3.forceX())
+                .force("y", d3.forceY());
+        }
+        else {
+            g_simulation
+                .force("center", d3.forceCenter(GetWindowWidth() / 2, GetWindowHeight() / 2))
         }
 
+        g_simulation.restart()
+    }
+
     
-    function CreateChart(title, json_text) {
-        g_data = JSON.parse(json_text);
-        g_title_text = title;
+    function CreateChart(data_json, config_json) {
+        g_data = JSON.parse(data_json);
+        g_config = JSON.parse(config_json);
+
         DoCreateChart();
         DoSimulation();
     }
@@ -296,8 +309,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function SetSelection(json_text) {
-        selection = JSON.parse(json_text);
+    function SetSelection(selection_json) {
+        selection = JSON.parse(selection_json);
 
         g_selected_nodes = new Set();
         selection.nodes.forEach(function (event_id) {

@@ -113,8 +113,8 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         elif len(cgi_list) == 2:
             action, args_encoded_text = cgi_list
             node_id, method = action.split('.')
-            args_json_text = base64.standard_b64decode(args_encoded_text)
-            args = json.loads(args_json_text)
+            args_json = base64.standard_b64decode(args_encoded_text)
+            args = json.loads(args_json)
             self._Callback(int(node_id), method, args)
             return install_dir / "empty.json"
 
