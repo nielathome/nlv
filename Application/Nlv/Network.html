@@ -22,11 +22,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <script src="fetch.umd.3.0.0.js"></script>
 <script src="d3.v5.min.js"></script>
 
-<!-- Create a div where the graph will take place -->
-<div id="my_dataviz"></div>
-
 
 <style>
+    html, body {
+        height: 100%;
+        margin: 0;
+    }
+
+    .full-height {
+        height: 99%;
+        overflow: hidden;
+    }
+
     .links line {
         stroke: #aaa;
     }
@@ -43,6 +50,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         pointer-events: none;
     }
 </style>
+
+
+<!-- Create a div for the SVG graph -->
+<div id="graph" class="full-height"></div>
 
 
 <script>
@@ -95,7 +106,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_curTransform = d3.zoomIdentity;
 
     // append the svg object to the body of the page
-    var g_svg = d3.select("#my_dataviz").append("svg");
+    var g_svg = d3.select("#graph")
+        .append("svg")
+        .attr("width", "100%")
+        .attr("height", "100%");
 
     var g_joined_links = null;
     var g_links_group = g_svg.append("g")
@@ -127,13 +141,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
     function GetWindowWidth() {
-        const min_window = 300, margin = 30;
-        return Math.max(min_window, document.documentElement.clientWidth);
+        return document.getElementById("graph").clientWidth;
     }
 
     function GetWindowHeight() {
-        const min_window = 300, margin = 30;
-        return Math.max(min_window, document.documentElement.clientHeight);
+        return document.getElementById("graph").clientHeight;
     }
 
 
@@ -179,13 +191,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_curZoom = g_curTransform.k;
 
         g_svg
-            .attr("width", GetWindowWidth())
-            .attr("height", GetWindowHeight())
-            .call(d3.zoom()
+           .call(d3.zoom()
                 .scaleExtent([1, 8])
                 .wheelDelta(function wheelDelta() {
                     // d3.event here is the underlying WheelEvent
-                    return -d3.event.deltaY * (d3.event.deltaMode === 1 ? 0.25 : d3.event.deltaMode ? 1 : 0.01);
+                    // fixed step per event; avoids magic numbers like this:
+                    //  return -d3.event.deltaY * (d3.event.deltaMode === 1 ? 0.15 : d3.event.deltaMode ? 1 : 0.01);
+                    return d3.event.deltaY < 0 ? 0.4 : -0.4;
                 })
                 .on("zoom", function() {
                     g_curTransform = d3.event.transform;
@@ -256,6 +268,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     function DoSimulation() {
+        centre_x = GetWindowWidth() / 2;
+        centre_y = GetWindowHeight() / 2;
+
         g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
                 .id(function (node) {
@@ -269,18 +284,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         if ("graph_is_disjoint" in g_config && g_config.graph_is_disjoint) {
             g_simulation
-                .force("x", d3.forceX())
-                .force("y", d3.forceY());
+                .force("x", d3.forceX(centre_x))
+                .force("y", d3.forceY(centre_y));
         }
         else {
             g_simulation
-                .force("center", d3.forceCenter(GetWindowWidth() / 2, GetWindowHeight() / 2))
+                .force("center", d3.forceCenter(centre_x, centre_y));
         }
 
-        g_simulation.restart()
+        g_simulation.restart();
     }
 
-    
+
     function CreateChart(data_json, config_json) {
         g_data = JSON.parse(data_json);
         g_config = JSON.parse(config_json);
