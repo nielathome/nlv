@@ -28,6 +28,7 @@ from .DataExplorer import G_DataExplorerProvider
 from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
 from .Global import G_Const
+from .Global import G_FrozenWindow
 from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
@@ -357,11 +358,12 @@ class G_ViewSearchNode(G_ViewChildNode, G_ThemeNode, G_MatchNode, G_ColourNode, 
             if len(text) == 0:
                 return True
             else:
-                # clear the "selection" hiliter
-                self.GetParentNode().GetChildNode(0).SetMatch(G_MatchItem("Literal", ""), make_active = False, refocus = False)
+                with G_FrozenWindow(self.GetFrame()):
+                    # clear the "selection" hiliter
+                    self.GetParentNode().GetChildNode(0).SetMatch(G_MatchItem("Literal", ""), make_active = False, refocus = False)
 
-                # copy selection into this hiliter, then continue with fwd/rev search
-                self.SetMatch(G_MatchItem("Literal", text))
+                    # copy selection into this hiliter, then continue with fwd/rev search
+                    self.SetMatch(G_MatchItem("Literal", text))
 
         self.OnSearch(modifiers = modifiers)
 
