@@ -734,11 +734,6 @@ class G_TreeNode(G_Node):
     #-------------------------------------------------------
     def MakeActive(self):
         """Ensure that this node is the tree's active node"""
-        return G_TreeNode.ActivateChild(self)
-
-
-    def ActivateChild(self, child = None):
-        """Ensure the named child is active in the tree; return True if no change made"""
         selected = self.GetTrItem().IsSelected()
         if not selected:
             self.Select()
@@ -1126,6 +1121,21 @@ class G_ContainerNode(G_ContainerMenu):
 
 
     #-------------------------------------------------------
+    def ActivateChild(self, child):
+        """Ensure the named child is active in the tree"""
+        subpage_idx = self.GetHrItem().GetChildIndex(child)
+        selected = subpage_idx == self._CurSelectionIdx
+        if not selected:
+            self._CurSelectionIdx = subpage_idx
+            if self.MakeActive():
+                self.SetSelection(subpage_idx)
+        else:
+            self.MakeActive()
+
+        return selected
+
+
+    #-------------------------------------------------------
     def SwitchSubpage(self, new_idx, page):
         page_window = page.GetWindow()
         page_sizer = page.GetSizer()
@@ -1240,6 +1250,13 @@ class G_TabContainerNode(G_ContainerNode, G_DeletableTreeNode):
 
 
     #-------------------------------------------------------
+    def SetSelection(self, new_idx):
+        """Set selection in selector control and force through sub-page switch"""
+        self._SubpageSelector.ToggleTool(new_idx, True)
+        self.SwitchSubpage(new_idx, self._Page)
+
+
+    #-------------------------------------------------------
     def OnSubpageSelect(self, event):
         self.SwitchSubpage(event.GetId(), self._Page)
 
@@ -1304,25 +1321,11 @@ class G_ListContainerNode(G_ContainerNode, G_TabContainedNode):
 
 
     #-------------------------------------------------------
-    def ActivateChild(self, child):
-        """Ensure the named child is active in the tree"""
-        subpage_idx = self.GetHrItem().GetChildIndex(child)
-        selected = subpage_idx == self._CurSelectionIdx
-        if not selected:
-            self._CurSelectionIdx = subpage_idx
-            if self.MakeActive():
-                self.SetSelection(subpage_idx)
-        else:
-            self.MakeActive()
-
-        return selected
-
-
-    #-------------------------------------------------------
     def SetSelection(self, new_idx):
         """Set selection in selector control and force through sub-page switch"""
         self._SubpageSelector.SetSelection(new_idx)
         self.SwitchSubpage(new_idx, self._Page)
+
 
     #-------------------------------------------------------
     def OnSubpageSelect(self, event):

@@ -96,11 +96,10 @@ class G_DelayedSendFocus:
     def SendFocusToCtrl(self, ctrl):
         """Delayed forwarding of input focus; safe to use in any event context"""
 
-        # in practice, we do see recursion (even though that
-        # makes little sense), so defend against that
-        if self._DelayedFocusWindow is None:
-            self._DelayedFocusWindow = ctrl
-            self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
+        # repeat requests can occur in some scenarious; always
+        # take the *last* request (i.e. "ctrl")
+        self._DelayedFocusWindow = ctrl
+        self._DelayedFocusWindow.Bind(wx.EVT_IDLE, self.OnSendFocusToWindow)
 
 
     #-------------------------------------------------------
@@ -254,6 +253,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         # the node to re-appear
         if self.IsNodeDisplayed():
             self._DisplayCtrl.SwitchToDisplayCtrl()
+
 
     def WithFocusLock(self, func):
         """Execute 'func' while holding the focus recursion-lock"""
