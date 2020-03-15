@@ -34,6 +34,7 @@ import Nlog
 
 # Application imports
 from .Global import G_Const
+from .Global import G_FrozenWindow
 from .Global import G_Global
 from .Global import G_PerfTimer
 from Nlv.Channel import Channel
@@ -450,30 +451,27 @@ class G_Node:
 
         return node
 
-    @G_Global.TimeFunction
-    def DoBuildNode(self, document, copy_defaults, name, **kwargs ):
-        """Common node building implementation; GUI is frozen"""
-        new_node = self.BuildChildNode(document, copy_defaults, name, **kwargs)
-
-        # final offers of initialisation to document nodes; the
-        # whole tree is now built
-        if new_node is not None:
-            for node in new_node.ListSubNodes(recursive = True, include_self = True):
-                node.PostInitLoad()
-                node._Initialising = False
-
-            # again, but parents are called before their children (breadth-first)
-            for node in new_node.ListSubNodes(recursive = True, depth_first = False, include_self = True):
-                node.PostInitLayout()
-
-        return new_node
-
     @G_Global.ProgressMeter
+    @G_Global.TimeFunction
     def BuildNode(self, document, copy_defaults, name, **kwargs ):
         """Common node building implementation"""
 
         # freeze frame to avoid GUI flicker
-        return self.WithFrameLocked(self.DoBuildNode, document, copy_defaults, name, **kwargs )
+        with G_FrozenWindow(self.GetFrame()):
+            new_node = self.BuildChildNode(document, copy_defaults, name, **kwargs)
+
+            # final offers of initialisation to document nodes; the
+            # whole tree is now built
+            if new_node is not None:
+                for node in new_node.ListSubNodes(recursive = True, include_self = True):
+                    node.PostInitLoad()
+                    node._Initialising = False
+
+                # again, but parents are called before their children (breadth-first)
+                for node in new_node.ListSubNodes(recursive = True, depth_first = False, include_self = True):
+                    node.PostInitLayout()
+
+            return new_node
 
     def BuildNodeFromDefaults(self, factory_id, name, **kwargs):
         """
@@ -688,19 +686,6 @@ class G_Node:
         """Helper to rebind a control's event handler"""
         control.Unbind(event)
         control.Bind(event, handler)
-
-
-    #-------------------------------------------------------
-    def WithFrameLocked(self, func, *args, **kwargs):
-        frame = self.GetFrame()
-        frame.Freeze()
-
-        try:
-            res = func(*args, **kwargs)
-        finally:
-            frame.Thaw()
-
-        return res
 
 
     #-------------------------------------------------------
@@ -1139,29 +1124,28 @@ class G_ContainerNode(G_ContainerMenu):
     def SwitchSubpage(self, new_idx, page):
         page_window = page.GetWindow()
         page_sizer = page.GetSizer()
-        page_window.Freeze()
 
-        node_sizer = None
-        if new_idx >= 0:
-            self._CurSelectionIdx = new_idx
+        with G_FrozenWindow(page_window):
+            node_sizer = None
+            if new_idx >= 0:
+                self._CurSelectionIdx = new_idx
 
-            new_node = self.GetChildNode(new_idx)
-            if new_node:
-                node_sizer = new_node.GetSizer()
-                page_sizer.Show(node_sizer, True)
-                new_node.Activate()
+                new_node = self.GetChildNode(new_idx)
+                if new_node:
+                    node_sizer = new_node.GetSizer()
+                    page_sizer.Show(node_sizer, True)
+                    new_node.Activate()
 
-        # it seems that since the sub-page sizers are specified with "EXPAND" that
-        # whenever one of them is hidden, the others are expanded to fill the void;
-        # so hide all unwanted sub-page sizers in one pass, which is after the wanted
-        # sub-page sizer is known to be visible
-        for sizer_item in page_sizer.GetChildren():
-            child_sizer = sizer_item.GetSizer()
-            if child_sizer and child_sizer is not node_sizer:
-                page_sizer.Show(child_sizer, False)
+            # it seems that since the sub-page sizers are specified with "EXPAND" that
+            # whenever one of them is hidden, the others are expanded to fill the void;
+            # so hide all unwanted sub-page sizers in one pass, which is after the wanted
+            # sub-page sizer is known to be visible
+            for sizer_item in page_sizer.GetChildren():
+                child_sizer = sizer_item.GetSizer()
+                if child_sizer and child_sizer is not node_sizer:
+                    page_sizer.Show(child_sizer, False)
 
-        page_sizer.Layout()
-        page_window.Thaw()
+            page_sizer.Layout()
 
 
     #-------------------------------------------------------
@@ -1927,21 +1911,21 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         # artifacts left on the screen (which can happen when a control's label
         # is set, but before the control has been correctly positioned by the
         # layout system)
-        window.Freeze()
-        old_node = _Item2Node(event.GetOldItem())
-        if old_node:
-            sizer.Show(old_node.GetSizer(), False)
+        with G_FrozenWindow(window):
+            old_node = _Item2Node(event.GetOldItem())
+            if old_node:
+                sizer.Show(old_node.GetSizer(), False)
 
-        new_node = _Item2Node(event.GetItem())
-        if new_node:
-            # order is important: the Show() behaves as if its "recursive" argument
-            # is forced to True, so the Activate has to follow afterwards, in order
-            # to have final control over visibility of sub-sizers
-            sizer.Show(new_node.GetSizer(), True)
-            new_node.Activate()
+            new_node = _Item2Node(event.GetItem())
+            if new_node:
+                # order is important: the Show() behaves as if its "recursive" argument
+                # is forced to True, so the Activate has to follow afterwards, in order
+                # to have final control over visibility of sub-sizers
+                sizer.Show(new_node.GetSizer(), True)
+                new_node.Activate()
 
-        sizer.Layout()
-        window.Thaw()
+            sizer.Layout()
+
         event.Skip()
 
 

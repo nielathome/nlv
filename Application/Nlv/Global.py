@@ -31,6 +31,28 @@ import Nlog
 
 
 
+## G_FrozenWindow ##########################################
+
+class G_FrozenWindow:
+    """Context manager (use with "with")."""
+
+    #-------------------------------------------------------
+    def __init__(self, window):
+        self._Window = window
+
+
+    #-------------------------------------------------------
+    def __enter__(self):
+        self._Window.Freeze()
+        return self
+
+
+    #-------------------------------------------------------
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._Window.Thaw()
+
+
+
 ## G_ProgressMeter #########################################
 
 class G_ProgressMeter:
