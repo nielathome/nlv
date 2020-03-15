@@ -350,7 +350,7 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
             module = com.gencache.EnsureModule('{00020813-0000-0000-C000-000000000046}', 0, 1, 8)
             me._BtnExcel.Enable(module is not None)
         except pywintypes.com_error as ex:
-            logging.info("Excel not found; Excel integration will be disabled")
+            logging.warn("Excel not found; Excel integration will be disabled")
 
 
     #-------------------------------------------------------
@@ -559,7 +559,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                 try:
                     file.unlink()
                 except Exception as ex:
-                    logging.info("Unable to remove temporary: file=[{}] info=[{}]".format(str(file), str(ex)))
+                    logging.warn("Unable to remove temporary: file=[{}] info=[{}]".format(str(file), str(ex)))
 
 
     #-------------------------------------------------------

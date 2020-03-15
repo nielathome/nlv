@@ -404,7 +404,7 @@ class G_DataExplorerSync:
 
 ## G_DataExplorerChildNode #################################
 
-class G_DataExplorerChildNode():
+class G_DataExplorerChildNode:
 
     """
     G_DataExplorer integration/support.

@@ -302,6 +302,12 @@ class G_Node:
 
         return G_Node._GetThemeId(self, theme_cls)
 
+    def GetDebugDescription(self):
+        return "{cls} ('{name}'@{id})".format(
+            cls = type(self).__name__,
+            name = self.GetNodeName(),
+            id = self.GetNodeId())
+
     def GetDocument(self):
         return self._Document
 
@@ -1293,7 +1299,7 @@ class G_ListContainerNode(G_ContainerNode, G_TabContainedNode):
 
     #-------------------------------------------------------
     def MakeActive(self):
-        """Ensure the this node is the tree's active node"""
+        """Ensure that this node is the tree's active node"""
         return self.GetParentNode().ActivateChild(self)
 
 

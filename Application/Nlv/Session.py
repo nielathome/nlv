@@ -35,7 +35,6 @@ from .Global import G_Global
 from .Logmeta import GetLogSchema, GetLogSchemataNames
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
-from .Project import G_TreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
 from .Project import G_WindowInfo

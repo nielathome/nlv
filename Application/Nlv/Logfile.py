@@ -17,6 +17,7 @@
 
 # Python imports
 import datetime
+import logging
 from pathlib import Path
 from weakref import ref as MakeWeakRef
 
@@ -111,6 +112,7 @@ class G_DelayedSendFocus:
             ctrl.Unbind(wx.EVT_IDLE)
 
             # move the focus
+            logging.debug("OnSendFocusToWindow: window=[{}]".format(ctrl.GetName()), extra = G_Const.LogFocus)
             ctrl.SetFocus()
 
         # don't interfere with any use the editor has for idle events
@@ -265,11 +267,13 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """A child node is activating; update the AuiNotebook accordingly"""
 
         def Work():
+            nonlocal child, focus_window
+            logging.debug("ChildActivating: self=[{}] child=[{}]".format(self.GetDebugDescription(), child.GetDebugDescription()), extra = G_Const.LogFocus)
+
             # ensure containing notebook(s) set correctly
             self.EnsureDisplayControlVisible()
 
             # forward focus; unless otherwise specified, forward to the display control
-            nonlocal child, focus_window
             if focus_window is None:
                 focus_window = self._DisplayFocusCtrl
             self.SendFocusToWindow(focus_window)
@@ -288,6 +292,8 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
         """A display control associated with this node has received input focus"""
 
         def Work():
+            logging.debug("OnDisplayCtrlSetFocus: self=[{}]".format(self.GetDebugDescription()), extra = G_Const.LogFocus)
+
             # ensure containing notebook(s) set correctly
             self.EnsureDisplayControlVisible()
 
@@ -364,6 +370,7 @@ class G_DisplayNode(G_LogChildNode, G_DelayedSendFocus):
     def SendFocusToWindow(self, focus_window):
         """Delayed forwarding of input focus; safe to use in any event context"""
         if self.IsNodeDisplayed():
+            logging.debug("SendFocusToWindow: self=[{}] window=[{}]".format(self.GetDebugDescription(), focus_window.GetName()), extra = G_Const.LogFocus)
             self.SendFocusToCtrl(focus_window)
 
     def SendFocusToDisplayCtrl(self):
