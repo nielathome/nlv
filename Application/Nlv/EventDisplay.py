@@ -224,8 +224,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
-        self._DataExplorerColour = G_ColourTraits.MakeColour("LIGHT SLATE BLUE")
-        self._DataExplorerSyncKey = None
+        self._DataExplorerColour = G_ColourTraits.MakeColour("WHEAT")
+        self._DataExplorerKey = None
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
@@ -234,7 +234,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self._Icons = [
             wx.ArtProvider.GetIcon(wx.ART_NORMAL_FILE, wx.ART_TOOLBAR, (16, 16)),
-            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16))
+            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16)),
+            wx.ArtProvider.GetIcon(wx.ART_GO_FORWARD, wx.ART_TOOLBAR, (16, 16))
         ]
 
 
@@ -254,6 +255,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
     @staticmethod
     def KeyToItem(key):
         return wx.dataview.DataViewItem(key + 1)
+
+
+    #-------------------------------------------------------
+    def IsDataExplorerLine(self, item_key):
+        return item_key == self._DataExplorerKey
 
 
     #-------------------------------------------------------
@@ -294,7 +300,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         icon = None
 
         if field_schema.IsFirst:
-            icon = self._Icons[self.IsContainer(item)]
+            if self.IsDataExplorerLine(item_key):
+                icon = self._Icons[2]
+            else:
+                icon = self._Icons[self.IsContainer(item)]
 
         return G_ProjectionTypeManager.GetDisplayValue(field_schema, icon, self._N_EventView, item_key, col_num)
 
@@ -359,9 +368,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if schema.UserDataExplorerClose is not None:
             schema.UserDataExplorerClose(builder)
 
+        self._DataExplorerKey = None
         location_item = None
         if sync:
-            self._DataExplorerSyncKey = key
+            self._DataExplorerKey = key
             location_item = item
 
         return location_item
@@ -369,8 +379,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
     def OnDataExplorerUnload(self):
-        do_refresh = self._DataExplorerSyncKey is not None
-        self._DataExplorerSyncKey = None
+        do_refresh = self._DataExplorerKey is not None
+        self._DataExplorerKey = None
         return do_refresh
 
 
@@ -481,15 +491,16 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     def GetAttr(self, item, col_num, attr):
         """Pass formatting request to any formatter registered by the recogniser"""
+
+        # attr is a DataViewItemAttr
         wrapped_attr = G_TableFieldFormatter(attr)
 
         if not self._IsValid:
             wrapped_attr.SetFgColour(self._InvalidColour, True)
 
         item_key = self.ItemToKey(item)
-        if item_key == self._DataExplorerSyncKey:
+        if self.IsDataExplorerLine(item_key):
             wrapped_attr.SetBgColour(self._DataExplorerColour, True)
-            wrapped_attr.SetBold(True)
 
         if col_num < len(self._ModelColumnToFieldId):
             field_id = self._ModelColumnToFieldId[col_num]
@@ -914,6 +925,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
     def OnDataExplorerLoad(self, sync, builder, location, page):
         item = self.GetModel().OnDataExplorerLoad(sync, builder, location, page)
         if item is not None:
+            self.UnselectAll()
             self.EnsureVisible(item)
 
     def OnDataExplorerUnload(self, location, page):

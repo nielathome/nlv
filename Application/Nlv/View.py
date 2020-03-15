@@ -1165,7 +1165,10 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
             self.MakeActive()
             view.SetHistoryLine(line)
             self.ScrollToLine(line)
-            self.RefreshView()
+        else:
+            view.SetHistoryLine(-1)
+
+        self.RefreshView()
 
 
     def OnDataExplorerUnload(self, location, page):
