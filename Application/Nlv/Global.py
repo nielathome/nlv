@@ -263,7 +263,8 @@ class G_ChannelLogFilter(logging.Filter):
         super().__init__()
 
         # the list of channels to log
-        self._Channels = set(["focus"])
+#        self._Channels = set(["focus"])
+        self._Channels = set()
 
 
     #-------------------------------------------------------
