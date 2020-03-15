@@ -990,7 +990,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         super().__init__(factory, wproject, witem)
-        self.SetupDataExplorer(self.OnDataExplorerNavigate)
+        self.SetupDataExplorer(self.OnDataExplorerLoad)
 
         self._ViewCount = 0
         self._N_Logfile = None
@@ -1148,7 +1148,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
 
 
     #-------------------------------------------------------
-    def OnDataExplorerNavigate(self, sync, builder, location, page):
+    def OnDataExplorerLoad(self, sync, builder, location, page):
         builder.AddPageHeading("Log")
         builder.AddField("Path", str(self._FullPath))
 

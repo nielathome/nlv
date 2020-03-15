@@ -322,7 +322,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             return str(key)
 
 
-    def OnDataExplorerNavigate(self, sync, builder, location, page):
+    #-------------------------------------------------------
+    def OnDataExplorerLoad(self, sync, builder, location, page):
         schema = self._TableSchema
         if schema.UserDataExplorerOpen is not None:
             schema.UserDataExplorerOpen(builder)
@@ -364,6 +365,13 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             location_item = item
 
         return location_item
+
+
+    #-------------------------------------------------------
+    def OnDataExplorerUnload(self):
+        do_refresh = self._DataExplorerSyncKey is not None
+        self._DataExplorerSyncKey = None
+        return do_refresh
 
 
     #-------------------------------------------------------
@@ -478,14 +486,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if not self._IsValid:
             wrapped_attr.SetFgColour(self._InvalidColour, True)
 
+        item_key = self.ItemToKey(item)
+        if item_key == self._DataExplorerSyncKey:
+            wrapped_attr.SetBgColour(self._DataExplorerColour, True)
+            wrapped_attr.SetBold(True)
+
         if col_num < len(self._ModelColumnToFieldId):
             field_id = self._ModelColumnToFieldId[col_num]
             if field_id >= 0 and field_id < len(self._ColumnColours):
                 wrapped_attr.SetFgColour(self._ColumnColours[field_id])
-
-        item_key = self.ItemToKey(item)
-        if item_key == self._DataExplorerSyncKey:
-            wrapped_attr.SetBgColour(self._DataExplorerColour, True)
 
         for hiliter in self._Hiliters:
             if self._N_EventView.GetHiliter(hiliter._Id).Hit(item_key):
@@ -902,10 +911,14 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
     def GetLocation(self, item):
         return self.GetModel().GetLocation(item)
 
-    def OnDataExplorerNavigate(self, sync, builder, location, page):
-        item = self.GetModel().OnDataExplorerNavigate(sync, builder, location, page)
+    def OnDataExplorerLoad(self, sync, builder, location, page):
+        item = self.GetModel().OnDataExplorerLoad(sync, builder, location, page)
         if item is not None:
             self.EnsureVisible(item)
+
+    def OnDataExplorerUnload(self, location, page):
+        if self.GetModel().OnDataExplorerUnload():
+            self.Refresh()
 
 
     #-------------------------------------------------------

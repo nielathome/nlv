@@ -194,6 +194,7 @@ class G_DataExplorer:
     def __init__(self, frame):
         self._Frame = frame
         self._PageCache = G_DataExplorerPageCache()
+        self._LastDataUrl = None
 
         parent = frame.GetDataExplorerPanel()
 
@@ -291,28 +292,24 @@ class G_DataExplorer:
         if scheme != "memory":
             return
 
-        node_id, location, page = self.SplitDataUrl(data_url)
-        node = self.FindNode(node_id)
-        if node is None:
+        next_node_id, next_location, next_page = self.SplitDataUrl(data_url)
+        next_node = self.FindNode(next_node_id)
+        if next_node is None:
             self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
             return
 
+        if self._LastDataUrl is not None:
+            last_node_id, last_location, last_page = self.SplitDataUrl(self._LastDataUrl)
+            last_node = self.FindNode(last_node_id)
+            if last_node is not None and last_node_id != next_node_id:
+                last_node.DataExplorerUnload(last_location, last_page)
+
+        self._LastDataUrl = data_url
         page_builder = G_DataExplorerPageBuilder(self)
-        node.DataExplorerNavigate(page_builder, location, page)
+        next_node.DataExplorerLoad(page_builder, next_location, next_page)
         self._PageCache.Replace(data_url, page_builder.Close())
 
 
-        #ref_validity = node.GetDataExplorerProvider().GetDataValidity()
-        #invalidity_reason, navigable = self._PageCache.Valid(data_url, ref_validity)
-        #if invalidity_reason is not None:
-        #    self.MakeErrorPage("Modified View", "The view has been modified, and has not been synchronised to the data explorer.", data_url, "Modification", invalidity_reason)
-        #    return
-
-        #if self._LastWebUrl != web_url and node.DataExplorerSync(location):
-        #    node.MakeActive()
-        #    self._LastWebUrl = web_url
-
-       
 
 ## G_DataExplorerProvider #################################
 
@@ -349,22 +346,11 @@ class G_DataExplorerChildNode:
 
 
     #-------------------------------------------------------
-    def SetupDataExplorer(self, on_navigate):
+    def SetupDataExplorer(self, on_load = None, on_unload = None):
         self._LastLocation = None
-        self._DataExplorerNavigate = on_navigate
+        self._DataExplorerLoad = on_load
+        self._DataExplorerUnload = on_unload
         self.SetDataExplorerValidity("Initialisation")
-
-    #def GetDataExplorerProvider(self):
-    #    if self._DataExplorerProvider is None:
-    #        return self
-    #    else:
-    #        return self._DataExplorerProvider
-
-    #def GetDataExplorerSync(self):
-    #    if self._DataExplorerSync is None:
-    #        return self
-    #    else:
-    #        return self._DataExplorerSync
 
 
     #-------------------------------------------------------
@@ -375,12 +361,12 @@ class G_DataExplorerChildNode:
 
 
     #-------------------------------------------------------
-    def DataExplorerNavigate(self, builder, location, page):
+    def DataExplorerLoad(self, builder, location, page):
         sync = self._LastLocation != location
         self._LastLocation = None
-        if self._DataExplorerNavigate is not None:
-            self._DataExplorerNavigate(sync, builder, location, page)
+        if self._DataExplorerLoad is not None:
+            self._DataExplorerLoad(sync, builder, location, page)
 
-    #def DataExplorerSync(self, location):
-    #    if self._DataExplorerSync is not None:
-    #        self._DataExplorerSync(location)
+    def DataExplorerUnload(self, location, page):
+        if self._DataExplorerUnload is not None:
+            self._DataExplorerUnload(location, page)

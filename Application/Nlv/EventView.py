@@ -1484,7 +1484,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def SetupTableCtrl(self, table_ctrl):
-        self.SetupDataExplorer(self.OnDataExplorerNavigate)
+        self.SetupDataExplorer(self.OnDataExplorerLoad, self.OnDataExplorerUnload)
         table_ctrl.SetSelectionhandler(self.OnTableSelectionChanged)
 
         inner_ctrl = table_ctrl.GetChildCtrl()
@@ -1510,10 +1510,13 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
-    def OnDataExplorerNavigate(self, sync, builder, location, page):
-        self.GetTableViewCtrl().OnDataExplorerNavigate(sync, builder, location, page)
+    def OnDataExplorerLoad(self, sync, builder, location, page):
+        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, page)
         if sync:
             self.MakeActive()
+
+    def OnDataExplorerUnload(self, location, page):
+        self.GetTableViewCtrl().OnDataExplorerUnload(location, page)
 
 
     #-------------------------------------------------------

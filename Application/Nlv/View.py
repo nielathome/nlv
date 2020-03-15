@@ -901,7 +901,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         # track our position in the project tree
         G_DisplayNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
-        self.SetupDataExplorer(self.OnDataExplorerNavigate)
+        self.SetupDataExplorer(self.OnDataExplorerLoad, self.OnDataExplorerUnload)
 
         self._CursorLine = -1
         self._AutoHiliteText = ""
@@ -1147,7 +1147,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
-    def OnDataExplorerNavigate(self, sync, builder, location, page):
+    def OnDataExplorerLoad(self, sync, builder, location, page):
         builder.AddPageHeading("View")
         builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
 
@@ -1166,6 +1166,11 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
             view.SetHistoryLine(line)
             self.ScrollToLine(line)
             self.RefreshView()
+
+
+    def OnDataExplorerUnload(self, location, page):
+        self.GetView().SetHistoryLine(-1)
+        self.RefreshView()
 
 
     #-------------------------------------------------------
