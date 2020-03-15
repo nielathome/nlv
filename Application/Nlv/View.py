@@ -25,7 +25,6 @@ from wx.lib.expando import ExpandoTextCtrl
 
 # Application imports 
 from .DataExplorer import G_DataExplorerProvider
-from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
 from .Global import G_Const
 from .Global import G_FrozenWindow
@@ -885,7 +884,7 @@ class G_ViewThemeContainerNode(G_ViewChildNode, G_ListContainerNode):
 
 ## G_ViewNode ##############################################
 
-class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider, G_DataExplorerSync):
+class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider):
     """Class that implements a view onto a logfile"""
 
     # global tracker key binding map to tracker index
@@ -902,7 +901,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         # track our position in the project tree
         G_DisplayNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
-        self.SetupDataExplorer()
+        self.SetupDataExplorer(self.OnDataExplorerNavigate)
 
         self._CursorLine = -1
         self._AutoHiliteText = ""
@@ -1063,30 +1062,6 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
-    def ShowLocation(self, location):
-        line = int(location)
-        self.GetView().SetHistoryLine(line)
-        self.ScrollToLine(line)
-        self.RefreshView()
-        return True
-
-
-    def CreateDataExplorerPage(self, builder, location, page):
-        builder.AddPageHeading("View")
-        builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
-
-        line = int(location)
-        view = self.GetView()
-
-        builder.AddField("Line No", location)
-
-        for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
-            builder.AddField(name, view.GetFieldText(line, field_id))
-
-        builder.AddField("Line", view.GetNonFieldText(line))
-
-
-    #-------------------------------------------------------
     def GetEditor(self):
         return self._ViewControl.GetEditor()
 
@@ -1172,6 +1147,28 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
+    def OnDataExplorerNavigate(self, sync, builder, location, page):
+        builder.AddPageHeading("View")
+        builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
+
+        line = int(location)
+        view = self.GetView()
+
+        builder.AddField("Line No", location)
+
+        for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
+            builder.AddField(name, view.GetFieldText(line, field_id))
+
+        builder.AddField("Line", view.GetNonFieldText(line))
+
+        if sync:
+            self.MakeActive()
+            view.SetHistoryLine(line)
+            self.ScrollToLine(line)
+            self.RefreshView()
+
+
+    #-------------------------------------------------------
     def OnUpdateUI(self, event):
         """Dispatcher for changes made in the Scintilla control"""
 
@@ -1215,7 +1212,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
             self.RefreshTrackers(update_local, update_global, self)
 
         # tell the data explorer
-        self.GetDataExplorer().Update(self.MakeDataUrl(str(cur_line)))
+        self.UpdateDataExplorer(str(cur_line))
 
         # tell the world
         self.NotifyLine(cur_line)

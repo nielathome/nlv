@@ -1484,7 +1484,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def SetupTableCtrl(self, table_ctrl):
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        self.SetupDataExplorer(self.OnDataExplorerNavigate)
         table_ctrl.SetSelectionhandler(self.OnTableSelectionChanged)
 
         inner_ctrl = table_ctrl.GetChildCtrl()
@@ -1507,6 +1507,13 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
     #-------------------------------------------------------
     def UpdateValidity(self, valid):
         self.GetTableViewCtrl().UpdateDisplay(valid = valid)
+
+
+    #-------------------------------------------------------
+    def OnDataExplorerNavigate(self, sync, builder, location, page):
+        self.GetTableViewCtrl().OnDataExplorerNavigate(sync, builder, location, page)
+        if sync:
+            self.MakeActive()
 
 
     #-------------------------------------------------------
@@ -1654,7 +1661,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             return
 
         # tell the data explorer
-        self.GetDataExplorer().Update(self.MakeDataUrl(self.GetTableViewCtrl().GetLocation(item)))
+        self.UpdateDataExplorer(self.GetTableViewCtrl().GetLocation(item))
 
         # identify tracking options
         info = self.GetTrackInfo()
@@ -1804,7 +1811,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             location = self.GetTableViewCtrl().GetLocation(item)
             if location is not None:
                 # tell the data explorer
-                self.GetDataExplorer().Update(self.MakeDataUrl(location))
+                self.UpdateDataExplorer(location)
 
 
     #-------------------------------------------------------
@@ -1960,7 +1967,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
             location = self.GetTableViewCtrl().GetLocation(item)
             if location is not None:
                 # tell the data explorer
-                self.GetDataExplorer().Update(self.MakeDataUrl(location))
+                self.UpdateDataExplorer(location)
 
 
     #-------------------------------------------------------

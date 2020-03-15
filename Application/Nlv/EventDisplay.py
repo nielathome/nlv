@@ -32,7 +32,6 @@ import winreg
 
 # Application imports 
 from .DataExplorer import G_DataExplorerProvider
-from .DataExplorer import G_DataExplorerSync
 from .Logfile import G_DisplayControl
 from .Logfile import G_NotebookDisplayControl
 from .EventProjector import ConnectDb
@@ -225,7 +224,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
-        self._HistoryColour = G_ColourTraits.MakeColour("LIGHT SLATE BLUE")
+        self._DataExplorerColour = G_ColourTraits.MakeColour("LIGHT SLATE BLUE")
+        self._DataExplorerSyncKey = None
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
@@ -321,11 +321,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         else:
             return str(key)
 
-    def SetHistoryKey(self, key):
-        self._HistoryKey = key
-        return self.KeyToItem(key)
 
-    def CreateDataExplorerPage(self, builder, location, page):
+    def OnDataExplorerNavigate(self, sync, builder, location, page):
         schema = self._TableSchema
         if schema.UserDataExplorerOpen is not None:
             schema.UserDataExplorerOpen(builder)
@@ -334,8 +331,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._DocumentUrl is not None:
             builder.AddLink(self._DocumentUrl, "Show log ...")
 
-        item_key = int(location)
-        item = self.KeyToItem(item_key)
+        key = int(location)
+        item = self.KeyToItem(key)
         table_schema = self._TableSchema
 
         for col_num, field in enumerate(self._TableSchema):
@@ -360,6 +357,13 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                     
         if schema.UserDataExplorerClose is not None:
             schema.UserDataExplorerClose(builder)
+
+        location_item = None
+        if sync:
+            self._DataExplorerSyncKey = key
+            location_item = item
+
+        return location_item
 
 
     #-------------------------------------------------------
@@ -480,8 +484,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                 wrapped_attr.SetFgColour(self._ColumnColours[field_id])
 
         item_key = self.ItemToKey(item)
-        if item_key == self._HistoryKey:
-            wrapped_attr.SetBgColour(self._HistoryColour, True)
+        if item_key == self._DataExplorerSyncKey:
+            wrapped_attr.SetBgColour(self._DataExplorerColour, True)
 
         for hiliter in self._Hiliters:
             if self._N_EventView.GetHiliter(hiliter._Id).Hit(item_key):
@@ -798,7 +802,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 ## G_TableViewCtrl #########################################
 
-class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
+class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
     #-------------------------------------------------------
     def __init__(self, parent, multiple_selection, name, doc_url):
@@ -898,10 +902,10 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
     def GetLocation(self, item):
         return self.GetModel().GetLocation(item)
 
-    def ShowLocation(self, location):
-        item = self.GetModel().SetHistoryKey(int(location))
-        self.EnsureVisible(item)
-        return True
+    def OnDataExplorerNavigate(self, sync, builder, location, page):
+        item = self.GetModel().OnDataExplorerNavigate(sync, builder, location, page)
+        if item is not None:
+            self.EnsureVisible(item)
 
 
     #-------------------------------------------------------

@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,7 +26,6 @@ import wx
 
 # Application imports
 from .DataExplorer import G_DataExplorerProvider
-from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
 from .Global import G_Const
 from .Global import G_Global
@@ -982,7 +981,7 @@ class G_LogThemeContainerNode(G_LogChildNode, G_ListContainerNode):
 
 ## G_LogNode ##############################################
 
-class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider, G_DataExplorerSync):
+class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider):
     """
     Class that implements a logfile.
     Instances are attached to the logfile nodes in the project tree.
@@ -991,7 +990,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         super().__init__(factory, wproject, witem)
-        self.SetupDataExplorer()
+        self.SetupDataExplorer(self.OnDataExplorerNavigate)
 
         self._ViewCount = 0
         self._N_Logfile = None
@@ -1131,21 +1130,6 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
 
 
     #-------------------------------------------------------
-    def CreateDataExplorerPage(self, builder, location, page):
-        builder.AddPageHeading("Log")
-
-        builder.AddField("Path", str(self._FullPath))
-
-        stat = self._FullPath.stat()
-
-        size = int(stat.st_size / 1024)
-        builder.AddField("Size", "{size} K".format(size = size))
-
-        mtime = datetime.datetime.fromtimestamp(stat.st_mtime)
-        builder.AddField("Modified", mtime.strftime("%A %d %B %Y %H:%M:%S"))
-
-
-    #-------------------------------------------------------
     def RefreshViews(self, source_view = None):
         """Refresh all views displaying this document"""
 
@@ -1161,6 +1145,23 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
         loaded from an existing document.
         """
         return self._InitCopyDefaults
+
+
+    #-------------------------------------------------------
+    def OnDataExplorerNavigate(self, sync, builder, location, page):
+        builder.AddPageHeading("Log")
+        builder.AddField("Path", str(self._FullPath))
+
+        stat = self._FullPath.stat()
+
+        size = int(stat.st_size / 1024)
+        builder.AddField("Size", "{size} K".format(size = size))
+
+        mtime = datetime.datetime.fromtimestamp(stat.st_mtime)
+        builder.AddField("Modified", mtime.strftime("%A %d %B %Y %H:%M:%S"))
+
+        if sync:
+            self.MakeActive()
 
 
     #-------------------------------------------------------
