@@ -79,7 +79,7 @@ class G_ScriptGuard:
     #-------------------------------------------------------
     def __init__(self, name, reporter = None):
         self._Name = name
-        self._Reporter = logging.info
+        self._Reporter = logging.warn
         if reporter is not None:
             self._Reporter = reporter
 
@@ -389,7 +389,7 @@ class G_Recogniser:
                     break
 
             if not got_finish:
-                logging.info("Match '{}' failed: Event close not found (performance warning)".format(str(match_finish_func)))
+                logging.warn("Match '{}' failed: Event close not found (performance warning)".format(str(match_finish_func)))
 
         user_analyser.End()
         user_analyser = None

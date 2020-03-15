@@ -38,6 +38,7 @@ import wx
 import wx.lib.agw.aui as aui
 
 # Application imports
+from Nlv.Global import G_ChannelLogFilter
 from Nlv.Global import G_Global
 from Nlv.Global import G_PerfTimerScope
 import Nlv.Session
@@ -48,9 +49,6 @@ from Nlv.Extension import LoadExtensions
 from Nlv.Project import G_Project
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
-
-# System imports
-import logging
 
 # Enable/disable profiling (VisualStudio tools not working ...)
 _G_WantProfiling = False
@@ -213,7 +211,7 @@ class G_ConsoleLog(wx.Log):
         self._LogHandler = logconsole_handler = logging.StreamHandler(self)
         logconsole_handler.setLevel(logging.INFO)
         logconsole_handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
-        _Logger.addHandler(logconsole_handler)
+        logging.getLogger().addHandler(logconsole_handler)
 
         # put a start marker in the log
         logging.debug( "" )
@@ -226,7 +224,7 @@ class G_ConsoleLog(wx.Log):
 
     #-------------------------------------------------------
     def Close(self):
-        _Logger.removeHandler(self._LogHandler)
+        logging.getLogger().removeHandler(self._LogHandler)
         wx.Log.SetActiveTarget(None)
 
 
@@ -470,24 +468,17 @@ class G_LogViewApp(wx.App):
         wx.ConfigBase.Set(config)
 
         # setup logging
-        global _Logger
         logfile = open(str(path / "nlv.log"), "a")
 
-        _Logger = logging.getLogger('')
-        _Logger.setLevel(logging.DEBUG)
+        logger = logging.getLogger()
+        logger.setLevel(logging.DEBUG)
 
         # send debug and above to the logfile
-        def FilterNoisyChartFindFontLines(record):
-            if record.levelno == logging.DEBUG and record.msg.find("findfont: score") >= 0:
-                return False
-            else:
-                return True
-
         logfile_handler = logging.StreamHandler(logfile)
-        logfile_handler.addFilter(FilterNoisyChartFindFontLines)
+        logfile_handler.addFilter(G_ChannelLogFilter())
         logfile_handler.setLevel(logging.DEBUG)
         logfile_handler.setFormatter(logging.Formatter( "%(asctime)s: %(levelname)s: %(message)s" ))
-        _Logger.addHandler(logfile_handler)
+        logger.addHandler(logfile_handler)
 
         # the text window display for logging is setup once the frame is created
         # see G_ConsoleLog
@@ -520,7 +511,6 @@ _Args = _Parser.parse_args()
 ## MODULE ##################################################
 
 # create and run the application
-_Logger = None
 
 def main():
     if _Args.integration:

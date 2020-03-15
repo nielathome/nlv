@@ -53,6 +53,7 @@ from .EventDisplay import G_NetworkViewCtrl
 from .EventProjector import G_Analyser
 from .EventProjector import G_ScriptGuard
 from .Global import G_Const
+from .Global import G_FrozenWindow
 from .Global import G_Global
 from .Logfile import G_DisplayNode
 from .Logfile import G_DisplayChildNode
@@ -350,7 +351,7 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
             module = com.gencache.EnsureModule('{00020813-0000-0000-C000-000000000046}', 0, 1, 8)
             me._BtnExcel.Enable(module is not None)
         except pywintypes.com_error as ex:
-            logging.info("Excel not found; Excel integration will be disabled")
+            logging.warn("Excel not found; Excel integration will be disabled")
 
 
     #-------------------------------------------------------
@@ -559,7 +560,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
                 try:
                     file.unlink()
                 except Exception as ex:
-                    logging.info("Unable to remove temporary: file=[{}] info=[{}]".format(str(file), str(ex)))
+                    logging.warn("Unable to remove temporary: file=[{}] info=[{}]".format(str(file), str(ex)))
 
 
     #-------------------------------------------------------
@@ -744,12 +745,11 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     @G_Global.TimeFunction
     def UpdateAnalysis(self):
         """Analysis requested by user"""
-        def Work():
+
+        with G_FrozenWindow(self.GetFrame()):
             self.AnalyseForAll()
             self.UpdateEventContent()
             self.PostAnalyse()
-
-        self.WithFrameLocked(Work)
 
 
     #-------------------------------------------------------
@@ -1286,10 +1286,10 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
         self._Field.idxSelectChart.Value = self._SelectChartCtl.GetSelection()
 
         pane = self._DynamicPane
-        pane.Freeze()
-        self.ActivateDynamicPane()
-        pane.GetSizer().Layout()
-        pane.Thaw()
+
+        with G_FrozenWindow(pane):
+            self.ActivateDynamicPane()
+            pane.GetSizer().Layout()
 
         self.PushParameterValues(activate_chart = True)
 

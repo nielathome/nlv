@@ -31,6 +31,28 @@ import Nlog
 
 
 
+## G_FrozenWindow ##########################################
+
+class G_FrozenWindow:
+    """Context manager (use with "with")."""
+
+    #-------------------------------------------------------
+    def __init__(self, window):
+        self._Window = window
+
+
+    #-------------------------------------------------------
+    def __enter__(self):
+        self._Window.Freeze()
+        return self
+
+
+    #-------------------------------------------------------
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        self._Window.Thaw()
+
+
+
 ## G_ProgressMeter #########################################
 
 class G_ProgressMeter:
@@ -151,7 +173,8 @@ class G_PerfTimer:
         inclusive = self._Elapsed
         exclusive = inclusive - sum([timer._Elapsed for timer in self._Children])
 
-        if indent == 0:
+        # only report "slow" operations to user; currently, greater than 2s
+        if indent == 0 and inclusive > 2:
             logging.info("{}({}) took {:.2f}s".format(self._Description, args, inclusive))
 
         per_item_text = ""
@@ -227,6 +250,36 @@ class G_PerfTimerScope:
 
 
 
+## G_ChannelLogFilter ######################################
+
+class G_ChannelLogFilter(logging.Filter):
+    """
+    Support rudimentary log "channels". Message can be selectively
+    sent to the logfile.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self):
+        super().__init__()
+
+        # the list of channels to log
+#        self._Channels = set(["focus"])
+        self._Channels = set()
+
+
+    #-------------------------------------------------------
+    def filter(self, record):
+        if "_nlv_channel" in record.__dict__:
+            if record._nlv_channel in self._Channels:
+                record.msg = "Channel({}): {}".format(record._nlv_channel, record.msg)
+                return True
+            else:
+                return False
+        else:
+            return True
+
+
+
 ## G_Const #################################################
 
 class G_Const:
@@ -298,6 +351,11 @@ class G_Const:
     ID_THEME_COPY = wx.ID_HIGHEST + 3
     ID_THEME_DELETE = wx.ID_HIGHEST + 44
     ID_THEME_RENAME = wx.ID_HIGHEST + 45
+
+    #-------------------------------------------------------
+    
+    # log channel "names"
+    LogFocus = dict(_nlv_channel = "focus")
 
 
 

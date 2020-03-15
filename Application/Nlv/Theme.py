@@ -563,27 +563,23 @@ class G_ThemeOverridesNode(G_ThemeManagerNode):
 
 
     #-------------------------------------------------------
-    def OnSaveWithFrameLock(self):
-        for node in self._GetThemeChildren():
-            node.SaveOverridesToTheme(self._ThemeCls, self._Domain)
-
-        # ensure consumers of the newly changed theme update their UI
-        theme_id = self._GetCurrentThemeId()
-        self.GetRootNode().NotifyThemeChange(self._ThemeCls, theme_id)
-        self.ActivateControl()
-        GetThemeGallery(self._ThemeCls).SaveTheme(theme_id)
-
     def OnSave(self, event):
-        self.WithFrameLocked(self.OnSaveWithFrameLock)
+        with G_FrozenWindow(self.GetFrame()):
+            for node in self._GetThemeChildren():
+                node.SaveOverridesToTheme(self._ThemeCls, self._Domain)
+
+            # ensure consumers of the newly changed theme update their UI
+            theme_id = self._GetCurrentThemeId()
+            self.GetRootNode().NotifyThemeChange(self._ThemeCls, theme_id)
+            self.ActivateControl()
+            GetThemeGallery(self._ThemeCls).SaveTheme(theme_id)
 
 
     #-------------------------------------------------------
-    def OnClearWithFrameLock(self):
-        self.DoClearThemeOverrides(True)
-        self.ActivateControl()
-
     def OnClear(self, event):
-        self.WithFrameLocked(self.OnClearWithFrameLock)
+        with G_FrozenWindow(self.GetFrame()):
+            self.DoClearThemeOverrides(True)
+            self.ActivateControl()
 
 
 
@@ -715,11 +711,13 @@ class G_ThemeGalleryNode(G_ThemeManagerNode):
             self.ActivateThemeText(idx = idx)
 
     def OnActivateTheme(self, idx, new_theme_id):
-        self.WithFrameLocked(self.SwitchThemeWithFrameLock, new_theme_id, idx, True)
+        with G_FrozenWindow(self.GetFrame()):
+            self.SwitchThemeWithFrameLock(new_theme_id, idx, True)
 
     def OnCopyTheme(self, theme_id):
         new_theme_id = self.GetThemeGallery().DuplicateTheme(theme_id)
-        self.WithFrameLocked(self.SwitchThemeWithFrameLock, new_theme_id, None, False)
+        with G_FrozenWindow(self.GetFrame()):
+            self.SwitchThemeWithFrameLock(new_theme_id, None, False)
         self.Activate()
 
     def OnDeleteTheme(self, theme_id):

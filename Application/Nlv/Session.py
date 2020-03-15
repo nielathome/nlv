@@ -31,11 +31,11 @@ from .DataExplorer import G_DataExplorerChildNode
 from .Document import D_Document
 from .Extension import GetExtensionNames
 from .Global import G_Const
+from .Global import G_FrozenWindow
 from .Global import G_Global
 from .Logmeta import GetLogSchema, GetLogSchemataNames
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
-from .Project import G_TreeNode
 from .Project import G_NodeFactory
 from .Project import G_Project
 from .Project import G_WindowInfo
@@ -124,6 +124,9 @@ class G_SessionManager:
     def GetRootNode(self):
         # will force crash if used improperly
         return self._WRootNode()
+
+    def GetFrame(self):
+        return self.GetRootNode().GetFrame()
 
     def GetSessionNode(self):
         return self.GetRootNode().FindChildNode(factory_id = G_Project.NodeID_Session)
@@ -246,76 +249,70 @@ class G_SessionManager:
         self._WRootNode = MakeWeakRef(root_node)
         self._CurrentPath = None
 
-        self.GetRootNode().WithFrameLocked(self._SessionSetup, program_args)
+        with G_FrozenWindow(self.GetFrame()):
+            path = program_args.session
+            if path is not None:
+                self.SessionOpen(path)
+            elif program_args.recent:
+                self.SessionOpen(0)
+            else:
+                self.SessionNew()
 
-    def _SessionSetup(self, args):
-        """Implement session startup; frame window is locked"""    
+            logfile_descs = program_args.log
+            if logfile_descs is None:
+                return
 
-        path = args.session
-        if path is not None:
-            self.SessionOpen(path)
-        elif args.recent:
-            self.SessionOpen(0)
-        else:
-            self.SessionNew()
+            base_path = Path.cwd()
+            schemata = dict(GetLogSchemataNames())
 
-        logfile_descs = args.log
-        if logfile_descs is None:
-            return
-
-        base_path = Path.cwd()
-        schemata = dict(GetLogSchemataNames())
-
-        for desc in logfile_descs:
-            try:
-                elems = desc.count('@')
-                builder_name = None
-                if elems == 2:
-                    (path, schema_name) = desc.split('@')
-                elif elems == 3:
-                    (path, schema_name, builder_name) = desc.split('@')
-                else:
-                    logging.error("Unrecognised logfile descriptor: '{}'".format(desc))
-
-                if schema_name not in schemata:
-                    schemata_names = "".join(schemata.keys())
-                    logging.error("Unrecognised schema in '{}'; valid schemata are: '{}'".format(desc, schemata_names))
-                    return
-
-                schema_guid = schemata[schema_name]
-                builders = dict(GetLogSchema(schema_guid).GetBuildersNameGuidList())
-
-                builder_guid = None
-                if builder_name is not None:
-                    if len(builders) == 0:
-                        logging.error("Builder name included in logfile descriptor '{}', but schema defined no builders".format(builder_name))
-                        return
-
-                    if builder_name in builders:
-                        builder_guid = builders[builder_name]
+            for desc in logfile_descs:
+                try:
+                    elems = desc.count('@')
+                    builder_name = None
+                    if elems == 2:
+                        (path, schema_name) = desc.split('@')
+                    elif elems == 3:
+                        (path, schema_name, builder_name) = desc.split('@')
                     else:
-                        builder_names = "".join(builders.keys())
-                        logging.error("Unrecognised builder in '{}'; valid builders are: '{}'".format(desc, builder_names))
+                        logging.error("Unrecognised logfile descriptor: '{}'".format(desc))
+
+                    if schema_name not in schemata:
+                        schemata_names = "".join(schemata.keys())
+                        logging.error("Unrecognised schema in '{}'; valid schemata are: '{}'".format(desc, schemata_names))
                         return
 
-                p = Path(path)
-                if p.is_absolute():
-                    p = G_Global.RelPath(p, base_path).as_posix()
+                    schema_guid = schemata[schema_name]
+                    builders = dict(GetLogSchema(schema_guid).GetBuildersNameGuidList())
 
-                self.GetSessionNode().AppendLog(str(p), builder_guid)
+                    builder_guid = None
+                    if builder_name is not None:
+                        if len(builders) == 0:
+                            logging.error("Builder name included in logfile descriptor '{}', but schema defined no builders".format(builder_name))
+                            return
 
-            except ValueError:
-                logging.error("No schema in log descriptor '{}'; expected 'path@schema@builder' where valid schema names are: '{}'".format(desc, schemata_names))
+                        if builder_name in builders:
+                            builder_guid = builders[builder_name]
+                        else:
+                            builder_names = "".join(builders.keys())
+                            logging.error("Unrecognised builder in '{}'; valid builders are: '{}'".format(desc, builder_names))
+                            return
+
+                    p = Path(path)
+                    if p.is_absolute():
+                        p = G_Global.RelPath(p, base_path).as_posix()
+
+                    self.GetSessionNode().AppendLog(str(p), builder_guid)
+
+                except ValueError:
+                    logging.error("No schema in log descriptor '{}'; expected 'path@schema@builder' where valid schema names are: '{}'".format(desc, schemata_names))
 
 
     #-------------------------------------------------------
     def OnCmdSessionNew(self, event = None):
-        def New():
+        with G_FrozenWindow(self.GetFrame()):
             self.SessionReap()
             self.SessionNew()
             self.GetSessionNode().Select()
-
-        self.GetRootNode().WithFrameLocked(New)
 
 
     #-------------------------------------------------------
@@ -341,21 +338,17 @@ class G_SessionManager:
 
     @G_Global.ProgressMeter
     def DoCmdSessionOpen(self, path):
-        def Open(path):
+        with G_FrozenWindow(self.GetFrame()):
             self.SessionReap()
             self.SessionOpen(path)
-
-        self.GetRootNode().WithFrameLocked(Open, path)
 
 
     #-------------------------------------------------------
     @G_Global.ProgressMeter
     def OnCmdSessionRecent(self, idx):
-        def Recent(idx):
+        with G_FrozenWindow(self.GetFrame()):
             self.SessionReap()
             self.SessionOpen(idx)
-
-        self.GetRootNode().WithFrameLocked(Recent, idx)
 
 
     #-------------------------------------------------------
@@ -401,11 +394,9 @@ class G_SessionManager:
         if len(files) > 1:
             return False
 
-        def Open(path):
+        with G_FrozenWindow(self.GetFrame()):
             self.SessionReap()
-            self.SessionOpen(path)
-
-        self.GetRootNode().WithFrameLocked(Open, files[0])
+            self.SessionOpen(files[0])
 
         return True
 
