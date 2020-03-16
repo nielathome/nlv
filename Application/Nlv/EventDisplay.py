@@ -229,7 +229,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
-        self._HistoryKey = None
         self.Reset()
 
         self._Icons = [
@@ -264,7 +263,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
     def ClearDataValidity(self, reason):
-        self._HistoryKey = None
         self.SetDataValidity(reason)
 
     def Reset(self, table_schema = None):
@@ -324,15 +322,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
     def GetLocation(self, item):
-        key = self.ItemToKey(item)
-        if key is None:
-            return key
-        else:
-            return str(key)
+        return self.ItemToKey(item)
 
 
     #-------------------------------------------------------
-    def OnDataExplorerLoad(self, sync, builder, location, page):
+    def OnDataExplorerLoad(self, sync, builder, location):
         schema = self._TableSchema
         if schema.UserDataExplorerOpen is not None:
             schema.UserDataExplorerOpen(builder)
@@ -341,7 +335,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._DocumentUrl is not None:
             builder.AddLink(self._DocumentUrl, "Show log ...")
 
-        key = int(location)
+        key = location["line"]
         item = self.KeyToItem(key)
         table_schema = self._TableSchema
 
@@ -922,13 +916,13 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
     def GetLocation(self, item):
         return self.GetModel().GetLocation(item)
 
-    def OnDataExplorerLoad(self, sync, builder, location, page):
-        item = self.GetModel().OnDataExplorerLoad(sync, builder, location, page)
+    def OnDataExplorerLoad(self, sync, builder, location):
+        item = self.GetModel().OnDataExplorerLoad(sync, builder, location)
         if item is not None:
             self.UnselectAll()
             self.EnsureVisible(item)
 
-    def OnDataExplorerUnload(self, location, page):
+    def OnDataExplorerUnload(self, location):
         if self.GetModel().OnDataExplorerUnload():
             self.Refresh()
 

@@ -1148,7 +1148,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_Da
 
 
     #-------------------------------------------------------
-    def OnDataExplorerLoad(self, sync, builder, location, page):
+    def OnDataExplorerLoad(self, sync, builder, location):
         builder.AddPageHeading("Log")
         builder.AddField("Path", str(self._FullPath))
 

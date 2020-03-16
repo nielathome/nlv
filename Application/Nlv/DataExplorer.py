@@ -16,8 +16,10 @@
 #
 
 # Python imports
+import base64
 import datetime
 import html
+import json
 import io
 from pathlib import Path
 
@@ -28,6 +30,40 @@ import wx.html2
 # Application imports
 from .Global import G_Const
 from .Global import G_Global
+
+
+
+## URL #####################################################
+
+_TimeBase = 1
+
+
+def _MakeLocation(node_id, **kwargs):
+    global _TimeBase
+    _TimeBase += 1
+
+    return dict(
+        kwargs,
+        timebase = _TimeBase,
+        node_id = node_id
+    )
+
+
+def _DataUrlToLocation(data_url):
+    b64_bytes = base64.urlsafe_b64decode(data_url)
+    data = json.loads(b64_bytes.decode())
+    return data
+
+
+def _LocationToDataUrl(location):
+    data_bytes = json.dumps(location).encode('utf-8')
+    b64_bytes = base64.urlsafe_b64encode(data_bytes)
+    res = b64_bytes.decode()
+    return res
+
+
+def _MakeWebUrl(data_url):
+    return "memory:" + data_url
 
 
 
@@ -79,9 +115,6 @@ class G_DataExplorerPageCache:
 
 
 ## G_DataExplorerPageBuilder ###############################
-
-def MakeWebUrl(data_url):
-    return "memory:" + data_url
 
 class G_DataExplorerPageBuilder:
     """Support building pages to display in the data explorer"""
@@ -137,7 +170,7 @@ class G_DataExplorerPageBuilder:
         self.AddFieldValue(value, value_style)
 
     def AddLink(self, data_url, text):
-        self.AddBodyText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = MakeWebUrl(data_url), text = html.escape(text)))
+        self.AddBodyText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = _MakeWebUrl(data_url), text = html.escape(text)))
 
 
     #-------------------------------------------------------
@@ -158,28 +191,6 @@ class G_DataExplorer:
     """Class that implements the project data explorer panel"""
 
     _DataExplorer = None
-
-    _LocationSplit = "__at__"
-    _PageSplit = "__page__"
-
-
-    #-------------------------------------------------------
-    @classmethod
-    def SplitDataUrl(cls, url):
-        # url is node-id<loc-split>location<page-split>page
-        node_id, rem = url.split(cls._LocationSplit)
-        location, page = rem.split(cls._PageSplit)
-
-        return node_id, location, page
-
-
-    @classmethod
-    def MakeDataUrl(cls, node_id, location, page):
-        return "{node_id}{loc_split}{location}{page_split}{page}".format(
-            node_id = node_id,
-            loc_split = cls._LocationSplit, location = location,
-            page_split = cls._PageSplit, page = page
-        )
 
 
     #-------------------------------------------------------
@@ -251,7 +262,7 @@ class G_DataExplorer:
 
     #-------------------------------------------------------
     def Update(self, data_url):
-        self._WebView.LoadURL(MakeWebUrl(data_url))
+        self._WebView.LoadURL(_MakeWebUrl(data_url))
 
 
     #-------------------------------------------------------
@@ -262,11 +273,6 @@ class G_DataExplorer:
 
         if field_name is not None:
             builder.AddField(field_name, field_value)
-
-        node_id, location, page = self.SplitDataUrl(data_url)
-        builder.AddField("ID", node_id)
-        builder.AddField("Location", location)
-        builder.AddField("Page", page)
 
         self._PageCache.Replace(data_url, builder.Close())
 
@@ -292,21 +298,21 @@ class G_DataExplorer:
         if scheme != "memory":
             return
 
-        next_node_id, next_location, next_page = self.SplitDataUrl(data_url)
-        next_node = self.FindNode(next_node_id)
+        next_location = _DataUrlToLocation(data_url)
+        next_node = self.FindNode(next_location["node_id"])
         if next_node is None:
             self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
             return
 
         if self._LastDataUrl is not None:
-            last_node_id, last_location, last_page = self.SplitDataUrl(self._LastDataUrl)
-            last_node = self.FindNode(last_node_id)
-            if last_node is not None and last_node_id != next_node_id:
-                last_node.DataExplorerUnload(last_location, last_page)
+            last_location = _DataUrlToLocation(self._LastDataUrl)
+            last_node = self.FindNode(last_location["node_id"])
+            if last_node is not None and last_location["node_id"] != next_location["node_id"]:
+                last_node.DataExplorerUnload(last_location)
 
         self._LastDataUrl = data_url
         page_builder = G_DataExplorerPageBuilder(self)
-        next_node.DataExplorerLoad(page_builder, next_location, next_page)
+        next_node.DataExplorerLoad(page_builder, next_location)
         self._PageCache.Replace(data_url, page_builder.Close())
 
 
@@ -320,10 +326,6 @@ class G_DataExplorerProvider:
         self._Validity = (datetime.datetime.now(), reason)
 
 
-    #-------------------------------------------------------
-    def GetDataValidity(self):
-        return self._Validity
-
 
 
 ## G_DataExplorerChildNode #################################
@@ -334,15 +336,16 @@ class G_DataExplorerChildNode:
     """
 
     #-------------------------------------------------------
-    def UpdateDataExplorer(self, location = "any", page = "0"):
-        self._LastLocation = location
+    def UpdateDataExplorer(self, **kwargs):
         data_explorer = self.GetSessionNode().GetDataExplorer()
-        data_explorer.Update(self.MakeDataUrl(location))
+        self._LastLocation = _MakeLocation(self.GetNodeId(), **kwargs)
+        data_explorer.Update(_LocationToDataUrl(self._LastLocation))
 
 
     #-------------------------------------------------------
-    def MakeDataUrl(self, location = "any", page = "0"):
-        return G_DataExplorer.MakeDataUrl(self.GetNodeId(), location, page)
+    def MakeDataUrl(self, **kwargs):
+        location = _MakeLocation(self.GetNodeId(), **kwargs)
+        return _LocationToDataUrl(location)
 
 
     #-------------------------------------------------------
@@ -361,12 +364,12 @@ class G_DataExplorerChildNode:
 
 
     #-------------------------------------------------------
-    def DataExplorerLoad(self, builder, location, page):
+    def DataExplorerLoad(self, builder, location):
         sync = self._LastLocation != location
         self._LastLocation = None
         if self._DataExplorerLoad is not None:
-            self._DataExplorerLoad(sync, builder, location, page)
+            self._DataExplorerLoad(sync, builder, location)
 
-    def DataExplorerUnload(self, location, page):
+    def DataExplorerUnload(self, location):
         if self._DataExplorerUnload is not None:
-            self._DataExplorerUnload(location, page)
+            self._DataExplorerUnload(location)

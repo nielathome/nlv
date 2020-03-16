@@ -1147,14 +1147,14 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
-    def OnDataExplorerLoad(self, sync, builder, location, page):
+    def OnDataExplorerLoad(self, sync, builder, location):
         builder.AddPageHeading("View")
         builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
 
-        line = int(location)
+        line = location["line"]
         view = self.GetView()
 
-        builder.AddField("Line No", location)
+        builder.AddField("Line No", str(line))
 
         for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
             builder.AddField(name, view.GetFieldText(line, field_id))
@@ -1171,7 +1171,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         self.RefreshView()
 
 
-    def OnDataExplorerUnload(self, location, page):
+    def OnDataExplorerUnload(self, location):
         self.GetView().SetHistoryLine(-1)
         self.RefreshView()
 
@@ -1220,7 +1220,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
             self.RefreshTrackers(update_local, update_global, self)
 
         # tell the data explorer
-        self.UpdateDataExplorer(str(cur_line))
+        self.UpdateDataExplorer(line = cur_line)
 
         # tell the world
         self.NotifyLine(cur_line)

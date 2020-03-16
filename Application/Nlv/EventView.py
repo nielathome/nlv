@@ -1510,13 +1510,13 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
-    def OnDataExplorerLoad(self, sync, builder, location, page):
-        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, page)
+    def OnDataExplorerLoad(self, sync, builder, location):
+        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location)
         if sync:
             self.MakeActive()
 
-    def OnDataExplorerUnload(self, location, page):
-        self.GetTableViewCtrl().OnDataExplorerUnload(location, page)
+    def OnDataExplorerUnload(self, location):
+        self.GetTableViewCtrl().OnDataExplorerUnload(location)
 
 
     #-------------------------------------------------------
@@ -1664,7 +1664,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             return
 
         # tell the data explorer
-        self.UpdateDataExplorer(self.GetTableViewCtrl().GetLocation(item))
+        self.UpdateDataExplorer(line = self.GetTableViewCtrl().GetLocation(item))
 
         # identify tracking options
         info = self.GetTrackInfo()
@@ -1814,7 +1814,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             location = self.GetTableViewCtrl().GetLocation(item)
             if location is not None:
                 # tell the data explorer
-                self.UpdateDataExplorer(location)
+                self.UpdateDataExplorer(line = location)
 
 
     #-------------------------------------------------------
@@ -1970,7 +1970,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
             location = self.GetTableViewCtrl().GetLocation(item)
             if location is not None:
                 # tell the data explorer
-                self.UpdateDataExplorer(location)
+                self.UpdateDataExplorer(line = location)
 
 
     #-------------------------------------------------------
