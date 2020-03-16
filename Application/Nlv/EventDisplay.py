@@ -262,9 +262,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def ClearDataValidity(self, reason):
-        self.SetDataValidity(reason)
-
     def Reset(self, table_schema = None):
         self._N_Logfile = None
         self._N_EventView = None
@@ -284,7 +281,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
             self._ModelColumnToFieldId.append(fid)
 
-        self.ClearDataValidity("Model reset")
+        self.SetNavigationValidity("Model reset")
 
 
     #-------------------------------------------------------
@@ -626,7 +623,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if not self.FilterLineSet(match):
             return False
         
-        self.ClearDataValidity("Filter: {match}".format(match = match.GetDescription()))
+        self.SetNavigationValidity("Filter: {match}".format(match = match.GetDescription()))
         self.Cleared()
         return True
 
@@ -636,7 +633,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._N_EventView is not None:
             (data_col_offset, direction) = self._TableSchema[col_num].ToggleSortDirection()
             self._N_EventView.Sort(col_num + data_col_offset, direction)
-            self.ClearDataValidity("Sorting")
+            self.SetNavigationValidity("Sorting")
             self.Cleared()
             return True
         else:
@@ -711,7 +708,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self._ViewFlat = view_flat
         if do_rebuild:
-            self.ClearDataValidity("Nesting level")
+            self.SetNavigationValidity("Nesting level")
             self.Cleared()
 
 

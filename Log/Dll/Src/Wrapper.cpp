@@ -411,7 +411,7 @@ BOOST_PYTHON_MODULE( Nlog )
 		.def( "LookupEventId", &NEventView::LookupEventId )
 		;
 
-	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewTimecode, NViewHiliting>>( "LogView", no_init )
+	class_<NLogView, logview_ptr_t, bases<NViewFieldAccess, NViewTimecode, NViewLineTranslation, NViewHiliting>>( "LogView", no_init )
 		.def( "Filter", &NLogView::Filter )
 		.def( "GetContent", &NLogView::GetContent )
 		.def( "ToggleBookmarks", &NLogView::ToggleBookmarks )

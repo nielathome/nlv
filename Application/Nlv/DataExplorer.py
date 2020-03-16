@@ -17,7 +17,6 @@
 
 # Python imports
 import base64
-import datetime
 import html
 import json
 import io
@@ -174,6 +173,30 @@ class G_DataExplorerPageBuilder:
 
 
     #-------------------------------------------------------
+    def MakeErrorPage(self, title, explanation, fields = []):
+        self.AddPageHeading(title, "color:darkred")
+        self.AddFieldValue(explanation)
+
+        for name, value in fields:
+            self.AddField(name, value)
+
+
+    def MakeUnknownLocationErrorPage(self, fields):
+        self.MakeErrorPage(
+            "Unknown Location",
+            "The view has been modified, and the location can no longer be found.",
+            fields
+        )
+
+
+    def MakeHiddenLocationErrorPage(self, fields):
+        self.MakeErrorPage(
+            "Hidden Location",
+            "The view has been modified, and the location is no longer visible.",
+            fields
+        )
+ 
+    #-------------------------------------------------------
     def Close(self):
         self.AddBodyText("</body>")
 
@@ -266,18 +289,6 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
-    def MakeErrorPage(self, title, text, data_url, field_name = None, field_value = None):
-        builder = G_DataExplorerPageBuilder(self)
-        builder.AddPageHeading(title, "color:darkred")
-        builder.AddFieldValue(text)
-
-        if field_name is not None:
-            builder.AddField(field_name, field_value)
-
-        self._PageCache.Replace(data_url, builder.Close())
-
-
-    #-------------------------------------------------------
     def OnPrevPageButton(self, event):
         self._WebView.GoBack()
 
@@ -300,19 +311,22 @@ class G_DataExplorer:
 
         next_location = _DataUrlToLocation(data_url)
         next_node = self.FindNode(next_location["node_id"])
-        if next_node is None:
-            self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
-            return
 
-        if self._LastDataUrl is not None:
-            last_location = _DataUrlToLocation(self._LastDataUrl)
-            last_node = self.FindNode(last_location["node_id"])
-            if last_node is not None and last_location["node_id"] != next_location["node_id"]:
-                last_node.DataExplorerUnload(last_location)
-
-        self._LastDataUrl = data_url
         page_builder = G_DataExplorerPageBuilder(self)
-        next_node.DataExplorerLoad(page_builder, next_location)
+        if next_node is None:
+            page_builder.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.")
+            self._LastDataUrl = None
+
+        else:
+            if self._LastDataUrl is not None:
+                last_location = _DataUrlToLocation(self._LastDataUrl)
+                last_node = self.FindNode(last_location["node_id"])
+                if last_node is not None and last_location["node_id"] != next_location["node_id"]:
+                    last_node.DataExplorerUnload(last_location)
+
+            self._LastDataUrl = data_url
+            next_node.DataExplorerLoad(page_builder, next_location)
+
         self._PageCache.Replace(data_url, page_builder.Close())
 
 
@@ -322,15 +336,31 @@ class G_DataExplorer:
 class G_DataExplorerProvider:
 
     #-------------------------------------------------------
-    def SetDataValidity(self, reason = "Initialisation"):
-        self._Validity = (datetime.datetime.now(), reason)
+    def SetNavigationValidity(self, reason = "Initialisation"):
+        self._Validity = (_TimeBase, reason)
 
+
+    #-------------------------------------------------------
+    def GetNavigationValidTime(self):
+        return self._Validity[0]
+
+    def GetNavigationValidReason(self):
+        return self._Validity[1]
+
+
+    #-------------------------------------------------------
+    def IsNavigationValid(self, builder, location):
+        if location["timebase"] < self.GetNavigationValidTime():
+            builder.MakeUnknownLocationErrorPage([("Reason", self.GetNavigationValidReason())])
+            return False
+        else:
+            return True
 
 
 
 ## G_DataExplorerChildNode #################################
 
-class G_DataExplorerChildNode:
+class G_DataExplorerChildNode(G_DataExplorerProvider):
     """
     G_DataExplorer integration/support.
     """
@@ -353,14 +383,7 @@ class G_DataExplorerChildNode:
         self._LastLocation = None
         self._DataExplorerLoad = on_load
         self._DataExplorerUnload = on_unload
-        self.SetDataExplorerValidity("Initialisation")
-
-
-    #-------------------------------------------------------
-    def SetDataExplorerValidity(self, reason):
-        return
-#        self.GetDataExplorerProvider().SetDataValidity(reason)
-
+        self.SetNavigationValidity("Initialisation")
 
 
     #-------------------------------------------------------

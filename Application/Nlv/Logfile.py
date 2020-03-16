@@ -25,7 +25,6 @@ from weakref import ref as MakeWeakRef
 import wx
 
 # Application imports
-from .DataExplorer import G_DataExplorerProvider
 from .Document import D_Document
 from .Global import G_Const
 from .Global import G_Global
@@ -981,7 +980,7 @@ class G_LogThemeContainerNode(G_LogChildNode, G_ListContainerNode):
 
 ## G_LogNode ##############################################
 
-class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider):
+class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
     """
     Class that implements a logfile.
     Instances are attached to the logfile nodes in the project tree.
