@@ -1152,6 +1152,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         view_line_no = view.LogLineToViewLine(log_line_no, True)
 
         if view_line_no < 0:
+            view.SetHistoryLine(-1)
+
             builder.MakeHiddenLocationErrorPage([
                 ("Reason", self.GetNavigationValidReason()),
                 ("Log line number", str(log_line_no))
@@ -1175,7 +1177,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             else:
                 view.SetHistoryLine(-1)
 
-            self.RefreshView()
+        self.RefreshView()
 
 
     def OnDataExplorerUnload(self, location):

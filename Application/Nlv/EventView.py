@@ -1505,6 +1505,11 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
+    def UpdateDataExplorer(self, item):
+        super().UpdateDataExplorer(event_id = self.GetTableViewCtrl().GetEventId(item))
+
+
+    #-------------------------------------------------------
     def UpdateValidity(self, valid):
         self.GetTableViewCtrl().UpdateDisplay(valid = valid)
 
@@ -1664,7 +1669,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             return
 
         # tell the data explorer
-        self.UpdateDataExplorer(line = self.GetTableViewCtrl().GetLocation(item))
+        self.UpdateDataExplorer(item)
 
         # identify tracking options
         info = self.GetTrackInfo()
@@ -1811,10 +1816,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
         # ignore de-selection and non-events
         if item is not None and item.IsOk():
-            location = self.GetTableViewCtrl().GetLocation(item)
-            if location is not None:
-                # tell the data explorer
-                self.UpdateDataExplorer(line = location)
+            self.UpdateDataExplorer(item)
 
 
     #-------------------------------------------------------
@@ -1967,10 +1969,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
         # ignore de-selection and non-events
         if item is not None and item.IsOk():
-            location = self.GetTableViewCtrl().GetLocation(item)
-            if location is not None:
-                # tell the data explorer
-                self.UpdateDataExplorer(line = location)
+            self.UpdateDataExplorer(item)
 
 
     #-------------------------------------------------------

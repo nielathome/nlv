@@ -662,6 +662,7 @@ private:
 protected:
 	std::string MakeOrderSql( void ) const;
 	std::string MakeViewSql( bool with_limit = false ) const;
+	std::string MakeLookupSql( void ) const;
 
 	const std::string & GetSortColumn( void ) const {
 		return m_ColumnNames[ m_SortColumn ];
@@ -966,6 +967,27 @@ std::string SqlViewAccessor::MakeViewSql( bool with_limit ) const
 		strm << R"__(
 			LIMIT 16 OFFSET ?1
 		)__";
+
+	return strm.str();
+}
+
+
+std::string SqlViewAccessor::MakeLookupSql( void ) const
+{
+	std::ostringstream strm;
+
+	strm << R"__(
+		SELECT
+			event_id,
+			row_number() OVER
+			(
+				ORDER BY
+					)__" << MakeOrderSql() << R"__(
+				RANGE
+					UNBOUNDED PRECEDING
+			) AS row_number
+		FROM
+			display)__";
 
 	return strm.str();
 }
@@ -1395,6 +1417,21 @@ int SqlViewAccessor::GetParent( nlineno_t line_no )
 int SqlViewAccessor::LookupEventId( int64_t event_id )
 {
 	std::ostringstream strm;
+
+#ifdef waiting_for_newer_sql
+	strm << R"__(
+		WITH sorted_display AS
+		(
+			)__" << MakeLookupSql() << R"__(
+		)
+		SELECT
+			row_number
+		FROM
+			sorted_display
+		WHERE
+			event_id = )__" << event_id;
+#else
+	// WARNING: this is buggy, as it ignores sort order ...
 	strm << R"__(
 		SELECT
 			rowid
@@ -1402,6 +1439,7 @@ int SqlViewAccessor::LookupEventId( int64_t event_id )
 			display
 		WHERE
 			event_id =)__" << event_id;
+#endif
 
 	statement_ptr_t statement;
 	Error res{ m_LogAccessor->MakeStatement( strm, true, statement ) };

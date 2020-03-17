@@ -260,11 +260,23 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
     def IsDataExplorerLine(self, item_key):
         return item_key == self._DataExplorerKey
 
+    def SetDataExplorerLine(self, key):
+        changed = self._DataExplorerKey != key
+        self._DataExplorerKey = key
+        return changed
+
+    def ClearDataExplorerLine(self):
+        changed = self._DataExplorerKey is not None
+        self._DataExplorerKey = None
+        return changed
+
 
     #-------------------------------------------------------
     def Reset(self, table_schema = None):
         self._N_Logfile = None
         self._N_EventView = None
+
+        self.ClearDataExplorerLine()
 
         if table_schema is None:
             table_schema = G_ProjectionSchema()
@@ -281,6 +293,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
             self._ModelColumnToFieldId.append(fid)
 
+# pass reason in
         self.SetNavigationValidity("Model reset")
 
 
@@ -318,61 +331,61 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def GetLocation(self, item):
-        return self.ItemToKey(item)
+    def OnDataExplorerLoad(self, ctrl, sync, builder, location):
+        item = self.LookupEventId(location["event_id"])
+        if item is None:
+            if self.ClearDataExplorerLine():
+                ctrl.Refresh()
 
+            builder.MakeHiddenLocationErrorPage([
+                ("Reason", self.GetNavigationValidReason())
+            ])
 
-    #-------------------------------------------------------
-    def OnDataExplorerLoad(self, sync, builder, location):
-        schema = self._TableSchema
-        if schema.UserDataExplorerOpen is not None:
-            schema.UserDataExplorerOpen(builder)
+        else:
+            schema = self._TableSchema
+            if schema.UserDataExplorerOpen is not None:
+                schema.UserDataExplorerOpen(builder)
 
-        builder.AddPageHeading("{} Item".format(self._Name))
-        if self._DocumentUrl is not None:
-            builder.AddLink(self._DocumentUrl, "Show log ...")
+            builder.AddPageHeading("{} Item".format(self._Name))
+            if self._DocumentUrl is not None:
+                builder.AddLink(self._DocumentUrl, "Show log ...")
 
-        key = location["line"]
-        item = self.KeyToItem(key)
-        table_schema = self._TableSchema
-
-        for col_num, field in enumerate(self._TableSchema):
-            if field.Available:
-                display_value = self.GetFieldDisplayValue(item, col_num)
-                if isinstance(display_value, str):
-                    text = display_value
-                elif isinstance(display_value, bool):
-                    if display_value:
-                        text = "True"
+            for col_num, field in enumerate(schema):
+                if field.Available:
+                    display_value = self.GetFieldDisplayValue(item, col_num)
+                    if isinstance(display_value, str):
+                        text = display_value
+                    elif isinstance(display_value, bool):
+                        if display_value:
+                            text = "True"
+                        else:
+                            text = "False"
                     else:
-                        text = "False"
-                else:
-                    text = display_value.Text
+                        text = display_value.Text
 
-                if text is not None and len(text) != 0:
-                    if field.ExplorerFormatter is not None:
-                        with G_ScriptGuard("CreateFieldDataForExplorer"):
-                            field.ExplorerFormatter(builder, field.Name, text)
-                    else:
-                        builder.AddField(field.Name, text)
+                    if text is not None and len(text) != 0:
+                        if field.ExplorerFormatter is not None:
+                            with G_ScriptGuard("CreateFieldDataForExplorer"):
+                                field.ExplorerFormatter(builder, field.Name, text)
+                        else:
+                            builder.AddField(field.Name, text)
                     
-        if schema.UserDataExplorerClose is not None:
-            schema.UserDataExplorerClose(builder)
+            if schema.UserDataExplorerClose is not None:
+                schema.UserDataExplorerClose(builder)
 
-        self._DataExplorerKey = None
-        location_item = None
-        if sync:
-            self._DataExplorerKey = key
-            location_item = item
+            if sync:
+                if self.SetDataExplorerLine(self.ItemToKey(item)):
+                    ctrl.UnselectAll()
+                    ctrl.EnsureVisible(item)
 
-        return location_item
+            elif self.ClearDataExplorerLine():
+                ctrl.Refresh()
 
 
     #-------------------------------------------------------
-    def OnDataExplorerUnload(self):
-        do_refresh = self._DataExplorerKey is not None
-        self._DataExplorerKey = None
-        return do_refresh
+    def OnDataExplorerUnload(self, ctrl):
+        if self.ClearDataExplorerLine():
+            ctrl.Refresh()
 
 
     #-------------------------------------------------------
@@ -521,6 +534,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
+    def GetEventId(self, item):
+        col_num = self._TableSchema.ColEventId
+        return self.GetFieldValue(self.ItemToKey(item), col_num)
+
     def MapSelectionToEventIds(self, items):
         col_num = self._TableSchema.ColEventId
         return [self.GetFieldValue(self.ItemToKey(item), col_num) for item in items]
@@ -623,7 +640,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if not self.FilterLineSet(match):
             return False
         
-        self.SetNavigationValidity("Filter: {match}".format(match = match.GetDescription()))
+        self.SetNavigationValidityReason("Filter: {match}".format(match = match.GetDescription()))
+        self.ClearDataExplorerLine()
         self.Cleared()
         return True
 
@@ -633,7 +651,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._N_EventView is not None:
             (data_col_offset, direction) = self._TableSchema[col_num].ToggleSortDirection()
             self._N_EventView.Sort(col_num + data_col_offset, direction)
-            self.SetNavigationValidity("Sorting")
             self.Cleared()
             return True
         else:
@@ -910,18 +927,14 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def GetLocation(self, item):
-        return self.GetModel().GetLocation(item)
+    def GetEventId(self, item):
+        return self.GetModel().GetEventId(item)
 
     def OnDataExplorerLoad(self, sync, builder, location):
-        item = self.GetModel().OnDataExplorerLoad(sync, builder, location)
-        if item is not None:
-            self.UnselectAll()
-            self.EnsureVisible(item)
+        self.GetModel().OnDataExplorerLoad(self, sync, builder, location)
 
     def OnDataExplorerUnload(self, location):
-        if self.GetModel().OnDataExplorerUnload():
-            self.Refresh()
+        self.GetModel().OnDataExplorerUnload(self)
 
 
     #-------------------------------------------------------

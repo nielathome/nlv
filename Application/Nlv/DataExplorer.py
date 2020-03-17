@@ -304,30 +304,35 @@ class G_DataExplorer:
 
     #-------------------------------------------------------
     def OnWebViewNavigating(self, event):
+        last_node = None
+        if self._LastDataUrl is not None:
+            last_location = _DataUrlToLocation(self._LastDataUrl)
+            last_node = self.FindNode(last_location["node_id"])
+
+        self._LastDataUrl = None
         web_url = event.GetURL()
         scheme, data_url = web_url.split(':')
+
         if scheme != "memory":
-            return
+            if last_node is not None:
+                last_node.DataExplorerUnload(last_location)
 
-        next_location = _DataUrlToLocation(data_url)
-        next_node = self.FindNode(next_location["node_id"])
+        else:    
+            next_location = _DataUrlToLocation(data_url)
+            next_node = self.FindNode(next_location["node_id"])
+            page_builder = G_DataExplorerPageBuilder(self)
 
-        page_builder = G_DataExplorerPageBuilder(self)
-        if next_node is None:
-            page_builder.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.")
-            self._LastDataUrl = None
+            if next_node is None:
+                page_builder.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.")
 
-        else:
-            if self._LastDataUrl is not None:
-                last_location = _DataUrlToLocation(self._LastDataUrl)
-                last_node = self.FindNode(last_location["node_id"])
+            else:
                 if last_node is not None and last_location["node_id"] != next_location["node_id"]:
                     last_node.DataExplorerUnload(last_location)
 
-            self._LastDataUrl = data_url
-            next_node.DataExplorerLoad(page_builder, next_location)
+                self._LastDataUrl = data_url
+                next_node.DataExplorerLoad(page_builder, next_location)
 
-        self._PageCache.Replace(data_url, page_builder.Close())
+            self._PageCache.Replace(data_url, page_builder.Close())
 
 
 
@@ -336,6 +341,9 @@ class G_DataExplorer:
 class G_DataExplorerProvider:
 
     #-------------------------------------------------------
+    def SetNavigationValidityReason(self, reason):
+        self._Validity = (self.GetNavigationValidTime(), reason)
+
     def SetNavigationValidity(self, reason = "Initialisation"):
         self._Validity = (_TimeBase, reason)
 
