@@ -215,12 +215,11 @@ class G_TableFieldFormatter:
 class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
-    def __init__(self, name, doc_url):
+    def __init__(self, name):
         super().__init__()
 
         self._ViewFlat = True
         self._Name = name
-        self._DocumentUrl = doc_url
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
@@ -331,7 +330,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def OnDataExplorerLoad(self, ctrl, sync, builder, location):
+    def OnDataExplorerLoad(self, ctrl, sync, builder, location, logfile_url):
         item = self.LookupEventId(location["event_id"])
         if item is None:
             if self.ClearDataExplorerLine():
@@ -347,8 +346,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                 schema.UserDataExplorerOpen(builder)
 
             builder.AddPageHeading("{} Item".format(self._Name))
-            if self._DocumentUrl is not None:
-                builder.AddLink(self._DocumentUrl, "Show log ...")
+            if logfile_url is not None:
+                builder.AddLink(logfile_url, "Show log file ...")
 
             for col_num, field in enumerate(schema):
                 if field.Available:
@@ -753,7 +752,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, flags, name, doc_url):
+    def __init__(self, parent, flags, name):
         super().__init__(
             parent,
             style = wx.dataview.DV_ROW_LINES
@@ -761,7 +760,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
             | flags
         )
 
-        self.AssociateModel(G_TableDataModel(name, doc_url))
+        self.AssociateModel(G_TableDataModel(name))
         self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
@@ -833,12 +832,12 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, multiple_selection, name, doc_url):
+    def __init__(self, parent, multiple_selection, name):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        super().__init__(parent, flags, name, doc_url)
+        super().__init__(parent, flags, name)
 
         self._SelectionHandler = None
         self._IsMultipleSelection = multiple_selection
@@ -930,8 +929,8 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
     def GetEventId(self, item):
         return self.GetModel().GetEventId(item)
 
-    def OnDataExplorerLoad(self, sync, builder, location):
-        self.GetModel().OnDataExplorerLoad(self, sync, builder, location)
+    def OnDataExplorerLoad(self, sync, builder, location, logfile_url):
+        self.GetModel().OnDataExplorerLoad(self, sync, builder, location, logfile_url)
 
     def OnDataExplorerUnload(self, location):
         self.GetModel().OnDataExplorerUnload(self)
@@ -1448,13 +1447,13 @@ class G_CommonViewCtrl(G_CoreViewCtrl):
     """
 
     #-------------------------------------------------------
-    def __init__(self, parent, multiple_selection, name, doc_url = None):
+    def __init__(self, parent, multiple_selection, name):
         super().__init__(parent)
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name, doc_url)
+        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name)
         self.ArrangeChildren()
 
 
@@ -1542,8 +1541,8 @@ class G_CommonViewCtrl(G_CoreViewCtrl):
 class G_EventsViewCtrl(G_CommonViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, name, doc_url):
-        super().__init__(parent, False, name, doc_url)
+    def __init__(self, parent, name):
+        super().__init__(parent, False, name)
 
 
 
@@ -1585,21 +1584,20 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
 class G_NetworkViewCtrl(G_CoreViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, doc_url = None):
+    def __init__(self, parent):
         super().__init__(parent)
 
         self._Notebook = self._TablePane = G_NotebookDisplayControl(self)
         self._ChartView = None
         self._TableViewCtrls = [None, None]
         self._TableNodeIds = [None, None]
-        self._DocumentUrl = doc_url
 
         self.ArrangeChildren()
 
 
     def SetupDataTable(self, idx, name, node_id):
         self._TableNodeIds[idx] = node_id
-        self._TableViewCtrls[idx] = table_ctrl = G_TableViewCtrl(self._Notebook, True, name, self._DocumentUrl)
+        self._TableViewCtrls[idx] = table_ctrl = G_TableViewCtrl(self._Notebook, True, name)
         self._Notebook.AddPage(table_ctrl, name)
         return table_ctrl
 

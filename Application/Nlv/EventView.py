@@ -1516,7 +1516,8 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def OnDataExplorerLoad(self, sync, builder, location):
-        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location)
+        logfile_url = self.GetLogNode().MakeDataUrl()
+        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, logfile_url)
         if sync:
             self.MakeActive()
 
@@ -1593,9 +1594,8 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        doc_url = self.GetLogNode().MakeDataUrl()
         parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
-        view_ctrl = G_EventsViewCtrl(parent_notebook, self._Name, doc_url)
+        view_ctrl = G_EventsViewCtrl(parent_notebook, self._Name)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
         self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
@@ -1858,9 +1858,8 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        doc_url = self.GetLogNode().MakeDataUrl()
         parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
-        view_ctrl = G_NetworkViewCtrl(parent_notebook, doc_url)
+        view_ctrl = G_NetworkViewCtrl(parent_notebook)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
         # the focus control will be updated later when the chart window is created
