@@ -357,9 +357,12 @@ class G_DataExplorerProvider:
 
 
     #-------------------------------------------------------
-    def IsNavigationValid(self, builder, location):
+    def IsNavigationValid(self, builder, location, node_name):
         if location["timebase"] < self.GetNavigationValidTime():
-            builder.MakeUnknownLocationErrorPage([("Reason", self.GetNavigationValidReason())])
+            builder.MakeUnknownLocationErrorPage([
+                ("Location", node_name),
+                ("Reason", self.GetNavigationValidReason())
+            ])
             return False
         else:
             return True

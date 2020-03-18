@@ -1155,6 +1155,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             view.SetHistoryLine(-1)
 
             builder.MakeHiddenLocationErrorPage([
+                ("Location", self.GetNodeName()),
                 ("Reason", self.GetNavigationValidReason()),
                 ("Log line number", str(log_line_no))
             ])
@@ -1162,6 +1163,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         else:
             builder.AddPageHeading("View")
             builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
+            builder.AddField("Location", self.GetNodeName())
             builder.AddField("Log Line No", str(log_line_no))
             builder.AddField("View Line No", str(view_line_no))
 

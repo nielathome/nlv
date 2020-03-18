@@ -228,7 +228,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
-        self.Reset()
+        self.Reset(reason = "Initialisation")
 
         self._Icons = [
             wx.ArtProvider.GetIcon(wx.ART_NORMAL_FILE, wx.ART_TOOLBAR, (16, 16)),
@@ -271,7 +271,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def Reset(self, table_schema = None):
+    def Reset(self, table_schema = None, reason = None):
         self._N_Logfile = None
         self._N_EventView = None
 
@@ -292,8 +292,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
             self._ModelColumnToFieldId.append(fid)
 
-# pass reason in
-        self.SetNavigationValidity("Model reset")
+        if reason is None:
+            # None effectively means "don't care"
+            reason = "Model reset"
+        self.SetNavigationValidity("Data cleared: {}".format(reason))
 
 
     #-------------------------------------------------------
@@ -332,11 +334,18 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
     #-------------------------------------------------------
     def OnDataExplorerLoad(self, ctrl, sync, builder, location, logfile_url):
         item = self.LookupEventId(location["event_id"])
-        if item is None:
+        node_name = location["node_name"]
+
+        if not self.IsNavigationValid(builder, location, node_name):
+            if self.ClearDataExplorerLine():
+                ctrl.Refresh()
+
+        elif item is None:
             if self.ClearDataExplorerLine():
                 ctrl.Refresh()
 
             builder.MakeHiddenLocationErrorPage([
+                ("Location", node_name),
                 ("Reason", self.GetNavigationValidReason())
             ])
 
@@ -348,6 +357,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             builder.AddPageHeading("{} Item".format(self._Name))
             if logfile_url is not None:
                 builder.AddLink(logfile_url, "Show log file ...")
+
+            builder.AddField("Location", node_name)
 
             for col_num, field in enumerate(schema):
                 if field.Available:
@@ -595,10 +606,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     @G_Global.TimeFunction
-    def UpdateContent(self, nesting, table_info, valid):
+    def UpdateContent(self, nesting, table_info, valid, reason):
         table_schema, db_path = table_info.GetSchemaAndDbPath()
 
-        self.Reset(table_schema)
+        self.Reset(table_schema, reason = reason)
         self.UpdateNesting(nesting, False)
         self.UpdateValidity(valid)
 
@@ -790,14 +801,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateContent(self, nesting, table_info, valid):
+    def UpdateContent(self, nesting, table_info, valid, reason = None):
         """Update the data view with new content"""
 
         # note: number of DataView columns is not the same as the number of
         # model columns; as some are hidden for internal use
         try:
             self.ClearColumns()
-            self.GetModel().UpdateContent(nesting, table_info, valid)
+            self.GetModel().UpdateContent(nesting, table_info, valid, reason = reason)
             self.UpdateColumns()
 
         except FileNotFoundError as ex:
@@ -1572,7 +1583,7 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             self._CollectorLocked = False
 
             table_ctrl = self.GetTableViewCtrl()
-            table_ctrl.UpdateContent(False, quantifier_info, valid)
+            table_ctrl.UpdateContent(False, quantifier_info, valid, reason = "Metric quantification (triggered when parent data is filtered or when the analysis is re-run)")
             table_ctrl.SetFieldMask(-1)
 
             self.CreateCharts(context, quantifier_info.Charts)
