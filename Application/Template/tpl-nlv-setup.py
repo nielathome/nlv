@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -141,7 +141,10 @@ if __name__ == '__main__':
             "Nlv": [
                 '*.xml',
                 '*.ico',
+                '*.html',
+                '*.js',
                 '*.css',
+                '*.json',
                  "Sphinx/doctrees/*",
                  "Sphinx/html/[!_]*",
                  "Sphinx/html/_sources/*",
@@ -157,9 +160,9 @@ if __name__ == '__main__':
 
         zip_safe = False,
         install_requires = [
-          'Nlv-wxPython==4.0.4',
-          'pywin32',
-          'matplotlib'
+          'Nlv-wxPython==__WXPYTHONVER__',
+          'comtypes',
+          'pywin32'
         ],
 
         entry_points={
