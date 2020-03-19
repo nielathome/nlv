@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2020. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ echo ==== Check/update Python Virtual Environment
 
 call %PYENVDBG%\Scripts\Activate.bat
 python -m pip install %PIP_ARGS% --upgrade pip 
-python -m pip %PIP_ARGS% install --upgrade pip pywin32 matplotlib
+python -m pip %PIP_ARGS% install --upgrade pip pywin32 six pillow comtypes
 
 
 
@@ -91,7 +91,7 @@ echo Double-click the solution file; ensure the _Work\PyEnv\Dbg Python virtual
 echo environment is setup and activated:
 echo   Solution Platforms = x64
 echo   Solution Explorer ] Nlv ] Python Environments ] Add Existing Virtual Environment...
-echo   Solution Explorer ] Nlv ] Python Environments ] Dbg (Python 36) ] Activate Environment      
+echo   Solution Explorer ] Nlv ] Python Environments ] Dbg (Python %PYVER%) ] Activate Environment      
 echo.
 
 :FINISH

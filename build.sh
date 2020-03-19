@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) Niel Clausen 2018-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,12 +25,16 @@ help()
 {
   echo "build options"
   echo "--clean - clean workspace of build results"
+  echo "--clean-pyenv - when cleaning, also remove Python virtual environments"
+  echo "--force - force BOOST/TBB builds"
   echo "--help | -h - display help"
   echo "--release | -r - increment release number"
   echo "--verbose | -v - increase detail in output"
 }
 
 cfg_clean=""
+cfg_clean_pyenv=""
+cfg_force=""
 cfg_release=""
 cfg_verbose=""
 cfg_skip_phoenix=""
@@ -42,6 +46,16 @@ for arg in $*; do
       cfg_clean=1
       ;;
         
+    "--clean-pyenv")
+      if [ -n "$cfg_clean" ]; then
+        cfg_clean_pyenv=1
+      fi
+      ;;
+      
+    "--force")
+      cfg_force=1
+      ;;
+
     "--help"|"-h"|"/?")
       help
       exit 0
@@ -261,10 +275,12 @@ echo "SET NUGET=`cygpath -w $nuget`" >> $envbat
 # Environment checks
 ###############################################################################
 
-python=`which -a python | fgrep 36`
-checkf "$python" "Unable to locate Python 36"
+pyver=37
+python=`which -a python | fgrep $pyver`
+checkf "$python" "Unable to locate Python $pyver"
 python_dir=`dirname $python`
 
+echo "SET PYVER=$pyver" >> $envbat
 addenvvar PYTHON "$python"
 addenvprops PYTHON "$python_dir"
 
@@ -285,18 +301,27 @@ addenvvar VS2017ENV "$cyg_vs2017env"
 pyenvbld="$wrkdir/PyEnv/Bld"
 addenvvar PYENVBLD "$pyenvbld"
 
-if [ ! -d "$pyenvbld" ]; then
-
-  msg_line "Creating Python virtual environment directory for build"
-  $python -m venv `cygpath -w $pyenvbld`
-fi
-
 pyenvdbg="$wrkdir/PyEnv/Dbg"
 addenvvar PYENVDBG "$pyenvdbg"
 
-if [ ! -d "$pyenvdbg" ]; then
-  msg_line "Creating Python virtual environment directory for debugging"
-  $python -m venv `cygpath -w $pyenvdbg`
+if [ -n "$cfg_clean_pyenv" ]; then
+
+  msg_line "Remove Python virtual environments"
+  rm -rf "$pyenvbld"
+  rm -rf "$pyenvdbg"
+    
+else
+
+  if [ ! -d "$pyenvbld" ]; then
+  
+    msg_line "Creating Python virtual environment directory for build"
+    $python -m venv `cygpath -w $pyenvbld`
+  fi
+  
+  if [ ! -d "$pyenvdbg" ]; then
+    msg_line "Creating Python virtual environment directory for debugging"
+    $python -m venv `cygpath -w $pyenvdbg`
+  fi
 fi
 
 
@@ -331,7 +356,7 @@ if [ -n "$cfg_clean" ]; then
   rm -f "${boost_build}" 
   runbat Scripts/build_boost.bat 2>&1 | tee "${boost_clean}"
 
-elif [ ! -f "$boost_build" ]; then
+elif [ -n "$cfg_force" -o ! -f "$boost_build" ]; then
   msg_header "Building BOOST ${boost_name}"
   time runbat Scripts/build_boost.bat 2>&1 | tee "${boost_build}"
 fi
@@ -379,7 +404,7 @@ if [ -n "$cfg_clean" ]; then
   rm -f "${tbb_build}" 
   runbat Scripts/build_tbb.bat 2>&1 | tee "${tbb_clean}"
 
-elif [ ! -f "$tbb_build" ]; then
+elif [ -n "$cfg_force" -o ! -f "$tbb_build" ]; then
   msg_header "Building TBB ${tbb_name}"
   time runbat Scripts/build_tbb.bat 2>&1 | tee "${tbb_build}"
 fi
@@ -390,9 +415,9 @@ fi
 # SQLite Header
 ###############################################################################
 
-sql_name="amalgamation-3140200"
+sql_name="amalgamation-3310100"
 sql_file="sqlite-${sql_name}.zip"
-sql_url="https://www.sqlite.org/2016/${sql_file}"
+sql_url="https://www.sqlite.org/2020/${sql_file}"
 sql_path="$pkgdir/${sql_file}"
 sql_dir="$pkgdir/sqlite-${sql_name}"
 
@@ -432,16 +457,18 @@ fi
 ###############################################################################
 
 # create the Python setup files
-sed -e "s/__VER__/$ver/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
+wxpythonver=`grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }'`
+sed -e "s/__VER__/$ver/" -e "s/__WXPYTHONVER__/$wxpythonver/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
 sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py
 
 sqlite_lib=$wrkdir/sqlite3.lib
 
 if [ -n "$cfg_clean" ]; then
-  rm "$sqlite_lib"
+  rm -f "$sqlite_lib"
 
 else
   if [ ! -f "$sqlite_lib" ]; then
+    msg_header "Build Sqlite import library"
     runbat Scripts/build_sqlite_lib.bat
   fi
 fi
@@ -492,7 +519,8 @@ projfile="Application/Nlv/Nlv.pyproj"
 tplfile="Application/Template/tpl-Nlv.pyproj"
 
 if [ -n "$cfg_clean" ]; then
-  rm $projfile
+  rm -rf "$wrkdir/Bld"
+  rm -f $projfile
   
 elif [ ! -f "$projfile" ]; then 
   wtestdir=`cygpath -a -m "$testdir"`
