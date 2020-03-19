@@ -17,8 +17,7 @@
 
 # Python imports
 
-import comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0
-from comtypes import COMObject, GUID, COMMETHOD
+from comtypes import IUnknown, COMObject, GUID, COMMETHOD, _compointer_base
 from ctypes import c_int, c_ulong, c_wchar_p, HRESULT
 import logging
 import os
@@ -63,7 +62,7 @@ import Nlog
 #   <module 'comtypes.gen._3050F1C5_98B5_11CF_BB82_00AA00BDCE0B_0_4_0' from 'lib\site-packages\comtypes\gen\_3050F1C5_98B5_11CF_BB82_00AA00BDCE0B_0_4_0.py'>
 #
 
-class IDeveloperConsoleMessageReceiver(comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0.IUnknown):
+class IDeveloperConsoleMessageReceiver(IUnknown):
     _case_insensitive_ = True
     'IDeveloperConsoleMessageReceiver interface'
     _iid_ = GUID('{30510808-98B5-11CF-BB82-00AA00BDCE0B}')
@@ -1065,8 +1064,8 @@ class G_HtmlHostCtrl(wx.Panel):
         # interface to a Python object, and wrap it into a
         # pythoncom PyIUnknown class
         pyobj = G_DeveloperConsoleMessageReceiver()
-        iunknown_c = pyobj.QueryInterface(comtypes.gen._00020430_0000_0000_C000_000000000046_0_2_0.IUnknown)
-        c_ptr = super(comtypes._compointer_base, iunknown_c).value
+        iunknown_c = pyobj.QueryInterface(IUnknown)
+        c_ptr = super(_compointer_base, iunknown_c).value
         iunknown_p = pythoncom.ObjectFromAddress(c_ptr)
 
         # access embedded browser's command target interface
