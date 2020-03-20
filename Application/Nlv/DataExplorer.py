@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2019. All rights reserved.
+# Copyright (C) Niel Clausen 2019-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,8 +16,9 @@
 #
 
 # Python imports
-import datetime
+import base64
 import html
+import json
 import io
 from pathlib import Path
 
@@ -31,40 +32,68 @@ from .Global import G_Global
 
 
 
+## URL #####################################################
+
+_TimeBase = 1
+
+
+def _MakeLocation(node_id, **kwargs):
+    global _TimeBase
+    _TimeBase += 1
+
+    return dict(
+        kwargs,
+        timebase = _TimeBase,
+        node_id = node_id
+    )
+
+
+def _DataUrlToLocation(data_url):
+    b64_bytes = base64.urlsafe_b64decode(data_url)
+    data = json.loads(b64_bytes.decode())
+    return data
+
+
+def _LocationToDataUrl(location):
+    data_bytes = json.dumps(location).encode('utf-8')
+    b64_bytes = base64.urlsafe_b64encode(data_bytes)
+    res = b64_bytes.decode()
+    return res
+
+
+def _MakeWebUrl(data_url):
+    return "memory:" + data_url
+
+
+
 ## G_DataExplorerPageCache #################################
 
 class G_DataExplorerPageCache:
-    """Wrapper for wx.MemoryFSHandler"""
+    """
+    Wrapper to maintain wx.MemoryFSHandler live entries.
+    """
 
-    _MaxHistory = 150
+    _MaxHistory = 5
 
 
     #-------------------------------------------------------
     def __init__(self):
-        # both containers have the same contents, but are used
-        # for different purposes
-
-        # order list of keys, first entry is oldest, last is newest
+        # ordered list of keys, first entry is oldest, last is newest
         self._MRU = []
-
-        # tuples of validity (date/time) and navigability of a page
-        self._Keys = dict()
 
 
     #-------------------------------------------------------
     def Clear(self):
-        for key in self._Keys:
+        for key in self._MRU:
             wx.MemoryFSHandler.RemoveFile(key)
 
         self._MRU.clear()
-        self._Keys.clear()
 
 
     #-------------------------------------------------------
     def Remove(self, key):
         wx.MemoryFSHandler.RemoveFile(key)
         self._MRU.remove(key)
-        del self._Keys[key]
 
 
     #-------------------------------------------------------
@@ -74,36 +103,10 @@ class G_DataExplorerPageCache:
 
 
     #-------------------------------------------------------
-    def Contains(self, key):
-        contains = key in self._Keys
-        if contains:
-            # effectively, drop key to end of MRU list; makes
-            # it the most-recently-used key
-            self._MRU.remove(key)
-            self._MRU.append(key)
-        return contains
-
-
-    #-------------------------------------------------------
-    def Valid(self, key, ref_validity):
-        # returns a tuple of validity and navigability; a
-        # valid is key where the cache entry was created after
-        # the reference date
-        ref_date, invalidity_reason = ref_validity
-        cache_date, navigable = self._Keys[key]
-
-        if ref_date < cache_date:
-            invalidity_reason = None
-
-        return (invalidity_reason, navigable)
-
-
-    #-------------------------------------------------------
-    def Add(self, key, data, navigable = True):
-        if key in self._Keys:
+    def Replace(self, key, data):
+        if key in self._MRU:
             self.Remove(key)
 
-        self._Keys[key] = (datetime.datetime.now(), navigable)
         self._MRU.append(key)
         wx.MemoryFSHandler.AddFileWithMimeType(key, data, "text/html")
         self.Prune()
@@ -111,9 +114,6 @@ class G_DataExplorerPageCache:
 
 
 ## G_DataExplorerPageBuilder ###############################
-
-def MakeWebUrl(data_url):
-    return "memory:" + data_url
 
 class G_DataExplorerPageBuilder:
     """Support building pages to display in the data explorer"""
@@ -169,10 +169,33 @@ class G_DataExplorerPageBuilder:
         self.AddFieldValue(value, value_style)
 
     def AddLink(self, data_url, text):
-        if self._DataExplorer.CreatePage(data_url):
-            self.AddBodyText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = MakeWebUrl(data_url), text = html.escape(text)))
+        self.AddBodyText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = _MakeWebUrl(data_url), text = html.escape(text)))
 
 
+    #-------------------------------------------------------
+    def MakeErrorPage(self, title, explanation, fields = []):
+        self.AddPageHeading(title, "color:darkred")
+        self.AddFieldValue(explanation)
+
+        for name, value in fields:
+            self.AddField(name, value)
+
+
+    def MakeUnknownLocationErrorPage(self, fields):
+        self.MakeErrorPage(
+            "Unknown Location",
+            "The view has been modified, and the location can no longer be found.",
+            fields
+        )
+
+
+    def MakeHiddenLocationErrorPage(self, fields):
+        self.MakeErrorPage(
+            "Hidden Location",
+            "The view has been modified, and the location is no longer visible.",
+            fields
+        )
+ 
     #-------------------------------------------------------
     def Close(self):
         self.AddBodyText("</body>")
@@ -192,28 +215,6 @@ class G_DataExplorer:
 
     _DataExplorer = None
 
-    _LocationSplit = "__at__"
-    _PageSplit = "__page__"
-
-
-    #-------------------------------------------------------
-    @classmethod
-    def SplitDataUrl(cls, url):
-        # url is node-id<loc-split>location<page-split>page
-        node_id, rem = url.split(cls._LocationSplit)
-        location, page = rem.split(cls._PageSplit)
-
-        return node_id, location, page
-
-
-    @classmethod
-    def MakeDataUrl(cls, node_id, location, page):
-        return "{node_id}{loc_split}{location}{page_split}{page}".format(
-            node_id = node_id,
-            loc_split = cls._LocationSplit, location = location,
-            page_split = cls._PageSplit, page = page
-        )
-
 
     #-------------------------------------------------------
     @classmethod
@@ -227,7 +228,7 @@ class G_DataExplorer:
     def __init__(self, frame):
         self._Frame = frame
         self._PageCache = G_DataExplorerPageCache()
-        self._LastWebUrl = None
+        self._LastDataUrl = None
 
         parent = frame.GetDataExplorerPanel()
 
@@ -283,42 +284,8 @@ class G_DataExplorer:
 
 
     #-------------------------------------------------------
-    def CreatePage(self, data_url):
-        node_id, location, page = self.SplitDataUrl(data_url)
-        node = self.FindNode(node_id)
-
-        if node is not None:
-            if not self._PageCache.Contains(data_url):
-                page_builder = G_DataExplorerPageBuilder(self)
-                node.GetDataExplorerProvider().CreateDataExplorerPage(page_builder, location, page)
-                self._PageCache.Add(data_url, page_builder.Close())
-            return True
-
-        else:
-            return False
-
-
     def Update(self, data_url):
-        if self.CreatePage(data_url):
-            self._LastWebUrl = web_url = MakeWebUrl(data_url)
-            self._WebView.LoadURL(web_url)
-
-
-    #-------------------------------------------------------
-    def MakeErrorPage(self, title, text, data_url, field_name = None, field_value = None):
-        builder = G_DataExplorerPageBuilder(self)
-        builder.AddPageHeading(title, "color:darkred")
-        builder.AddFieldValue(text)
-
-        if field_name is not None:
-            builder.AddField(field_name, field_value)
-
-        node_id, location, page = self.SplitDataUrl(data_url)
-        builder.AddField("ID", node_id)
-        builder.AddField("Location", location)
-        builder.AddField("Page", page)
-
-        self._PageCache.Add(data_url, builder.Close(), False)
+        self._WebView.LoadURL(_MakeWebUrl(data_url))
 
 
     #-------------------------------------------------------
@@ -337,115 +304,106 @@ class G_DataExplorer:
 
     #-------------------------------------------------------
     def OnWebViewNavigating(self, event):
+        last_node = None
+        if self._LastDataUrl is not None:
+            last_location = _DataUrlToLocation(self._LastDataUrl)
+            last_node = self.FindNode(last_location["node_id"])
+
+        self._LastDataUrl = None
         web_url = event.GetURL()
-        if web_url.find("memory:") != 0:
-            return
-
         scheme, data_url = web_url.split(':')
-        if not self._PageCache.Contains(data_url):
-            self.MakeErrorPage("Page not found", "The data explorer page has dropped from the cache, and its data is no longer available.", data_url)
 
-        node_id, location, page = self.SplitDataUrl(data_url)
-        node = self.FindNode(node_id)
+        if scheme != "memory":
+            if last_node is not None:
+                last_node.DataExplorerUnload(last_location)
 
-        if node is None:
-            self.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.", data_url)
-            return
+        else:    
+            next_location = _DataUrlToLocation(data_url)
+            next_node = self.FindNode(next_location["node_id"])
+            page_builder = G_DataExplorerPageBuilder(self)
 
-        ref_validity = node.GetDataExplorerProvider().GetDataValidity()
-        invalidity_reason, navigable = self._PageCache.Valid(data_url, ref_validity)
-        if invalidity_reason is not None:
-            self.MakeErrorPage("Modified View", "The view has been modified, and has not been synchronised to the data explorer.", data_url, "Modification", invalidity_reason)
-            return
+            if next_node is None:
+                page_builder.MakeErrorPage("View not found", "The view cannot be found. It has probably been deleted.")
 
-        if navigable and self._LastWebUrl != web_url and node.GetDataExplorerSync().ShowLocation(location):
-            node.MakeActive()
-            self._LastWebUrl = web_url
+            else:
+                if last_node is not None and last_location["node_id"] != next_location["node_id"]:
+                    last_node.DataExplorerUnload(last_location)
 
-       
+                self._LastDataUrl = data_url
+                next_node.DataExplorerLoad(page_builder, next_location)
+
+            self._PageCache.Replace(data_url, page_builder.Close())
+
+
 
 ## G_DataExplorerProvider #################################
 
 class G_DataExplorerProvider:
-    """
-    Abstract base class for data providers. Concrete classes
-    will need to implement:
-        
-        def CreateDataExplorerPage(self, builder, location, page):
-            # create HTML text for the given location
-            pass
-    """
 
     #-------------------------------------------------------
-    def SetDataValidity(self, reason = "Initialisation"):
-        self._Validity = (datetime.datetime.now(), reason)
+    def SetNavigationValidityReason(self, reason):
+        self._Validity = (self.GetNavigationValidTime(), reason)
+
+    def SetNavigationValidity(self, reason = "Initialisation"):
+        self._Validity = (_TimeBase, reason)
 
 
     #-------------------------------------------------------
-    def GetDataValidity(self):
-        return self._Validity
+    def GetNavigationValidTime(self):
+        return self._Validity[0]
+
+    def GetNavigationValidReason(self):
+        return self._Validity[1]
 
 
-
-## G_DataExplorerSync #####################################
-
-class G_DataExplorerSync:
-    """
-    Abstract base class for display views synchronised to the
-    data provider
-    """
-        
-    def ShowLocation(self, location):
-        # switch UI to ensure 'location' is visible on
-        # the screen
-        return False
+    #-------------------------------------------------------
+    def IsNavigationValid(self, builder, location, node_name):
+        if location["timebase"] < self.GetNavigationValidTime():
+            builder.MakeUnknownLocationErrorPage([
+                ("Location", node_name),
+                ("Reason", self.GetNavigationValidReason())
+            ])
+            return False
+        else:
+            return True
 
 
 
 ## G_DataExplorerChildNode #################################
 
-class G_DataExplorerChildNode:
-
+class G_DataExplorerChildNode(G_DataExplorerProvider):
     """
     G_DataExplorer integration/support.
-
-    If the default provider is used, nodes will need to
-    implement:
-        CreateDataExplorerPage(builder, location, page)
-
-    and if the default sync is used:
-        ShowLocation(location)
     """
 
     #-------------------------------------------------------
-    def GetDataExplorer(self):
-        return self.GetSessionNode().GetDataExplorer()
+    def UpdateDataExplorer(self, **kwargs):
+        data_explorer = self.GetSessionNode().GetDataExplorer()
+        self._LastLocation = _MakeLocation(self.GetNodeId(), **kwargs)
+        data_explorer.Update(_LocationToDataUrl(self._LastLocation))
 
 
     #-------------------------------------------------------
-    def MakeDataUrl(self, location = "any", page = "0"):
-        return G_DataExplorer.MakeDataUrl(self.GetNodeId(), location, page)
+    def MakeDataUrl(self, **kwargs):
+        location = _MakeLocation(self.GetNodeId(), **kwargs)
+        return _LocationToDataUrl(location)
 
 
     #-------------------------------------------------------
-    def SetupDataExplorer(self, provider = None, sync = None):
-        self._DataExplorerProvider = provider
-        self._DataExplorerSync = sync
-        self.SetDataExplorerValidity("Initialisation")
-
-    def GetDataExplorerProvider(self):
-        if self._DataExplorerProvider is None:
-            return self
-        else:
-            return self._DataExplorerProvider
-
-    def GetDataExplorerSync(self):
-        if self._DataExplorerSync is None:
-            return self
-        else:
-            return self._DataExplorerSync
+    def SetupDataExplorer(self, on_load = None, on_unload = None):
+        self._LastLocation = None
+        self._DataExplorerLoad = on_load
+        self._DataExplorerUnload = on_unload
+        self.SetNavigationValidity("Initialisation")
 
 
     #-------------------------------------------------------
-    def SetDataExplorerValidity(self, reason):
-        self.GetDataExplorerProvider().SetDataValidity(reason)
+    def DataExplorerLoad(self, builder, location):
+        sync = self._LastLocation != location
+        self._LastLocation = None
+        if self._DataExplorerLoad is not None:
+            self._DataExplorerLoad(sync, builder, location)
+
+    def DataExplorerUnload(self, location):
+        if self._DataExplorerUnload is not None:
+            self._DataExplorerUnload(location)

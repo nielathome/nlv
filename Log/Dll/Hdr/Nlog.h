@@ -567,6 +567,7 @@ class NLogView
 	:
 	public NViewFieldAccess,
 	public NViewTimecode,
+	public NViewLineTranslation,
 	public NViewHiliting,
 	public VContent
 {

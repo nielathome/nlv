@@ -693,20 +693,16 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     def PostAnalyse(self):
-        def Work(node):
-            node.PostAnalyse(self._AnalysisResults)
-
-        self._ForallProjectors(Work, [G_Project.NodeID_EventProjector])
+        self._ForallProjectors(lambda node : node.PostAnalyse(self._AnalysisResults), [
+            G_Project.NodeID_EventProjector
+        ])
 
 
     def ReleaseFiles(self):
         self._AnalysisResults = None
         self._AnalysisRun = False
         
-        def Work(node):
-            node.ReleaseFiles()
-
-        self._ForallProjectors(Work, [
+        self._ForallProjectors(lambda node : node.ReleaseFiles(), [
             G_Project.NodeID_EventProjector,
             G_Project.NodeID_MetricsProjector,
             G_Project.NodeID_NetworkProjector
@@ -719,10 +715,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         if analysis is None:
             return
 
-        def Work(node):
-            node.UpdateEventContent()
-
-        self._ForallProjectors(Work, [
+        self._ForallProjectors(lambda node : node.UpdateEventContent(), [
             G_Project.NodeID_EventProjector,
             G_Project.NodeID_NetworkDataProjector,
             G_Project.NodeID_NetworkProjector # must be after NodeID_NetworkDataProjector
@@ -730,10 +723,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
 
     def UpdateValidity(self, valid):
-        def Work(node):
-            node.UpdateValidity(valid)
-
-        self._ForallProjectors(Work, [
+        self._ForallProjectors(lambda node : node.UpdateValidity(valid), [
             G_Project.NodeID_EventProjector,
             G_Project.NodeID_MetricsProjector,
             G_Project.NodeID_NetworkDataProjector
@@ -1484,7 +1474,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def SetupTableCtrl(self, table_ctrl):
-        self.SetupDataExplorer(table_ctrl.GetModel(), table_ctrl)
+        self.SetupDataExplorer(self.OnDataExplorerLoad, self.OnDataExplorerUnload)
         table_ctrl.SetSelectionhandler(self.OnTableSelectionChanged)
 
         inner_ctrl = table_ctrl.GetChildCtrl()
@@ -1505,8 +1495,25 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
 
     #-------------------------------------------------------
+    def UpdateDataExplorer(self, item):
+        super().UpdateDataExplorer(event_id = self.GetTableViewCtrl().GetEventId(item))
+
+
+    #-------------------------------------------------------
     def UpdateValidity(self, valid):
         self.GetTableViewCtrl().UpdateDisplay(valid = valid)
+
+
+    #-------------------------------------------------------
+    def OnDataExplorerLoad(self, sync, builder, location):
+        location["node_name"] = self.GetNodeName()
+        logfile_url = self.GetLogNode().MakeDataUrl()
+        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, logfile_url)
+        if sync:
+            self.MakeActive()
+
+    def OnDataExplorerUnload(self, location):
+        self.GetTableViewCtrl().OnDataExplorerUnload(location)
 
 
     #-------------------------------------------------------
@@ -1578,9 +1585,8 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        doc_url = self.GetLogNode().MakeDataUrl()
         parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
-        view_ctrl = G_EventsViewCtrl(parent_notebook, self._Name, doc_url)
+        view_ctrl = G_EventsViewCtrl(parent_notebook, self._Name)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
         self.SetDisplayCtrl(view_ctrl, owns_display_ctrl = False)
@@ -1654,7 +1660,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             return
 
         # tell the data explorer
-        self.GetDataExplorer().Update(self.MakeDataUrl(self.GetTableViewCtrl().GetLocation(item)))
+        self.UpdateDataExplorer(item)
 
         # identify tracking options
         info = self.GetTrackInfo()
@@ -1719,10 +1725,8 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def UpdateMetricContent(self):
-        def Work(node):
-            node.UpdateMetricContent()
-
-        self.VisitSubNodes(Work, factory_id = G_Project.NodeID_MetricsProjector, recursive = True)
+        self.VisitSubNodes(lambda node : node.UpdateMetricContent(),
+            factory_id = G_Project.NodeID_MetricsProjector, recursive = True)
 
 
     @G_Global.TimeFunction
@@ -1731,7 +1735,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
         # load events into event viewer data control
         projector_info, is_valid = self.GetProjectorInfo()
-        self.GetTableViewCtrl().UpdateContent(self.GetNesting(), projector_info, is_valid)
+        self.GetTableViewCtrl().UpdateContent(self.GetNesting(), projector_info, is_valid, reason = "Analyser run")
         
         # make any required charts
         self.GetViewCtrl().CreateCharts(self.MakeChartCreateContext(), projector_info.Charts)
@@ -1801,10 +1805,7 @@ class G_MetricsProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
         # ignore de-selection and non-events
         if item is not None and item.IsOk():
-            location = self.GetTableViewCtrl().GetLocation(item)
-            if location is not None:
-                # tell the data explorer
-                self.GetDataExplorer().Update(self.MakeDataUrl(location))
+            self.UpdateDataExplorer(item)
 
 
     #-------------------------------------------------------
@@ -1846,9 +1847,8 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         self._Field = D_Document(self.GetDocument(), self)
 
         # setup UI
-        doc_url = self.GetLogNode().MakeDataUrl()
         parent_notebook = self.GetParentNode().GetDisplayAnalysisNoteBook()
-        view_ctrl = G_NetworkViewCtrl(parent_notebook, doc_url)
+        view_ctrl = G_NetworkViewCtrl(parent_notebook)
         parent_notebook.AddPage(view_ctrl, self._Name)
 
         # the focus control will be updated later when the chart window is created
@@ -1957,10 +1957,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
         # ignore de-selection and non-events
         if item is not None and item.IsOk():
-            location = self.GetTableViewCtrl().GetLocation(item)
-            if location is not None:
-                # tell the data explorer
-                self.GetDataExplorer().Update(self.MakeDataUrl(location))
+            self.UpdateDataExplorer(item)
 
 
     #-------------------------------------------------------
@@ -1970,11 +1967,8 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
         # load events into event viewer data control
         projector_info, is_valid = self.GetProjectorInfo()
-        self.GetTableViewCtrl().UpdateContent(False, projector_info, is_valid)
+        self.GetTableViewCtrl().UpdateContent(False, projector_info, is_valid, reason = "Analyser run")
         self.EnsureDisplayControlVisible()
-
-        ## forward to child metrics views
-        #self.UpdateMetricContent()
 
 
     #-------------------------------------------------------

@@ -31,7 +31,6 @@ import winreg
 
 # Application imports 
 from .DataExplorer import G_DataExplorerProvider
-from .DataExplorer import G_DataExplorerSync
 from .Logfile import G_DisplayControl
 from .Logfile import G_NotebookDisplayControl
 from .EventProjector import ConnectDb
@@ -215,25 +214,25 @@ class G_TableFieldFormatter:
 class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
-    def __init__(self, name, doc_url):
+    def __init__(self, name):
         super().__init__()
 
         self._ViewFlat = True
         self._Name = name
-        self._DocumentUrl = doc_url
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
-        self._HistoryColour = G_ColourTraits.MakeColour("LIGHT SLATE BLUE")
+        self._DataExplorerColour = G_ColourTraits.MakeColour("WHEAT")
+        self._DataExplorerKey = None
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
-        self._HistoryKey = None
-        self.Reset()
+        self.Reset(reason = "Initialisation")
 
         self._Icons = [
             wx.ArtProvider.GetIcon(wx.ART_NORMAL_FILE, wx.ART_TOOLBAR, (16, 16)),
-            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16))
+            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16)),
+            wx.ArtProvider.GetIcon(wx.ART_GO_FORWARD, wx.ART_TOOLBAR, (16, 16))
         ]
 
 
@@ -256,13 +255,26 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def ClearDataValidity(self, reason):
-        self._HistoryKey = None
-        self.SetDataValidity(reason)
+    def IsDataExplorerLine(self, item_key):
+        return item_key == self._DataExplorerKey
 
-    def Reset(self, table_schema = None):
+    def SetDataExplorerLine(self, key):
+        changed = self._DataExplorerKey != key
+        self._DataExplorerKey = key
+        return changed
+
+    def ClearDataExplorerLine(self):
+        changed = self._DataExplorerKey is not None
+        self._DataExplorerKey = None
+        return changed
+
+
+    #-------------------------------------------------------
+    def Reset(self, table_schema = None, reason = None):
         self._N_Logfile = None
         self._N_EventView = None
+
+        self.ClearDataExplorerLine()
 
         if table_schema is None:
             table_schema = G_ProjectionSchema()
@@ -279,7 +291,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
             self._ModelColumnToFieldId.append(fid)
 
-        self.ClearDataValidity("Model reset")
+        if reason is None:
+            # None effectively means "don't care"
+            reason = "Model reset"
+        self.SetNavigationValidity("Data cleared: {}".format(reason))
 
 
     #-------------------------------------------------------
@@ -293,7 +308,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         icon = None
 
         if field_schema.IsFirst:
-            icon = self._Icons[self.IsContainer(item)]
+            if self.IsDataExplorerLine(item_key):
+                icon = self._Icons[2]
+            else:
+                icon = self._Icons[self.IsContainer(item)]
 
         return G_ProjectionTypeManager.GetDisplayValue(field_schema, icon, self._N_EventView, item_key, col_num)
 
@@ -313,52 +331,70 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def GetLocation(self, item):
-        key = self.ItemToKey(item)
-        if key is None:
-            return key
+    def OnDataExplorerLoad(self, ctrl, sync, builder, location, logfile_url):
+        item = self.LookupEventId(location["event_id"])
+        node_name = location["node_name"]
+
+        if not self.IsNavigationValid(builder, location, node_name):
+            if self.ClearDataExplorerLine():
+                ctrl.Refresh()
+
+        elif item is None:
+            if self.ClearDataExplorerLine():
+                ctrl.Refresh()
+
+            builder.MakeHiddenLocationErrorPage([
+                ("Location", node_name),
+                ("Reason", self.GetNavigationValidReason())
+            ])
+
         else:
-            return str(key)
+            schema = self._TableSchema
+            if schema.UserDataExplorerOpen is not None:
+                schema.UserDataExplorerOpen(builder)
 
-    def SetHistoryKey(self, key):
-        self._HistoryKey = key
-        return self.KeyToItem(key)
+            builder.AddPageHeading("{} Item".format(self._Name))
+            if logfile_url is not None:
+                builder.AddLink(logfile_url, "Show log file ...")
 
-    def CreateDataExplorerPage(self, builder, location, page):
-        schema = self._TableSchema
-        if schema.UserDataExplorerOpen is not None:
-            schema.UserDataExplorerOpen(builder)
+            builder.AddField("Location", node_name)
 
-        builder.AddPageHeading("{} Item".format(self._Name))
-        if self._DocumentUrl is not None:
-            builder.AddLink(self._DocumentUrl, "Show log ...")
-
-        item_key = int(location)
-        item = self.KeyToItem(item_key)
-        table_schema = self._TableSchema
-
-        for col_num, field in enumerate(self._TableSchema):
-            if field.Available:
-                display_value = self.GetFieldDisplayValue(item, col_num)
-                if isinstance(display_value, str):
-                    text = display_value
-                elif isinstance(display_value, bool):
-                    if display_value:
-                        text = "True"
+            for col_num, field in enumerate(schema):
+                if field.Available:
+                    display_value = self.GetFieldDisplayValue(item, col_num)
+                    if isinstance(display_value, str):
+                        text = display_value
+                    elif isinstance(display_value, bool):
+                        if display_value:
+                            text = "True"
+                        else:
+                            text = "False"
                     else:
-                        text = "False"
-                else:
-                    text = display_value.Text
+                        text = display_value.Text
 
-                if text is not None and len(text) != 0:
-                    if field.ExplorerFormatter is not None:
-                        with G_ScriptGuard("CreateFieldDataForExplorer"):
-                            field.ExplorerFormatter(builder, field.Name, text)
-                    else:
-                        builder.AddField(field.Name, text)
+                    if text is not None and len(text) != 0:
+                        if field.ExplorerFormatter is not None:
+                            with G_ScriptGuard("CreateFieldDataForExplorer"):
+                                field.ExplorerFormatter(builder, field.Name, text)
+                        else:
+                            builder.AddField(field.Name, text)
                     
-        if schema.UserDataExplorerClose is not None:
-            schema.UserDataExplorerClose(builder)
+            if schema.UserDataExplorerClose is not None:
+                schema.UserDataExplorerClose(builder)
+
+            if sync:
+                if self.SetDataExplorerLine(self.ItemToKey(item)):
+                    ctrl.UnselectAll()
+                    ctrl.EnsureVisible(item)
+
+            elif self.ClearDataExplorerLine():
+                ctrl.Refresh()
+
+
+    #-------------------------------------------------------
+    def OnDataExplorerUnload(self, ctrl):
+        if self.ClearDataExplorerLine():
+            ctrl.Refresh()
 
 
     #-------------------------------------------------------
@@ -468,19 +504,21 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     def GetAttr(self, item, col_num, attr):
         """Pass formatting request to any formatter registered by the recogniser"""
+
+        # attr is a DataViewItemAttr
         wrapped_attr = G_TableFieldFormatter(attr)
 
         if not self._IsValid:
             wrapped_attr.SetFgColour(self._InvalidColour, True)
 
+        item_key = self.ItemToKey(item)
+        if self.IsDataExplorerLine(item_key):
+            wrapped_attr.SetBgColour(self._DataExplorerColour, True)
+
         if col_num < len(self._ModelColumnToFieldId):
             field_id = self._ModelColumnToFieldId[col_num]
             if field_id >= 0 and field_id < len(self._ColumnColours):
                 wrapped_attr.SetFgColour(self._ColumnColours[field_id])
-
-        item_key = self.ItemToKey(item)
-        if item_key == self._HistoryKey:
-            wrapped_attr.SetBgColour(self._HistoryColour, True)
 
         for hiliter in self._Hiliters:
             if self._N_EventView.GetHiliter(hiliter._Id).Hit(item_key):
@@ -505,6 +543,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
+    def GetEventId(self, item):
+        col_num = self._TableSchema.ColEventId
+        return self.GetFieldValue(self.ItemToKey(item), col_num)
+
     def MapSelectionToEventIds(self, items):
         col_num = self._TableSchema.ColEventId
         return [self.GetFieldValue(self.ItemToKey(item), col_num) for item in items]
@@ -563,10 +605,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     @G_Global.TimeFunction
-    def UpdateContent(self, nesting, table_info, valid):
+    def UpdateContent(self, nesting, table_info, valid, reason):
         table_schema, db_path = table_info.GetSchemaAndDbPath()
 
-        self.Reset(table_schema)
+        self.Reset(table_schema, reason = reason)
         self.UpdateNesting(nesting, False)
         self.UpdateValidity(valid)
 
@@ -607,7 +649,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if not self.FilterLineSet(match):
             return False
         
-        self.ClearDataValidity("Filter: {match}".format(match = match.GetDescription()))
+        self.SetNavigationValidityReason("Filter: {match}".format(match = match.GetDescription()))
+        self.ClearDataExplorerLine()
         self.Cleared()
         return True
 
@@ -617,7 +660,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._N_EventView is not None:
             (data_col_offset, direction) = self._TableSchema[col_num].ToggleSortDirection()
             self._N_EventView.Sort(col_num + data_col_offset, direction)
-            self.ClearDataValidity("Sorting")
+            self.ClearDataExplorerLine()
             self.Cleared()
             return True
         else:
@@ -692,7 +735,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self._ViewFlat = view_flat
         if do_rebuild:
-            self.ClearDataValidity("Nesting level")
             self.Cleared()
 
 
@@ -720,7 +762,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, flags, name, doc_url):
+    def __init__(self, parent, flags, name):
         super().__init__(
             parent,
             style = wx.dataview.DV_ROW_LINES
@@ -728,7 +770,7 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
             | flags
         )
 
-        self.AssociateModel(G_TableDataModel(name, doc_url))
+        self.AssociateModel(G_TableDataModel(name))
         self.Bind(wx.dataview.EVT_DATAVIEW_COLUMN_HEADER_CLICK, self.OnColClick)
 
 
@@ -758,14 +800,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateContent(self, nesting, table_info, valid):
+    def UpdateContent(self, nesting, table_info, valid, reason = None):
         """Update the data view with new content"""
 
         # note: number of DataView columns is not the same as the number of
         # model columns; as some are hidden for internal use
         try:
             self.ClearColumns()
-            self.GetModel().UpdateContent(nesting, table_info, valid)
+            self.GetModel().UpdateContent(nesting, table_info, valid, reason = reason)
             self.UpdateColumns()
 
         except FileNotFoundError as ex:
@@ -797,15 +839,15 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 ## G_TableViewCtrl #########################################
 
-class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
+class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, multiple_selection, name, doc_url):
+    def __init__(self, parent, multiple_selection, name):
         flags = 0
         if multiple_selection:
             flags = wx.dataview.DV_MULTIPLE
 
-        super().__init__(parent, flags, name, doc_url)
+        super().__init__(parent, flags, name)
 
         self._SelectionHandler = None
         self._IsMultipleSelection = multiple_selection
@@ -894,13 +936,14 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DataExplorerSync, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def GetLocation(self, item):
-        return self.GetModel().GetLocation(item)
+    def GetEventId(self, item):
+        return self.GetModel().GetEventId(item)
 
-    def ShowLocation(self, location):
-        item = self.GetModel().SetHistoryKey(int(location))
-        self.EnsureVisible(item)
-        return True
+    def OnDataExplorerLoad(self, sync, builder, location, logfile_url):
+        self.GetModel().OnDataExplorerLoad(self, sync, builder, location, logfile_url)
+
+    def OnDataExplorerUnload(self, location):
+        self.GetModel().OnDataExplorerUnload(self)
 
 
     #-------------------------------------------------------
@@ -1414,13 +1457,13 @@ class G_CommonViewCtrl(G_CoreViewCtrl):
     """
 
     #-------------------------------------------------------
-    def __init__(self, parent, multiple_selection, name, doc_url = None):
+    def __init__(self, parent, multiple_selection, name):
         super().__init__(parent)
 
         self.SetMinimumPaneSize(150)
         self.SetSashGravity(0.5)
 
-        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name, doc_url)
+        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name)
         self.ArrangeChildren()
 
 
@@ -1508,8 +1551,8 @@ class G_CommonViewCtrl(G_CoreViewCtrl):
 class G_EventsViewCtrl(G_CommonViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, name, doc_url):
-        super().__init__(parent, False, name, doc_url)
+    def __init__(self, parent, name):
+        super().__init__(parent, False, name)
 
 
 
@@ -1539,7 +1582,7 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             self._CollectorLocked = False
 
             table_ctrl = self.GetTableViewCtrl()
-            table_ctrl.UpdateContent(False, quantifier_info, valid)
+            table_ctrl.UpdateContent(False, quantifier_info, valid, reason = "Metric quantification (triggered when parent data is filtered or when the analysis is re-run)")
             table_ctrl.SetFieldMask(-1)
 
             self.CreateCharts(context, quantifier_info.Charts)
@@ -1551,21 +1594,20 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
 class G_NetworkViewCtrl(G_CoreViewCtrl):
 
     #-------------------------------------------------------
-    def __init__(self, parent, doc_url = None):
+    def __init__(self, parent):
         super().__init__(parent)
 
         self._Notebook = self._TablePane = G_NotebookDisplayControl(self)
         self._ChartView = None
         self._TableViewCtrls = [None, None]
         self._TableNodeIds = [None, None]
-        self._DocumentUrl = doc_url
 
         self.ArrangeChildren()
 
 
     def SetupDataTable(self, idx, name, node_id):
         self._TableNodeIds[idx] = node_id
-        self._TableViewCtrls[idx] = table_ctrl = G_TableViewCtrl(self._Notebook, True, name, self._DocumentUrl)
+        self._TableViewCtrls[idx] = table_ctrl = G_TableViewCtrl(self._Notebook, True, name)
         self._Notebook.AddPage(table_ctrl, name)
         return table_ctrl
 

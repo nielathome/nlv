@@ -24,8 +24,6 @@ import wx.stc
 from wx.lib.expando import ExpandoTextCtrl
 
 # Application imports 
-from .DataExplorer import G_DataExplorerProvider
-from .DataExplorer import G_DataExplorerSync
 from .Document import D_Document
 from .Global import G_Const
 from .Global import G_FrozenWindow
@@ -163,14 +161,14 @@ class G_ViewControl(G_PanelDisplayControl):
     #-------------------------------------------------------
     def Activate(self, view_node):
         editor = self.GetEditor()
-        line = editor.LineFromPosition(editor.GetSelectionEnd())
+        view_line_no = editor.LineFromPosition(editor.GetSelectionEnd())
 
-        annotation_text = editor.AnnotationGetText(line)
+        annotation_text = editor.AnnotationGetText(view_line_no)
         self._Annotation.SetValue(annotation_text)
 
         if annotation_text != "":
             traits = self.StyleTraits
-            style_no = editor.AnnotationGetStyle(line)
+            style_no = editor.AnnotationGetStyle(view_line_no)
             self._StyleCombo.SetSelection(traits.GetIndexByData(style_no))
 
         self.ShowAnnotationPane(True)
@@ -195,9 +193,9 @@ class G_ViewControl(G_PanelDisplayControl):
             annotation_text = self._Annotation.GetValue()
 
             editor = self.GetEditor()
-            line = editor.LineFromPosition(editor.GetSelectionEnd())
-            editor.AnnotationSetText(line, annotation_text)
-            editor.AnnotationSetStyle(line, self.GetStyle())
+            view_line_no = editor.LineFromPosition(editor.GetSelectionEnd())
+            editor.AnnotationSetText(view_line_no, annotation_text)
+            editor.AnnotationSetStyle(view_line_no, self.GetStyle())
 
             view_node.GetLogNode().RefreshViews()
 
@@ -222,8 +220,8 @@ class G_ViewControl(G_PanelDisplayControl):
         view_node = self._ViewNode
         if view_node is not None:
             editor = self.GetEditor()
-            line = editor.LineFromPosition(editor.GetSelectionEnd())
-            editor.AnnotationSetStyle(line, self.GetStyle())
+            view_line_no = editor.LineFromPosition(editor.GetSelectionEnd())
+            editor.AnnotationSetStyle(view_line_no, self.GetStyle())
             view_node.GetLogNode().RefreshViews()
 
 
@@ -885,7 +883,7 @@ class G_ViewThemeContainerNode(G_ViewChildNode, G_ListContainerNode):
 
 ## G_ViewNode ##############################################
 
-class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataExplorerProvider, G_DataExplorerSync):
+class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     """Class that implements a view onto a logfile"""
 
     # global tracker key binding map to tracker index
@@ -902,7 +900,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         # track our position in the project tree
         G_DisplayNode.__init__(self)
         G_TabContainerNode.__init__(self, factory, wproject, witem)
-        self.SetupDataExplorer()
+        self.SetupDataExplorer(self.OnDataExplorerLoad, self.OnDataExplorerUnload)
 
         self._CursorLine = -1
         self._AutoHiliteText = ""
@@ -1063,30 +1061,6 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
-    def ShowLocation(self, location):
-        line = int(location)
-        self.GetView().SetHistoryLine(line)
-        self.ScrollToLine(line)
-        self.RefreshView()
-        return True
-
-
-    def CreateDataExplorerPage(self, builder, location, page):
-        builder.AddPageHeading("View")
-        builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
-
-        line = int(location)
-        view = self.GetView()
-
-        builder.AddField("Line No", location)
-
-        for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
-            builder.AddField(name, view.GetFieldText(line, field_id))
-
-        builder.AddField("Line", view.GetNonFieldText(line))
-
-
-    #-------------------------------------------------------
     def GetEditor(self):
         return self._ViewControl.GetEditor()
 
@@ -1105,8 +1079,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
     def GetTrackInfo(self):
         return self.FindChildNode(factory_id = G_Project.NodeID_ViewTracking).GetTrackInfo()
 
-    def GetNearestUtcTimecode(self, line_no):
-        return self._N_View.GetNearestUtcTimecode(line_no)
+    def GetNearestUtcTimecode(self, view_line_no):
+        return self._N_View.GetNearestUtcTimecode(view_line_no)
 
 
     #-------------------------------------------------------
@@ -1116,10 +1090,10 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
     def SetScreenState(self, state_tuple):
         # note: order is important
-        (first_line, cursor_line) = state_tuple
+        (first_line_no, cursor_line_no) = state_tuple
         editor = self.GetEditor()
-        editor.GotoLine(cursor_line)
-        editor.SetFirstVisibleLine(first_line)
+        editor.GotoLine(cursor_line_no)
+        editor.SetFirstVisibleLine(first_line_no)
 
 
     #-------------------------------------------------------
@@ -1135,21 +1109,21 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
                 return
 
         editor = self.GetEditor()
-        cur_line = editor.LineFromPosition(editor.GetCurrentPos())
+        cur_line_no = editor.LineFromPosition(editor.GetCurrentPos())
 
         if what == "bookmark":
-            next_line = self._N_View.GetNextBookmark(cur_line, forward)
+            next_line_no = self._N_View.GetNextBookmark(cur_line_no, forward)
         elif what == "annotation":
-            next_line = self._N_View.GetNextAnnotation(cur_line, forward)
+            next_line_no = self._N_View.GetNextAnnotation(cur_line_no, forward)
         elif what == "hilite":
-            next_line = self._N_View.GetHiliter(index).Search(cur_line, forward)
+            next_line_no = self._N_View.GetHiliter(index).Search(cur_line_no, forward)
 
-        if next_line >= 0:
-            editor.GotoLine(next_line)
+        if next_line_no >= 0:
+            editor.GotoLine(next_line_no)
 
 
     #-------------------------------------------------------
-    def NotifyLine(self, line_number):
+    def NotifyLine(self, view_line_no):
         """Notify the log line to the current channel listener(s)"""
 
         schema = self.GetLogNode().GetLogSchema()
@@ -1157,9 +1131,9 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         if emitter_id < 0:
             return
 
-        emitter_text = self._N_View.GetFieldText(line_number, emitter_id)
+        emitter_text = self._N_View.GetFieldText(view_line_no, emitter_id)
         if emitter_text != "":
-            log_line = self.GetEditor().GetLine(line_number).rstrip("\n")
+            log_line = self.GetEditor().GetLine(view_line_no).rstrip("\n")
             message = schema.CreateLineNotificationMessage(log_line, emitter_text)
             channel = self.GetProject().GetChannel(schema.GetName(), schema.GetEffectiveChannelGuid())
             channel.Notify(message)
@@ -1172,6 +1146,48 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
+    def OnDataExplorerLoad(self, sync, builder, location):
+        view = self._N_View
+        log_line_no = location["log_line_no"]
+        view_line_no = view.LogLineToViewLine(log_line_no, True)
+
+        if view_line_no < 0:
+            view.SetHistoryLine(-1)
+
+            builder.MakeHiddenLocationErrorPage([
+                ("Location", self.GetNodeName()),
+                ("Reason", self.GetNavigationValidReason()),
+                ("Log line number", str(log_line_no))
+            ])
+
+        else:
+            builder.AddPageHeading("View")
+            builder.AddLink(self.GetLogNode().MakeDataUrl(), "Show log ...")
+            builder.AddField("Location", self.GetNodeName())
+            builder.AddField("Log Line No", str(log_line_no))
+            builder.AddField("View Line No", str(view_line_no))
+
+            for field_id, name in enumerate(self.GetLogNode().GetLogSchema().GetFieldNames()):
+                builder.AddField(name, view.GetFieldText(view_line_no, field_id))
+
+            builder.AddField("Line", view.GetNonFieldText(view_line_no))
+
+            if sync:
+                self.MakeActive()
+                view.SetHistoryLine(view_line_no)
+                self.ScrollToLine(view_line_no)
+            else:
+                view.SetHistoryLine(-1)
+
+        self.RefreshView()
+
+
+    def OnDataExplorerUnload(self, location):
+        self._N_View.SetHistoryLine(-1)
+        self.RefreshView()
+
+
+    #-------------------------------------------------------
     def OnUpdateUI(self, event):
         """Dispatcher for changes made in the Scintilla control"""
 
@@ -1179,7 +1195,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
             self.OnSelectionChange()
 
 
-    def OnSelectionChange(self):
+    def OnSelectionChange(self, force = False):
         """Use indicator zero to auto-hilite all occurances of the selected text in the view"""
 
         # set hiliter matching first
@@ -1188,12 +1204,13 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
             self._AutoHiliteText = text
             self.UpdateHiliterMatch(0, G_MatchItem("Literal", text))
 
-        # everything else only meaningful when line changes
+        # everything else only meaningful when line changes, or force is True
         editor = self.GetEditor()
-        cur_line = editor.LineFromPosition(editor.GetSelectionEnd())
-        if cur_line == self._CursorLine:
+        cur_line_no = editor.LineFromPosition(editor.GetSelectionEnd())
+
+        if not force and cur_line_no == self._CursorLine:
             return
-        self._CursorLine = cur_line
+        self._CursorLine = cur_line_no
 
         # identify tracking options
         info = self.GetTrackInfo()
@@ -1205,20 +1222,21 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         # update trackers
         if update:
             if update_local:
-                self._N_View.SetLocalTrackerLine(cur_line)
+                self._N_View.SetLocalTrackerLine(cur_line_no)
 
             # capture new tracker data
-            timecode = self.GetNearestUtcTimecode(cur_line)
+            timecode = self.GetNearestUtcTimecode(cur_line_no)
             self.UpdateTrackers(update_local, update_global_idx, [timecode])
 
             # flush any changes through to the GUI
             self.RefreshTrackers(update_local, update_global, self)
 
         # tell the data explorer
-        self.GetDataExplorer().Update(self.MakeDataUrl(str(cur_line)))
+        log_line_no = self._N_View.ViewLineToLogLine(cur_line_no)
+        self.UpdateDataExplorer(log_line_no = log_line_no)
 
         # tell the world
-        self.NotifyLine(cur_line)
+        self.NotifyLine(cur_line_no)
 
         # maintanance note - do not add any more random stuff to this function,
         # implement a proper notification system
@@ -1229,7 +1247,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         handled = False
 
         editor = self.GetEditor()
-        cur_line = editor.LineFromPosition(editor.GetSelectionStart())
+        cur_line_no = editor.LineFromPosition(editor.GetSelectionStart())
         if key_code == ord("A"):
             handled = True
             if modifiers ==  wx.MOD_CONTROL:
@@ -1241,8 +1259,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
             handled = True
             if modifiers ==  wx.MOD_CONTROL:
                 # set a user bookmark on the current line(s)
-                to_line = editor.LineFromPosition(editor.GetSelectionEnd())
-                self._N_View.ToggleBookmarks(cur_line, to_line)
+                to_line_no = editor.LineFromPosition(editor.GetSelectionEnd())
+                self._N_View.ToggleBookmarks(cur_line_no, to_line_no)
                 self.GetLogNode().RefreshViews()
 
             else:
@@ -1250,7 +1268,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
         elif key_code == ord("C") and modifiers == 0:
             handled = True
-            self.ScrollToLine(cur_line)
+            self.ScrollToLine(cur_line_no)
 
         elif key_code == ord("L"):
             if modifiers == 0:
@@ -1258,9 +1276,9 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
                 self.ScrollToLine(self._N_View.GetLocalTrackerLine())
             elif modifiers == wx.MOD_CONTROL:
                 handled = True
-                self._N_View.SetLocalTrackerLine(cur_line)
+                self._N_View.SetLocalTrackerLine(cur_line_no)
                 self.RefreshTrackers(True, False, self)
-                timecode = self.GetNearestUtcTimecode(cur_line)
+                timecode = self.GetNearestUtcTimecode(cur_line_no)
                 self.UpdateTrackers(True, -1, [timecode])
 
         elif key_code in self._GlobalTrackerKeys:
@@ -1270,7 +1288,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
                 self.ScrollToLine(self._N_View.GetGlobalTrackerLine(tracker_idx))
             elif modifiers == wx.MOD_CONTROL:
                 handled = True
-                timecode = self.GetNearestUtcTimecode(cur_line)
+                timecode = self.GetNearestUtcTimecode(cur_line_no)
                 Nlog.SetGlobalTracker(tracker_idx, timecode)
                 self.RefreshTrackers(False, True, self)
                 self.UpdateTrackers(False, tracker_idx, [timecode])
@@ -1279,10 +1297,10 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
 
 
     #-------------------------------------------------------
-    def ScrollToLine(self, line):
+    def ScrollToLine(self, view_line_no):
         editor = self.GetEditor()
-        start = editor.PositionFromLine(line)
-        end = editor.PositionFromLine(line + 1)
+        start = editor.PositionFromLine(view_line_no)
+        end = editor.PositionFromLine(view_line_no + 1)
         editor.ScrollRange(start, end)
 
 
@@ -1350,7 +1368,8 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode, G_DataEx
         """The filter GUI page has been altered; re-filter the logfile view"""
         ok = self._N_View.Filter(match)
         if ok:
-            self.SetDataExplorerValidity("Filter: {match}".format(match = match.GetDescription()))
+            self.SetNavigationValidity("Filter: {match}".format(match = match.GetDescription()))
+            self.OnSelectionChange(force = True)
         return ok
             
 
