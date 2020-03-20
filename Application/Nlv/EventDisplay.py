@@ -660,6 +660,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._N_EventView is not None:
             (data_col_offset, direction) = self._TableSchema[col_num].ToggleSortDirection()
             self._N_EventView.Sort(col_num + data_col_offset, direction)
+            self.ClearDataExplorerLine()
             self.Cleared()
             return True
         else:
@@ -734,7 +735,6 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self._ViewFlat = view_flat
         if do_rebuild:
-            self.SetNavigationValidity("Nesting level")
             self.Cleared()
 
 

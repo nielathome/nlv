@@ -1418,7 +1418,6 @@ int SqlViewAccessor::LookupEventId( int64_t event_id )
 {
 	std::ostringstream strm;
 
-#ifdef waiting_for_newer_sql
 	strm << R"__(
 		WITH sorted_display AS
 		(
@@ -1430,16 +1429,6 @@ int SqlViewAccessor::LookupEventId( int64_t event_id )
 			sorted_display
 		WHERE
 			event_id = )__" << event_id;
-#else
-	// WARNING: this is buggy, as it ignores sort order ...
-	strm << R"__(
-		SELECT
-			rowid
-		FROM
-			display
-		WHERE
-			event_id =)__" << event_id;
-#endif
 
 	statement_ptr_t statement;
 	Error res{ m_LogAccessor->MakeStatement( strm, true, statement ) };
