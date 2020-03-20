@@ -18,8 +18,6 @@ rem
 
 call _Work\env.bat
 
-call "%VS2015ENV%" x64
-
 echo.
 echo ==== BOOST Release %BOOST%
 
@@ -28,7 +26,7 @@ if not exist b2.exe (
   call bootstrap.bat
 )
 
-set OPT=%B2_ARGS% -j 4 --stagedir=./stage/x64 address-model=64 --build-dir=bld threading=multi runtime-link=shared --with-python
+set OPT=%B2_ARGS% -j 4 --toolset=msvc-14.0 --stagedir=./stage/x64 address-model=64 --build-dir=bld threading=multi runtime-link=shared --with-python
 .\b2 %OPT% variant=release link=shared debug-symbols=on
 
 echo.
