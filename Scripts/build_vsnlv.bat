@@ -46,6 +46,6 @@ if not exist %INSTDIR%\vsNLV (
   mkdir %INSTDIR%\vsNlv
 )
 
-xcopy /q /y ..\..\_Work\Bld\VsExtension\Bin\Release\*.vsix %INSTDIR%\vsNlv > NUL
+xcopy /q /y %BLDDIR%\VsExtension\Bin\Release\*.vsix %INSTDIR%\vsNlv > NUL
 
 :FINISH

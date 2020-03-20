@@ -108,7 +108,7 @@ fi
 ###############################################################################
 
 # add path variable to Windows environment
-function addenvvar()
+function addenvpath()
 {
   name=$1
   winpath=`cygpath -a -w "$2"`
@@ -116,7 +116,7 @@ function addenvvar()
 }
 
 # add path variable to VisualStudio environment
-function addenvprops()
+function addpropspath()
 {
   name=$1
   winpath=`cygpath -a -w "$2"`
@@ -124,7 +124,7 @@ function addenvprops()
 }
 
 # add path variable to Windows and VisualStudio environments
-function addenv()
+function addenvpropspath()
 {
   name=$1
   winpath=`cygpath -a -w "$2"`
@@ -162,14 +162,15 @@ ver="`cat ver.txt`.`cat bld.txt`"
 sed -e "s/__DEV__/$ver/" < Application/Template/tpl-Version.py > Application/Nlv/Version.py
 
 # directory structure
-blddir=`pwd`
-wrkdir="$blddir/_Work"
-pkgdir="$blddir/Deps/Packages"
+prjdir=`pwd`
+wrkdir="$prjdir/_Work"
+blddir="$wrkdir/Bld"
+pkgdir="$prjdir/Deps/Packages"
 instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
 stagedir="$wrkdir/Stage"
 testdir="$wrkdir/Test"
-mkdir -p "$logdir" "$pkgdir" "$instdir" "$testdir" "$stagedir"
+mkdir -p "$blddir" "$pkgdir" "$instdir" "$logdir" "$stagedir" "$testdir"
 
 # initialise installer directory
 cp Scripts/install.bat "$instdir"
@@ -186,9 +187,12 @@ echo "SET B2_ARGS=$b2_args" >> $envbat
 echo "SET MSBUILD_ARGS=$msbuild_args" >> $envbat
 echo "SET MSBUILD_TARGET=$msbuild_target" >> $envbat
 echo "SET PIP_ARGS=$pip_args" >> $envbat
-addenvvar ROOT_DIR "."
-addenvvar CYGWIN_BASE "/"
-addenvvar INSTDIR "$instdir"
+addenvpath ROOT_DIR "."
+addenvpath CYGWIN_BASE "/"
+addenvpath BLDDIR "$blddir"
+addenvpath INSTDIR "$instdir"
+addenvpath LOGDIR "$logdir"
+addenvpath STAGEDIR "$stagedir"
 
 # initialise VisualStudio environment
 envprops=$wrkdir/env.props
@@ -196,10 +200,10 @@ echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>" > $envprops
 echo "<Project xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">" >> $envprops
 echo "  <PropertyGroup>" >> $envprops
 
-addenv GTEST "Deps/Modules/GoogleTest"
-addenv JSON "Deps/Modules/Json"
-addenv PHOENIX "Deps/Modules/Phoenix"
-addenv WXWIDGETS "Deps/Modules/Phoenix/ext/wxWidgets"
+addenvpropspath GTEST "Deps/Modules/GoogleTest"
+addenvpropspath JSON "Deps/Modules/Json"
+addenvpropspath PHOENIX "Deps/Modules/Phoenix"
+addenvpropspath WXWIDGETS "Deps/Modules/Phoenix/ext/wxWidgets"
 
 
 
@@ -251,7 +255,7 @@ function runbat()
   path=$1
   `cygpath -u $COMSPEC` /C `cygpath -w $path`
 
-  cd $blddir
+  cd $prjdir
 }
 
 
@@ -281,16 +285,16 @@ checkf "$python" "Unable to locate Python $pyver"
 python_dir=`dirname $python`
 
 echo "SET PYVER=$pyver" >> $envbat
-addenvvar PYTHON "$python"
-addenvprops PYTHON "$python_dir"
+addenvpath PYTHON "$python"
+addpropspath PYTHON "$python_dir"
 
 cyg_vs2015env='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat'
 checkf "$cyg_vs2015env" "Unable to locate VisualStudio 2015"
-addenvvar VS2015ENV "$cyg_vs2015env"
+addenvpath VS2015ENV "$cyg_vs2015env"
 
 cyg_vs2017env='C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/Common7/Tools/VsDevCmd.bat'
 checkf "$cyg_vs2017env" "Unable to locate VisualStudio 2017"
-addenvvar VS2017ENV "$cyg_vs2017env"
+addenvpath VS2017ENV "$cyg_vs2017env"
 
 
 
@@ -299,10 +303,10 @@ addenvvar VS2017ENV "$cyg_vs2017env"
 ###############################################################################
 
 pyenvbld="$wrkdir/PyEnv/Bld"
-addenvvar PYENVBLD "$pyenvbld"
+addenvpath PYENVBLD "$pyenvbld"
 
 pyenvdbg="$wrkdir/PyEnv/Dbg"
-addenvvar PYENVDBG "$pyenvdbg"
+addenvpath PYENVDBG "$pyenvdbg"
 
 if [ -n "$cfg_clean_pyenv" ]; then
 
@@ -348,7 +352,7 @@ if [ ! -d "$boost_dir" ]; then
 
 fi
 
-addenv BOOST "${boost_dir}"
+addenvpropspath BOOST "${boost_dir}"
 echo -n ";`cygpath -w ${boost_dir}/stage/x64/lib`" >> $pathvar 
 
 if [ -n "$cfg_clean" ]; then
@@ -395,7 +399,7 @@ if [ ! -d "$tbb_dir" ]; then
  
 fi
 
-addenv TBB "${tbb_dir}"
+addenvpropspath TBB "${tbb_dir}"
 echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Debug`" >> $pathvar 
 echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Release`" >> $pathvar 
 
@@ -421,7 +425,7 @@ sql_url="https://www.sqlite.org/2020/${sql_file}"
 sql_path="$pkgdir/${sql_file}"
 sql_dir="$pkgdir/sqlite-${sql_name}"
 
-addenv SQLITE "${sql_dir}"
+addenvpropspath SQLITE "${sql_dir}"
 
 if [ ! -d "$sql_dir" ]; then
 
@@ -464,6 +468,7 @@ sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.
 sqlite_lib=$wrkdir/sqlite3.lib
 
 if [ -n "$cfg_clean" ]; then
+  msg_header "Clean Sqlite import library"
   rm -f "$sqlite_lib"
 
 else
@@ -473,7 +478,7 @@ else
   fi
 fi
 
-addenvvar SQLITE_LIB_DIR "$wrkdir"
+addenvpath SQLITE_LIB_DIR "$wrkdir"
 
 if [ -z "$cfg_clean" ]; then
   msg_header "Building NLV Release"
@@ -519,7 +524,7 @@ projfile="Application/Nlv/Nlv.pyproj"
 tplfile="Application/Template/tpl-Nlv.pyproj"
 
 if [ -n "$cfg_clean" ]; then
-  rm -rf "$wrkdir/Bld"
+  rm -rf "$blddir"
   rm -f $projfile
   
 elif [ ! -f "$projfile" ]; then 

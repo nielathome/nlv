@@ -45,12 +45,12 @@ call make html
 echo.
 echo ==== NLV
 
-set PYBLD=%ROOT_DIR%\_Work\Bld\Python\
+set PYBLD=%BLDDIR%\Python\
 set PYNLV=%PYBLD%\Nlv
 
 rem Setup staging area for build; contains NLV *and* built documentation
-xcopy /q /y %ROOT_DIR%\Application\Nlv\*.* %ROOT_DIR%\_Work\Stage\Nlv >NUL
-cd %ROOT_DIR%\_Work\Stage
+xcopy /q /y %ROOT_DIR%\Application\Nlv\*.* %STAGEDIR%\Nlv >NUL
+cd %STAGEDIR%
 
 rem Build the distributable wheel
 python nlv-setup.py %PIP_ARGS% ^

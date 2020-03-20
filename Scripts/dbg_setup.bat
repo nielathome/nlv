@@ -52,7 +52,7 @@ set NLV_EGG_LINK=%SITEDIR%\nlv.egg-link
 set NLOG_EGG_LINK=%SITEDIR%\nlog.egg-link
 
 set NLV_DIR=%ROOT_DIR%\Application
-set NLOG_DIR=%ROOT_DIR%\_Work\Bld\NlogDll\Bin
+set NLOG_DIR=%BLDDIR%\NlogDll\Bin
 
 rem sys.path extension
 echo # NLV developer paths > %NLV_PTH%
