@@ -26,9 +26,10 @@ help()
   echo "build options"
   echo "--clean - clean workspace of build results"
   echo "--clean-pyenv - when cleaning, also remove Python virtual environments"
-  echo "--force - force BOOST/TBB builds"
+  echo "--force - force BOOST/TBB (re-)build"
   echo "--help | -h - display help"
   echo "--release | -r - increment release number"
+  echo "--skip-phoenix - do not clean/build wxPython or wxWidgets"
   echo "--verbose | -v - increase detail in output"
 }
 
@@ -334,10 +335,10 @@ fi
 # BOOST
 ###############################################################################
 
-boost_ver=63
+boost_ver=72
 boost_name="boost_1_${boost_ver}_0"
 boost_file="${boost_name}.tar.bz2"
-boost_url="https://sourceforge.net/projects/boost/files/boost/1.${boost_ver}.0/${boost_file}"
+boost_url="https://dl.bintray.com/boostorg/release/1.${boost_ver}.0/source/${boost_file}"
 boost_path="$pkgdir/${boost_file}"
 boost_dir="$pkgdir/${boost_name}"
 boost_build="${logdir}/${boost_name}.build.log"
@@ -466,6 +467,7 @@ sed -e "s/__VER__/$ver/" -e "s/__WXPYTHONVER__/$wxpythonver/" < Application/Temp
 sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py
 
 sqlite_lib=$wrkdir/sqlite3.lib
+addenvpath SQLITE_LIB_DIR "$wrkdir"
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Clean Sqlite import library"
@@ -477,8 +479,6 @@ else
     runbat Scripts/build_sqlite_lib.bat
   fi
 fi
-
-addenvpath SQLITE_LIB_DIR "$wrkdir"
 
 if [ -z "$cfg_clean" ]; then
   msg_header "Building NLV Release"
