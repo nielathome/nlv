@@ -308,6 +308,7 @@ MapFieldAccessor::factory_t::map_t MapFieldAccessor::factory_t::m_Map
 	{ c_Type_DateTime_TraceFmt_UsStd, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
 	{ c_Type_DateTime_TraceFmt_IntHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
 	{ c_Type_DateTime_TraceFmt_UsHires, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
+	{ c_Type_Time_TraceFmt_NoDate, &MakeField<MapFieldAccessorDate, const FieldDescriptor &, unsigned, size_t *> },
 	{ c_Type_Bool, &MakeField<MapFieldAccessorBool, const FieldDescriptor &, unsigned, size_t *> },
 	{ c_Type_Uint08, &MakeField<MapFieldAccessorUint<uint8_t>, const FieldDescriptor &, unsigned, size_t *> },
 	{ c_Type_Uint16, &MakeField<MapFieldAccessorUint<uint16_t>, const FieldDescriptor &, unsigned, size_t *> },
