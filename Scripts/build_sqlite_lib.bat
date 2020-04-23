@@ -29,7 +29,7 @@ rem
 rem Taken from https://stackoverflow.com/questions/9946322/how-to-generate-an-import-library-lib-file-from-a-dll
 rem
 
-dumpbin /exports %PYTHON%\..\DLLs\sqlite3.dll > %BLDDIR%\exports.txt
+dumpbin /exports "%PYTHON%\..\DLLs\sqlite3.dll" > %BLDDIR%\exports.txt
 echo LIBRARY SQLITE3 > %BLDDIR%\sqlite3.def
 echo EXPORTS >> %BLDDIR%\sqlite3.def
 for /f "skip=19 tokens=4" %%A in (%BLDDIR%\exports.txt) do echo %%A >> %BLDDIR%\sqlite3.def

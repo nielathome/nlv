@@ -195,6 +195,18 @@ addenvpath INSTDIR "$instdir"
 addenvpath LOGDIR "$logdir"
 addenvpath STAGEDIR "$stagedir"
 
+if [ -n "$http_proxy" ]; then
+  echo "set HTTP_PROXY=$http_proxy" >> $envbat
+fi
+
+if [ -n "$https_proxy" ]; then
+  echo "set HTTPS_PROXY=$https_proxy" >> $envbat
+fi
+
+if [ -n "$REQUESTS_CA_BUNDLE" ]; then
+  echo "set REQUESTS_CA_BUNDLE=`cygpath -w "$REQUESTS_CA_BUNDLE"`" >> $envbat
+fi
+
 # initialise VisualStudio environment
 envprops=$wrkdir/env.props
 echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>" > $envprops
@@ -212,16 +224,27 @@ addenvpropspath WXWIDGETS "Deps/Modules/Phoenix/ext/wxWidgets"
 # Utility Functions
 ###############################################################################
 
-function checkf()
+function fail()
 {
-  if [ ! -f "$1" ]; then
-    echo
-    echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-    echo "$2"
-    echo "Ref: $1"
-    echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
-    exit 3
-  fi
+  echo
+  echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+  echo "$1"
+  echo "Ref: $2"
+  echo "+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++"
+  exit 3
+}
+
+function findf()
+{
+  for i in "$@"
+  do
+    if [ -f "$i" ]; then
+      echo "$i"
+	  return 0
+	fi
+  done
+  
+  return 1
 }
 
 function getfile()
@@ -281,21 +304,35 @@ echo "SET NUGET=`cygpath -w $nuget`" >> $envbat
 ###############################################################################
 
 pyver=37
-python=`which -a python | fgrep $pyver`
-checkf "$python" "Unable to locate Python $pyver"
-python_dir=`dirname $python`
+loc=`which -a python | fgrep $pyver`
+python=`findf "$loc"`
+if [ "$?" == 0 ]; then
+  python_dir=`dirname "$python"`
 
-echo "SET PYVER=$pyver" >> $envbat
-addenvpath PYTHON "$python"
-addpropspath PYTHON "$python_dir"
+  echo "SET PYVER=$pyver" >> $envbat
+  addenvpath PYTHON "$python"
+  addpropspath PYTHON "$python_dir"
+else
+  fail "Unable to locate Python $pyver" "$loc"
+fi
 
-cyg_vs2015env='C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat'
-checkf "$cyg_vs2015env" "Unable to locate VisualStudio 2015"
-addenvpath VS2015ENV "$cyg_vs2015env"
+loc="C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/vcvarsall.bat"
+cyg_vs2015env=$(findf "$loc")
+if [ "$?" == 0 ]; then
+  addenvpath VS2015ENV "$cyg_vs2015env"
+else
+  fail "Unable to locate VisualStudio 2015" "$loc"
+fi
 
-cyg_vs2017env='C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/Common7/Tools/VsDevCmd.bat'
-checkf "$cyg_vs2017env" "Unable to locate VisualStudio 2017"
-addenvpath VS2017ENV "$cyg_vs2017env"
+
+loc1="C:/Program Files (x86)/Microsoft Visual Studio/2017/Community/Common7/Tools/VsDevCmd.bat"
+loc2="C:/Program Files (x86)/Microsoft Visual Studio/2017/Enterprise/Common7/Tools/VsDevCmd.bat"
+cyg_vs2017env=$(findf "$loc1" "$loc2")
+if [ "$?" == 0 ]; then
+  addenvpath VS2017ENV "$cyg_vs2017env"
+else
+  fail "Unable to locate VisualStudio 2017" "$loc1 $loc2"
+fi
 
 
 
@@ -320,12 +357,12 @@ else
   if [ ! -d "$pyenvbld" ]; then
   
     msg_line "Creating Python virtual environment directory for build"
-    $python -m venv `cygpath -w $pyenvbld`
+    "$python" -m venv `cygpath -w $pyenvbld`
   fi
   
   if [ ! -d "$pyenvdbg" ]; then
     msg_line "Creating Python virtual environment directory for debugging"
-    $python -m venv `cygpath -w $pyenvdbg`
+    "$python" -m venv `cygpath -w $pyenvdbg`
   fi
 fi
 
@@ -386,7 +423,12 @@ if [ ! -d "$tbb_dir" ]; then
 
   msg_line "Unpacking archive: $tbb_file ..."
   tar xfz $tbb_path -C $pkgdir
- 
+
+  # latest downloads extract to a different directory; fix
+  if [ -d "$pkgdir/onetbb-${tbb_name}" ]; then
+    mv "$pkgdir/onetbb-${tbb_name}" "$tbb_dir"
+  fi
+  
   # switch the toolchain in the Vs2013 (120) projects to Vs2015 (140)
   for f in $tbb_dir/build/Vs2013/*vcxproj
   do
