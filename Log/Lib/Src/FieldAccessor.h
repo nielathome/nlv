@@ -50,6 +50,7 @@ const std::string c_Type_DateTime_TraceFmt_IntStd{ "datetime_tracefmt_int_std" }
 const std::string c_Type_DateTime_TraceFmt_UsStd{ "datetime_tracefmt_us_std" };
 const std::string c_Type_DateTime_TraceFmt_IntHires{ "datetime_tracefmt_int_hires" };
 const std::string c_Type_DateTime_TraceFmt_UsHires{ "datetime_tracefmt_us_hires" };
+const std::string c_Type_DateTime_WebUTC{ "datetime_web_utc" };
 const std::string c_Type_Time_TraceFmt_NoDate{ "datetime_tracefmt_no_date" };
 const std::string c_Type_Bool{ "bool" };
 const std::string c_Type_Uint08{ "uint08" };

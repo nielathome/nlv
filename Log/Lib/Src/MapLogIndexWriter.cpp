@@ -489,6 +489,10 @@ protected:
 		return *m_Current;
 	}
 
+	void PushChar( void ) {
+		m_Current -= 1;
+	}
+
 	// convert next (numeric) character to an integer
 	uint8_t CharToNumber( void ) {
 		const uint8_t result{ static_cast<uint8_t>(GetChar() - '0') };
@@ -546,16 +550,56 @@ protected:
 		using int_t = T_RESULT;
 
 		int_t res{ CharToNumber() };
-		if( PeekChar() != c_Terminator)
+		if( PeekChar() != c_Terminator )
 			res = (10 * res) + CharToNumber();
 
 		return res;
+	}
+
+	// convert a fraction into its equivalent in whole billion'ths (ns)
+	uint32_t FractionAsNanoSeconds( void ) {
+		uint32_t ns{ 0 }, sum{ 0 }, ref{ 1 };
+
+		if (GetChar() == '.')
+		{
+			unsigned count{ 0 };
+			while( true )
+			{
+				const char ch{ GetChar() };
+				if ((ch < '0') || (ch > '9'))
+					break;
+
+				// max 9 digits considered
+				if( count++ < 9 )
+				{
+					sum = (sum * 10) + (ch - '0');
+					ref *= 10;
+				}
+			}
+
+			const uint32_t m{ 1'000'000'000u / ref };
+			ns = sum * m;
+		}
+
+		PushChar();
+		return ns;
 	}
 
 	void ExpectChar( char exp ) {
 		const char ch{ GetChar() };
 		if( ch != exp )
 			m_Error = true;
+	}
+
+	void ExpectChar( const char *exp ) {
+		const char ch{ GetChar() };
+
+		char got;
+		while ((got = *(exp++)) != '\0')
+			if (ch == got)
+				return;
+
+		m_Error = true;
 	}
 
 	// convert the next 3 characters to a month number, assuming the characters
@@ -643,6 +687,8 @@ protected:
 };
 
 
+/*----------------------------------------------------------------------*/
+
 class FieldWriterDateTimeUnix : public FieldWriterDateTime
 {
 private:
@@ -674,10 +720,12 @@ public:
 		tm tm; GetTime( &tm );
 		m_AssumedYear = tm.tm_year;
 
-		TraceInfo( "Assumed year for logfile: %d", m_AssumedYear );
+		TraceInfo( "Assumed year for logfile: %d", m_AssumedYear + c_GmtimeYearOffset);
 	}
 };
 
+
+/*----------------------------------------------------------------------*/
 
 class FieldWriterDateTimeUsStd : public FieldWriterDateTime
 {
@@ -688,7 +736,7 @@ private:
 	//
 	// where:
 	//  month, day of month and hour consist of 1 or 2 characters
-	//  millisecond time value is optional; 3 digits where present
+	//  fractional time value is optional
 	//
 	Error WriteValue( WriteContext & cxt, const char * first, const char * last ) override
 	{
@@ -704,15 +752,7 @@ private:
 		tm.tm_min = CountedCharsToNumber<2>(); ExpectChar( time_sep );
 		tm.tm_sec = CountedCharsToNumber<2>();
 
-		constexpr char ns_sep{ '.' };
-		uint32_t ns{ 0 };
-		if( PeekChar() == ns_sep )
-		{
-			ExpectChar( ns_sep );
-
-			const uint32_t ms{ CountedCharsToNumber<3, uint32_t>() };
-			ns = (1000000 * ms);
-		}
+		const uint32_t ns{ FractionAsNanoSeconds() };
 		ExpectChar( ' ' );
 
 		tm.tm_hour = AmPmToCharsToNumber( tm.tm_hour );
@@ -725,6 +765,8 @@ public:
 		: FieldWriterDateTime{ field_desc, field_id } {}
 };
 
+
+/*----------------------------------------------------------------------*/
 
 template<bool c_International, bool c_Hires>
 class FieldWriterDateTimeTraceFmt : public FieldWriterDateTime
@@ -771,14 +813,61 @@ using FieldWriterDateTimeTraceFmtUsStd = FieldWriterDateTimeTraceFmt<false, fals
 using FieldWriterDateTimeTraceFmtUsHires = FieldWriterDateTimeTraceFmt<false, true>;
 
 
+/*----------------------------------------------------------------------*/
+
+class FieldWriterDateTimeWebUTC : public FieldWriterDateTime
+{
+private:
+	//
+	// W3 Web format UTC date/time (https://www.w3.org/TR/NOTE-datetime) (described as
+	// a constrained subset of ISO 8601) profiles:
+	//   5 - "Complete date plus hours, minutes and seconds"), and;
+	//   6 - "Complete date plus hours, minutes, seconds and a decimal fraction of a second"
+	//
+	// Currently only supports the "UTC" timezone ("Z"). Also, permits the required "T"
+	// character to be a space (" ").
+	//
+	// examples
+	//  1997-07-16T19:20Z
+	//  1997-07-16 19:20:30.45Z
+	//
+	// where:
+	//  month, day of month and hour consist of 1 or 2 characters
+	//  millisecond time value is optional; 3 digits where present
+	//
+	Error WriteValue(WriteContext & cxt, const char * first, const char * last) override
+	{
+		tm tm; InitState(first, &tm);
+
+		tm.tm_year = CountedCharsToNumber<4>() - c_GmtimeYearOffset; ExpectChar('-');
+		tm.tm_mon = CountedCharsToNumber<2>() - 1; ExpectChar('-');
+		tm.tm_mday = CountedCharsToNumber<2>(); ExpectChar("T ");
+		tm.tm_hour = CountedCharsToNumber<2>(); ExpectChar(':');
+		tm.tm_min = CountedCharsToNumber<2>(); ExpectChar(':');
+		tm.tm_sec = CountedCharsToNumber<2>();
+		
+		const uint32_t ns{ FractionAsNanoSeconds() };
+		ExpectChar('Z');
+
+		return WriteDateTime(cxt, first, last, tm, ns);
+	}
+
+public:
+	FieldWriterDateTimeWebUTC( const FieldDescriptor & field_desc, unsigned field_id )
+		: FieldWriterDateTime{ field_desc, field_id } {}
+};
+
+
+/*----------------------------------------------------------------------*/
+
 class FieldWriterTimeTraceFmt : public FieldWriterDateTime
 {
 private:
 	int m_AssumedYear, m_AssumedMonth, m_AssumedDay;
 
 	//
-	// example (fraction is in 100ns units):
-	//  "18:03:17.8392221"
+	// example (fraction is optional):
+	//  "18:03:17[.8392221]"
 	//
 	Error WriteValue( WriteContext & cxt, const char * first, const char * last ) override
 	{
@@ -791,9 +880,7 @@ private:
 		tm.tm_min = CountedCharsToNumber<2>(); ExpectChar( ':' );
 		tm.tm_sec = CountedCharsToNumber<2>(); ExpectChar( '.' );
 
-		const uint32_t frac{ CountedCharsToNumber<7, uint32_t>() };
-		const uint32_t ns{ frac * 100 };
-
+		const uint32_t ns{ FractionAsNanoSeconds() };
 		return WriteDateTime( cxt, first, last, tm, ns );
 	}
 
@@ -909,6 +996,7 @@ FieldWriter::factory_t::map_t FieldWriter::factory_t::m_Map
 	{ c_Type_DateTime_TraceFmt_UsStd, &MakeField<FieldWriterDateTimeTraceFmtUsStd, const FieldDescriptor &, unsigned> },
 	{ c_Type_DateTime_TraceFmt_IntHires, &MakeField<FieldWriterDateTimeTraceFmtIntHires, const FieldDescriptor &, unsigned> },
 	{ c_Type_DateTime_TraceFmt_UsHires, &MakeField<FieldWriterDateTimeTraceFmtUsHires, const FieldDescriptor &, unsigned> },
+	{ c_Type_DateTime_WebUTC, &MakeField<FieldWriterDateTimeWebUTC, const FieldDescriptor &, unsigned> },
 	{ c_Type_Time_TraceFmt_NoDate, &MakeField<FieldWriterTimeTraceFmt, const FieldDescriptor &, unsigned> },
 	{ c_Type_Bool, &MakeField<FieldWriterBool, const FieldDescriptor &, unsigned> },
 	{ c_Type_Uint08, &MakeField<FieldWriterUint<uint8_t>, const FieldDescriptor &, unsigned> },
