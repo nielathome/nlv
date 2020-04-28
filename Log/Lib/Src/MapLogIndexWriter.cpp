@@ -129,8 +129,10 @@ public:
 	FieldWriter( const FieldDescriptor & field_desc, unsigned field_id )
 		:
 		c_Separator{ field_desc.f_Separator },
-		c_MinWidth{ field_desc.f_MinWidth },
 		c_SeparatorCount{ field_desc.f_SeparatorCount },
+		c_MinWidth{ field_desc.f_MinWidth },
+		c_LeftTrim{ field_desc.f_LeftTrim },
+		c_RightTrim{ field_desc.f_RightTrim },
 		c_FieldId{ field_id }
 	{}
 
@@ -138,6 +140,7 @@ public:
 	const std::string c_Separator;
 	const unsigned c_SeparatorCount;
 	const unsigned c_MinWidth;
+	const bool c_LeftTrim, c_RightTrim;
 
 	// fields index within the set of all fields
 	const unsigned c_FieldId;
@@ -1135,9 +1138,12 @@ Error LogIndexWriter::WriteLineSeparated( WriteContext & cxt, size_t offset, con
 			const std::string & separator{ info.c_Separator };
 			const unsigned separator_count{ info.c_SeparatorCount };
 			const unsigned min_width{ info.c_MinWidth };
+			const bool ltrim{ info.c_LeftTrim };
+			const bool rtrim{ info.c_RightTrim };
 
 			// step over the defined minimum width
-			const char *field_end{ f_FieldBegin + min_width };
+			const char *field_begin{ f_FieldBegin };
+			const char *field_end{ field_begin + min_width };
 			if( field_end >= f_LineEnd )
 				return Fail();
 
@@ -1155,8 +1161,17 @@ Error LogIndexWriter::WriteLineSeparated( WriteContext & cxt, size_t offset, con
 			if( (field_end + separator.size()) >= f_LineEnd )
 				return Fail();
 
-			field_location_t field{ true, f_FieldBegin, field_end };
 			f_FieldBegin = field_end + separator.size();
+
+			if(ltrim)
+				for (char ch = field_begin[0]; (ch == ' ') || (ch == '\t'); ch = (++field_begin)[0])
+					;
+
+			if( rtrim )
+				for( char ch = field_end[-1]; (ch == ' ') || (ch == '\t'); ch = (--field_end)[-1] )
+					;
+
+			field_location_t field{ true, field_begin, field_end };
 
 			return field;
 		}
