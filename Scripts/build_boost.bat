@@ -23,7 +23,7 @@ echo ==== BOOST Release %BOOST%
 
 cd %BOOST%
 if not exist b2.exe (
-  call bootstrap.bat
+  call bootstrap.bat vc14
 )
 
 set OPT=%B2_ARGS% -j 4 --toolset=msvc-14.0 --stagedir=./stage/x64 address-model=64 --build-dir=bld threading=multi runtime-link=shared --with-python

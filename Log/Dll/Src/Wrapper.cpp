@@ -142,6 +142,8 @@ logaccessor_ptr_t MakeLogAccessor( object log_schema )
 			extract<std::string>{ ifield_schema->attr( "Separator" ) },
 			extract<unsigned>{ ifield_schema->attr( "SeparatorCount" ) },
 			extract<unsigned>{ ifield_schema->attr( "MinWidth" ) },
+			extract<bool>{ ifield_schema->attr("LeftTrim") },
+			extract<bool>{ ifield_schema->attr("RightTrim") },
 			data_col_offset
 		} );
 	}

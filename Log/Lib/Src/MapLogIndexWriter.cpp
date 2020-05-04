@@ -129,8 +129,10 @@ public:
 	FieldWriter( const FieldDescriptor & field_desc, unsigned field_id )
 		:
 		c_Separator{ field_desc.f_Separator },
-		c_MinWidth{ field_desc.f_MinWidth },
 		c_SeparatorCount{ field_desc.f_SeparatorCount },
+		c_MinWidth{ field_desc.f_MinWidth },
+		c_LeftTrim{ field_desc.f_LeftTrim },
+		c_RightTrim{ field_desc.f_RightTrim },
 		c_FieldId{ field_id }
 	{}
 
@@ -138,6 +140,7 @@ public:
 	const std::string c_Separator;
 	const unsigned c_SeparatorCount;
 	const unsigned c_MinWidth;
+	const bool c_LeftTrim, c_RightTrim;
 
 	// fields index within the set of all fields
 	const unsigned c_FieldId;
@@ -448,7 +451,7 @@ protected:
 	FieldWriterDateTime( const FieldDescriptor & field_desc, unsigned field_id )
 		: base_t{ field_desc, field_id } {}
 
-	// the first date time field discovered will be treated as "the" data time field
+	// the first date time field discovered will be treated as "the" date time field
 	Error WriteFieldHeader( WriteContext & cxt ) override {
 		if( cxt.f_Header.f_TimecodeFieldId < 0 )
 			cxt.f_Header.f_TimecodeFieldId = c_FieldId;
@@ -461,15 +464,24 @@ protected:
 
 	const int c_GmtimeYearOffset{ 1900 };
 
-	tm InitState( const char * first ) {
+	void InitState( const char * first, tm * tm ) {
 		m_Current = first;
 		m_Error = false;
 
-		tm tm;
-		tm.tm_wday = 0;
-		tm.tm_yday = 0;
-		tm.tm_isdst = 0;
-		return tm;
+		tm->tm_wday = 0;
+		tm->tm_yday = 0;
+		tm->tm_isdst = 0;
+	}
+
+	void GetTime( tm * tm ) {
+		const time_t utc{ time( nullptr ) };
+		const errno_t err{ _gmtime64_s( tm, &utc ) };
+
+		if( (utc == -1) || err )
+		{
+			TraceInfo( "Unable to determine system date/time" );
+			memset( tm, 0, sizeof( *tm ) );
+		}
 	}
 
 	char GetChar( void ) {
@@ -478,6 +490,10 @@ protected:
 
 	char PeekChar( void ) {
 		return *m_Current;
+	}
+
+	void PushChar( void ) {
+		m_Current -= 1;
 	}
 
 	// convert next (numeric) character to an integer
@@ -537,16 +553,56 @@ protected:
 		using int_t = T_RESULT;
 
 		int_t res{ CharToNumber() };
-		if( PeekChar() != c_Terminator)
+		if( PeekChar() != c_Terminator )
 			res = (10 * res) + CharToNumber();
 
 		return res;
+	}
+
+	// convert a fraction into its equivalent in whole billion'ths (ns)
+	uint32_t FractionAsNanoSeconds( void ) {
+		uint32_t ns{ 0 }, sum{ 0 }, ref{ 1 };
+
+		if (GetChar() == '.')
+		{
+			unsigned count{ 0 };
+			while( true )
+			{
+				const char ch{ GetChar() };
+				if ((ch < '0') || (ch > '9'))
+					break;
+
+				// max 9 digits considered
+				if( count++ < 9 )
+				{
+					sum = (sum * 10) + (ch - '0');
+					ref *= 10;
+				}
+			}
+
+			const uint32_t m{ 1'000'000'000u / ref };
+			ns = sum * m;
+		}
+
+		PushChar();
+		return ns;
 	}
 
 	void ExpectChar( char exp ) {
 		const char ch{ GetChar() };
 		if( ch != exp )
 			m_Error = true;
+	}
+
+	void ExpectChar( const char *exp ) {
+		const char ch{ GetChar() };
+
+		char got;
+		while ((got = *(exp++)) != '\0')
+			if (ch == got)
+				return;
+
+		m_Error = true;
 	}
 
 	// convert the next 3 characters to a month number, assuming the characters
@@ -621,7 +677,7 @@ protected:
 
 		// check and write out fractional second part
 		if( ns >= NTimecode::c_NanoSecond )
-			return TraceInfoCxt( cxt, "Date missing: line:%lld fraction:%u", cxt.f_LineNo, ns );
+			return TraceInfoCxt( cxt, "Invalid second fraction: line:%lld fraction:%u", cxt.f_LineNo, ns );
 
 		if( cxt.f_Header.f_UtcDatum == 0 )
 			cxt.f_Header.f_UtcDatum = utc;
@@ -634,9 +690,13 @@ protected:
 };
 
 
+/*----------------------------------------------------------------------*/
+
 class FieldWriterDateTimeUnix : public FieldWriterDateTime
 {
 private:
+	int m_AssumedYear;
+
 	//
 	// examples:
 	//  Mar 31 23:58:15
@@ -644,23 +704,31 @@ private:
 	//
 	Error WriteValue( WriteContext & cxt, const char * first, const char * last ) override
 	{
-		tm tm{ InitState( first ) };
+		tm tm; InitState( first, &tm );
+		tm.tm_year = m_AssumedYear;
 
 		tm.tm_mon = GetMonthAbbr() - 1; ExpectChar( ' ' );
 		tm.tm_mday = CountedCharsToNumber<2>(); ExpectChar( ' ' );
 		tm.tm_hour = CountedCharsToNumber<2>(); ExpectChar( ':' );
 		tm.tm_min = CountedCharsToNumber<2>(); ExpectChar( ':' );
 		tm.tm_sec = CountedCharsToNumber<2>();
-		tm.tm_year = 2017 - c_GmtimeYearOffset; // TODO !
 
 		return WriteDateTime( cxt, first, last, tm );
 	}
 
 public:
 	FieldWriterDateTimeUnix( const FieldDescriptor & field_desc, unsigned field_id )
-		: FieldWriterDateTime{ field_desc, field_id } {}
+		: FieldWriterDateTime{ field_desc, field_id }
+	{
+		tm tm; GetTime( &tm );
+		m_AssumedYear = tm.tm_year;
+
+		TraceInfo( "Assumed year for logfile: %d", m_AssumedYear + c_GmtimeYearOffset);
+	}
 };
 
+
+/*----------------------------------------------------------------------*/
 
 class FieldWriterDateTimeUsStd : public FieldWriterDateTime
 {
@@ -671,11 +739,11 @@ private:
 	//
 	// where:
 	//  month, day of month and hour consist of 1 or 2 characters
-	//  millisecond time value is optional; 3 digits where present
+	//  fractional time value is optional
 	//
 	Error WriteValue( WriteContext & cxt, const char * first, const char * last ) override
 	{
-		tm tm{ InitState( first ) };
+		tm tm; InitState( first, &tm );
 
 		constexpr char date_sep{ '/' };
 		tm.tm_mon = TerminatedCharsToNumber<date_sep>() - 1; ExpectChar( date_sep );
@@ -687,15 +755,7 @@ private:
 		tm.tm_min = CountedCharsToNumber<2>(); ExpectChar( time_sep );
 		tm.tm_sec = CountedCharsToNumber<2>();
 
-		constexpr char ns_sep{ '.' };
-		uint32_t ns{ 0 };
-		if( PeekChar() == ns_sep )
-		{
-			ExpectChar( ns_sep );
-
-			const uint32_t ms{ CountedCharsToNumber<3, uint32_t>() };
-			ns = (1000000 * ms);
-		}
+		const uint32_t ns{ FractionAsNanoSeconds() };
 		ExpectChar( ' ' );
 
 		tm.tm_hour = AmPmToCharsToNumber( tm.tm_hour );
@@ -709,6 +769,8 @@ public:
 };
 
 
+/*----------------------------------------------------------------------*/
+
 template<bool c_International, bool c_Hires>
 class FieldWriterDateTimeTraceFmt : public FieldWriterDateTime
 {
@@ -720,7 +782,7 @@ private:
 	//
 	Error WriteValue( WriteContext & cxt, const char * first, const char * last ) override
 	{
-		tm tm{ InitState( first ) };
+		tm tm; InitState( first, &tm );
 
 		(c_International ? tm.tm_mday : tm.tm_mon) = CountedCharsToNumber<2>(); ExpectChar( '/' );
 		(c_International ? tm.tm_mon : tm.tm_mday) = CountedCharsToNumber<2>(); ExpectChar( '/' );
@@ -752,6 +814,91 @@ using FieldWriterDateTimeTraceFmtIntStd = FieldWriterDateTimeTraceFmt<true, fals
 using FieldWriterDateTimeTraceFmtIntHires = FieldWriterDateTimeTraceFmt<true, true>;
 using FieldWriterDateTimeTraceFmtUsStd = FieldWriterDateTimeTraceFmt<false, false>;
 using FieldWriterDateTimeTraceFmtUsHires = FieldWriterDateTimeTraceFmt<false, true>;
+
+
+/*----------------------------------------------------------------------*/
+
+class FieldWriterDateTimeWebUTC : public FieldWriterDateTime
+{
+private:
+	//
+	// W3 Web format UTC date/time (https://www.w3.org/TR/NOTE-datetime) (described as
+	// a constrained subset of ISO 8601) profiles:
+	//   5 - "Complete date plus hours, minutes and seconds"), and;
+	//   6 - "Complete date plus hours, minutes, seconds and a decimal fraction of a second"
+	//
+	// Currently only supports the "UTC" timezone ("Z"). Also, permits the required "T"
+	// character to be a space (" ").
+	//
+	// examples
+	//  1997-07-16T19:20Z
+	//  1997-07-16 19:20:30.45Z
+	//
+	// where:
+	//  month, day of month and hour consist of 1 or 2 characters
+	//  millisecond time value is optional; 3 digits where present
+	//
+	Error WriteValue(WriteContext & cxt, const char * first, const char * last) override
+	{
+		tm tm; InitState(first, &tm);
+
+		tm.tm_year = CountedCharsToNumber<4>() - c_GmtimeYearOffset; ExpectChar('-');
+		tm.tm_mon = CountedCharsToNumber<2>() - 1; ExpectChar('-');
+		tm.tm_mday = CountedCharsToNumber<2>(); ExpectChar("T ");
+		tm.tm_hour = CountedCharsToNumber<2>(); ExpectChar(':');
+		tm.tm_min = CountedCharsToNumber<2>(); ExpectChar(':');
+		tm.tm_sec = CountedCharsToNumber<2>();
+		
+		const uint32_t ns{ FractionAsNanoSeconds() };
+		ExpectChar('Z');
+
+		return WriteDateTime(cxt, first, last, tm, ns);
+	}
+
+public:
+	FieldWriterDateTimeWebUTC( const FieldDescriptor & field_desc, unsigned field_id )
+		: FieldWriterDateTime{ field_desc, field_id } {}
+};
+
+
+/*----------------------------------------------------------------------*/
+
+class FieldWriterTimeTraceFmt : public FieldWriterDateTime
+{
+private:
+	int m_AssumedYear, m_AssumedMonth, m_AssumedDay;
+
+	//
+	// example (fraction is optional):
+	//  "18:03:17[.8392221]"
+	//
+	Error WriteValue( WriteContext & cxt, const char * first, const char * last ) override
+	{
+		tm tm; InitState( first, &tm );
+		tm.tm_mday = m_AssumedDay;
+		tm.tm_mon = m_AssumedMonth;
+		tm.tm_year = m_AssumedYear;
+
+		tm.tm_hour = CountedCharsToNumber<2>(); ExpectChar( ':' );
+		tm.tm_min = CountedCharsToNumber<2>(); ExpectChar( ':' );
+		tm.tm_sec = CountedCharsToNumber<2>(); ExpectChar( '.' );
+
+		const uint32_t ns{ FractionAsNanoSeconds() };
+		return WriteDateTime( cxt, first, last, tm, ns );
+	}
+
+public:
+	FieldWriterTimeTraceFmt( const FieldDescriptor & field_desc, unsigned field_id )
+		: FieldWriterDateTime{ field_desc, field_id }
+	{
+		tm tm; GetTime( &tm );
+		m_AssumedYear = tm.tm_year;
+		m_AssumedMonth = tm.tm_mon;
+		m_AssumedDay = tm.tm_mday;
+
+		TraceInfo( "Assumed date for logfile: %d/%d/%d", m_AssumedDay, m_AssumedMonth, m_AssumedYear );
+	}
+};
 
 
 
@@ -852,6 +999,8 @@ FieldWriter::factory_t::map_t FieldWriter::factory_t::m_Map
 	{ c_Type_DateTime_TraceFmt_UsStd, &MakeField<FieldWriterDateTimeTraceFmtUsStd, const FieldDescriptor &, unsigned> },
 	{ c_Type_DateTime_TraceFmt_IntHires, &MakeField<FieldWriterDateTimeTraceFmtIntHires, const FieldDescriptor &, unsigned> },
 	{ c_Type_DateTime_TraceFmt_UsHires, &MakeField<FieldWriterDateTimeTraceFmtUsHires, const FieldDescriptor &, unsigned> },
+	{ c_Type_DateTime_WebUTC, &MakeField<FieldWriterDateTimeWebUTC, const FieldDescriptor &, unsigned> },
+	{ c_Type_Time_TraceFmt_NoDate, &MakeField<FieldWriterTimeTraceFmt, const FieldDescriptor &, unsigned> },
 	{ c_Type_Bool, &MakeField<FieldWriterBool, const FieldDescriptor &, unsigned> },
 	{ c_Type_Uint08, &MakeField<FieldWriterUint<uint8_t>, const FieldDescriptor &, unsigned> },
 	{ c_Type_Uint16, &MakeField<FieldWriterUint<uint16_t>, const FieldDescriptor &, unsigned> },
@@ -989,9 +1138,12 @@ Error LogIndexWriter::WriteLineSeparated( WriteContext & cxt, size_t offset, con
 			const std::string & separator{ info.c_Separator };
 			const unsigned separator_count{ info.c_SeparatorCount };
 			const unsigned min_width{ info.c_MinWidth };
+			const bool ltrim{ info.c_LeftTrim };
+			const bool rtrim{ info.c_RightTrim };
 
 			// step over the defined minimum width
-			const char *field_end{ f_FieldBegin + min_width };
+			const char *field_begin{ f_FieldBegin };
+			const char *field_end{ field_begin + min_width };
 			if( field_end >= f_LineEnd )
 				return Fail();
 
@@ -1009,8 +1161,17 @@ Error LogIndexWriter::WriteLineSeparated( WriteContext & cxt, size_t offset, con
 			if( (field_end + separator.size()) >= f_LineEnd )
 				return Fail();
 
-			field_location_t field{ true, f_FieldBegin, field_end };
 			f_FieldBegin = field_end + separator.size();
+
+			if(ltrim)
+				for (char ch = field_begin[0]; (ch == ' ') || (ch == '\t'); ch = (++field_begin)[0])
+					;
+
+			if( rtrim )
+				for( char ch = field_end[-1]; (ch == ' ') || (ch == '\t'); ch = (--field_end)[-1] )
+					;
+
+			field_location_t field{ true, field_begin, field_end };
 
 			return field;
 		}

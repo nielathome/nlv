@@ -582,6 +582,8 @@ class G_ProjectionFieldSchema:
         self.Separator = ","
         self.SeparatorCount = 1
         self.MinWidth = 0
+        self.LeftTrim = False
+        self.RightTrim = False
 
         # management data
         self.IsFirst = False

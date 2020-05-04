@@ -71,6 +71,8 @@ class G_FieldSchema:
         self.Separator = element.get("separator")
         self.SeparatorCount = 1
         self.MinWidth = 0
+        self.LeftTrim = False
+        self.RightTrim = False
         self.Available = True
 
         # number of repeats of separator and/or minimum number of characters in
@@ -83,6 +85,15 @@ class G_FieldSchema:
         mw = element.get("minwidth")
         if mw is not None:
             self.MinWidth = int(mw)
+
+        ltrim = element.get("ltrim")
+        if ltrim is not None:
+            self.LeftTrim = bool(ltrim)
+
+        rtrim = element.get("rtrim")
+        if rtrim is not None:
+            self.RightTrim = bool(rtrim)
+
 
 
 ## G_FieldList ##############################################

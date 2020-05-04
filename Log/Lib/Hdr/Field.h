@@ -158,6 +158,12 @@ struct FieldDescriptor
 	// field minimum width; another solution for case where field contains f_Separator
 	unsigned f_MinWidth;
 
+	// when displaying the field, hide white space at the (left) beginning of the field
+	bool f_LeftTrim;
+
+	// when displaying the field, hide white space at the (right) end of the field
+	bool f_RightTrim;
+
 	// offset to another field which holds the actual data to be used for sorting/filtering
 	unsigned f_DataColumnOffset;
 };
