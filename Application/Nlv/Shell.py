@@ -26,6 +26,7 @@ import winnt
 
 # Application imports
 from .Global import G_Global
+from Nlv.Version import NLV_VERSION
 
 
 
@@ -164,7 +165,7 @@ class G_Shell:
 
         menu_dir = shell.SHGetFolderPath (0, shellcon.CSIDL_STARTMENU, 0, 0)
         persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
-        persist_file.Save(os.path.join(menu_dir, "Programs", "NLV.{}.lnk".format(self._PublicVersion)), 0)
+        persist_file.Save(os.path.join(menu_dir, "Programs", "NLV.{}.{}.lnk".format(self._PublicVersion, NLV_VERSION)), 0)
 
 
     #-------------------------------------------------------
