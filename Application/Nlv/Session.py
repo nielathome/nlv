@@ -514,7 +514,7 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
         me._Sizer.Add(me._TxtLogSchema, proportion = 1, flag = wx.BOTTOM | wx.LEFT | wx.RIGHT | wx.EXPAND, border = G_Const.Sizer_StdBorder, userData = "OpenNode-schema")
 
         me._ChoiceLogBuilder = wx.Choice(window, size = (-1, G_Const.ComboRowHeight))
-        me.BuildLabelledRow(parent, "Log builder:", me._ChoiceLogBuilder)
+        me.BuildLabelledRow(parent, "Initial views:", me._ChoiceLogBuilder)
         me._TxtLogBuilder = wx.TextCtrl(window, style = wx.TE_READONLY | wx.TE_MULTILINE)
         me._Sizer.Add(me._TxtLogBuilder, proportion = 1, flag = wx.BOTTOM | wx.LEFT | wx.RIGHT | wx.EXPAND, border = G_Const.Sizer_StdBorder, userData = "OpenNode-builder")
 

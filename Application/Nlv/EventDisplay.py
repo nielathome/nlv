@@ -33,7 +33,7 @@ import winreg
 from .DataExplorer import G_DataExplorerProvider
 from .Logfile import G_DisplayControl
 from .Logfile import G_NotebookDisplayControl
-from .EventProjector import ConnectDb
+from .EventProjector import G_DbConnection
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
@@ -351,7 +351,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         else:
             schema = self._TableSchema
             if schema.UserDataExplorerOpen is not None:
-                schema.UserDataExplorerOpen(builder)
+                with G_ScriptGuard("DataExplorerOpen"):
+                    schema.UserDataExplorerOpen(builder)
 
             builder.AddPageHeading("{} Item".format(self._Name))
             if logfile_url is not None:
@@ -374,13 +375,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
                     if text is not None and len(text) != 0:
                         if field.ExplorerFormatter is not None:
-                            with G_ScriptGuard("CreateFieldDataForExplorer"):
+                            with G_ScriptGuard("DataExplorerFormatter"):
                                 field.ExplorerFormatter(builder, field.Name, text)
                         else:
                             builder.AddField(field.Name, text)
                     
             if schema.UserDataExplorerClose is not None:
-                schema.UserDataExplorerClose(builder)
+                with G_ScriptGuard("DataExplorerClose"):
+                    schema.UserDataExplorerClose(builder)
 
             if sync:
                 if self.SetDataExplorerLine(self.ItemToKey(item)):
@@ -606,7 +608,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     @G_Global.TimeFunction
     def UpdateContent(self, nesting, table_info, valid, reason):
-        table_schema, db_path = table_info.GetSchemaAndDbPath()
+        table_schema = table_info.GetSchema()
+        db_path = table_info.GetDbInfo().Path
 
         self.Reset(table_schema, reason = reason)
         self.UpdateNesting(nesting, False)
@@ -1251,7 +1254,10 @@ class G_HtmlHostCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def DefineParameters(self, error_reporter):
-        parameters = None
+        db_path = self.GetDbPath()
+        if db_path is None:
+            return None
+
 
         class Context:
             """Collect parameter data from a chart"""
@@ -1276,12 +1282,12 @@ class G_HtmlHostCtrl(wx.Panel):
                 return self._Host.GetSelectedEventIds(set)
 
 
-        with G_ScriptGuard("DefineParameters", error_reporter):
-            connection, cursor = self.MakeDbCursor()
-            if connection is not None:
-                context = Context(self)
-                self._ChartInfo.DefineParameters(connection, cursor, context)
-                parameters = context.Close()
+        parameters = None
+        with G_ScriptGuard("DefineParameters", error_reporter), G_DbConnection(db_path) as connection:
+            cursor = self.MakeDbCursor(connection)
+            context = Context(self)
+            self._ChartInfo.DefineParameters(connection, cursor, context)
+            parameters = context.Close()
 
         return parameters
 
@@ -1333,12 +1339,12 @@ class G_HtmlHostCtrl(wx.Panel):
             parameters_changed = True
             self._ParameterValues = parameters.copy()
 
-        if do_realize:
-            with G_ScriptGuard("Realise", error_reporter):
-                connection, cursor = self.MakeDbCursor()
-                if cursor is not None:
-                    context = Context(self, data_changed, selection_changed, parameters_changed)
-                    self._ChartInfo.Realise(connection, cursor, context)
+        db_path = self.GetDbPath()
+        if do_realize and db_path is not None:
+            with G_ScriptGuard("Realise", error_reporter), G_DbConnection(db_path) as connection:
+                cursor = self.MakeDbCursor(connection)
+                context = Context(self, data_changed, selection_changed, parameters_changed)
+                self._ChartInfo.Realise(connection, cursor, context)
 
 
             
@@ -1359,12 +1365,16 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def MakeDbCursor(self):
-        connection = ConnectDb(self._ChartInfo.ChartDbPath, True)
-        if connection is None:
-            return None, None
-        else:
-            return connection, connection.cursor()
+    def GetDbPath(self):
+        path = self._ChartInfo.ChartDbInfo.Path
+        if not Path(path).exists():
+            return None
+
+        return path
+
+    @staticmethod
+    def MakeDbCursor(connection):
+        return connection.cursor()
 
 
 
@@ -1385,14 +1395,21 @@ class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def MakeDbCursor(self):
-        connection = ConnectDb(self._ChartInfo.NodesDbPath, True)
-        if connection is None:
-            return None, None
-        else:
-            cursor = connection.cursor()
-            cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._ChartInfo.LinksDbPath))
-            return connection, cursor
+    def GetDbPath(self):
+        nodes_path = self._ChartInfo.NodesDbInfo.Path
+        if not Path(nodes_path).exists():
+            return None
+
+        links_path = self._ChartInfo.LinksDbInfo.Path
+        if not Path(links_path).exists():
+            return None
+
+        return nodes_path
+
+    def MakeDbCursor(self, connection):
+        cursor = connection.cursor()
+        cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._ChartInfo.LinksDbInfo.Path))
+        return cursor
 
 
 

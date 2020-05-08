@@ -195,6 +195,7 @@ class G_DataExplorerPageBuilder:
             "The view has been modified, and the location is no longer visible.",
             fields
         )
+
  
     #-------------------------------------------------------
     def Close(self):
