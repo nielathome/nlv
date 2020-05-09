@@ -180,7 +180,7 @@ def RescheduleProjector(connection, cursor, context):
         """.format(utc_datum = utc_datum))
 
 
-def DataExplorerOpen(builder):
+def DataExplorerOpen(event_id, db_info, builder):
     mycss = """
         h2 {
           color: lightsteelblue;

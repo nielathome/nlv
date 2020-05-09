@@ -33,7 +33,6 @@ import winreg
 from .DataExplorer import G_DataExplorerProvider
 from .Logfile import G_DisplayControl
 from .Logfile import G_NotebookDisplayControl
-from .EventProjector import G_DbConnection
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
@@ -270,7 +269,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def Reset(self, table_schema = None, reason = None):
+    def Reset(self, table_schema = None, db_info = None, reason = None):
         self._N_Logfile = None
         self._N_EventView = None
 
@@ -279,6 +278,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if table_schema is None:
             table_schema = G_ProjectionSchema()
         self._TableSchema = table_schema
+        self._DbInfo = db_info
 
         self._ModelColumnToFieldId = []
         field_id = 0
@@ -332,7 +332,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     #-------------------------------------------------------
     def OnDataExplorerLoad(self, ctrl, sync, builder, location, logfile_url):
-        item = self.LookupEventId(location["event_id"])
+        event_id = location["event_id"]
+        item = self.LookupEventId(event_id)
         node_name = location["node_name"]
 
         if not self.IsNavigationValid(builder, location, node_name):
@@ -350,9 +351,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         else:
             schema = self._TableSchema
+            db_info = self._DbInfo
             if schema.UserDataExplorerOpen is not None:
                 with G_ScriptGuard("DataExplorerOpen"):
-                    schema.UserDataExplorerOpen(builder)
+                    schema.UserDataExplorerOpen(event_id, db_info, builder)
 
             builder.AddPageHeading("{} Item".format(self._Name))
             if logfile_url is not None:
@@ -382,7 +384,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                     
             if schema.UserDataExplorerClose is not None:
                 with G_ScriptGuard("DataExplorerClose"):
-                    schema.UserDataExplorerClose(builder)
+                    schema.UserDataExplorerClose(event_id, db_info, builder)
 
             if sync:
                 if self.SetDataExplorerLine(self.ItemToKey(item)):
@@ -609,13 +611,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
     @G_Global.TimeFunction
     def UpdateContent(self, nesting, table_info, valid, reason):
         table_schema = table_info.GetSchema()
-        db_path = table_info.GetDbInfo().Path
+        db_info = table_info.GetDbInfo()
 
-        self.Reset(table_schema, reason = reason)
+        self.Reset(table_schema, db_info, reason = reason)
         self.UpdateNesting(nesting, False)
         self.UpdateValidity(valid)
 
         num_fields = self.GetColumnCount()
+        db_path = db_info.Path
         if Path(db_path).exists() and num_fields != 0:
             self._N_Logfile = Nlog.MakeLogfile(db_path, table_schema, G_Global.PulseProgressMeter)
 
@@ -1254,8 +1257,8 @@ class G_HtmlHostCtrl(wx.Panel):
 
     #-------------------------------------------------------
     def DefineParameters(self, error_reporter):
-        db_path = self.GetDbPath()
-        if db_path is None:
+        db_info = self.GetDbInfo()
+        if db_info is None:
             return None
 
 
@@ -1283,7 +1286,7 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
         parameters = None
-        with G_ScriptGuard("DefineParameters", error_reporter), G_DbConnection(db_path) as connection:
+        with G_ScriptGuard("DefineParameters", error_reporter), db_info.ConnectionManager() as connection:
             cursor = self.MakeDbCursor(connection)
             context = Context(self)
             self._ChartInfo.DefineParameters(connection, cursor, context)
@@ -1339,9 +1342,9 @@ class G_HtmlHostCtrl(wx.Panel):
             parameters_changed = True
             self._ParameterValues = parameters.copy()
 
-        db_path = self.GetDbPath()
-        if do_realize and db_path is not None:
-            with G_ScriptGuard("Realise", error_reporter), G_DbConnection(db_path) as connection:
+        db_info = self.GetDbInfo()
+        if do_realize and db_info is not None:
+            with G_ScriptGuard("Realise", error_reporter), db_info.ConnectionManager() as connection:
                 cursor = self.MakeDbCursor(connection)
                 context = Context(self, data_changed, selection_changed, parameters_changed)
                 self._ChartInfo.Realise(connection, cursor, context)
@@ -1365,12 +1368,12 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def GetDbPath(self):
-        path = self._ChartInfo.ChartDbInfo.Path
-        if not Path(path).exists():
+    def GetDbInfo(self):
+        db_info = self._ChartInfo.ChartDbInfo
+        if not Path(db_info.Path).exists():
             return None
 
-        return path
+        return db_info
 
     @staticmethod
     def MakeDbCursor(connection):
@@ -1395,16 +1398,16 @@ class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def GetDbPath(self):
-        nodes_path = self._ChartInfo.NodesDbInfo.Path
-        if not Path(nodes_path).exists():
+    def GetDbInfo(self):
+        db_info = self._ChartInfo.NodesDbInfo
+        if not Path(db_info.Path).exists():
             return None
 
         links_path = self._ChartInfo.LinksDbInfo.Path
         if not Path(links_path).exists():
             return None
 
-        return nodes_path
+        return db_info
 
     def MakeDbCursor(self, connection):
         cursor = connection.cursor()

@@ -739,9 +739,26 @@ class G_ProjectionSchema(G_FieldSchemata):
 class G_DbInfo:
 
     #-------------------------------------------------------
-    def __init__(self, path, base_info = None):
+    def __init__(self, db_name, path, base_info = None):
+        self.DbName = db_name
         self.Path = path
         self.BaseInfo = base_info
+
+
+    #-------------------------------------------------------
+    def ConnectionManager(self):
+        return G_DbConnection(self.Path)
+
+
+    #-------------------------------------------------------
+    def Attach(self, cursor):
+        cursor.execute("ATTACH DATABASE '{db_path}' AS {db_name}".format(db_path = self.Path, db_name = self.DbName))
+        self.AttachBases(cursor)
+
+    def AttachBases(self, cursor):
+        base_info = self.BaseInfo
+        if base_info is not None:
+            base_info.Attach(cursor)
 
 
 
@@ -769,20 +786,20 @@ class G_ChartInfo:
 
 ## G_QuantifierInfo ########################################
 
-def DeriveSubDbInfo(info, subname):
+def DeriveDbInfo(info, db_name, file_extension):
     path = Path(info.Path)
-    subpath = str(path.with_name("{}.{}.db".format(path.stem, str(subname).lower().strip())))
-    return G_DbInfo(subpath, info)
+    new_path = str(path.with_name("{}.{}.db".format(path.stem, str(file_extension).lower().strip())))
+    return G_DbInfo(db_name, new_path, info)
 
 
 class G_QuantifierInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, quantifier, metrics_schema, base_db_info, idx):
+    def __init__(self, name, quantifier, metrics_schema, projection_db_info, idx):
         self.Name = name
         self.UserQuantifier = quantifier
         self.MetricsSchema = metrics_schema
-        self.MetricsDbInfo = DeriveSubDbInfo(base_db_info, idx)
+        self.MetricsDbInfo = DeriveDbInfo(projection_db_info, "quantifier", idx)
         self.Charts = []
 
 
@@ -806,10 +823,10 @@ class G_QuantifierInfo:
 class G_ProjectorInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, projection_schema, base_db_info):
+    def __init__(self, name, projection_schema, analysis_db_info):
         self.ProjectionName = name
         self.ProjectionSchema = projection_schema
-        self.ProjectionDbInfo = DeriveSubDbInfo(base_db_info, name)
+        self.ProjectionDbInfo = DeriveDbInfo(analysis_db_info, "events", name)
         self.DocumentNodeID = G_Project.NodeID_EventProjector
         self.Quantifiers = dict()
         self.Charts = []
@@ -892,7 +909,7 @@ class G_AnalysisResults:
 
     #-------------------------------------------------------
     def __init__(self, analysis_db_path, event_id):
-        self.AnalysisDbInfo = G_DbInfo(analysis_db_path)
+        self.AnalysisDbInfo = G_DbInfo("analysis", analysis_db_path)
         self.EventId = event_id
         self.Projectors = dict()
 
@@ -1015,9 +1032,10 @@ class G_Projector:
         if self._SchemaOnly:
             return projection
 
-        with G_DbConnection(projection.ProjectionDbInfo.Path) as connection:
+        db_info = projection.ProjectionDbInfo
+        with db_info.ConnectionManager() as connection:
             cursor = connection.cursor()
-            cursor.execute("ATTACH DATABASE '{db}' AS analysis".format(db = self._Results.AnalysisDbInfo.Path))
+            db_info.AttachBases(cursor)
 
             projection_context = G_ProjectionContext(self._LogNode, projection_schema.ColStartOffset)
             self._LogNode = None
@@ -1114,19 +1132,17 @@ class G_Quantifier:
 
     #-------------------------------------------------------
     def Run(self, locked):
-        metrics_db_info = self._QuantifierInfo.MetricsDbInfo
-        events_db_path = metrics_db_info.BaseInfo.Path
-        if not  Path(events_db_path).exists():
+        db_info = self._QuantifierInfo.MetricsDbInfo
+        if not Path(db_info.BaseInfo.Path).exists():
             return
 
-        metrics_db_path = metrics_db_info.Path
-        if locked and Path(metrics_db_path).exists():
+        if locked and Path(db_info.Path).exists():
             return
 
-        with G_DbConnection(metrics_db_path) as connection:
+        with db_info.ConnectionManager() as connection:
             cursor = connection.cursor()
-            cursor.execute("ATTACH DATABASE '{events}' AS events".format(events = events_db_path))
-
+            db_info.AttachBases(cursor)
+            
             self._QuantifierInfo.UserQuantifier(connection, cursor)
         
             MakeProjectionView(cursor)

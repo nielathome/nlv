@@ -104,12 +104,39 @@ def ProgramProjector(connection, cursor, context):
     """)
 
 
+def DateExplorerDetails(event_id, db_info, builder):
+    builder.AddPageHeading("Details")
+    builder.AddFieldHeading("Events")
+
+    with db_info.ConnectionManager() as connection:
+        cursor = connection.cursor()
+        db_info.AttachBases(cursor)
+        cursor.execute("""
+            SELECT
+                start_text,
+                channel,
+                cardid
+            FROM
+                display
+            JOIN
+                analysis.program
+                ON
+                    title
+            WHERE
+                event_id = {event_id}
+        """.format(event_id = event_id))
+
+        for row in cursor:
+            builder.AddFieldValue("{} {} {}".format(row[0], row[1], row[2]))
+        
+
 projection = Project(
     "Programs",
     ProgramProjector,
     MakeDisplaySchema()
         .AddField("Name", "text", 400)
         .AddField("Count", "int", 60)
+        .OnDataExplorerClose(DateExplorerDetails)
 )
 
 
