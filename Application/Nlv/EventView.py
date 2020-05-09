@@ -39,7 +39,6 @@ from pathlib import Path
 import pywintypes
 import time
 from uuid import uuid4
-import win32com.client as com
 import zlib
 
 # wxWidgets imports
@@ -340,19 +339,6 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
         me._BtnAnalyse = wx.Button(window, label = "Analyse", size = G_Const.ButtonSize)
         me.BuildLabelledRow(parent, "Analyse logfile and extract events", me._BtnAnalyse)
 
-        me._BtnExcel = wx.Button(window, label = "Open", size = G_Const.ButtonSize)
-        me.BuildLabelledRow(parent, "Open event data in Excel", me._BtnExcel)
-        me._BtnExcel.Enable(False)
-
-        # makepy.py -i
-        # Microsoft Excel 15.0 Object Library
-        # {00020813-0000-0000-C000-000000000046}, lcid=0, major=1, minor=8
-        try:
-            module = com.gencache.EnsureModule('{00020813-0000-0000-C000-000000000046}', 0, 1, 8)
-            me._BtnExcel.Enable(module is not None)
-        except pywintypes.com_error as ex:
-            logging.warn("Excel not found; Excel integration will be disabled")
-
 
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
@@ -367,7 +353,6 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
     def Activate(self):
         self.ActivateCommon()
         self.Rebind(self._BtnAnalyse, wx.EVT_BUTTON, self.OnCmdAnalyse)
-        self.Rebind(self._BtnExcel, wx.EVT_BUTTON, self.OnCmdExcel)
         self.SetNodeHelp("Analyser", "events.html", "eventanalyser")
 
 
@@ -375,15 +360,6 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
     @G_Global.ProgressMeter
     def OnCmdAnalyse(self, event):
         self.GetLogAnalysisNode().UpdateAnalysis()
-
-
-    #-------------------------------------------------------
-    def OnCmdExcel(self, event):
-        filename = self.GetLogAnalysisNode().MakeTemporaryFilename(".csv")
-        excel = com.Dispatch("Excel.Application")
-        if excel is not None:
-            excel.Workbooks.Open( Filename = filename)
-            excel.Visible = 1
 
 
 

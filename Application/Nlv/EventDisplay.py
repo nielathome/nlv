@@ -25,6 +25,7 @@ from pathlib import Path
 import pythoncom
 import sys
 import win32com
+import win32com.client as com
 import win32con
 import win32gui
 import winreg
@@ -1093,7 +1094,7 @@ class G_HtmlHostCtrl(wx.Panel):
 
         # makepy.py -i
         # {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
-        module = win32com.client.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
+        module = com.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
         cls._IIDMap = module.NamesToIIDMap
 
         cls._InitCharting = False
@@ -1179,7 +1180,7 @@ class G_HtmlHostCtrl(wx.Panel):
                         # the returned value is a generic CDispatch for class ID 
                         # '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
                         clsid = self._IIDMap["IHTMLDocument2"]
-                        document = win32com.client.Dispatch(object, resultCLSID = clsid)
+                        document = com.Dispatch(object, resultCLSID = clsid)
                         if document is not None:
                             data[0] = document
                             data[1] = hwnd
@@ -1242,11 +1243,11 @@ class G_HtmlHostCtrl(wx.Panel):
 
         for script_text in self._ScriptQueue:
             elem = doc.createElement("script")
-            script_elem = win32com.client.Dispatch(elem, resultCLSID = self._IIDMap["IHTMLScriptElement"])
+            script_elem = com.Dispatch(elem, resultCLSID = self._IIDMap["IHTMLScriptElement"])
             script_elem.text = script_text
 
             # add script to DOM; will execute
-            node = win32com.client.Dispatch(doc.body, resultCLSID = self._IIDMap["IHTMLDOMNode"])
+            node = com.Dispatch(doc.body, resultCLSID = self._IIDMap["IHTMLDOMNode"])
             script_node = node.appendChild(script_elem)
 
             # remove script from DOM; don't need it any more
