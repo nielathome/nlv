@@ -25,6 +25,7 @@ from pathlib import Path
 from queue import Queue
 import socketserver 
 import sys
+import tempfile
 import threading
 
 # the only *reliable* way for Nlog to find and link against the sqlite3.dll
@@ -49,6 +50,7 @@ from Nlv.Extension import LoadExtensions
 from Nlv.Project import G_Project
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
+
 
 # Enable/disable profiling (VisualStudio tools not working ...)
 _G_WantProfiling = False
@@ -104,9 +106,10 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         cgi_list = path.split('?')
 
         if len(cgi_list) == 1 or self._Callback is None:
-            candidate = install_dir / path
-            if candidate.exists():
-                return str(candidate)
+            for dir in (install_dir, G_Global.TempDir):
+                candidate = dir / path
+                if candidate.exists():
+                    return str(candidate)
 
         elif len(cgi_list) == 2:
             action, args_encoded_text = cgi_list
@@ -516,10 +519,14 @@ def main():
     if _Args.integration:
         G_Shell().SetupIntegration()
     else:
-        G_LogViewApp().MainLoop()
+        with tempfile.TemporaryDirectory(prefix = "NLV.") as tmp_dir:
+            G_Global.TempDir = Path(tmp_dir)
+            G_LogViewApp().MainLoop()
+
 
 if _G_Profiler is not None:
     _G_Profiler.enable()
+
 
 if __name__ == "__main__":
     main()

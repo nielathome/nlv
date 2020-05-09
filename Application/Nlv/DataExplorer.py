@@ -21,6 +21,7 @@ import html
 import json
 import io
 from pathlib import Path
+from urllib.parse import urlparse
 
 # wxWidgets imports
 import wx
@@ -49,7 +50,7 @@ def _MakeLocation(node_id, **kwargs):
 
 
 def _DataUrlToLocation(data_url):
-    b64_bytes = base64.urlsafe_b64decode(data_url)
+    b64_bytes = base64.urlsafe_b64decode(data_url[:-5])
     data = json.loads(b64_bytes.decode())
     return data
 
@@ -58,21 +59,17 @@ def _LocationToDataUrl(location):
     data_bytes = json.dumps(location).encode('utf-8')
     b64_bytes = base64.urlsafe_b64encode(data_bytes)
     res = b64_bytes.decode()
-    return res
+    return res + ".html"
 
 
 def _MakeWebUrl(data_url):
-    return "memory:" + data_url
+    return "http://localhost:8000/{}".format(data_url)
 
 
 
 ## G_DataExplorerPageCache #################################
 
 class G_DataExplorerPageCache:
-    """
-    Wrapper to maintain wx.MemoryFSHandler live entries.
-    """
-
     _MaxHistory = 5
 
 
@@ -85,14 +82,14 @@ class G_DataExplorerPageCache:
     #-------------------------------------------------------
     def Clear(self):
         for key in self._MRU:
-            wx.MemoryFSHandler.RemoveFile(key)
+            G_Global.MakeTempPath(key).unlink()
 
         self._MRU.clear()
 
 
     #-------------------------------------------------------
     def Remove(self, key):
-        wx.MemoryFSHandler.RemoveFile(key)
+        G_Global.MakeTempPath(key).unlink()
         self._MRU.remove(key)
 
 
@@ -108,7 +105,10 @@ class G_DataExplorerPageCache:
             self.Remove(key)
 
         self._MRU.append(key)
-        wx.MemoryFSHandler.AddFileWithMimeType(key, data, "text/html")
+
+        with open(str(G_Global.MakeTempPath(key)), 'w') as file:
+            file.write(data)
+
         self.Prune()
     
 
@@ -126,7 +126,7 @@ class G_DataExplorerPageBuilder:
         self.AddHeaderText("""
             <!DOCTYPE html>
             <head>
-                <link rel="stylesheet" type="text/css" href="memory:style.css">
+                <link rel="stylesheet" type="text/css" href="http:style.css">
         """)
 
         self._BodyHtmlStream = io.StringIO()
@@ -238,15 +238,6 @@ class G_DataExplorer:
         self._WebView.EnableHistory(True)
         self._WebView.EnableContextMenu(False)
 
-        # setup virtual filesystem: "memory:"
-        wx.FileSystem.AddHandler(wx.MemoryFSHandler())
-        self._WebView.RegisterHandler(wx.html2.WebViewFSHandler("memory"))
-
-        # can't seem to access local files from HTML; so workaround
-        with open(str(G_Global.GetInstallDir() / "data.css")) as css_file:
-            css_str = css_file.read();
-            wx.MemoryFSHandler.AddFile("style.css", css_str)
-
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -312,9 +303,11 @@ class G_DataExplorer:
 
         self._LastDataUrl = None
         web_url = event.GetURL()
-        scheme, data_url = web_url.split(':')
+        split = urlparse(web_url)
+        scheme = split.scheme
+        data_url = split.path.lstrip("/")
 
-        if scheme != "memory":
+        if scheme != "http":
             if last_node is not None:
                 last_node.DataExplorerUnload(last_location)
 

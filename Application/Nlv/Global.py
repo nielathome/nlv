@@ -364,9 +364,16 @@ class G_Const:
 class G_Global:
 
     #-------------------------------------------------------
+    TempDir = None
+
+    @classmethod
+    def MakeTempPath(cls, file):
+        return cls.TempDir / file
+
+
+    #-------------------------------------------------------
     def GetInstallDir():
         return Path( __file__ ).parent
-
 
     def GetConfigDir():
         return wx.ConfigBase.Get().Read("/NLV/DataDir")
