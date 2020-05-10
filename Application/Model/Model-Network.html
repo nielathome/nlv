@@ -59,21 +59,38 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <script>
     //----------------------------------------------------------
-    function OnNodeClick(d) {
-        console.log("Node selected: " + d.event_id);
+    function OnNodeClick(node) {
+        console.log("Node selected: " + node.event_id);
     }
 
-    function OnLinkClick(d) {
-        console.log("Link selected: " + d.event_id);
+    function OnLinkClick(link) {
+        console.log("Link selected: " + link.event_id);
     }
 
 
     //----------------------------------------------------------
 
-    // retained data
+    //
+    // data to display - schema:
+    //
+    //  nodes[]
+    //    event_id - number used by link structures to identify the node
+    //    type - arbitrary type; nodes of the same type will normally the same style
+    //    title - textual title displayed for the node
+    //    size - arbitrary size; after normalising, the displayed diameter is proportional to this value
+    //
+    //  links[]
+    //    source - initially node.event_id of source node; re-written to be reference to source node
+    //    target - initially node.event_id of target node; re-written to be reference to target node
+    //
     var g_data = null;
+
+    //
+    // display/layout configuration - schema:
+    //
     var g_config = null;
 
+    // retained data
     var g_simulation = null;
     var g_curZoom = 0;
     var g_curTransform = d3.zoomIdentity;
@@ -231,8 +248,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_joined_labels = g_nodes_group.selectAll("text")
           .data(g_data.nodes)
           .join("text")
-            .text(function (d) {
-                return d.title;
+            .text(function (node) {
+                return node.title;
             })
             .attr("x", function (node) {
                 return nodeScale(node.size);
@@ -247,7 +264,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
                 .id(function (node) {
-                    return node.title;
+                    return node.event_id;
                 })
                 .distance(50)
             )

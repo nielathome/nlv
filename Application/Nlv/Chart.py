@@ -184,35 +184,23 @@ class Network:
             where = ""
             if have_nodes:
                 nodes = ", ".join([str(node) for node in selected_nodes])
-                where = "source_event_id IN ({nodes}) OR target_event_id IN ({nodes})".format(nodes = nodes)
+                where = "source_id IN ({nodes}) OR target_id IN ({nodes})".format(nodes = nodes)
 
             if have_links:
                 if have_nodes:
                     where = where + " OR "
                 links = ", ".join([str(link) for link in selected_links])
-                text = " link_event_id IN ({links})".format(links = links)
+                text = " event_id IN ({links})".format(links = links)
                 where = where + text
 
-            # find everything "reachable" from the selection
+            # find everything "reachable" from the selected links
             cursor.execute("""
                 SELECT
-                    link_data.event_id AS link_event_id,
-                    source_data.event_id AS source_event_id,
-                    target_data.event_id AS target_event_id
+                    event_id,
+                    source_id,
+                    target_id
                 FROM
-                    links.display AS link_data
-                JOIN
-                    main.display
-                    AS
-                        source_data
-                    ON
-                        link_data.source = source_data.title 
-                JOIN
-                    main.display
-                    AS
-                        target_data
-                    ON
-                        link_data.target = target_data.title 
+                    links.display
                 WHERE
                     {where}
                 """.format(where = where))
@@ -247,13 +235,13 @@ class Network:
         cursor.execute("""
             SELECT
                 event_id,
-                source,
-                target
+                source_id,
+                target_id
             FROM
                 links.display
             WHERE
-                source IN (SELECT title FROM main.display) AND
-                target IN (SELECT title FROM main.display)
+                source_id IN (SELECT event_id FROM main.display) AND
+                target_id IN (SELECT event_id FROM main.display)
             """)
 
         links = []

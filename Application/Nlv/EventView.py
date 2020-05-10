@@ -527,10 +527,11 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def MakeTemporaryFilename(self, ext):
         cachedir = self.GetLogNode().MakeSessionDir()
-        return str((cachedir / self._Field.Guid.Value).with_suffix(ext))
+        full_ext = ".{}(analysis).{}".format(self._Field.DefaultNodeName.Value, ext)
+        return str((cachedir / self._Field.Guid.Value[0:8]).with_suffix(full_ext))
 
     def RemoveTemporaryFiles(self):
-        guid = self._Field.Guid.Value
+        guid = self._Field.Guid.Value[0:8]
         for file in self.GetLogNode().MakeSessionDir().iterdir():
             if str(file).find(guid) >= 0:
                 try:
@@ -588,7 +589,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         # with a backing file, the debugger can step through the script code
         try:
-            backing_file = self.MakeTemporaryFilename(".py")
+            backing_file = self.MakeTemporaryFilename("py")
             open(backing_file, 'w').write(src)
 
         except OSError as ex:
@@ -617,7 +618,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self.SetErrorText("Analysing ...\n")
         with G_ScriptGuard("Analysis", self.GetErrorReporter()):
             event_id = self.GetSessionNode().GetEventId()
-            analyser = G_Analyser(self.MakeTemporaryFilename(".db"), event_id)
+            analyser = G_Analyser(self.MakeTemporaryFilename("db"), event_id)
             globals = analyser.SetEntryPoints(meta_only, log_schema, self.GetLogfile(), self.GetLogNode())
 
             exec(code, globals)

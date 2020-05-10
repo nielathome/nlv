@@ -786,20 +786,23 @@ class G_ChartInfo:
 
 ## G_QuantifierInfo ########################################
 
-def DeriveDbInfo(info, db_name, file_extension):
-    path = Path(info.Path)
-    new_path = str(path.with_name("{}.{}.db".format(path.stem, str(file_extension).lower().strip())))
-    return G_DbInfo(db_name, new_path, info)
+def MakeRelatedDbInfo(info, name, db_name):
+    # db_name is the name given to the database when attach'ed
+    # into a child connection/cursor
+    short_name = name.strip()
+    base_path = Path(info.Path)
+    new_path = base_path.with_name("{}.{}({}).db".format(base_path.stem, short_name, db_name))
+    return G_DbInfo(db_name, str(new_path), info)
 
 
 class G_QuantifierInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, quantifier, metrics_schema, projection_db_info, idx):
+    def __init__(self, name, quantifier, metrics_schema, projection_db_info):
         self.Name = name
         self.UserQuantifier = quantifier
         self.MetricsSchema = metrics_schema
-        self.MetricsDbInfo = DeriveDbInfo(projection_db_info, "quantifier", idx)
+        self.MetricsDbInfo = MakeRelatedDbInfo(projection_db_info, name, "quantifier")
         self.Charts = []
 
 
@@ -826,7 +829,7 @@ class G_ProjectorInfo:
     def __init__(self, name, projection_schema, analysis_db_info):
         self.ProjectionName = name
         self.ProjectionSchema = projection_schema
-        self.ProjectionDbInfo = DeriveDbInfo(analysis_db_info, "events", name)
+        self.ProjectionDbInfo = MakeRelatedDbInfo(analysis_db_info, name, "events")
         self.DocumentNodeID = G_Project.NodeID_EventProjector
         self.Quantifiers = dict()
         self.Charts = []
@@ -836,8 +839,7 @@ class G_ProjectorInfo:
     def Quantify(self, name, user_quantifier, metrics_schema):
         """Implements user analyse script Quantify() function"""
 
-        idx = len(self.Quantifiers)
-        info = G_QuantifierInfo(name, user_quantifier, metrics_schema, self.ProjectionDbInfo, idx)
+        info = G_QuantifierInfo(name, user_quantifier, metrics_schema, self.ProjectionDbInfo)
         self.Quantifiers.update([(name, info)])
         return info
 
@@ -947,6 +949,7 @@ class G_ProjectionContext:
 
 
     #-------------------------------------------------------
+    # currently unused; may be bad design
     def FindDbFile(self, theme_id):
         for node in self._LogNode.ListSubNodes(factory_id = G_Project.NodeID_LogAnalysis, recursive = True):
             if node.GetCurrentThemeId("event") == theme_id:

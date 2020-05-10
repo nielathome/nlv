@@ -85,14 +85,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
-    function OnNodeClick(d) {
-        if (! d.dragged) {
-            CallPython(g_nodes_table_node_id, "OnChartSelection", { event_id: d.event_id, ctrl_key: d3.event.ctrlKey });
+    function OnNodeClick(node) {
+        if (!node.dragged) {
+            CallPython(g_nodes_table_node_id, "OnChartSelection", { event_id: node.event_id, ctrl_key: d3.event.ctrlKey });
         }
     }
 
-    function OnLinkClick(d) {
-        CallPython(g_links_table_node_id, "OnChartSelection", { event_id: d.event_id, ctrl_key: d3.event.ctrlKey });
+    function OnLinkClick(link) {
+        CallPython(g_links_table_node_id, "OnChartSelection", { event_id: link.event_id, ctrl_key: d3.event.ctrlKey });
     }
 
 
@@ -102,14 +102,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     // data to display - schema:
     //
     //  nodes[]
-    //    id - number used by link structures to identify the node
+    //    event_id - number used by link structures to identify the node
     //    type - arbitrary type; nodes of the same type will normally the same style
     //    title - textual title displayed for the node
     //    size - arbitrary size; after normalising, the displayed diameter is proportional to this value
     //
     //  links[]
-    //    source - initially node.id of source node; re-written to be reference to source node
-    //    target - initially node.id of target node; re-written to be reference to target node
+    //    source - initially node.event_id of source node; re-written to be reference to source node
+    //    target - initially node.event_id of target node; re-written to be reference to target node
     //
     var g_data = null;
 
@@ -292,7 +292,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
                 .id(function (node) {
-                    return node.title;
+                    return node.event_id;
                 })
                 .distance(50)
             )
