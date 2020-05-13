@@ -1483,9 +1483,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def OnDataExplorerLoad(self, sync, builder, location):
-        location["node_name"] = self.GetNodeName()
-        logfile_url = self.GetLogNode().MakeDataUrl()
-        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, logfile_url)
+        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, self)
         if sync:
             self.MakeActive()
 

@@ -164,6 +164,26 @@ class G_DeveloperConsoleMessageReceiver(COMObject):
 
 
 
+## G_DataExplorerContext ###################################
+
+class G_DataExplorerContext:
+
+    #-------------------------------------------------------
+    def __init__(self, event_id, db_info, ui_node):
+        self.EventId = event_id
+        self.DbInfo = db_info
+        self._UiNode = ui_node
+
+    def GetTargetId(self, node_name):
+        ui_nodes = self._UiNode.GetLogAnalysisNode().ListSubNodes(recursive = True)
+        for ui_node in ui_nodes:
+            if ui_node.GetNodeName() == node_name:
+                return ui_node.GetNodeId()
+
+        return None
+
+
+
 ## G_TableHiliter ##########################################
 
 class G_TableHiliter:
@@ -332,10 +352,16 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def OnDataExplorerLoad(self, ctrl, sync, builder, location, logfile_url):
+    def UserDataExplorer(self, func, desc, context, builder):
+        if func is not None: 
+            with G_ScriptGuard(desc):
+                func(context, builder)
+
+
+    def OnDataExplorerLoad(self, ctrl, sync, builder, location, ui_node):
         event_id = location["event_id"]
         item = self.LookupEventId(event_id)
-        node_name = location["node_name"]
+        node_name = ui_node.GetNodeName()
 
         if not self.IsNavigationValid(builder, location, node_name):
             if self.ClearDataExplorerLine():
@@ -352,12 +378,12 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         else:
             schema = self._TableSchema
-            db_info = self._DbInfo
-            if schema.UserDataExplorerOpen is not None:
-                with G_ScriptGuard("DataExplorerOpen"):
-                    schema.UserDataExplorerOpen(event_id, db_info, builder)
+            context = G_DataExplorerContext(event_id, self._DbInfo, ui_node)
 
+            self.UserDataExplorer(schema.UserDataExplorerOpen, "DataExplorerOpen", context, builder)
             builder.AddPageHeading("{} Item".format(self._Name))
+
+            logfile_url = ui_node.GetLogNode().MakeDataUrl()
             if logfile_url is not None:
                 builder.AddLink(logfile_url, "Show log file ...")
 
@@ -383,9 +409,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
                         else:
                             builder.AddField(field.Name, text)
                     
-            if schema.UserDataExplorerClose is not None:
-                with G_ScriptGuard("DataExplorerClose"):
-                    schema.UserDataExplorerClose(event_id, db_info, builder)
+            self.UserDataExplorer(schema.UserDataExplorerClose, "DataExplorerClose", context, builder)
 
             if sync:
                 if self.SetDataExplorerLine(self.ItemToKey(item)):
@@ -946,8 +970,8 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
     def GetEventId(self, item):
         return self.GetModel().GetEventId(item)
 
-    def OnDataExplorerLoad(self, sync, builder, location, logfile_url):
-        self.GetModel().OnDataExplorerLoad(self, sync, builder, location, logfile_url)
+    def OnDataExplorerLoad(self, sync, builder, location, ui_node):
+        self.GetModel().OnDataExplorerLoad(self, sync, builder, location, ui_node)
 
     def OnDataExplorerUnload(self, location):
         self.GetModel().OnDataExplorerUnload(self)

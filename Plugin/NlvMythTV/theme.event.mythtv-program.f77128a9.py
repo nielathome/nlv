@@ -207,13 +207,13 @@ def ProgramProjector(connection, cursor, context):
     """)
 
 
-def DateExplorerProgramDetails(event_id, db_info, builder):
+def DataExplorerProgramDetails(context, builder):
     builder.AddPageHeading("Details")
     builder.AddFieldHeading("Events")
 
-    with db_info.ConnectionManager() as connection:
+    with context.DbInfo.ConnectionManager() as connection:
         cursor = connection.cursor()
-        db_info.AttachBases(cursor)
+        context.DbInfo.AttachBases(cursor)
         cursor.execute("""
             SELECT
                 program.start_text,
@@ -227,7 +227,7 @@ def DateExplorerProgramDetails(event_id, db_info, builder):
                     display.title = program.title
             WHERE
                 display.event_id = {event_id}
-        """.format(event_id = event_id))
+        """.format(event_id = context.EventId))
 
         for row in cursor:
             builder.AddFieldValue("Time: {} Channel: {} Card:{}".format(row[0], row[1], row[2]))
@@ -239,7 +239,7 @@ projection = Project(
     MakeDisplaySchema()
         .AddField("Name", "text", 400)
         .AddField("Count", "int", 60)
-        .OnDataExplorerClose(DateExplorerProgramDetails)
+        .OnDataExplorerClose(DataExplorerProgramDetails)
 )
 
 
@@ -279,13 +279,13 @@ def NodesProjector(connection, cursor, context):
         """)
 
 
-def DateExplorerNodesDetails(event_id, db_info, builder):
-    builder.AddPageHeading("Relations")
-    builder.AddFieldHeading("Entities")
+def DataExplorerNodesDetails(context, builder):
+    builder.AddPageHeading("Goto")
+    node_id = context.GetTargetId("Entities")
 
-    with db_info.ConnectionManager() as connection:
+    with context.DbInfo.ConnectionManager() as connection:
         cursor = connection.cursor()
-        db_info.AttachBases(cursor)
+        context.DbInfo.AttachBases(cursor)
 
         cursor.execute("""
             SELECT
@@ -295,12 +295,8 @@ def DateExplorerNodesDetails(event_id, db_info, builder):
                 analysis.relationships
             WHERE
                 source_id = {event_id}
-        """.format(event_id = event_id))
 
-        for row in cursor:
-            builder.AddFieldValue("Id: {} Name: {}".format(row[1], row[0]))
-
-        cursor.execute("""
+            UNION ALL
             SELECT
                 source,
                 source_id
@@ -308,10 +304,10 @@ def DateExplorerNodesDetails(event_id, db_info, builder):
                 analysis.relationships
             WHERE
                 target_id = {event_id}
-        """.format(event_id = event_id))
+        """.format(event_id = context.EventId))
 
         for row in cursor:
-            builder.AddFieldValue("Id: {} Name: {}".format(row[1], row[0]))
+            builder.AddAction(node_id, row[0], row[1])
 
 
 nodes = Nodes(
@@ -321,7 +317,7 @@ nodes = Nodes(
         .AddField("Type", "text", 70)
         .AddField("Title", "text", 200, align = "left")
         .AddField("Size", "int", 60)
-        .OnDataExplorerClose(DateExplorerNodesDetails)
+        .OnDataExplorerClose(DataExplorerNodesDetails)
 )
 
 

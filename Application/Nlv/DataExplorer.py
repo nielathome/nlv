@@ -127,6 +127,28 @@ class G_DataExplorerPageBuilder:
             <!DOCTYPE html>
             <head>
                 <link rel="stylesheet" type="text/css" href="http:style.css">
+
+            <!-- Load d3.js -->
+            <script src="polyfill.8.1.3.js"></script>
+            <script src="fetch.umd.3.0.0.js"></script>
+            <script src="d3.v5.min.js"></script>
+
+            <script>
+                function CallPython(target_node_id, method, args_object) {
+                    args_json_text = JSON.stringify(args_object);
+                    args_encoded_text = btoa(args_json_text);
+                    cgi_text = "/" + target_node_id + "." + method + "?" + args_encoded_text;
+
+                    d3.json(cgi_text, function (error, results_json) {
+                        if (error)
+                            throw error;
+                    });
+                }
+
+                function DoSelect(node_id, event_id) {
+                    CallPython(node_id, "OnChartSelection", { event_id: event_id, ctrl_key: false });
+                }
+            </script>
         """)
 
         self._BodyHtmlStream = io.StringIO()
@@ -145,28 +167,39 @@ class G_DataExplorerPageBuilder:
     def AddBodyText(self, text):
         self._BodyHtmlStream.write(text + "\n")
 
-    def AddBodyElement(self, tag, text, style = None):
-        if style is not None:
-            style = ' style="{style}"'.format(style = style)
-        else:
-            style = ""
+    def AddBodyElement(self, tag, text, **kwargs):
+        attributes = ""
+        for key, value in kwargs.items():
+            if value is not None:
+                attributes = '{attributes} {key}="{value}"'.format(attributes = attributes, key = key.strip('_'), value = value)
 
-        self.AddBodyText("<{tag}{style}>{text}</{tag}>".format(tag = tag, style = style, text = html.escape(text)))
+        self.AddBodyText("<{tag}{attributes}>{text}</{tag}>".format(tag = tag, attributes = attributes, text = html.escape(text)))
 
 
     #-------------------------------------------------------
-    def AddPageHeading(self, text, style = None):
-        self.AddBodyElement("h1", text, style)
+    def AddPageHeading(self, text, **kwargs):
+        self.AddBodyElement("h1", text, **kwargs)
 
-    def AddFieldHeading(self, text, style = None):
-        self.AddBodyElement("h2", text, style)
+    def AddFieldHeading(self, text, **kwargs):
+        self.AddBodyElement("h2", text, **kwargs)
 
-    def AddFieldValue(self, text, style = None):
-        self.AddBodyElement("p", text, style)
+    def AddFieldValue(self, text, **kwargs):
+        self.AddBodyElement("p", text, **kwargs)
 
     def AddField(self, heading, value, heading_style = None, value_style = None):
-        self.AddFieldHeading(heading, heading_style)
-        self.AddFieldValue(value, value_style)
+        self.AddFieldHeading(heading, style = heading_style)
+        self.AddFieldValue(value, style = value_style)
+
+    def AddAction(self, target_id, event_name, event_id, **kwargs):
+        onclick = ""
+        if target_id is not None:
+            self.AddBodyElement("button", event_name,
+                onclick="DoSelect({node_id}, {event_id});".format(node_id = target_id, event_id = event_id),
+                _class = "select-button",
+                **kwargs
+            )
+        else:
+            self.AddBodyElement("p", event_name, **kwargs)
 
     def AddLink(self, data_url, text):
         self.AddBodyText('<p><a href="{web_url}">{text}</a></p>'.format(web_url = _MakeWebUrl(data_url), text = html.escape(text)))
@@ -174,7 +207,7 @@ class G_DataExplorerPageBuilder:
 
     #-------------------------------------------------------
     def MakeErrorPage(self, title, explanation, fields = []):
-        self.AddPageHeading(title, "color:darkred")
+        self.AddPageHeading(title, style="color:darkred")
         self.AddFieldValue(explanation)
 
         for name, value in fields:
