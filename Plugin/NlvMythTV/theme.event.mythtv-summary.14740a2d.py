@@ -206,12 +206,12 @@ Project(
     "Reschedule",
     RescheduleProjector,
     MakeDisplaySchema()
-        .AddStart("Start", width = 100)
-        .AddFinish("Finish", width = 100, initial_visibility = False)
-        .AddDuration("Duration", scale = "s", width = 60, view_formatter = ViewFormatter)
-        .AddField("Process", "int", 60)
-        .AddField("Place", "real", 60)
-        .AddField("Abool", "bool", 60, explorer_formatter = ExplorerFormatter)
+        .AddStart("Start", "Date code at the beginning of the reschedule event.", width = 100)
+        .AddFinish("Finish", "Date code at the end of the reschedule event.", width = 100, initial_visibility = False)
+        .AddDuration("Duration", "Length of the reschedule event.", scale = "s", width = 60, view_formatter = ViewFormatter)
+        .AddField("Process", "Operating system process ID.", "int", 60)
+        .AddField("Place", "Synthesized 'place' name, to demonstrate the use of floating point values.", "real", 60)
+        .AddField("Abool", "Synthesized 'Abool' field, to demonstrate the use of booleans.", "bool", 60, explorer_formatter = ExplorerFormatter)
         .OnDataExplorerOpen(DataExplorerOpen)
 )
 
@@ -318,9 +318,9 @@ projection = Project(
     SummaryProjector,
     MakeDisplaySchema()
         .AddNesting()
-        .AddStart("Start", width = 100)
-        .AddDuration("Duration", scale = "s", width = 60)
-        .AddField("Event Summary", "text", 150, "left", initial_colour = "ROYAL BLUE")
+        .AddStart("Start", "Date code at the beginning of the summarised event.", width = 100)
+        .AddDuration("Duration", "Duration of the summarised event.", scale = "s", width = 60)
+        .AddField("Event Summary", "Brief description of the event.", "text", 150, "left", initial_colour = "ROYAL BLUE")
 )
 
 
@@ -363,10 +363,10 @@ metrics = projection.Quantify(
     "Breakdown",
     SummaryQuantifier,
     MakeDisplaySchema()
-        .AddField("Summary", "text", 150, "left")
-        .AddField("Count", "int", 80, "left")
-        .AddField("Duration (s)", "int", 80, "left")
-        .AddField("Average (s)", "real", 80, "left")
+        .AddField("Summary", "Brief description of the event.", "text", 150, "left")
+        .AddField("Count", "The number of events.", "int", 80, "left")
+        .AddField("Duration (s)", "The total duration of all events.", "int", 80, "left")
+        .AddField("Average (s)", "The average duration of an event.", "real", 80, "left")
 )
 
 

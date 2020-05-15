@@ -83,15 +83,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     minwidth: (optional) minimum number of characters in the field, again, for use
      when the field contains the same text as the separator
     -->
-    <field type="datetime_unix" name="DateTime" separator=" " minwidth="15"/>
-    <field type="enum08" name="Machine" separator=" "/>
-    <field type="enum08" name="Module_A" separator=": "/>
-    <field type="enum08" name="Module_B" separator="["/>
-    <field type="uint32" name="Process" separator="]: "/>
-    <field type="enum08" name="Category" separator=" "/>
-    <field type="enum16" name="Thread" separator=" "/>
-    <field type="emitter" name="Emitter" separator=" ("/>
-    <field type="enum08" name="Function" separator=") "/>
+    <field type="datetime_unix" name="DateTime" separator=" " minwidth="15" description="Date code associated with the log line, to the nearest second. This type of logfile has no meaningful value for the year; it is set to the year when the logfile was first opened."/>
+    <field type="enum08" name="Machine" separator=" " description="The name of the machine which generated the log line."/>
+    <field type="enum08" name="Module_A" separator=": " description="The primary module, e.g. mythbackend."/>
+    <field type="enum08" name="Module_B" separator="[" description="The secondary module, e.g. mythbackend."/>
+    <field type="uint32" name="Process" separator="]: " description="Operating system process ID for the process."/>
+    <field type="enum08" name="Category" separator=" " description="Message category: I - information; N - notice, or; E - error."/>
+    <field type="enum16" name="Thread" separator=" " description="Primary activity."/>
+    <field type="emitter" name="Emitter" separator=" (" description="Source code information."/>
+    <field type="enum08" name="Function" separator=") " description="Activity."/>
 
     
     <!--

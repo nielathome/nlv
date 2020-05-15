@@ -66,6 +66,9 @@ class G_FieldSchema:
         # the field's name; used in the UI and by the filter language
         self.Name = element.get("name")
 
+        # the field's description; used in the UI
+        self.Description = element.get("description")
+
         # character sequence following the field, and separating it from
         # the next field
         self.Separator = element.get("separator")
@@ -140,6 +143,9 @@ class G_FieldSchemata(G_FieldList):
     #-------------------------------------------------------
     def GetFieldNames(self):
         return [fs.Name for fs in self if fs.Available]
+
+    def GetFieldDescriptions(self):
+        return [(fs.Name, fs.Description) for fs in self if fs.Available]
 
 
     

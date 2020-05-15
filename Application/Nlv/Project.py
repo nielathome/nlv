@@ -93,9 +93,9 @@ class G_WindowInfo:
     """
 
     #-------------------------------------------------------
-    def MakePane(window):
+    def MakePane(window, cls = wx.Panel):
         """(Static) Common routine to create a simple, sized, child pane of 'window'"""
-        panel = wx.Panel(window)
+        panel = cls(window)
         panel.SetBackgroundColour(wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE))
         sizer = wx.BoxSizer(wx.VERTICAL)
         panel.SetSizer(sizer)

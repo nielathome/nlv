@@ -312,6 +312,9 @@ class G_Const:
 
     #-------------------------------------------------------
 
+    # preferred font
+    FontFaceName = "Segoe UI"
+
     # standard border size for items inside a static box sizer
     Sizer_StdBorder = 4
 

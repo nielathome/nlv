@@ -23,6 +23,7 @@ import wx
 import wx.stc as stc
 
 # Application imports 
+from .Global import G_Const
 from .Logfile import G_DisplayControl
 from .Logfile import G_PanelDisplayControl
 from .StyleNode import G_ColourTraits
@@ -33,7 +34,7 @@ from .StyleNode import G_ColourTraits
 faces = {
     'times': 'Times New Roman',
     'mono' : 'Courier New',
-    'helv' : 'Segoe UI',
+    'helv' : G_Const.FontFaceName,
     'other': 'Comic Sans MS',
     'size' : 9,
     'size2': 8,

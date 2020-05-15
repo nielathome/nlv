@@ -237,8 +237,8 @@ projection = Project(
     "Programs",
     ProgramProjector,
     MakeDisplaySchema()
-        .AddField("Name", "text", 400)
-        .AddField("Count", "int", 60)
+        .AddField("Name", "Name of the recorded program.", "text", 400)
+        .AddField("Count", "Number of times the program was recorded.", "int", 60)
         .OnDataExplorerClose(DataExplorerProgramDetails)
 )
 
@@ -314,9 +314,9 @@ nodes = Nodes(
     "Entities",
     NodesProjector,
     MakeDisplaySchema()
-        .AddField("Type", "text", 70)
-        .AddField("Title", "text", 200, align = "left")
-        .AddField("Size", "int", 60)
+        .AddField("Type", "The entity type: program, channel, or card.", "text", 70)
+        .AddField("Title", "The entity title: a program name, channel number, or card ID.", "text", 200, align = "left")
+        .AddField("Size", "The number of times the entity is referenced: the number of recordings for a program, the number of time a particular channel was recorded from, or the number of times a particular card was recorded from.", "int", 60)
         .OnDataExplorerClose(DataExplorerNodesDetails)
 )
 
@@ -357,9 +357,9 @@ links = Links(
     "Relationships",
     LinksProjector,
     MakeDisplaySchema()
-        .AddField("Source", "text", 200)
+        .AddField("Source", "A program, channel, or card.", "text", 200)
         .AddHiddenField("SourceId", "int")
-        .AddField("Target", "text", 200, align = "left")
+        .AddField("Target", "A program, channel, or card.", "text", 200, align = "left")
         .AddHiddenField("TargetId", "int")
 )
 

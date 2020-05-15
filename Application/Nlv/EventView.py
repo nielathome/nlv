@@ -1082,17 +1082,17 @@ class G_EventFieldNode(G_ProjectorChildNode, G_ThemeNode, G_EnabledColourNode, G
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateCommon()
-        self.ActivateEnabledColour(self.GetFieldNames())
+        self.ActivateEnabledColour(self.GetFieldDescriptions())
         self.SetNodeHelp("Event Field Visibility", "events.html", "eventfields")
 
 
     #-------------------------------------------------------
-    def GetFieldNames(self):
+    def GetFieldDescriptions(self):
         event_schema = self.GetTableViewCtrl().GetTableSchema()
         if event_schema is None:
             return []
         else:
-            return event_schema.GetFieldNames()
+            return event_schema.GetFieldDescriptions()
 
 
     #-------------------------------------------------------
@@ -1109,7 +1109,7 @@ class G_EventFieldNode(G_ProjectorChildNode, G_ThemeNode, G_EnabledColourNode, G
     #-------------------------------------------------------
     def OnThemeChange(self, theme_cls, theme_id):
         if self.IsThemeApplicable(theme_cls, theme_id, G_Const.EventThemeCls):
-            self.SetEnabledColourTheme(self.GetFieldNames())
+            self.SetEnabledColourTheme()
 
 
 
