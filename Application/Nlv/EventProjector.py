@@ -778,7 +778,6 @@ class G_ChartInfo:
         self.WantSelection = want_selection
         self.Builder = builder
         self.ChartDbInfo = chart_db_info
-        self.HtmlPage = builder.Setup(name)
 
 
     #-------------------------------------------------------
@@ -879,7 +878,6 @@ class G_NetworkChartInfo:
         self.Builder = builder
         self.NodesDbInfo = nodes_db_info
         self.LinksDbInfo = links_db_info
-        self.HtmlPage = builder.Setup(name)
 
 
     #-------------------------------------------------------

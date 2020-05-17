@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2019. All rights reserved.
+# Copyright (C) Niel Clausen 2019-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,8 +42,8 @@ class Bar:
 
     #-----------------------------------------------------------
     @classmethod
-    def Setup(cls, name):
-        return "BarChart.html"
+    def Setup(cls, context):
+        context.LoadPage("BarChart.html")
 
 
     #-----------------------------------------------------------
@@ -94,8 +94,8 @@ class Pie:
 
     #-----------------------------------------------------------
     @classmethod
-    def Setup(cls, name):
-        return "PieChart.html"
+    def Setup(cls, context):
+        context.LoadPage("PieChart.html")
 
 
     #-----------------------------------------------------------
@@ -162,14 +162,20 @@ class Pie:
 class Network:
 
     #-----------------------------------------------------------
+    def __init__(self, setup_script = None):
+        self._SetupScript = setup_script
+
+
+    #-----------------------------------------------------------
     def DefineParameters(self, connection, cursor, context):
         context.AddBool("graph_is_disjoint", "Network is disjoint", False)
         
 
     #-----------------------------------------------------------
-    @classmethod
-    def Setup(cls, name):
-        return "Network.html"
+    def Setup(self, context):
+        context.LoadPage("Network.html")
+        if self._SetupScript is not None:
+            context.LoadScript(self._SetupScript)
 
 
     #-----------------------------------------------------------
@@ -248,12 +254,12 @@ class Network:
         for row in cursor:
             links.append(dict(zip(["event_id", "source", "target"], [row[0], row[1], row[2]])))
 
-        config = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
-        config_json = json.dumps(config)
+        options = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
+        options_json = json.dumps(options)
 
         network = dict(nodes = nodes, links = links)
         data_json = json.dumps(network)
-        context.CallJavaScript("CreateChart", data_json, config_json)
+        context.CallJavaScript("CreateChart", data_json, options_json)
 
         self.SetSelection(connection, cursor, context)
 

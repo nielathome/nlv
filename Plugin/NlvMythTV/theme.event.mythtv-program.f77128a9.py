@@ -368,5 +368,5 @@ Network(
     "Recordings",
     nodes,
     links
-).Chart(True, Chart.Network())
+).Chart(True, Chart.Network(setup_script = "theme.event.mythtv-program.f77128a9.network.js"))
 

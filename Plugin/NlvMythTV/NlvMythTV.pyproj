@@ -41,6 +41,7 @@
     <Content Include="formatter.mythtv.xml" />
     <Content Include="schema.mythtv.xml" />
     <Content Include="styleset.mythtv.xml" />
+    <Content Include="theme.event.mythtv-program.f77128a9.network.js" />
     <Content Include="theme.event.mythtv-summary.xml" />
     <Content Include="theme.event.mythtv-program.xml" />
     <Content Include="theme.log.mythtv.xml" />

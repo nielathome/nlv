@@ -41,6 +41,7 @@ from .EventProjector import G_ScriptGuard
 from .Global import G_Global
 from .Global import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
+from .Theme import GetThemeSupportFile
 
 # wxWidgets imports
 import wx
@@ -1072,13 +1073,89 @@ class G_ChoiceParam(G_Param):
 
 
 
+## G_UpdateDom #############################################
+
+_IIDMap = None
+
+class G_UpdateDom:
+    #-------------------------------------------------------
+    def __init__(self, script):
+        self.Script = script
+
+
+    #-------------------------------------------------------
+    @staticmethod
+    def MakeScriptElement(doc):
+        elem = doc.createElement("script")
+        return com.Dispatch(elem, resultCLSID = _IIDMap["IHTMLScriptElement"])
+
+
+    #-------------------------------------------------------
+    @staticmethod
+    def LoadScriptElement(doc, script_elem):
+        # add script to DOM; will execute
+        dom_node = com.Dispatch(doc.body, resultCLSID = _IIDMap["IHTMLDOMNode"])
+        script_node = dom_node.appendChild(script_elem)
+        return dom_node, script_node
+    
+
+    #-------------------------------------------------------
+    @staticmethod
+    def UnloadScriptNode(dom_node, script_node):
+        # remove script from DOM; often, don't need it any more
+        dom_node.removeChild(script_node)
+
+
+
+## G_UpdateDomCallJavaScript ###############################
+
+class G_UpdateDomCallJavaScript(G_UpdateDom):
+
+    #-------------------------------------------------------
+    def __init__(self, script):
+        super().__init__(script)
+
+
+    #-------------------------------------------------------
+    def Update(self, doc):
+        script_elem = self.MakeScriptElement(doc)
+        script_elem.text = self.Script
+        dom_node, script_node = self.LoadScriptElement(doc, script_elem)
+        self.UnloadScriptNode(dom_node, script_node)
+
+
+
+## G_UpdateDomLoadScript ###################################
+
+class G_UpdateDomLoadScript(G_UpdateDom):
+
+    #-------------------------------------------------------
+    def __init__(self, script):
+        super().__init__(script)
+
+
+    #-------------------------------------------------------
+    def Update(self, doc):
+        # writing the script_elem.src property will load a
+        # script, but, always asynchronously. So, stuff the
+        # script directly into the page instead.
+
+        script_text = ""
+        with open(GetThemeSupportFile(self.Script), "r") as file:
+            script_text = "".join(file.readlines())
+
+        script_elem = self.MakeScriptElement(doc)
+        script_elem.text = script_text
+        dom_node, script_node = self.LoadScriptElement(doc, script_elem)
+
+
+
 ## G_HtmlHostCtrl ##########################################
 
 class G_HtmlHostCtrl(wx.Panel):
 
     #-------------------------------------------------------
     _InitCharting = True
-    _IIDMap = None
     _ConsoleRegistered = False
 
 
@@ -1118,8 +1195,9 @@ class G_HtmlHostCtrl(wx.Panel):
 
         # makepy.py -i
         # {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
+        global _IIDMap
         module = com.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
-        cls._IIDMap = module.NamesToIIDMap
+        _IIDMap = module.NamesToIIDMap
 
         cls._InitCharting = False
 
@@ -1161,7 +1239,7 @@ class G_HtmlHostCtrl(wx.Panel):
         self._ChartInfo = chart_info
         self._CreateContext = context
         self._ParameterValues = dict()
-        self._ScriptQueue = []
+        self._DomUpdateQueue = []
 
         self.InitCharting()
 
@@ -1170,9 +1248,7 @@ class G_HtmlHostCtrl(wx.Panel):
         self._Figure.EnableContextMenu(False)
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
-
-        page_name = self._ChartInfo.HtmlPage
-        self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
+        self.SetupHtml()
 
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
@@ -1180,10 +1256,30 @@ class G_HtmlHostCtrl(wx.Panel):
         self.SetSizer(vsizer)
 
 
+    def SetupHtml(self):
+        class Context:
+            #-----------------------------------------------
+            def __init__(self, host):
+                self._Host = host
+
+            #-----------------------------------------------
+            def LoadPage(self, page_name):
+                self._Host._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
+
+            def LoadScript(self, script_name):
+                self._Host.LoadScript(script_name)
+
+            #-----------------------------------------------
+            def CallJavaScript(self, method, *args):
+                self._Host.CallJavaScript(method, *args)
+
+        self._ChartInfo.Builder.Setup(Context(self))
+
+
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
         if not "about:" in event.URL:
-            self.RunScriptQueue()
+            self.RunDomUpdateQueue()
 
 
     #-------------------------------------------------------
@@ -1203,7 +1299,7 @@ class G_HtmlHostCtrl(wx.Panel):
                         # have to force the class ID - not really clear why; without this though,
                         # the returned value is a generic CDispatch for class ID 
                         # '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
-                        clsid = self._IIDMap["IHTMLDocument2"]
+                        clsid = _IIDMap["IHTMLDocument2"]
                         document = com.Dispatch(object, resultCLSID = clsid)
                         if document is not None:
                             data[0] = document
@@ -1219,7 +1315,7 @@ class G_HtmlHostCtrl(wx.Panel):
             context = self._CreateContext
             self._CreateContext = None
 
-            self.EnqueueScript("SetNodeId({});".format(context.GetNodeId()), False)
+            self.CallJavaScript("SetNodeId", context.GetNodeId())
 
             # keep the Python/wxWidgets window alive while we (the parent)
             # window is remains
@@ -1240,44 +1336,36 @@ class G_HtmlHostCtrl(wx.Panel):
 
         arg_text = ",".join([ConvertArg(arg) for arg in args])
         script = "{method}({args});".format(method = method, args = arg_text)
-        self.EnqueueScript(script)
+        self.EnqueueDomUpdate(G_UpdateDomCallJavaScript(script))
 
 
-    def EnqueueScript(self, script, run_queue = True):
-        last_script = None
-        last_idx = len(self._ScriptQueue) - 1
+    def LoadScript(self, script_name):
+        self.EnqueueDomUpdate(G_UpdateDomLoadScript(script_name))
 
+
+    def EnqueueDomUpdate(self, dom_update):
+        append = True
+        last_idx = len(self._DomUpdateQueue) - 1
         if last_idx >= 0:
-            last_script = self._ScriptQueue[last_idx]
+            last_update = self._DomUpdateQueue[last_idx]
+            append = dom_update.Script != last_update.Script
 
-        append = script != last_script
         if append:
-            self._ScriptQueue.append(script)
+            self._DomUpdateQueue.append(dom_update)
+            self.RunDomUpdateQueue()
 
-        if append and run_queue:
-            self.RunScriptQueue()
-        
 
-    def RunScriptQueue(self):
+    def RunDomUpdateQueue(self):
         doc = self.GetIHTMLDocument2()
         if doc is None:
             return
 
         self.RegisterConsole(doc)
 
-        for script_text in self._ScriptQueue:
-            elem = doc.createElement("script")
-            script_elem = com.Dispatch(elem, resultCLSID = self._IIDMap["IHTMLScriptElement"])
-            script_elem.text = script_text
+        for dom_update in self._DomUpdateQueue:
+            dom_update.Update(doc)
 
-            # add script to DOM; will execute
-            node = com.Dispatch(doc.body, resultCLSID = self._IIDMap["IHTMLDOMNode"])
-            script_node = node.appendChild(script_elem)
-
-            # remove script from DOM; don't need it any more
-            node.removeChild(script_node)
-
-        self._ScriptQueue = []
+        self._DomUpdateQueue = []
 
 
     #-------------------------------------------------------

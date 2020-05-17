@@ -96,6 +96,46 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
 
+    // Style & behaviour configuration items. Override these
+    // functions in your plugin.
+
+    function Config() { }
+
+    // fetch a node's ID; link elements use the ID to identify
+    // the node's they connect
+    Config.prototype.GetNodeId = function (node) {
+        return node.event_id;
+    }
+
+    // determine a relative size for the node
+    Config.prototype.GetNodeWeight = function (node) {
+        return 1;
+    }
+
+    // map relative node sizes to pixles in a given min .. max range
+    Config.prototype.GetNodeSizeRange = function () {
+        return [10, 10];
+    }
+
+    // return a colour for the node
+    Config.prototype.GetNodeFillColour = function (node) {
+        return "green";
+    }
+
+    var g_Config = new Config();
+    Config.prototype.GetNodeSizeRange = function () {
+        return [10, 10];
+    }
+
+    var g_config = new Config();
+
+    function SetConfig(config) {
+        g_config = config;
+    }
+
+    
+    //----------------------------------------------------------
+
     //
     // data to display - schema:
     //
@@ -114,7 +154,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //
     // display/layout configuration - schema:
     //
-    var g_config = null;
+    var g_options = null;
 
     // retained data
     var g_simulation = null;
@@ -135,8 +175,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_joined_labels = null;
     var g_nodes_group = g_svg.append("g")
         .attr("class", "nodes");
-
-    const g_scale = d3.scaleOrdinal(d3.schemeCategory10);
 
 
     //----------------------------------------------------------
@@ -227,16 +265,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .on("click", OnLinkClick)
 
         // map node counts to a node size
-        const minNodeWeight = d3.min(g_data.nodes, function (node) {
-            return node.size;
-        });
-        const maxNodeWeight = d3.max(g_data.nodes, function (node) {
-            return node.size;
-        });
-
+        const minNodeWeight = d3.min(g_data.nodes, g_config.GetNodeWeight);
+        const maxNodeWeight = d3.max(g_data.nodes, g_config.GetNodeWeight);
         var nodeScale = d3.scaleLinear()
             .domain([minNodeWeight, maxNodeWeight])
-            .range([4, 20])
+            .range(g_config.GetNodeSizeRange())
             .clamp(true);
 
         g_joined_nodes = g_nodes_group.selectAll("circle")
@@ -245,9 +278,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("r", function (node) {
                 return nodeScale(node.size);
             })
-            .attr("fill", function (node) {
-                return g_scale(node.type);
-            })
+            .attr("fill", g_config.GetNodeFillColour)
             .on("click", OnNodeClick)
             .call(d3.drag()
                 .on("start", function (node) {
@@ -289,16 +320,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
-                .id(function (node) {
-                    return node.event_id;
-                })
+                .id(g_config.GetNodeId)
                 .distance(50)
             )
             .force("charge", d3.forceManyBody())
             .on("tick", Layout)
             .stop();
 
-        if ("graph_is_disjoint" in g_config && g_config.graph_is_disjoint) {
+        if ("graph_is_disjoint" in g_options && g_options.graph_is_disjoint) {
             g_simulation
                 .force("x", d3.forceX(centre_x))
                 .force("y", d3.forceY(centre_y));
@@ -312,9 +341,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function CreateChart(data_json, config_json) {
+    function CreateChart(data_json, options_json) {
         g_data = JSON.parse(data_json);
-        g_config = JSON.parse(config_json);
+        g_options = JSON.parse(options_json);
 
         DoCreateChart();
         DoSimulation();
