@@ -16,22 +16,56 @@
 //
 
 // Customise the network configuration
-function ProgramConfig() {}
+var f_nodeScale = null;
+function ProgramConfig(data) {
+    // map node weights to a node size
+    const minNodeWeight = d3.min(data.nodes, function (node) {
+        return node.size;
+    });
+
+    const maxNodeWeight = d3.max(data.nodes, function (node) {
+        return node.size;
+    });
+
+    f_nodeScale = d3.scaleLinear()
+        .domain([minNodeWeight, maxNodeWeight])
+        .range([4, 20])
+        .clamp(true);
+
+    // base "class"
+    Config.call(this, data);
+}
 
 ProgramConfig.prototype = Object.create(Config.prototype);
+
 ProgramConfig.prototype.constructor = ProgramConfig;
 
-ProgramConfig.prototype.GetNodeWeight = function (node) {
-    return node.size;
+var f_nodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
+ProgramConfig.prototype.StyleNode = function (selection) {
+    selection
+        .attr("r", function (node) {
+            return f_nodeScale(node.size);
+        })
+        .attr("fill", function (node) {
+            return f_nodeColourScale(node.type)
+        })
+        .attr("opacity", function (node) {
+            return IsNodeSelected(node) ? 1.0 : 0.3;
+        })
+        .attr("style", "stroke: white; stroke-width: 1.5px;")
 }
 
-ProgramConfig.prototype.GetNodeSizeRange = function () {
-    return [4, 20];
+ProgramConfig.prototype.StyleLabel = function (selection) {
+    selection
+        .text(function (node) {
+            return node.title;
+        })
+        .attr("x", function (node) {
+            return f_nodeScale(node.size) + 3;
+        })
+        .attr("opacity", function (node) {
+            return IsNodeSelected(node) ? 1.0 : 0.3;
+        });
 }
 
-var _NodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
-ProgramConfig.prototype.GetNodeFillColour = function (node) {
-    return _NodeColourScale(node.type)
-}
-
-SetConfig(new ProgramConfig());
+SetConfigConstructor(ProgramConfig);
