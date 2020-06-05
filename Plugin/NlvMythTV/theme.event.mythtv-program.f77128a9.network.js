@@ -29,7 +29,7 @@ function ProgramConfig(data) {
 
     f_nodeScale = d3.scaleLinear()
         .domain([minNodeWeight, maxNodeWeight])
-        .range([4, 20])
+        .range([1, 5])
         .clamp(true);
 
     // base "class"
@@ -42,6 +42,10 @@ ProgramConfig.prototype.constructor = ProgramConfig;
 
 var f_nodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
 ProgramConfig.prototype.CreateNode = function (display_nodes) {
+    function calc_pad(node_data) {
+        return f_nodeScale(node_data.size) + 4;
+    }
+
     display_nodes
       .append("text")
         .attr("class", "node-text")
@@ -51,29 +55,33 @@ ProgramConfig.prototype.CreateNode = function (display_nodes) {
             return node_data.title;
         })
         .each(function (node_data) {
-            node_data.text_bbox = d3.select(this).node().getBBox();
+            node_data.text_extent = d3.select(this).node().getBBox();
         });
 
-    var pad = 5;
     display_nodes
       .insert("rect", ":first-child")
         .attr("rx", 5)
         .attr("ry", 5)
         .attr("x", function (node_data) {
-            return node_data.text_bbox.x - pad;
+            return node_data.text_extent.x - calc_pad(node_data);
         })
         .attr("y", function (node_data) {
-            return node_data.text_bbox.y - pad;
+            return node_data.text_extent.y - calc_pad(node_data);
         })
         .attr("width", function (node_data) {
-            return node_data.text_bbox.width + (2 * pad);
+            return node_data.text_extent.width + (2 * calc_pad(node_data));
         })
         .attr("height", function (node_data) {
-            return node_data.text_bbox.height + (2 * pad);
+            return node_data.text_extent.height + (2 * calc_pad(node_data));
         })
         .attr("style", "stroke: white; stroke-width: 1.5px;")
         .attr("fill", function (node_data) {
             return f_nodeColourScale(node_data.type)
+        })
+        .each(function (node_data) {
+            node_data.node_extent = d3.select(this).node().getBBox();
+            node_data.node_extent.x2 = node_data.node_extent.x + node_data.node_extent.width;
+            node_data.node_extent.y2 = node_data.node_extent.y + node_data.node_extent.height;
         });
 }
 
@@ -87,6 +95,21 @@ ProgramConfig.prototype.StyleNode = function (display_nodes) {
         .attr("opacity", function (node_data) {
             return IsNodeSelected(node_data) ? 1.0 : 0.3;
         });
+}
+
+Config.prototype.StyleSimulation = function (simulation) {
+    simulation.force("link")
+        .distance(100);
+
+    simulation
+        .force("collision", d3.forceCollide()
+            .radius(function (node_data) {
+                var w = node_data.text_extent.width / 2;
+                var h = node_data.text_extent.height / 2;
+                return 1.5 * Math.sqrt(w * w + h * h);
+            })
+            .iterations(1)
+        );
 }
 
 SetConfigConstructor(ProgramConfig);

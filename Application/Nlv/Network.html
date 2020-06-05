@@ -138,6 +138,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("style", "stroke: #aaa;");
     }
 
+    // refine the D3 simulation; the link force is "link", and the attraction
+    // force is called "charge"
+    Config.prototype.StyleSimulation = function (simulation) {
+        simulation.force("link")
+            .distance(50);
+    }
+
     var g_configConstructor = Config;
     var g_config = null;
 
@@ -239,15 +246,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 return g_curTransform.applyY(link.target.y);
             });
 
-        function translate(item) {
-            // map model coord system to SVG coord system
-            const x = g_curTransform.applyX(item.x);
-            const y = g_curTransform.applyY(item.y);
-            return "translate(" + x + "," + y + ")";
-        }
-
         (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
-            .attr("transform", translate);
+            .attr("transform", function (node_data) {
+                // map model coord system to SVG coord system
+                const x = g_curTransform.applyX(node_data.x);
+                const y = g_curTransform.applyY(node_data.y);
+                return "translate(" + x + "," + y + ")";
+            });
     }
 
 
@@ -314,12 +319,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
                 .id(g_config.GetNodeId)
-                .distance(50)
             )
             .force("charge", d3.forceManyBody())
             .on("tick", Layout)
             .stop();
-
+        
         if ("graph_is_disjoint" in g_options && g_options.graph_is_disjoint) {
             g_simulation
                 .force("x", d3.forceX(centre_x))
@@ -330,6 +334,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 .force("center", d3.forceCenter(centre_x, centre_y));
         }
 
+        g_config.StyleSimulation(g_simulation);
         g_simulation.restart();
     }
 
