@@ -19,12 +19,12 @@
 var f_nodeScale = null;
 function ProgramConfig(data) {
     // map node weights to a node size
-    const minNodeWeight = d3.min(data.nodes, function (node) {
-        return node.size;
+    const minNodeWeight = d3.min(data.nodes, function (node_data) {
+        return node_data.size;
     });
 
-    const maxNodeWeight = d3.max(data.nodes, function (node) {
-        return node.size;
+    const maxNodeWeight = d3.max(data.nodes, function (node_data) {
+        return node_data.size;
     });
 
     f_nodeScale = d3.scaleLinear()
@@ -41,30 +41,51 @@ ProgramConfig.prototype = Object.create(Config.prototype);
 ProgramConfig.prototype.constructor = ProgramConfig;
 
 var f_nodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
-ProgramConfig.prototype.StyleNode = function (selection) {
-    selection
-        .attr("r", function (node) {
-            return f_nodeScale(node.size);
+ProgramConfig.prototype.CreateNode = function (display_nodes) {
+    display_nodes
+      .append("text")
+        .attr("class", "node-text")
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "middle")
+        .text(function (node_data) {
+            return node_data.title;
         })
-        .attr("fill", function (node) {
-            return f_nodeColourScale(node.type)
+        .each(function (node_data) {
+            node_data.text_bbox = d3.select(this).node().getBBox();
+        });
+
+    var pad = 5;
+    display_nodes
+      .insert("rect", ":first-child")
+        .attr("rx", 5)
+        .attr("ry", 5)
+        .attr("x", function (node_data) {
+            return node_data.text_bbox.x - pad;
         })
-        .attr("opacity", function (node) {
-            return IsNodeSelected(node) ? 1.0 : 0.3;
+        .attr("y", function (node_data) {
+            return node_data.text_bbox.y - pad;
+        })
+        .attr("width", function (node_data) {
+            return node_data.text_bbox.width + (2 * pad);
+        })
+        .attr("height", function (node_data) {
+            return node_data.text_bbox.height + (2 * pad);
         })
         .attr("style", "stroke: white; stroke-width: 1.5px;")
+        .attr("fill", function (node_data) {
+            return f_nodeColourScale(node_data.type)
+        });
 }
 
-ProgramConfig.prototype.StyleLabel = function (selection) {
-    selection
-        .text(function (node) {
-            return node.title;
-        })
-        .attr("x", function (node) {
-            return f_nodeScale(node.size) + 3;
-        })
-        .attr("opacity", function (node) {
-            return IsNodeSelected(node) ? 1.0 : 0.3;
+ProgramConfig.prototype.StyleNode = function (display_nodes) {
+    display_nodes
+        .attr("opacity", function (node_data) {
+            return IsNodeSelected(node_data) ? 1.0 : 0.3;
+        });
+
+    display_nodes
+        .attr("opacity", function (node_data) {
+            return IsNodeSelected(node_data) ? 1.0 : 0.3;
         });
 }
 

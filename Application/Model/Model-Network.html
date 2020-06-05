@@ -35,7 +35,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         overflow: hidden;
     }
 
-    .nodes text {
+    .node-text {
         font-family: sans-serif;
         font-size: x-small;
         pointer-events: none;
@@ -49,8 +49,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <script>
     //----------------------------------------------------------
-    function OnNodeClick(node) {
-        console.log("Node selected: " + node.event_id);
+    function OnNodeClick(node_data) {
+        console.log("Node selected: " + node_data.event_id);
     }
 
     function OnLinkClick(link) {
@@ -68,40 +68,46 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     // fetch a node's ID; link elements use the ID to identify
     // the node's they connect
-    Config.prototype.GetNodeId = function (node) {
-        return node.event_id;
+    Config.prototype.GetNodeId = function (node_data) {
+        return node_data.event_id;
     }
 
-    // set attributes on to a node (as a d3 selection)
-    Config.prototype.StyleNode = function (selection) {
-        selection
+    // populate the graphical elements of all display nodes
+    Config.prototype.CreateNode = function (display_nodes) {
+        display_nodes
+          .append("circle")
+            .attr("class", "node-shape")
             .attr("r", 10)
             .attr("fill", "green")
-            .attr("opacity", function (node) {
-                return IsNodeSelected(node) ? 1.0 : 0.3;
-            })
             .attr("style", "stroke: white; stroke-width: 1.5px;");
-    }
 
-    // set attributes on to a label (as a d3 selection)
-    Config.prototype.StyleLabel = function (selection) {
-        selection
-            .text(function (node) {
-                return node.title;
-            })
-            .attr("x", function (node) {
-                return 15;
-            })
-            .attr("opacity", function (node) {
-                return IsNodeSelected(node) ? 1.0 : 0.3;
+        display_nodes
+          .append("text")
+            .attr("class", "node-text")
+            .attr("x", 15)
+            .text(function (node_data) {
+                return node_data.title;
             });
     }
 
-    // set attributes on to a link (as a d3 selection)
-    Config.prototype.StyleLink = function (selection) {
-        selection
-            .attr("opacity", function (node) {
-                return IsLinkSelected(node) ? 1.0 : 0.3;
+    // style (set styles/attributes) on display nodes
+    Config.prototype.StyleNode = function (display_nodes) {
+        display_nodes.select(".node-shape")
+            .attr("opacity", function (node_data) {
+                return IsNodeSelected(node_data) ? 1.0 : 0.3;
+            });
+
+        display_nodes.select(".node-text")
+            .attr("opacity", function (node_data) {
+                return IsNodeSelected(node_data) ? 1.0 : 0.3;
+            });
+    }
+
+    // style (set styles/attributes) on a display links
+    Config.prototype.StyleLink = function (display_links) {
+        display_links
+            .attr("opacity", function (link_data) {
+                return IsLinkSelected(link_data) ? 1.0 : 0.3;
             })
             .attr("style", "stroke: #aaa;");
     }
@@ -124,12 +130,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var f_nodeScale = null;
     function ProgramConfig(data) {
         // map node weights to a node size
-        const minNodeWeight = d3.min(data.nodes, function (node) {
-            return node.size;
+        const minNodeWeight = d3.min(data.nodes, function (node_data) {
+            return node_data.size;
         });
 
-        const maxNodeWeight = d3.max(data.nodes, function (node) {
-            return node.size;
+        const maxNodeWeight = d3.max(data.nodes, function (node_data) {
+            return node_data.size;
         });
 
         f_nodeScale = d3.scaleLinear()
@@ -145,35 +151,60 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     ProgramConfig.prototype.constructor = ProgramConfig;
 
-    ProgramConfig.prototype.GetNodeId = function (node) {
-        return node.title;
+    ProgramConfig.prototype.GetNodeId = function (node_data) {
+        return node_data.title;
     }
 
     var f_nodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
-    ProgramConfig.prototype.StyleNode = function (selection) {
-        selection
-            .attr("r", function (node) {
-                return f_nodeScale(node.size);
+    ProgramConfig.prototype.CreateNode = function (display_nodes) {
+        display_nodes
+          .append("text")
+            .attr("class", "node-text")
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "middle")
+            .text(function (node_data) {
+                return node_data.title;
             })
-            .attr("fill", function (node) {
-                return f_nodeColourScale(node.type)
+            .each(function (node_data) {
+                node_data.text_bbox = d3.select(this).node().getBBox();
+            });
+
+        var pad = 5;
+        display_nodes
+          .insert("rect", ":first-child")
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr("x", function (node_data) {
+                return node_data.text_bbox.x - pad;
             })
-            .attr("opacity", function (node) {
-                return IsNodeSelected(node) ? 1.0 : 0.3;
+            .attr("y", function (node_data) {
+                return node_data.text_bbox.y - pad;
+            })
+            .attr("width", function (node_data) {
+                return node_data.text_bbox.width + (2 * pad);
+            })
+            .attr("height", function (node_data) {
+                return node_data.text_bbox.height + (2 * pad);
             })
             .attr("style", "stroke: white; stroke-width: 1.5px;")
+            .attr("fill", function (node_data) {
+                return f_nodeColourScale(node_data.type)
+            });
+
+        //.attr("r", function (node) {
+        //    return f_nodeScale(node.size);
+        //})
     }
 
-    ProgramConfig.prototype.StyleLabel = function (selection) {
-        selection
-            .text(function (node) {
-                return node.title;
-            })
-            .attr("x", function (node) {
-                return f_nodeScale(node.size) + 3;
-            })
-            .attr("opacity", function (node) {
-                return IsNodeSelected(node) ? 1.0 : 0.3;
+    ProgramConfig.prototype.StyleNode = function (display_nodes) {
+        display_nodes
+            .attr("opacity", function (node_data) {
+                return IsNodeSelected(node_data) ? 1.0 : 0.3;
+            });
+
+        display_nodes
+            .attr("opacity", function (node_data) {
+                return IsNodeSelected(node_data) ? 1.0 : 0.3;
             });
     }
 
@@ -214,13 +245,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         .attr("height", "100%");
 
     var g_joined_links = null;
-    var g_links_group = g_svg.append("g")
-        .attr("class", "links");
+    var g_links_group = g_svg.append("g");
 
     var g_joined_nodes = null;
-    var g_joined_labels = null;
-    var g_nodes_group = g_svg.append("g")
-        .attr("class", "nodes");
+    var g_nodes_group = g_svg.append("g");
 
 
     //----------------------------------------------------------
@@ -230,10 +258,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_selected_nodes = new Set();
     var g_selected_links = new Set();
 
-    function IsNodeSelected(node) {
-        return !g_has_selection || g_selected_nodes.has(node.event_id);
+    function IsNodeSelected(node_data) {
+        return !g_has_selection || g_selected_nodes.has(node_data.event_id);
     }
 
+// todo what is id - should be link data ?
     function IsLinkSelected(id) {
         return !g_has_selection || g_selected_links.has(id);
     }
@@ -281,9 +310,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
             .attr("transform", translate);
-
-        (doTransition ? g_joined_labels.transition(ref_transition) : g_joined_labels)
-            .attr("transform", translate);
     }
 
 
@@ -312,37 +338,34 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .call(g_config.StyleLink)
             .on("click", OnLinkClick)
 
-        g_joined_nodes = g_nodes_group.selectAll("circle")
+        g_joined_nodes = g_nodes_group.selectAll(".node-group")
           .data(g_data.nodes)
-          .join("circle")
+          .join("g")
+            .attr("class", "node-group")
+            .call(g_config.CreateNode)
             .call(g_config.StyleNode)
             .on("click", OnNodeClick)
             .call(d3.drag()
-                .on("start", function (node) {
+                .on("start", function (node_data) {
                     if (!d3.event.active)
                         g_simulation.alphaTarget(0.3).restart();
-                    node.fx = node.x;
-                    node.fy = node.y;
-                    node.dragged = false;
+                    node_data.fx = node_data.x;
+                    node_data.fy = node_data.y;
+                    node_data.dragged = false;
                 })
-                .on("drag", function (node) {
+                .on("drag", function (node_data) {
                     // map SVG coord system back to model coord system
-                    node.fx += d3.event.dx / g_curZoom;
-                    node.fy += d3.event.dy / g_curZoom;
-                    node.dragged = true;
+                    node_data.fx += d3.event.dx / g_curZoom;
+                    node_data.fy += d3.event.dy / g_curZoom;
+                    node_data.dragged = true;
                 })
-                .on("end", function (node) {
+                .on("end", function (node_data) {
                     if (!d3.event.active)
                         g_simulation.alphaTarget(0);
-                    node.fx = null;
-                    node.fy = null;
+                    node_data.fx = null;
+                    node_data.fy = null;
                 })
             );
-
-        g_joined_labels = g_nodes_group.selectAll("text")
-          .data(g_data.nodes)
-          .join("text")
-            .call(g_config.StyleLabel);
     }
 
 
@@ -386,9 +409,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     function DoSetSelection() {
         g_joined_nodes.transition(250)
             .call(g_config.StyleNode);
-
-        g_joined_labels.transition(250)
-            .call(g_config.StyleLabel);
 
         g_joined_links.transition(250)
             .call(g_config.StyleLink);
