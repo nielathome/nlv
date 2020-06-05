@@ -166,7 +166,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 return node_data.title;
             })
             .each(function (node_data) {
-                node_data.text_bbox = d3.select(this).node().getBBox();
+                node_data.text_extent = d3.select(this).node().getBBox();
             });
 
         var pad = 5;
@@ -175,20 +175,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("rx", 5)
             .attr("ry", 5)
             .attr("x", function (node_data) {
-                return node_data.text_bbox.x - pad;
+                return node_data.text_extent.x - pad;
             })
             .attr("y", function (node_data) {
-                return node_data.text_bbox.y - pad;
+                return node_data.text_extent.y - pad;
             })
             .attr("width", function (node_data) {
-                return node_data.text_bbox.width + (2 * pad);
+                return node_data.text_extent.width + (2 * pad);
             })
             .attr("height", function (node_data) {
-                return node_data.text_bbox.height + (2 * pad);
+                return node_data.text_extent.height + (2 * pad);
             })
             .attr("style", "stroke: white; stroke-width: 1.5px;")
             .attr("fill", function (node_data) {
                 return f_nodeColourScale(node_data.type)
+            })
+            .each(function (node_data) {
+                node_data.node_extent = d3.select(this).node().getBBox();
+                node_data.node_extent.x2 = node_data.node_extent.x + node_data.node_extent.width;
+                node_data.node_extent.y2 = node_data.node_extent.y + node_data.node_extent.height;
             });
 
         //.attr("r", function (node) {
@@ -279,9 +284,67 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
+    function preventCollisions() {
+        var quadtree = d3.quadtree(
+            g_data.nodes,
+            function (node_data) {
+                return node_data.x;
+            },
+            function (node_data) {
+                return node_data.y;
+            });
+
+        g_data.nodes.forEach(function (src_node_data) {
+            var src_l = src_node_data.x + src_node_data.node_extent.x / g_curZoom,
+                src_r = src_node_data.x + src_node_data.node_extent.x2 / g_curZoom,
+                src_t = src_node_data.y + src_node_data.node_extent.y / g_curZoom,
+                src_b = src_node_data.y + src_node_data.node_extent.y2 / g_curZoom;
+
+            quadtree.visit(function (quad) {
+                if (quad.data && quad.data !== src_node_data) {
+                    var tgt_node_data = quad.data,
+                        tgt_l = tgt_node_data.x + tgt_node_data.node_extent.x / g_curZoom,
+                        tgt_r = tgt_node_data.x + tgt_node_data.node_extent.x2 / g_curZoom,
+                        tgt_t = tgt_node_data.y + tgt_node_data.node_extent.y / g_curZoom,
+                        tgt_b = tgt_node_data.y + tgt_node_data.node_extent.y2 / g_curZoom;
+
+                    var overlap = (tgt_l <= src_r && src_l <= tgt_r && tgt_t <= src_b && src_t <= tgt_b);
+
+                    if (overlap) {
+                        var xa1 = src_r - tgt_l, // shift src left , tgt right
+                            xa2 = tgt_r - src_l, // shift src right, tgt left
+                            ya1 = src_b - tgt_t, // shift src up   , tgt down
+                            ya2 = tgt_b - src_t, // shift src down , tgt up
+                            adj = Math.min(xa1, xa2, ya1, ya2);
+
+                        if (adj == xa1) {
+                            src_node_data.x -= adj / 2;
+                            tgt_node_data.x += adj / 2;
+                        } else if (adj == xa2) {
+                            src_node_data.x += adj / 2;
+                            tgt_node_data.x -= adj / 2;
+                        } else if (adj == ya1) {
+                            src_node_data.y -= adj / 2;
+                            tgt_node_data.y += adj / 2;
+                        } else if (adj == ya2) {
+                            src_node_data.y += adj / 2;
+                            tgt_node_data.y -= adj / 2;
+                        }
+                    }
+                    return overlap;
+                }
+            });
+        });
+    }
+
+    var g_no_cd = 0;
+
     function Layout() {
         const doTransition = (g_curZoom != g_curTransform.k);
         g_curZoom = g_curTransform.k;
+
+        //if (g_no_cd++ > 100)
+        //    preventCollisions();
 
         const ref_transition = d3.transition()
             .duration(250);
@@ -301,15 +364,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 return g_curTransform.applyY(link.target.y);
             });
 
-        function translate(item) {
-            // map model coord system to SVG coord system
-            const x = g_curTransform.applyX(item.x);
-            const y = g_curTransform.applyY(item.y);
-            return "translate(" + x + "," + y + ")";
-        }
-
         (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
-            .attr("transform", translate);
+            .attr("transform", function (node_data) {
+                // map model coord system to SVG coord system
+                const x = g_curTransform.applyX(node_data.x);
+                const y = g_curTransform.applyY(node_data.y);
+                return "translate(" + x + "," + y + ")";
+            });
     }
 
 
@@ -376,9 +437,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
                 .id(g_config.GetNodeId)
-                .distance(50)
+                .distance(100)
             )
             .force("charge", d3.forceManyBody())
+.force("collision", d3.forceCollide()
+    .radius(function (node_data) {
+        var w = node_data.text_extent.width / 2;
+        var h = node_data.text_extent.height / 2;
+        return 1.5 * Math.sqrt(w * w + h * h);
+    })
+    .iterations(1)
+)
             .on("tick", Layout)
             .stop();
 
