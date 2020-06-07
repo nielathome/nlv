@@ -91,25 +91,21 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     // style (set styles/attributes) on display nodes
+    // default behaviour sets node opacity according to selection state
     Config.prototype.StyleNode = function (display_nodes) {
-        display_nodes.select(".node-shape")
-            .attr("opacity", function (node_data) {
-                return NodeOpacity(node_data);
-            });
-
-        display_nodes.select(".node-text")
+        display_nodes
             .attr("opacity", function (node_data) {
                 return NodeOpacity(node_data);
             });
     }
 
     // style (set styles/attributes) on a display links
+    // default behaviour sets link opacity according to selection state
     Config.prototype.StyleLink = function (display_links) {
         display_links
             .attr("opacity", function (link_data) {
-                return IsLinkSelected(link_data) ? 1.0 : 0.3;
-            })
-            .attr("style", "stroke: #aaa;");
+                return LinkOpacity(link_data);
+            });
     }
 
     // refine the D3 simulation; the link force is "link", and the attraction
@@ -167,7 +163,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr('d', 'M0,-5L10,0L0,5');
 
         // base "class"
-        Config.call(this, data);
+        Config.call(this, data, svg);
     }
 
     ProgramConfig.prototype = Object.create(Config.prototype);
@@ -228,19 +224,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
-    ProgramConfig.prototype.StyleNode = function (display_nodes) {
-        display_nodes
-            .attr("opacity", function (node_data) {
-                return NodeOpacity(node_data);
-            });
-    }
-
     ProgramConfig.prototype.StyleLink = function (display_links) {
         display_links
-            .attr("opacity", function (link_data) {
-                return IsLinkSelected(link_data) ? 1.0 : 0.3;
-            })
             .attr("style", "stroke: #666; marker-end: url(#end);");
+
+        Config.prototype.StyleLink.call(this, display_links);
     }
 
     ProgramConfig.prototype.StyleSimulation = function (simulation) {
@@ -316,9 +304,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         return IsNodeSelected(node_data) ? 1.0 : 0.2;
     }
 
-// todo what is id - should be link data ?
-    function IsLinkSelected(id) {
-        return !g_has_selection || g_selected_links.has(id);
+    function IsLinkSelected(link_data) {
+        return !g_has_selection || g_selected_links.has(link_data.event_id);
+    }
+
+    function LinkOpacity(link_data) {
+        return IsLinkSelected(link_data) ? 1.0 : 0.2;
     }
 
 

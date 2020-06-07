@@ -49,7 +49,7 @@ function ProgramConfig(data, svg) {
         .attr('d', 'M0,-5L10,0L0,5');
 
     // base "class"
-    Config.call(this, data);
+    Config.call(this, data, svg);
 }
 
 ProgramConfig.prototype = Object.create(Config.prototype);
@@ -106,19 +106,11 @@ ProgramConfig.prototype.CreateNode = function (display_nodes) {
         });
 }
 
-ProgramConfig.prototype.StyleNode = function (display_nodes) {
-    display_nodes
-        .attr("opacity", function (node_data) {
-            return NodeOpacity(node_data);
-        });
-}
-
 ProgramConfig.prototype.StyleLink = function (display_links) {
     display_links
-        .attr("opacity", function (link_data) {
-            return IsLinkSelected(link_data) ? 1.0 : 0.3;
-        })
         .attr("style", "stroke: #666; marker-end: url(#end);");
+
+    Config.prototype.StyleLink.call(this, display_links);
 }
 
 ProgramConfig.prototype.StyleSimulation = function (simulation) {
