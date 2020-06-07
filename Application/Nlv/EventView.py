@@ -485,6 +485,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def PostInitChildren(self):
         # apply the themed default node name to the tree
         node_name = self._Field.DefaultNodeName.Value
+        node_name = "{}/{}".format(self.GetLogNode().GetNodeLabel(), node_name)
         self.SetTreeLabel(node_name)
         G_Global.GetCurrentTimer().AddArgument(node_name)
 
