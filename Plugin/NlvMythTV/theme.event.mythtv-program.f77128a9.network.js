@@ -17,8 +17,8 @@
 
 // Customise the network configuration
 var f_nodeScale = null;
-function ProgramConfig(data) {
-    // map node weights to a node size
+function ProgramConfig(data, svg) {
+    // map node weights to node "padding"
     const minNodeWeight = d3.min(data.nodes, function (node_data) {
         return node_data.size;
     });
@@ -32,6 +32,22 @@ function ProgramConfig(data) {
         .range([1, 5])
         .clamp(true);
 
+    // arrow head
+    svg.append('defs').selectAll('marker')
+        .data(['end'])
+      .enter()
+      .append('marker')
+        .attr('id', String)
+        .attr('viewBox', '0 -5 10 10')
+        .attr('refX', 10)
+        .attr('refY', 0)
+        .attr('markerWidth', 6)
+        .attr('markerHeight', 6)
+        .attr('orient', 'auto')
+        .attr("style", "fill: #666; stroke: #666; stroke-width: 1.5px;")
+      .append('path')
+        .attr('d', 'M0,-5L10,0L0,5');
+
     // base "class"
     Config.call(this, data);
 }
@@ -44,6 +60,10 @@ var f_nodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
 ProgramConfig.prototype.CreateNode = function (display_nodes) {
     function calc_pad(node_data) {
         return f_nodeScale(node_data.size) + 4;
+    }
+
+    function calc_colour(node_data, darken) {
+        return d3.color(f_nodeColourScale(node_data.type)).darker(darken).toString();
     }
 
     display_nodes
@@ -74,30 +94,34 @@ ProgramConfig.prototype.CreateNode = function (display_nodes) {
         .attr("height", function (node_data) {
             return node_data.text_extent.height + (2 * calc_pad(node_data));
         })
-        .attr("style", "stroke: white; stroke-width: 1.5px;")
-        .attr("fill", function (node_data) {
-            return f_nodeColourScale(node_data.type)
+        .style("fill", function (node_data) {
+            return calc_colour(node_data, -0.1);
         })
+        .style("stroke", function (node_data) {
+            return calc_colour(node_data, 0.7);
+        })
+        .style("stroke-width", "2px")
         .each(function (node_data) {
             node_data.node_extent = d3.select(this).node().getBBox();
-            node_data.node_extent.x2 = node_data.node_extent.x + node_data.node_extent.width;
-            node_data.node_extent.y2 = node_data.node_extent.y + node_data.node_extent.height;
         });
 }
 
 ProgramConfig.prototype.StyleNode = function (display_nodes) {
     display_nodes
         .attr("opacity", function (node_data) {
-            return IsNodeSelected(node_data) ? 1.0 : 0.3;
-        });
-
-    display_nodes
-        .attr("opacity", function (node_data) {
-            return IsNodeSelected(node_data) ? 1.0 : 0.3;
+            return NodeOpacity(node_data);
         });
 }
 
-Config.prototype.StyleSimulation = function (simulation) {
+ProgramConfig.prototype.StyleLink = function (display_links) {
+    display_links
+        .attr("opacity", function (link_data) {
+            return IsLinkSelected(link_data) ? 1.0 : 0.3;
+        })
+        .attr("style", "stroke: #666; marker-end: url(#end);");
+}
+
+ProgramConfig.prototype.StyleSimulation = function (simulation) {
     simulation.force("link")
         .distance(100);
 
