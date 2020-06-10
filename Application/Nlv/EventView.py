@@ -1474,7 +1474,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def UpdateDataExplorer(self, item):
-        super().UpdateDataExplorer(event_id = self.GetTableViewCtrl().GetEventId(item))
+        super().UpdateDataExplorer(event_id = self.GetTableViewCtrl().GetItemEventId(item))
 
 
     #-------------------------------------------------------

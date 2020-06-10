@@ -243,8 +243,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
+
         self._DataExplorerColour = G_ColourTraits.MakeColour("WHEAT")
+        self._DataExplorerIcon = wx.ArtProvider.GetIcon(wx.ART_REDO, wx.ART_TOOLBAR, (16, 16))
         self._DataExplorerKey = None
+
+        self._SelectedIcon = wx.ArtProvider.GetIcon(wx.ART_PLUS, wx.ART_TOOLBAR, (16, 16))
+        self._SelectedKeys = set()
+
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
@@ -252,8 +258,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self._Icons = [
             wx.ArtProvider.GetIcon(wx.ART_NORMAL_FILE, wx.ART_TOOLBAR, (16, 16)),
-            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16)),
-            wx.ArtProvider.GetIcon(wx.ART_GO_FORWARD, wx.ART_TOOLBAR, (16, 16))
+            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16))
         ]
 
 
@@ -288,6 +293,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         changed = self._DataExplorerKey is not None
         self._DataExplorerKey = None
         return changed
+
+
+    #-------------------------------------------------------
+    def IsSelectedLine(self, item_key):
+        return item_key in self._SelectedKeys
+
+    def SetSelectedLines(self, items):
+        self._SelectedKeys.clear()
+        self._SelectedKeys.update([self.ItemToKey(item) for item in items])
 
 
     #-------------------------------------------------------
@@ -331,7 +345,9 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         if field_schema.IsFirst:
             if self.IsDataExplorerLine(item_key):
-                icon = self._Icons[2]
+                icon = self._DataExplorerIcon
+            elif self.IsSelectedLine(item_key):
+                icon = self._SelectedIcon
             else:
                 icon = self._Icons[self.IsContainer(item)]
 
@@ -573,11 +589,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def GetEventId(self, item):
+    def GetItemEventId(self, item):
         col_num = self._TableSchema.ColEventId
         return self.GetFieldValue(self.ItemToKey(item), col_num)
 
-    def MapSelectionToEventIds(self, items):
+    def GetItemsEventIds(self, items):
         col_num = self._TableSchema.ColEventId
         return [self.GetFieldValue(self.ItemToKey(item), col_num) for item in items]
 
@@ -893,7 +909,18 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
     #-------------------------------------------------------
     def GetSelectedEventIds(self):
-        return self.GetModel().MapSelectionToEventIds(self.GetSelections())
+        return self.GetModel().GetItemsEventIds(self.GetSelections())
+
+    def GenerateSelectionEvent(self, item):
+        """
+        The control does not generate selection events when calling
+        self.UnselectAll, self.Select etc. This routine fakes an event
+        to allow the rest of the UI to keep up to date
+        """
+        evt = wx.dataview.DataViewEvent()
+        if item is not None:
+            evt.SetItem(item)
+        self.OnItemActivated(evt)
 
     def OnChartSelection(self, event_id, ctrl_key):
         item = self.GetModel().LookupEventId(event_id)
@@ -908,11 +935,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
                 self.UnselectAll()
                 self.Select(item)
 
-            # the control does not generate an event, so fake one
-            evt = wx.dataview.DataViewEvent()
-            if item is not None:
-                evt.SetItem(item)
-            self.OnItemActivated(evt)
+            self.GenerateSelectionEvent(item)
 
 
     #-------------------------------------------------------
@@ -939,6 +962,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
             self.Select(next_item)
             self.EnsureVisible(next_item)
+            self.GenerateSelectionEvent(next_item)
 
 
     #-------------------------------------------------------
@@ -968,8 +992,8 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def GetEventId(self, item):
-        return self.GetModel().GetEventId(item)
+    def GetItemEventId(self, item):
+        return self.GetModel().GetItemEventId(item)
 
     def OnDataExplorerLoad(self, sync, builder, location, ui_node):
         self.GetModel().OnDataExplorerLoad(self, sync, builder, location, ui_node)
@@ -988,6 +1012,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
         self._SelectionHandler = selection_handler
 
     def OnItemActivated(self, evt):
+        self.GetModel().SetSelectedLines(self.GetSelections())
         if self._SelectionHandler is not None:
             self._SelectionHandler(evt.GetItem())
 
