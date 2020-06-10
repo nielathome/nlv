@@ -25,6 +25,7 @@ from pathlib import Path
 import pythoncom
 import sys
 import win32com
+import win32com.client as com
 import win32con
 import win32gui
 import winreg
@@ -33,7 +34,6 @@ import winreg
 from .DataExplorer import G_DataExplorerProvider
 from .Logfile import G_DisplayControl
 from .Logfile import G_NotebookDisplayControl
-from .EventProjector import ConnectDb
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
@@ -41,6 +41,7 @@ from .EventProjector import G_ScriptGuard
 from .Global import G_Global
 from .Global import G_PerfTimerScope
 from .StyleNode import G_ColourTraits
+from .Theme import GetThemeSupportFile
 
 # wxWidgets imports
 import wx
@@ -164,6 +165,26 @@ class G_DeveloperConsoleMessageReceiver(COMObject):
 
 
 
+## G_DataExplorerContext ###################################
+
+class G_DataExplorerContext:
+
+    #-------------------------------------------------------
+    def __init__(self, event_id, db_info, ui_node):
+        self.EventId = event_id
+        self.DbInfo = db_info
+        self._UiNode = ui_node
+
+    def GetTargetId(self, node_name):
+        ui_nodes = self._UiNode.GetLogAnalysisNode().ListSubNodes(recursive = True)
+        for ui_node in ui_nodes:
+            if ui_node.GetNodeName() == node_name:
+                return ui_node.GetNodeId()
+
+        return None
+
+
+
 ## G_TableHiliter ##########################################
 
 class G_TableHiliter:
@@ -222,8 +243,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._RawFieldMask = 0
         self._IsValid = True
         self._InvalidColour = G_ColourTraits.MakeColour("FIREBRICK")
+
         self._DataExplorerColour = G_ColourTraits.MakeColour("WHEAT")
+        self._DataExplorerIcon = wx.ArtProvider.GetIcon(wx.ART_REDO, wx.ART_TOOLBAR, (16, 16))
         self._DataExplorerKey = None
+
+        self._SelectedIcon = wx.ArtProvider.GetIcon(wx.ART_PLUS, wx.ART_TOOLBAR, (16, 16))
+        self._SelectedKeys = set()
+
         self._ColumnColours = []
         self._FilterMatch = None
         self._Hiliters = []
@@ -231,8 +258,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self._Icons = [
             wx.ArtProvider.GetIcon(wx.ART_NORMAL_FILE, wx.ART_TOOLBAR, (16, 16)),
-            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16)),
-            wx.ArtProvider.GetIcon(wx.ART_GO_FORWARD, wx.ART_TOOLBAR, (16, 16))
+            wx.ArtProvider.GetIcon(wx.ART_FOLDER, wx.ART_TOOLBAR, (16, 16))
         ]
 
 
@@ -270,7 +296,16 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def Reset(self, table_schema = None, reason = None):
+    def IsSelectedLine(self, item_key):
+        return item_key in self._SelectedKeys
+
+    def SetSelectedLines(self, items):
+        self._SelectedKeys.clear()
+        self._SelectedKeys.update([self.ItemToKey(item) for item in items])
+
+
+    #-------------------------------------------------------
+    def Reset(self, table_schema = None, db_info = None, reason = None):
         self._N_Logfile = None
         self._N_EventView = None
 
@@ -279,6 +314,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if table_schema is None:
             table_schema = G_ProjectionSchema()
         self._TableSchema = table_schema
+        self._DbInfo = db_info
 
         self._ModelColumnToFieldId = []
         field_id = 0
@@ -309,7 +345,9 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         if field_schema.IsFirst:
             if self.IsDataExplorerLine(item_key):
-                icon = self._Icons[2]
+                icon = self._DataExplorerIcon
+            elif self.IsSelectedLine(item_key):
+                icon = self._SelectedIcon
             else:
                 icon = self._Icons[self.IsContainer(item)]
 
@@ -331,9 +369,16 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def OnDataExplorerLoad(self, ctrl, sync, builder, location, logfile_url):
-        item = self.LookupEventId(location["event_id"])
-        node_name = location["node_name"]
+    def UserDataExplorer(self, func, desc, context, builder):
+        if func is not None: 
+            with G_ScriptGuard(desc):
+                func(context, builder)
+
+
+    def OnDataExplorerLoad(self, ctrl, sync, builder, location, ui_node):
+        event_id = location["event_id"]
+        item = self.LookupEventId(event_id)
+        node_name = ui_node.GetNodeName()
 
         if not self.IsNavigationValid(builder, location, node_name):
             if self.ClearDataExplorerLine():
@@ -350,10 +395,12 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         else:
             schema = self._TableSchema
-            if schema.UserDataExplorerOpen is not None:
-                schema.UserDataExplorerOpen(builder)
+            context = G_DataExplorerContext(event_id, self._DbInfo, ui_node)
 
+            self.UserDataExplorer(schema.UserDataExplorerOpen, "DataExplorerOpen", context, builder)
             builder.AddPageHeading("{} Item".format(self._Name))
+
+            logfile_url = ui_node.GetLogNode().MakeDataUrl()
             if logfile_url is not None:
                 builder.AddLink(logfile_url, "Show log file ...")
 
@@ -374,13 +421,12 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
                     if text is not None and len(text) != 0:
                         if field.ExplorerFormatter is not None:
-                            with G_ScriptGuard("CreateFieldDataForExplorer"):
+                            with G_ScriptGuard("DataExplorerFormatter"):
                                 field.ExplorerFormatter(builder, field.Name, text)
                         else:
                             builder.AddField(field.Name, text)
                     
-            if schema.UserDataExplorerClose is not None:
-                schema.UserDataExplorerClose(builder)
+            self.UserDataExplorer(schema.UserDataExplorerClose, "DataExplorerClose", context, builder)
 
             if sync:
                 if self.SetDataExplorerLine(self.ItemToKey(item)):
@@ -543,11 +589,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def GetEventId(self, item):
+    def GetItemEventId(self, item):
         col_num = self._TableSchema.ColEventId
         return self.GetFieldValue(self.ItemToKey(item), col_num)
 
-    def MapSelectionToEventIds(self, items):
+    def GetItemsEventIds(self, items):
         col_num = self._TableSchema.ColEventId
         return [self.GetFieldValue(self.ItemToKey(item), col_num) for item in items]
 
@@ -606,13 +652,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     @G_Global.TimeFunction
     def UpdateContent(self, nesting, table_info, valid, reason):
-        table_schema, db_path = table_info.GetSchemaAndDbPath()
+        table_schema = table_info.GetSchema()
+        db_info = table_info.GetDbInfo()
 
-        self.Reset(table_schema, reason = reason)
+        self.Reset(table_schema, db_info, reason = reason)
         self.UpdateNesting(nesting, False)
         self.UpdateValidity(valid)
 
         num_fields = self.GetColumnCount()
+        db_path = db_info.Path
         if Path(db_path).exists() and num_fields != 0:
             self._N_Logfile = Nlog.MakeLogfile(db_path, table_schema, G_Global.PulseProgressMeter)
 
@@ -861,7 +909,18 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
     #-------------------------------------------------------
     def GetSelectedEventIds(self):
-        return self.GetModel().MapSelectionToEventIds(self.GetSelections())
+        return self.GetModel().GetItemsEventIds(self.GetSelections())
+
+    def GenerateSelectionEvent(self, item):
+        """
+        The control does not generate selection events when calling
+        self.UnselectAll, self.Select etc. This routine fakes an event
+        to allow the rest of the UI to keep up to date
+        """
+        evt = wx.dataview.DataViewEvent()
+        if item is not None:
+            evt.SetItem(item)
+        self.OnItemActivated(evt)
 
     def OnChartSelection(self, event_id, ctrl_key):
         item = self.GetModel().LookupEventId(event_id)
@@ -876,11 +935,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
                 self.UnselectAll()
                 self.Select(item)
 
-            # the control does not generate an event, so fake one
-            evt = wx.dataview.DataViewEvent()
-            if item is not None:
-                evt.SetItem(item)
-            self.OnItemActivated(evt)
+            self.GenerateSelectionEvent(item)
 
 
     #-------------------------------------------------------
@@ -907,6 +962,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
             self.Select(next_item)
             self.EnsureVisible(next_item)
+            self.GenerateSelectionEvent(next_item)
 
 
     #-------------------------------------------------------
@@ -936,11 +992,11 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
 
 
     #-------------------------------------------------------
-    def GetEventId(self, item):
-        return self.GetModel().GetEventId(item)
+    def GetItemEventId(self, item):
+        return self.GetModel().GetItemEventId(item)
 
-    def OnDataExplorerLoad(self, sync, builder, location, logfile_url):
-        self.GetModel().OnDataExplorerLoad(self, sync, builder, location, logfile_url)
+    def OnDataExplorerLoad(self, sync, builder, location, ui_node):
+        self.GetModel().OnDataExplorerLoad(self, sync, builder, location, ui_node)
 
     def OnDataExplorerUnload(self, location):
         self.GetModel().OnDataExplorerUnload(self)
@@ -956,6 +1012,7 @@ class G_TableViewCtrl(G_DataViewCtrl, G_DisplayControl):
         self._SelectionHandler = selection_handler
 
     def OnItemActivated(self, evt):
+        self.GetModel().SetSelectedLines(self.GetSelections())
         if self._SelectionHandler is not None:
             self._SelectionHandler(evt.GetItem())
 
@@ -1041,13 +1098,89 @@ class G_ChoiceParam(G_Param):
 
 
 
+## G_UpdateDom #############################################
+
+_IIDMap = None
+
+class G_UpdateDom:
+    #-------------------------------------------------------
+    def __init__(self, script):
+        self.Script = script
+
+
+    #-------------------------------------------------------
+    @staticmethod
+    def MakeScriptElement(doc):
+        elem = doc.createElement("script")
+        return com.Dispatch(elem, resultCLSID = _IIDMap["IHTMLScriptElement"])
+
+
+    #-------------------------------------------------------
+    @staticmethod
+    def LoadScriptElement(doc, script_elem):
+        # add script to DOM; will execute
+        dom_node = com.Dispatch(doc.body, resultCLSID = _IIDMap["IHTMLDOMNode"])
+        script_node = dom_node.appendChild(script_elem)
+        return dom_node, script_node
+    
+
+    #-------------------------------------------------------
+    @staticmethod
+    def UnloadScriptNode(dom_node, script_node):
+        # remove script from DOM; often, don't need it any more
+        dom_node.removeChild(script_node)
+
+
+
+## G_UpdateDomCallJavaScript ###############################
+
+class G_UpdateDomCallJavaScript(G_UpdateDom):
+
+    #-------------------------------------------------------
+    def __init__(self, script):
+        super().__init__(script)
+
+
+    #-------------------------------------------------------
+    def Update(self, doc):
+        script_elem = self.MakeScriptElement(doc)
+        script_elem.text = self.Script
+        dom_node, script_node = self.LoadScriptElement(doc, script_elem)
+        self.UnloadScriptNode(dom_node, script_node)
+
+
+
+## G_UpdateDomLoadScript ###################################
+
+class G_UpdateDomLoadScript(G_UpdateDom):
+
+    #-------------------------------------------------------
+    def __init__(self, script):
+        super().__init__(script)
+
+
+    #-------------------------------------------------------
+    def Update(self, doc):
+        # writing the script_elem.src property will load a
+        # script, but, always asynchronously. So, stuff the
+        # script directly into the page instead.
+
+        script_text = ""
+        with open(GetThemeSupportFile(self.Script), "r") as file:
+            script_text = "".join(file.readlines())
+
+        script_elem = self.MakeScriptElement(doc)
+        script_elem.text = script_text
+        dom_node, script_node = self.LoadScriptElement(doc, script_elem)
+
+
+
 ## G_HtmlHostCtrl ##########################################
 
 class G_HtmlHostCtrl(wx.Panel):
 
     #-------------------------------------------------------
     _InitCharting = True
-    _IIDMap = None
     _ConsoleRegistered = False
 
 
@@ -1087,8 +1220,9 @@ class G_HtmlHostCtrl(wx.Panel):
 
         # makepy.py -i
         # {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
-        module = win32com.client.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
-        cls._IIDMap = module.NamesToIIDMap
+        global _IIDMap
+        module = com.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
+        _IIDMap = module.NamesToIIDMap
 
         cls._InitCharting = False
 
@@ -1130,7 +1264,7 @@ class G_HtmlHostCtrl(wx.Panel):
         self._ChartInfo = chart_info
         self._CreateContext = context
         self._ParameterValues = dict()
-        self._ScriptQueue = []
+        self._DomUpdateQueue = []
 
         self.InitCharting()
 
@@ -1139,9 +1273,7 @@ class G_HtmlHostCtrl(wx.Panel):
         self._Figure.EnableContextMenu(False)
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
-
-        page_name = self._ChartInfo.HtmlPage
-        self._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
+        self.SetupHtml()
 
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
@@ -1149,10 +1281,30 @@ class G_HtmlHostCtrl(wx.Panel):
         self.SetSizer(vsizer)
 
 
+    def SetupHtml(self):
+        class Context:
+            #-----------------------------------------------
+            def __init__(self, host):
+                self._Host = host
+
+            #-----------------------------------------------
+            def LoadPage(self, page_name):
+                self._Host._Figure.LoadURL("http://localhost:8000/{}".format(page_name))
+
+            def LoadScript(self, script_name):
+                self._Host.LoadScript(script_name)
+
+            #-----------------------------------------------
+            def CallJavaScript(self, method, *args):
+                self._Host.CallJavaScript(method, *args)
+
+        self._ChartInfo.Builder.Setup(Context(self))
+
+
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
         if not "about:" in event.URL:
-            self.RunScriptQueue()
+            self.RunDomUpdateQueue()
 
 
     #-------------------------------------------------------
@@ -1172,8 +1324,8 @@ class G_HtmlHostCtrl(wx.Panel):
                         # have to force the class ID - not really clear why; without this though,
                         # the returned value is a generic CDispatch for class ID 
                         # '{C59C6B12-F6C1-11CF-8835-00A0C911E8B2}', which doesn't work very well
-                        clsid = self._IIDMap["IHTMLDocument2"]
-                        document = win32com.client.Dispatch(object, resultCLSID = clsid)
+                        clsid = _IIDMap["IHTMLDocument2"]
+                        document = com.Dispatch(object, resultCLSID = clsid)
                         if document is not None:
                             data[0] = document
                             data[1] = hwnd
@@ -1188,7 +1340,7 @@ class G_HtmlHostCtrl(wx.Panel):
             context = self._CreateContext
             self._CreateContext = None
 
-            self.EnqueueScript("SetNodeId({});".format(context.GetNodeId()), False)
+            self.CallJavaScript("SetNodeId", context.GetNodeId())
 
             # keep the Python/wxWidgets window alive while we (the parent)
             # window is remains
@@ -1209,49 +1361,44 @@ class G_HtmlHostCtrl(wx.Panel):
 
         arg_text = ",".join([ConvertArg(arg) for arg in args])
         script = "{method}({args});".format(method = method, args = arg_text)
-        self.EnqueueScript(script)
+        self.EnqueueDomUpdate(G_UpdateDomCallJavaScript(script))
 
 
-    def EnqueueScript(self, script, run_queue = True):
-        last_script = None
-        last_idx = len(self._ScriptQueue) - 1
+    def LoadScript(self, script_name):
+        self.EnqueueDomUpdate(G_UpdateDomLoadScript(script_name))
 
+
+    def EnqueueDomUpdate(self, dom_update):
+        append = True
+        last_idx = len(self._DomUpdateQueue) - 1
         if last_idx >= 0:
-            last_script = self._ScriptQueue[last_idx]
+            last_update = self._DomUpdateQueue[last_idx]
+            append = dom_update.Script != last_update.Script
 
-        append = script != last_script
         if append:
-            self._ScriptQueue.append(script)
+            self._DomUpdateQueue.append(dom_update)
+            self.RunDomUpdateQueue()
 
-        if append and run_queue:
-            self.RunScriptQueue()
-        
 
-    def RunScriptQueue(self):
+    def RunDomUpdateQueue(self):
         doc = self.GetIHTMLDocument2()
         if doc is None:
             return
 
         self.RegisterConsole(doc)
 
-        for script_text in self._ScriptQueue:
-            elem = doc.createElement("script")
-            script_elem = win32com.client.Dispatch(elem, resultCLSID = self._IIDMap["IHTMLScriptElement"])
-            script_elem.text = script_text
+        for dom_update in self._DomUpdateQueue:
+            dom_update.Update(doc)
 
-            # add script to DOM; will execute
-            node = win32com.client.Dispatch(doc.body, resultCLSID = self._IIDMap["IHTMLDOMNode"])
-            script_node = node.appendChild(script_elem)
-
-            # remove script from DOM; don't need it any more
-            node.removeChild(script_node)
-
-        self._ScriptQueue = []
+        self._DomUpdateQueue = []
 
 
     #-------------------------------------------------------
     def DefineParameters(self, error_reporter):
-        parameters = None
+        db_info = self.GetDbInfo()
+        if db_info is None:
+            return None
+
 
         class Context:
             """Collect parameter data from a chart"""
@@ -1276,12 +1423,12 @@ class G_HtmlHostCtrl(wx.Panel):
                 return self._Host.GetSelectedEventIds(set)
 
 
-        with G_ScriptGuard("DefineParameters", error_reporter):
-            connection, cursor = self.MakeDbCursor()
-            if connection is not None:
-                context = Context(self)
-                self._ChartInfo.DefineParameters(connection, cursor, context)
-                parameters = context.Close()
+        parameters = None
+        with G_ScriptGuard("DefineParameters", error_reporter), db_info.ConnectionManager() as connection:
+            cursor = self.MakeDbCursor(connection)
+            context = Context(self)
+            self._ChartInfo.DefineParameters(connection, cursor, context)
+            parameters = context.Close()
 
         return parameters
 
@@ -1333,12 +1480,12 @@ class G_HtmlHostCtrl(wx.Panel):
             parameters_changed = True
             self._ParameterValues = parameters.copy()
 
-        if do_realize:
-            with G_ScriptGuard("Realise", error_reporter):
-                connection, cursor = self.MakeDbCursor()
-                if cursor is not None:
-                    context = Context(self, data_changed, selection_changed, parameters_changed)
-                    self._ChartInfo.Realise(connection, cursor, context)
+        db_info = self.GetDbInfo()
+        if do_realize and db_info is not None:
+            with G_ScriptGuard("Realise", error_reporter), db_info.ConnectionManager() as connection:
+                cursor = self.MakeDbCursor(connection)
+                context = Context(self, data_changed, selection_changed, parameters_changed)
+                self._ChartInfo.Realise(connection, cursor, context)
 
 
             
@@ -1359,12 +1506,16 @@ class G_HtmlChartCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def MakeDbCursor(self):
-        connection = ConnectDb(self._ChartInfo.ChartDbPath, True)
-        if connection is None:
-            return None, None
-        else:
-            return connection, connection.cursor()
+    def GetDbInfo(self):
+        db_info = self._ChartInfo.ChartDbInfo
+        if not Path(db_info.Path).exists():
+            return None
+
+        return db_info
+
+    @staticmethod
+    def MakeDbCursor(connection):
+        return connection.cursor()
 
 
 
@@ -1385,14 +1536,21 @@ class G_HtmlNetworkCtrl(G_HtmlHostCtrl):
 
 
     #-------------------------------------------------------
-    def MakeDbCursor(self):
-        connection = ConnectDb(self._ChartInfo.NodesDbPath, True)
-        if connection is None:
-            return None, None
-        else:
-            cursor = connection.cursor()
-            cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._ChartInfo.LinksDbPath))
-            return connection, cursor
+    def GetDbInfo(self):
+        db_info = self._ChartInfo.NodesDbInfo
+        if not Path(db_info.Path).exists():
+            return None
+
+        links_path = self._ChartInfo.LinksDbInfo.Path
+        if not Path(links_path).exists():
+            return None
+
+        return db_info
+
+    def MakeDbCursor(self, connection):
+        cursor = connection.cursor()
+        cursor.execute("ATTACH DATABASE '{db}' AS links".format(db = self._ChartInfo.LinksDbInfo.Path))
+        return cursor
 
 
 

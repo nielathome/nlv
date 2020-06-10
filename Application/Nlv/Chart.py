@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2019. All rights reserved.
+# Copyright (C) Niel Clausen 2019-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -42,8 +42,8 @@ class Bar:
 
     #-----------------------------------------------------------
     @classmethod
-    def Setup(cls, name):
-        return "BarChart.html"
+    def Setup(cls, context):
+        context.LoadPage("BarChart.html")
 
 
     #-----------------------------------------------------------
@@ -94,8 +94,8 @@ class Pie:
 
     #-----------------------------------------------------------
     @classmethod
-    def Setup(cls, name):
-        return "PieChart.html"
+    def Setup(cls, context):
+        context.LoadPage("PieChart.html")
 
 
     #-----------------------------------------------------------
@@ -162,14 +162,20 @@ class Pie:
 class Network:
 
     #-----------------------------------------------------------
+    def __init__(self, setup_script = None):
+        self._SetupScript = setup_script
+
+
+    #-----------------------------------------------------------
     def DefineParameters(self, connection, cursor, context):
         context.AddBool("graph_is_disjoint", "Network is disjoint", False)
         
 
     #-----------------------------------------------------------
-    @classmethod
-    def Setup(cls, name):
-        return "Network.html"
+    def Setup(self, context):
+        context.LoadPage("Network.html")
+        if self._SetupScript is not None:
+            context.LoadScript(self._SetupScript)
 
 
     #-----------------------------------------------------------
@@ -184,35 +190,23 @@ class Network:
             where = ""
             if have_nodes:
                 nodes = ", ".join([str(node) for node in selected_nodes])
-                where = "source_event_id IN ({nodes}) OR target_event_id IN ({nodes})".format(nodes = nodes)
+                where = "source_id IN ({nodes}) OR target_id IN ({nodes})".format(nodes = nodes)
 
             if have_links:
                 if have_nodes:
                     where = where + " OR "
                 links = ", ".join([str(link) for link in selected_links])
-                text = " link_event_id IN ({links})".format(links = links)
+                text = " event_id IN ({links})".format(links = links)
                 where = where + text
 
-            # find everything "reachable" from the selection
+            # find everything "reachable" from the selected links
             cursor.execute("""
                 SELECT
-                    link_data.event_id AS link_event_id,
-                    source_data.event_id AS source_event_id,
-                    target_data.event_id AS target_event_id
+                    event_id,
+                    source_id,
+                    target_id
                 FROM
-                    links.display AS link_data
-                JOIN
-                    main.display
-                    AS
-                        source_data
-                    ON
-                        link_data.source = source_data.title 
-                JOIN
-                    main.display
-                    AS
-                        target_data
-                    ON
-                        link_data.target = target_data.title 
+                    links.display
                 WHERE
                     {where}
                 """.format(where = where))
@@ -247,25 +241,25 @@ class Network:
         cursor.execute("""
             SELECT
                 event_id,
-                source,
-                target
+                source_id,
+                target_id
             FROM
                 links.display
             WHERE
-                source IN (SELECT title FROM main.display) AND
-                target IN (SELECT title FROM main.display)
+                source_id IN (SELECT event_id FROM main.display) AND
+                target_id IN (SELECT event_id FROM main.display)
             """)
 
         links = []
         for row in cursor:
             links.append(dict(zip(["event_id", "source", "target"], [row[0], row[1], row[2]])))
 
-        config = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
-        config_json = json.dumps(config)
+        options = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
+        options_json = json.dumps(options)
 
         network = dict(nodes = nodes, links = links)
         data_json = json.dumps(network)
-        context.CallJavaScript("CreateChart", data_json, config_json)
+        context.CallJavaScript("CreateChart", data_json, options_json)
 
         self.SetSelection(connection, cursor, context)
 

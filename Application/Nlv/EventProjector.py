@@ -38,24 +38,6 @@ import Nlog
 ## Locals ##################################################
 
 #-----------------------------------------------------------
-def ConnectDb(path, read_only = False):
-    # can't read from a non-existand database
-    if read_only and not Path(path).exists():
-        return None
-        
-    connection = sqlite3.connect(path)
-    connection.row_factory = sqlite3.Row
-    cursor = connection.cursor()
-    cursor.execute("PRAGMA synchronous = OFF")
-
-    # commented out, as it yields strange "sqlite3.OperationalError:
-    # database table is locked" errors on the first db execute
-    #cursor.execute("PRAGMA journal_mode = MEMORY")
-
-    return connection
-
-
-#-----------------------------------------------------------
 def MakeProjectionView(cursor):
     cursor.execute("DROP TABLE IF EXISTS main.filter")
     cursor.execute("""
@@ -63,6 +45,37 @@ def MakeProjectionView(cursor):
         (
             event_id INT NOT NULL PRIMARY KEY
         )""")
+
+
+
+## G_DbConnection ##########################################
+
+class G_DbConnection:
+    """
+    Guarantees DB shutdown semantics.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, path):
+        self._Connection = connection = sqlite3.connect(path)
+        connection.row_factory = sqlite3.Row
+        cursor = connection.cursor()
+        cursor.execute("PRAGMA synchronous = OFF")
+
+        # commented out, as it yields strange "sqlite3.OperationalError:
+        # database table is locked" errors on the first db execute
+        #cursor.execute("PRAGMA journal_mode = MEMORY")
+
+
+    #-------------------------------------------------------
+    def __enter__(self):
+        return self._Connection
+
+
+    #-------------------------------------------------------
+    def __exit__(self, exc_type, exc_value, exc_traceback):
+        if self._Connection is not None:
+            self._Connection.close()
 
 
 
@@ -178,9 +191,9 @@ class G_Recogniser:
     """Assess a log, creates any number of event/feature tables"""
 
     #-------------------------------------------------------
-    def __init__(self, event_id, db_path, log_schema, logfile):
+    def __init__(self, event_id, db_info, log_schema, logfile):
         self._EventId = event_id
-        self._DbPath = db_path
+        self._DbInfo = db_info
         self._LogFile = logfile
         self._DateFieldId = logfile.GetTimecodeBase().GetFieldId()
 
@@ -397,16 +410,11 @@ class G_Recogniser:
 
     @G_Global.TimeFunction
     def Recognise(self, user_analyser, start_desc, finish_desc = None):
-        connection = ConnectDb(self._DbPath)
-        cursor = connection.cursor()
-
-        try:
+        with G_DbConnection(self._DbInfo.Path) as connection:
+            cursor = connection.cursor()
             self.DoRecognise(user_analyser, start_desc, finish_desc, connection, cursor)
             cursor.close()
             connection.commit()
-
-        finally:
-            connection.close()
 
 
     #-------------------------------------------------------
@@ -562,12 +570,13 @@ class G_ProjectionFieldSchema:
     """Describe a single projector field (database 'colummn')"""
 
     #-------------------------------------------------------
-    def __init__(self, name, type, available, width = 0, align = None, view_formatter = None, data_col_offset = 0, scale_factor = None, initial_visibility = None, initial_colour = None, explorer_formatter = None):
+    def __init__(self, name, description, type, available, width = 0, align = None, view_formatter = None, data_col_offset = 0, scale_factor = None, initial_visibility = None, initial_colour = None, explorer_formatter = None):
         # user data
         if align is None:
             align = wx.ALIGN_CENTER
 
         self.Name = name
+        self.Description = description
         self.Type = type
         self.Available = self.Visible = available
         self.Width = width
@@ -649,7 +658,7 @@ class G_ProjectionSchema(G_FieldSchemata):
 
     #-------------------------------------------------------
     @staticmethod
-    def _CalcScaleFactor(name, scale):
+    def _CalcScaleFactor(name, description, scale):
         if scale is None:
             sf = None
 
@@ -657,32 +666,37 @@ class G_ProjectionSchema(G_FieldSchemata):
             sf = scale
 
         else:
-            name = "{} ({})".format(name, scale)
-
             if scale == "s":
                 sf = 1000000000
+                d = "seconds"
             elif scale == "ms":
                 sf = 1000000
+                d = "milliseconds"
             elif scale == "us":
                 sf = 1000
+                d = "microseconds"
             elif scale == "ns":
                 sf = 1
+                d = "nanoseconds"
             else:
                 raise RuntimeError("Invalid temporal scale: {}".format(scale))
 
-        return name, sf
+            name = "{} ({})".format(name, scale)
+            description = "{} (Measured in {}.)".format(description, d)
+
+        return name, description, sf
 
 
     #-------------------------------------------------------
     def MakeHiddenFieldSchema(self, name, type):
         G_ProjectionTypeManager.ValidateType(type)
-        return self.Append(G_ProjectionFieldSchema(name, type, False))
+        return self.Append(G_ProjectionFieldSchema(name, "None", type, False))
 
 
-    def MakeFieldSchema(self, name, type, width = 30, align = "centre", view_formatter = None, data_col_offset = 0, scale_factor = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
+    def MakeFieldSchema(self, name, description, type, width = 30, align = "centre", view_formatter = None, data_col_offset = 0, scale_factor = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
         G_ProjectionTypeManager.ValidateType(type)
         al = __class__._CalcAlign(align)
-        return self.Append(G_ProjectionFieldSchema(name, type, True, width, al, view_formatter, data_col_offset, scale_factor, initial_visibility, initial_colour, explorer_formatter))
+        return self.Append(G_ProjectionFieldSchema(name, description, type, True, width, al, view_formatter, data_col_offset, scale_factor, initial_visibility, initial_colour, explorer_formatter))
 
 
     #-------------------------------------------------------
@@ -690,24 +704,28 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.PermitNesting = enable
         return self
 
-    def AddField(self, name, type, width = 30, align = "centre", view_formatter = None, scale = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
-        name, sf = self._CalcScaleFactor(name, scale)
-        self.MakeFieldSchema(name, type, width, align, view_formatter, scale_factor = sf, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
+    def AddHiddenField(self, name, type):
+        self.MakeHiddenFieldSchema(name, type)
         return self
 
-    def AddStart(self, name, width = 30, align = "centre", view_formatter = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
-        self.MakeFieldSchema(name, "text", width, align, view_formatter, data_col_offset = 1, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
+    def AddField(self, name, description, type, width = 30, align = "centre", view_formatter = None, scale = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
+        name, description, sf = self._CalcScaleFactor(name, description, scale)
+        self.MakeFieldSchema(name, description, type, width, align, view_formatter, scale_factor = sf, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
+        return self
+
+    def AddStart(self, name, description, width = 30, align = "centre", view_formatter = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
+        self.MakeFieldSchema(name, description, "text", width, align, view_formatter, data_col_offset = 1, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
         self.ColStartOffset = self.MakeHiddenFieldSchema("start_offset_ns", "int")
         return self
 
-    def AddFinish(self, name, width = 30, align = "centre", view_formatter = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
-        self.MakeFieldSchema(name, "text", width, align, view_formatter, data_col_offset = 1, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
+    def AddFinish(self, name, description, width = 30, align = "centre", view_formatter = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
+        self.MakeFieldSchema(name, description, "text", width, align, view_formatter, data_col_offset = 1, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
         self.ColFinishOffset = self.MakeHiddenFieldSchema("finish_offset_ns", "int")
         return self
 
-    def AddDuration(self, name, width = 30, align = "centre", view_formatter = None, scale = "us", initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
-        name, sf = self._CalcScaleFactor(name, scale)
-        self.ColDuration = self.MakeFieldSchema(name, "int", width, align, view_formatter, scale_factor = sf, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
+    def AddDuration(self, name, description, width = 30, align = "centre", view_formatter = None, scale = "us", initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
+        name, description, sf = self._CalcScaleFactor(name, description, scale)
+        self.ColDuration = self.MakeFieldSchema(name, description, "int", width, align, view_formatter, scale_factor = sf, initial_visibility = initial_visibility, initial_colour = initial_colour, explorer_formatter = explorer_formatter)
         return self
 
 
@@ -722,17 +740,44 @@ class G_ProjectionSchema(G_FieldSchemata):
 
 
 
+## G_DbInfo ################################################
+
+class G_DbInfo:
+
+    #-------------------------------------------------------
+    def __init__(self, db_name, path, base_info = None):
+        self.DbName = db_name
+        self.Path = path
+        self.BaseInfo = base_info
+
+
+    #-------------------------------------------------------
+    def ConnectionManager(self):
+        return G_DbConnection(self.Path)
+
+
+    #-------------------------------------------------------
+    def Attach(self, cursor):
+        cursor.execute("ATTACH DATABASE '{db_path}' AS {db_name}".format(db_path = self.Path, db_name = self.DbName))
+        self.AttachBases(cursor)
+
+    def AttachBases(self, cursor):
+        base_info = self.BaseInfo
+        if base_info is not None:
+            base_info.Attach(cursor)
+
+
+
 ## G_ChartInfo #############################################
 
 class G_ChartInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, want_selection, builder, chart_db_path):
+    def __init__(self, name, want_selection, builder, chart_db_info):
         self.Name = name
         self.WantSelection = want_selection
         self.Builder = builder
-        self.ChartDbPath = chart_db_path
-        self.HtmlPage = builder.Setup(name)
+        self.ChartDbInfo = chart_db_info
 
 
     #-------------------------------------------------------
@@ -746,31 +791,38 @@ class G_ChartInfo:
 
 ## G_QuantifierInfo ########################################
 
-def DeriveSubPath(path_in, subname):
-    path = Path(path_in)
-    return str(path.with_name("{}.{}.db".format(path.stem, str(subname).lower().strip())))
+def MakeRelatedDbInfo(info, name, db_name):
+    # db_name is the name given to the database when attach'ed
+    # into a child connection/cursor
+    short_name = name.strip()
+    base_path = Path(info.Path)
+    new_path = base_path.with_name("{}.{}({}).db".format(base_path.stem, short_name, db_name))
+    return G_DbInfo(db_name, str(new_path), info)
+
 
 class G_QuantifierInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, quantifier, metrics_schema, base_db_path, idx):
+    def __init__(self, name, quantifier, metrics_schema, projection_db_info):
         self.Name = name
         self.UserQuantifier = quantifier
         self.MetricsSchema = metrics_schema
-        self.BaseDbPath = base_db_path
-        self.MetricsDbPath = DeriveSubPath(base_db_path, idx)
+        self.MetricsDbInfo = MakeRelatedDbInfo(projection_db_info, name, "quantifier")
         self.Charts = []
 
 
     #-------------------------------------------------------
     def Chart(self, name, want_selection, builder):
         """Implements user analyse script Quantifier.Chart() function"""
-        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.MetricsDbPath))
+        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.MetricsDbInfo))
 
 
     #-------------------------------------------------------
-    def GetSchemaAndDbPath(self):
-        return self.MetricsSchema, self.MetricsDbPath
+    def GetSchema(self):
+        return self.MetricsSchema
+
+    def GetDbInfo(self):
+        return self.MetricsDbInfo
 
 
 
@@ -779,10 +831,10 @@ class G_QuantifierInfo:
 class G_ProjectorInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, projection_schema, base_db_path):
+    def __init__(self, name, projection_schema, analysis_db_info):
         self.ProjectionName = name
         self.ProjectionSchema = projection_schema
-        self.ProjectionDbPath = DeriveSubPath(base_db_path, name)
+        self.ProjectionDbInfo = MakeRelatedDbInfo(analysis_db_info, name, "events")
         self.DocumentNodeID = G_Project.NodeID_EventProjector
         self.Quantifiers = dict()
         self.Charts = []
@@ -792,8 +844,7 @@ class G_ProjectorInfo:
     def Quantify(self, name, user_quantifier, metrics_schema):
         """Implements user analyse script Quantify() function"""
 
-        idx = len(self.Quantifiers)
-        info = G_QuantifierInfo(name, user_quantifier, metrics_schema, self.ProjectionDbPath, idx)
+        info = G_QuantifierInfo(name, user_quantifier, metrics_schema, self.ProjectionDbInfo)
         self.Quantifiers.update([(name, info)])
         return info
 
@@ -801,15 +852,18 @@ class G_ProjectorInfo:
     #-------------------------------------------------------
     def Chart(self, name, want_selection, builder):
         """Implements user analyse script Projector.Chart() function"""
-        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.ProjectionDbPath))
+        self.Charts.append(G_ChartInfo(name, want_selection, builder, self.ProjectionDbInfo))
 
 
     #-------------------------------------------------------
     def GetQuantifierInfo(self, name):
         return self.Quantifiers[name]
 
-    def GetSchemaAndDbPath(self):
-        return self.ProjectionSchema, self.ProjectionDbPath
+    def GetSchema(self):
+        return self.ProjectionSchema
+
+    def GetDbInfo(self):
+        return self.ProjectionDbInfo
 
 
 
@@ -818,13 +872,12 @@ class G_ProjectorInfo:
 class G_NetworkChartInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, want_selection, builder, nodes_db_path, links_db_path):
+    def __init__(self, name, want_selection, builder, nodes_db_info, links_db_info):
         self.Name = name
         self.WantSelection = want_selection
         self.Builder = builder
-        self.NodesDbPath = nodes_db_path
-        self.LinksDbPath = links_db_path
-        self.HtmlPage = builder.Setup(name)
+        self.NodesDbInfo = nodes_db_info
+        self.LinksDbInfo = links_db_info
 
 
     #-------------------------------------------------------
@@ -850,14 +903,9 @@ class G_NetworkInfo:
 
     #-------------------------------------------------------
     def Chart(self, want_selection, builder):
-        nodes_db_path = self.NetworkProjectors[0].ProjectionDbPath
-        links_db_path = self.NetworkProjectors[1].ProjectionDbPath
-        self.ChartInfo = G_NetworkChartInfo(self.ProjectionName, want_selection, builder, nodes_db_path, links_db_path)
-
-
-    #-------------------------------------------------------
-    def GetDbPaths(self):
-        return [self.ProjectionDbPath for projector in self.NetworkProjectors]
+        nodes_db_info = self.NetworkProjectors[0].ProjectionDbInfo
+        links_db_info = self.NetworkProjectors[1].ProjectionDbInfo
+        self.ChartInfo = G_NetworkChartInfo(self.ProjectionName, want_selection, builder, nodes_db_info, links_db_info)
 
 
 
@@ -867,14 +915,14 @@ class G_AnalysisResults:
 
     #-------------------------------------------------------
     def __init__(self, analysis_db_path, event_id):
-        self.AnalysisDbPath = analysis_db_path
+        self.AnalysisDbInfo = G_DbInfo("analysis", analysis_db_path)
         self.EventId = event_id
         self.Projectors = dict()
 
 
     #-------------------------------------------------------
     def Project(self, name, projection_schema, record):
-        info = G_ProjectorInfo(name, projection_schema, self.AnalysisDbPath)
+        info = G_ProjectorInfo(name, projection_schema, self.AnalysisDbInfo)
         if record:
             self.Projectors.update([(name, info)])
         return info
@@ -905,6 +953,7 @@ class G_ProjectionContext:
 
 
     #-------------------------------------------------------
+    # currently unused; may be bad design
     def FindDbFile(self, theme_id):
         for node in self._LogNode.ListSubNodes(factory_id = G_Project.NodeID_LogAnalysis, recursive = True):
             if node.GetCurrentThemeId("event") == theme_id:
@@ -990,11 +1039,11 @@ class G_Projector:
         if self._SchemaOnly:
             return projection
 
-        connection = ConnectDb(projection.ProjectionDbPath)
-        cursor = connection.cursor()
-        cursor.execute("ATTACH DATABASE '{db}' AS analysis".format(db = self._Results.AnalysisDbPath))
+        db_info = projection.ProjectionDbInfo
+        with db_info.ConnectionManager() as connection:
+            cursor = connection.cursor()
+            db_info.AttachBases(cursor)
 
-        try:
             projection_context = G_ProjectionContext(self._LogNode, projection_schema.ColStartOffset)
             self._LogNode = None
 
@@ -1006,9 +1055,6 @@ class G_Projector:
 
             cursor.close()
             connection.commit()
-
-        finally:
-            connection.close()
 
         return projection
 
@@ -1061,7 +1107,7 @@ class G_Analyser:
         if meta_only:
             self._Recogniser = G_NullRecogniser(event_id)
         else:
-            self._Recogniser = G_Recogniser(event_id, self._Results.AnalysisDbPath, log_schema, log_file)
+            self._Recogniser = G_Recogniser(event_id, self._Results.AnalysisDbInfo, log_schema, log_file)
         
         script_globals.update(Recognise = self._Recogniser.Recognise)
 
@@ -1093,20 +1139,19 @@ class G_Quantifier:
 
     #-------------------------------------------------------
     def Run(self, locked):
-        events_db_path = self._QuantifierInfo.BaseDbPath
-        if not  Path(events_db_path).exists():
+        db_info = self._QuantifierInfo.MetricsDbInfo
+        if not Path(db_info.BaseInfo.Path).exists():
             return
 
-        metrics_db_path = self._QuantifierInfo.MetricsDbPath
-        if locked and Path(metrics_db_path).exists():
+        if locked and Path(db_info.Path).exists():
             return
 
-        connection = ConnectDb(metrics_db_path)
-        cursor = connection.cursor()
-        cursor.execute("ATTACH DATABASE '{events}' AS events".format(events = events_db_path))
-
-        self._QuantifierInfo.UserQuantifier(connection, cursor)
+        with db_info.ConnectionManager() as connection:
+            cursor = connection.cursor()
+            db_info.AttachBases(cursor)
+            
+            self._QuantifierInfo.UserQuantifier(connection, cursor)
         
-        MakeProjectionView(cursor)
-        cursor.close()
-        connection.commit()
+            MakeProjectionView(cursor)
+            cursor.close()
+            connection.commit()

@@ -35,7 +35,10 @@ class Recogniser:
         cursor.execute("""
             CREATE TABLE program
             (
+                event_id INT,
                 start_text TEXT,
+                start_utc INT,
+                start_offset_ns INT,
                 title TEXT,
                 channel INT,
                 cardid INT
@@ -50,9 +53,11 @@ class Recogniser:
             f_channel = int(match[2])
             f_cardid = int(match[3])
 
-            self.Cursor.execute("INSERT INTO program VALUES (?, ?, ?, ?)",
+            self.Cursor.execute("INSERT INTO program VALUES (?, ?, ?, ?, ?, ?, ?)",
             (
+                context.GetEventId(),
                 context.GetEventStartText(),
+                *context.GetEventStartTime(),
                 f_title,
                 f_channel,
                 f_cardid
@@ -63,7 +68,105 @@ class Recogniser:
 
     #-----------------------------------------------------------
     def End(self):
-        pass
+        self.Cursor.execute("DROP TABLE IF EXISTS main.entities")
+        self.Cursor.execute("""
+            CREATE TABLE entities
+            (
+                event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
+                type TEXT,
+                title TEXT,
+                size INT
+            )""")
+
+        self.Cursor.execute("""
+            INSERT INTO entities
+            (
+                type,
+                title,
+                size
+            )
+            SELECT
+                'Program',
+                title,
+                count(title)
+            FROM
+                program
+            GROUP BY
+                title
+
+            UNION ALL
+            SELECT
+                'Channel',
+                'Channel-' || channel,
+                count(channel)
+            FROM
+                program
+            GROUP BY
+                channel
+
+            UNION ALL
+            SELECT
+                'CardID',
+                'CardID-' || cardid,
+                count(cardid)
+            FROM
+                program
+            GROUP BY
+                cardid
+            """)
+
+        self.Cursor.execute("DROP TABLE IF EXISTS main.relationships")
+        self.Cursor.execute("""
+            CREATE TABLE relationships
+            (
+                event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
+                source TEXT,
+                source_id INT,
+                target TEXT,
+                target_id INT
+            )""")
+
+        self.Cursor.execute("""
+            INSERT INTO relationships
+            (
+                source,
+                source_id,
+                target,
+                target_id
+            )
+            SELECT DISTINCT
+                program.title as source,
+                source_entities.event_id as source_id,
+                'Channel-' || program.channel as target,
+                target_entities.event_id as target_id
+            FROM
+                program
+            JOIN
+                entities as source_entities
+                ON
+                    program.title = source_entities.title
+            JOIN
+                entities as target_entities
+                ON
+                    'Channel-' || program.channel = target_entities.title
+
+            UNION ALL
+            SELECT DISTINCT
+                program.title as source,
+                source_entities.event_id as source_id,
+                'CardID-' || program.cardid as target,
+                target_entities.event_id as target_id
+            FROM
+                program
+            JOIN
+                entities as source_entities
+                ON
+                    program.title = source_entities.title
+            JOIN
+                entities as target_entities
+                ON
+                    'CardID-' || program.cardid = target_entities.title
+        """)
 
 
 Recognise(
@@ -104,12 +207,39 @@ def ProgramProjector(connection, cursor, context):
     """)
 
 
+def DataExplorerProgramDetails(context, builder):
+    builder.AddPageHeading("Details")
+    builder.AddFieldHeading("Events")
+
+    with context.DbInfo.ConnectionManager() as connection:
+        cursor = connection.cursor()
+        context.DbInfo.AttachBases(cursor)
+        cursor.execute("""
+            SELECT
+                program.start_text,
+                program.channel,
+                program.cardid
+            FROM
+                display
+            JOIN
+                analysis.program as program
+                ON
+                    display.title = program.title
+            WHERE
+                display.event_id = {event_id}
+        """.format(event_id = context.EventId))
+
+        for row in cursor:
+            builder.AddFieldValue("Time: {} Channel: {} Card:{}".format(row[0], row[1], row[2]))
+        
+
 projection = Project(
     "Programs",
     ProgramProjector,
     MakeDisplaySchema()
-        .AddField("Name", "text", 400)
-        .AddField("Count", "int", 60)
+        .AddField("Name", "Name of the recorded program.", "text", 400)
+        .AddField("Count", "Number of times the program was recorded.", "int", 60)
+        .OnDataExplorerClose(DataExplorerProgramDetails)
 )
 
 
@@ -125,7 +255,7 @@ def NodesProjector(connection, cursor, context):
     cursor.execute("""
         CREATE TABLE projection
         (
-            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
+            event_id INT,
             type TEXT,
             title TEXT,
             size INT
@@ -134,48 +264,60 @@ def NodesProjector(connection, cursor, context):
     cursor.execute("""
         INSERT INTO projection
         (
+            event_id,
             type,
             title,
             size
         )
         SELECT
-            'Program',
+            event_id,
+            type,
             title,
-            count(title)
+            size
         FROM
-            analysis.program
-        GROUP BY
-            title
-
-        UNION ALL
-        SELECT
-            'Channel',
-            'Channel-' || channel,
-            count(channel)
-        FROM
-            analysis.program
-        GROUP BY
-            channel
-
-        UNION ALL
-        SELECT
-            'CardID',
-            'CardID-' || cardid,
-            count(cardid)
-        FROM
-            analysis.program
-        GROUP BY
-            cardid
+            analysis.entities
         """)
+
+
+def DataExplorerNodesDetails(context, builder):
+    builder.AddPageHeading("Goto")
+    node_id = context.GetTargetId("Entities")
+
+    with context.DbInfo.ConnectionManager() as connection:
+        cursor = connection.cursor()
+        context.DbInfo.AttachBases(cursor)
+
+        cursor.execute("""
+            SELECT
+                target,
+                target_id
+            FROM
+                analysis.relationships
+            WHERE
+                source_id = {event_id}
+
+            UNION ALL
+            SELECT
+                source,
+                source_id
+            FROM
+                analysis.relationships
+            WHERE
+                target_id = {event_id}
+        """.format(event_id = context.EventId))
+
+        for row in cursor:
+            builder.AddAction(node_id, row[0], row[1])
 
 
 nodes = Nodes(
     "Entities",
     NodesProjector,
     MakeDisplaySchema()
-        .AddField("Type", "text", 70)
-        .AddField("Title", "text", 200, align = "left")
-        .AddField("Size", "int", 60)
+        .AddField("Type", "The entity type: program, channel, or card.", "text", 70)
+        .AddField("Title", "The entity title: a program name, channel number, or card ID.", "text", 200, align = "left")
+        .AddField("Size", "The number of times the entity is referenced: the number of recordings for a program, the number of time a particular channel was recorded from, or the number of times a particular card was recorded from.", "int", 60)
+        .OnDataExplorerClose(DataExplorerNodesDetails)
 )
 
 
@@ -184,29 +326,30 @@ def LinksProjector(connection, cursor, context):
     cursor.execute("""
         CREATE TABLE projection
         (
-            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
+            event_id INT,
             source TEXT,
-            target TEXT
+            source_id INT,
+            target TEXT,
+            target_id INT
         )""")
 
     cursor.execute("""
         INSERT INTO projection
         (
+            event_id,
             source,
-            target
+            source_id,
+            target,
+            target_id
         )
-        SELECT DISTINCT
-            title as source,
-            'Channel-' || channel as target
+        SELECT
+            event_id,
+            source,
+            source_id,
+            target,
+            target_id
         FROM
-            analysis.program
-
-        UNION ALL
-        SELECT DISTINCT
-            title as source,
-            'CardID-' || cardid as target
-        FROM
-            analysis.program
+            relationships
     """)
 
 
@@ -214,8 +357,10 @@ links = Links(
     "Relationships",
     LinksProjector,
     MakeDisplaySchema()
-        .AddField("Source", "text", 200)
-        .AddField("Target", "text", 200, align = "left")
+        .AddField("Source", "A program, channel, or card.", "text", 200)
+        .AddHiddenField("SourceId", "int")
+        .AddField("Target", "A program, channel, or card.", "text", 200, align = "left")
+        .AddHiddenField("TargetId", "int")
 )
 
 
@@ -223,5 +368,5 @@ Network(
     "Recordings",
     nodes,
     links
-).Chart(True, Chart.Network())
+).Chart(True, Chart.Network(setup_script = "theme.event.mythtv-program.f77128a9.network.js"))
 

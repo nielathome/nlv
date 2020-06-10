@@ -39,7 +39,6 @@ from pathlib import Path
 import pywintypes
 import time
 from uuid import uuid4
-import win32com.client as com
 import zlib
 
 # wxWidgets imports
@@ -340,19 +339,6 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
         me._BtnAnalyse = wx.Button(window, label = "Analyse", size = G_Const.ButtonSize)
         me.BuildLabelledRow(parent, "Analyse logfile and extract events", me._BtnAnalyse)
 
-        me._BtnExcel = wx.Button(window, label = "Open", size = G_Const.ButtonSize)
-        me.BuildLabelledRow(parent, "Open event data in Excel", me._BtnExcel)
-        me._BtnExcel.Enable(False)
-
-        # makepy.py -i
-        # Microsoft Excel 15.0 Object Library
-        # {00020813-0000-0000-C000-000000000046}, lcid=0, major=1, minor=8
-        try:
-            module = com.gencache.EnsureModule('{00020813-0000-0000-C000-000000000046}', 0, 1, 8)
-            me._BtnExcel.Enable(module is not None)
-        except pywintypes.com_error as ex:
-            logging.warn("Excel not found; Excel integration will be disabled")
-
 
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
@@ -367,7 +353,6 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
     def Activate(self):
         self.ActivateCommon()
         self.Rebind(self._BtnAnalyse, wx.EVT_BUTTON, self.OnCmdAnalyse)
-        self.Rebind(self._BtnExcel, wx.EVT_BUTTON, self.OnCmdExcel)
         self.SetNodeHelp("Analyser", "events.html", "eventanalyser")
 
 
@@ -375,15 +360,6 @@ class G_EventAnalyseNode(G_LogAnalysisChildNode, G_ThemeNode, G_TabContainedNode
     @G_Global.ProgressMeter
     def OnCmdAnalyse(self, event):
         self.GetLogAnalysisNode().UpdateAnalysis()
-
-
-    #-------------------------------------------------------
-    def OnCmdExcel(self, event):
-        filename = self.GetLogAnalysisNode().MakeTemporaryFilename(".csv")
-        excel = com.Dispatch("Excel.Application")
-        if excel is not None:
-            excel.Workbooks.Open( Filename = filename)
-            excel.Visible = 1
 
 
 
@@ -509,6 +485,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     def PostInitChildren(self):
         # apply the themed default node name to the tree
         node_name = self._Field.DefaultNodeName.Value
+        node_name = "{}/{}".format(self.GetLogNode().GetNodeLabel(), node_name)
         self.SetTreeLabel(node_name)
         G_Global.GetCurrentTimer().AddArgument(node_name)
 
@@ -551,10 +528,11 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
     #-------------------------------------------------------
     def MakeTemporaryFilename(self, ext):
         cachedir = self.GetLogNode().MakeSessionDir()
-        return str((cachedir / self._Field.Guid.Value).with_suffix(ext))
+        full_ext = ".{}(analysis).{}".format(self._Field.DefaultNodeName.Value, ext)
+        return str((cachedir / self._Field.Guid.Value[0:8]).with_suffix(full_ext))
 
     def RemoveTemporaryFiles(self):
-        guid = self._Field.Guid.Value
+        guid = self._Field.Guid.Value[0:8]
         for file in self.GetLogNode().MakeSessionDir().iterdir():
             if str(file).find(guid) >= 0:
                 try:
@@ -612,7 +590,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         # with a backing file, the debugger can step through the script code
         try:
-            backing_file = self.MakeTemporaryFilename(".py")
+            backing_file = self.MakeTemporaryFilename("py")
             open(backing_file, 'w').write(src)
 
         except OSError as ex:
@@ -641,7 +619,7 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self.SetErrorText("Analysing ...\n")
         with G_ScriptGuard("Analysis", self.GetErrorReporter()):
             event_id = self.GetSessionNode().GetEventId()
-            analyser = G_Analyser(self.MakeTemporaryFilename(".db"), event_id)
+            analyser = G_Analyser(self.MakeTemporaryFilename("db"), event_id)
             globals = analyser.SetEntryPoints(meta_only, log_schema, self.GetLogfile(), self.GetLogNode())
 
             exec(code, globals)
@@ -1105,17 +1083,17 @@ class G_EventFieldNode(G_ProjectorChildNode, G_ThemeNode, G_EnabledColourNode, G
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateCommon()
-        self.ActivateEnabledColour(self.GetFieldNames())
+        self.ActivateEnabledColour(self.GetFieldDescriptions())
         self.SetNodeHelp("Event Field Visibility", "events.html", "eventfields")
 
 
     #-------------------------------------------------------
-    def GetFieldNames(self):
+    def GetFieldDescriptions(self):
         event_schema = self.GetTableViewCtrl().GetTableSchema()
         if event_schema is None:
             return []
         else:
-            return event_schema.GetFieldNames()
+            return event_schema.GetFieldDescriptions()
 
 
     #-------------------------------------------------------
@@ -1132,7 +1110,7 @@ class G_EventFieldNode(G_ProjectorChildNode, G_ThemeNode, G_EnabledColourNode, G
     #-------------------------------------------------------
     def OnThemeChange(self, theme_cls, theme_id):
         if self.IsThemeApplicable(theme_cls, theme_id, G_Const.EventThemeCls):
-            self.SetEnabledColourTheme(self.GetFieldNames())
+            self.SetEnabledColourTheme()
 
 
 
@@ -1496,7 +1474,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def UpdateDataExplorer(self, item):
-        super().UpdateDataExplorer(event_id = self.GetTableViewCtrl().GetEventId(item))
+        super().UpdateDataExplorer(event_id = self.GetTableViewCtrl().GetItemEventId(item))
 
 
     #-------------------------------------------------------
@@ -1506,9 +1484,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def OnDataExplorerLoad(self, sync, builder, location):
-        location["node_name"] = self.GetNodeName()
-        logfile_url = self.GetLogNode().MakeDataUrl()
-        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, logfile_url)
+        self.GetTableViewCtrl().OnDataExplorerLoad(sync, builder, location, self)
         if sync:
             self.MakeActive()
 

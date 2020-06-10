@@ -1,4 +1,4 @@
-html, body, h1, h2, h3, h4, h5, h6 {
+html, body, h1, h2, h3, h4, h5, h6, button {
   font-family: "Segoe UI", Verdana, Arial
 }
 
@@ -34,4 +34,13 @@ pre {
 
 a {
   text-decoration: none;
+}
+
+.select-button {
+  font-size: smaller;
+  background-color: white;
+  border: 2px solid steelblue;
+  padding: 4px 8px;
+  margin: 4px 2px;
+  cursor: pointer;
 }

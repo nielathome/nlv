@@ -312,6 +312,9 @@ class G_Const:
 
     #-------------------------------------------------------
 
+    # preferred font
+    FontFaceName = "Segoe UI"
+
     # standard border size for items inside a static box sizer
     Sizer_StdBorder = 4
 
@@ -364,9 +367,16 @@ class G_Const:
 class G_Global:
 
     #-------------------------------------------------------
+    TempDir = None
+
+    @classmethod
+    def MakeTempPath(cls, file):
+        return cls.TempDir / file
+
+
+    #-------------------------------------------------------
     def GetInstallDir():
         return Path( __file__ ).parent
-
 
     def GetConfigDir():
         return wx.ConfigBase.Get().Read("/NLV/DataDir")

@@ -18,9 +18,13 @@
 # wxWidgets imports
 import wx.adv
 import wx.lib.colourdb
+from wx.lib.expando import ExpandoTextCtrl
+from wx.lib.scrolledpanel import ScrolledPanel
 
 # Application imports
 from .Global import G_Const
+from .Global import G_FrozenWindow
+from .Project import G_WindowInfo
 
 
 
@@ -218,6 +222,76 @@ class G_ColourNode:
 
 
 
+## G_EnabledColourRow ######################################
+
+class G_EnabledColourRow:
+    """
+    Single "row" in a G_EnabledColourNode. This is either a
+    checkbox (show) colour pair, or the pair supplemented
+    with the field's full description.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, cls, panel, bg_colour, show_id):
+        self._Label = ""
+        window = panel.GetWindow()
+        sizer = panel.GetSizer()
+
+        line = self._StaticLine = wx.StaticLine(window)
+        sizer.Add(line, flag = wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, border = G_Const.Sizer_StdBorder)
+
+        checkbox = self._ShowColumnCheckBox = wx.CheckBox(window, id = show_id)
+        combo = self._ColumnColourCombo = G_ColourCombo(window, show_id)
+        self._RowSizer = cls.BuildRow(panel, checkbox, combo, "enabled-colour-row-{}".format(show_id))
+
+        description = self._DescriptionCtrl = ExpandoTextCtrl(window, style = wx.TE_MULTILINE
+            | wx.TE_NO_VSCROLL
+            | wx.TE_READONLY
+            | wx.TE_RICH2
+            | wx.BORDER_NONE)
+    
+        description.SetBackgroundColour(bg_colour)
+        sizer.Add(description, flag = wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, border = G_Const.Sizer_StdBorder, userData = "enabled-colour-description-{}".format(show_id))
+
+
+    #-------------------------------------------------------
+    def Bind(self, onshow, description_text, visible, oncolour, colour_name, title_attr, normal_attr):
+        label, desc = description_text
+        self._Label = label
+        checkbox = self._ShowColumnCheckBox
+        checkbox.Unbind(wx.EVT_CHECKBOX)
+        checkbox.SetValue(visible)
+        checkbox.Bind(wx.EVT_CHECKBOX, onshow)
+
+        combo = self._ColumnColourCombo
+        combo.SetSelection(G_ColourTraits.GetColourIndex(colour_name))
+        combo.Bind(wx.EVT_COMBOBOX, oncolour)
+
+        description = self._DescriptionCtrl
+        description.SetDefaultStyle(title_attr)
+        description.SetValue("")
+        description.WriteText(label)
+        description.SetDefaultStyle(normal_attr)
+        description.WriteText(" - " + desc)
+
+    def Unbind(self):
+        self._ShowColumnCheckBox.Unbind(wx.EVT_CHECKBOX)
+        self._ColumnColourCombo.Unbind(wx.EVT_COMBOBOX)
+
+
+    #-------------------------------------------------------
+    def Show(self, parent_sizer, show, with_description):
+        label = "Show"
+        if not with_description:
+            label = self._Label
+        self._ShowColumnCheckBox.SetLabel(label)
+
+        parent_sizer.Show(self._StaticLine, show and with_description)
+        parent_sizer.Show(self._RowSizer, show)
+        parent_sizer.Show(self._DescriptionCtrl, show and with_description)
+
+
+
 ## G_EnabledColourNode #####################################
 
 class G_EnabledColourNode:
@@ -228,24 +302,27 @@ class G_EnabledColourNode:
     #-------------------------------------------------------
     def BuildEnabledColour(me, page):
         # class static function
+        me._ShowDescriptionsCheckBox = wx.CheckBox(page.GetWindow())
+        me.BuildLabelledRow(page, "Show Descriptions", me._ShowDescriptionsCheckBox)
         
-        window = page.GetWindow()
-        me._CheckBoxes = []
-        me._ColourCombos = []
-        me._RowSizers = []
-        
+        scroll_panel = G_WindowInfo.MakePane(page.GetWindow(), ScrolledPanel)
+        me._ScrollPanelSizer = sizer = scroll_panel.GetSizer()
+        window = scroll_panel.GetWindow()
+        page.GetSizer().Add(window, proportion = 1, flag = wx.EXPAND, userData = "G_EnabledColourNode")
+
+        me._Rows = []
+        bg_colour = wx.SystemSettings.GetColour(wx.SYS_COLOUR_BTNFACE)    
         for i in range(0, me.cMaxNumRows):
-            id = wx.ID_HIGHEST + i
-            check_box = wx.CheckBox(window, id = id)
-            combo = G_ColourCombo(window, id)
-            me._CheckBoxes.append(check_box)
-            me._ColourCombos.append(combo)
-            me._RowSizers.append(me.BuildRow(page, check_box, combo, "enabled-colour-{}".format(i)))
+            row = G_EnabledColourRow(me, scroll_panel, bg_colour, wx.ID_HIGHEST + i)
+            me._Rows.append(row)
+    
+        window.SetupScrolling()
 
 
     #-------------------------------------------------------
     def PostInitColour(self):
         self._Field.Add(__class__.cMaxNumRows, "NumActive", replace_existing = False)
+        self._Field.Add(True, "ShowDescriptions", replace_existing = False)
         self.OnColours()
         self.OnEnable()
 
@@ -261,31 +338,56 @@ class G_EnabledColourNode:
         self.OnColours()
         self.OnEnable()
 
-
         
     #-------------------------------------------------------
-    def ActivateEnabledColour(self, labels):
-        # handle visible controls
-        num_controls = self._Field.NumActive.Value = len(labels)
-        colour_names = self._Field.ColourNames.Value
-        visibility = self._Field.Visibility.Value
-        for i in range(0, num_controls):
-            check = self._CheckBoxes[i]
-            check.Unbind(wx.EVT_CHECKBOX)
-            check.SetLabel(labels[i])
-            check.SetValue(visibility[i])
-            check.Bind(wx.EVT_CHECKBOX, self.OnCheckBox)
+    def BindEnabledColour(self, num_controls, visibility, colour_names, descriptions):
+        # ensure control width's are set, before text controls resize
+        self._Sizer.Layout()
 
-            combo = self._ColourCombos[i]
-            combo.SetSelection(G_ColourTraits.GetColourIndex(colour_names[i]))
-            combo.Bind(wx.EVT_COMBOBOX, self.OnColourCombo)
-            self._Sizer.Show(self._RowSizers[i], True)
+        title_attr = wx.TextAttr()
+        title_attr.SetFontFaceName(G_Const.FontFaceName)
+        title_attr.SetFontStyle(wx.FONTSTYLE_ITALIC)
+        title_attr.SetFontPointSize(9)
+
+        normal_attr = wx.TextAttr()
+        normal_attr.SetFontFaceName(G_Const.FontFaceName)
+        normal_attr.SetFontStyle(wx.FONTSTYLE_NORMAL)
+        normal_attr.SetFontPointSize(9)
+
+        for i in range(0, num_controls):
+            self._Rows[i].Bind(self.OnCheckBox, descriptions[i], visibility[i], self.OnColourCombo, colour_names[i], title_attr, normal_attr)
+
+        for i in range(num_controls, __class__.cMaxNumRows):
+            self._Rows[i].Unbind()
+
+
+    def ShowEnabledColour(self, num_controls, show_descriptions):
+        # handle visible controls
+        for i in range(0, num_controls):
+            self._Rows[i].Show(self._ScrollPanelSizer, True, show_descriptions)
 
         # hide excess controls
         for i in range(num_controls, __class__.cMaxNumRows):
-            self._CheckBoxes[i].Unbind(wx.EVT_CHECKBOX)
-            self._ColourCombos[i].Unbind(wx.EVT_COMBOBOX)
-            self._Sizer.Show(self._RowSizers[i], False)
+            self._Rows[i].Show(self._ScrollPanelSizer, False, False)
+
+        # ensure revisions to text control sizes are correct, and
+        # fed back into the scroll pane
+        self._Sizer.Layout()
+
+
+    def ActivateEnabledColour(self, descriptions):
+        num_controls = self._Field.NumActive.Value = len(descriptions)
+        show_descriptions = self._Field.ShowDescriptions.Value
+        visibility = self._Field.Visibility.Value
+        colour_names = self._Field.ColourNames.Value
+
+        check = self._ShowDescriptionsCheckBox
+        check.Unbind(wx.EVT_CHECKBOX)
+        check.SetValue(show_descriptions)
+        check.Bind(wx.EVT_CHECKBOX, self.OnShowDescriptions)
+
+        self.BindEnabledColour(num_controls, visibility, colour_names, descriptions)
+        self.ShowEnabledColour(num_controls, show_descriptions)
 
 
     #-------------------------------------------------------
@@ -307,12 +409,23 @@ class G_EnabledColourNode:
     def OnColourCombo(self, event):
         """Action the colour selection; derived class must implement OnColour"""
         field_id = event.GetId() - wx.ID_HIGHEST
-        self.UpdateColour(field_id, self._ColourCombos[field_id].GetValue())
+        self.UpdateColour(field_id, event.EventObject.GetValue())
         self.OnColour(field_id)
 
     def OnColours(self):
         for i in range(0, self.GetNumActive()):
             self.OnColour(i)
+
+    def OnShowDescriptions(self, event):
+        """Show/hide the field descriptions"""
+        num_controls = self._Field.NumActive.Value
+        show_descriptions = self._Field.ShowDescriptions.Value = event.IsChecked()
+
+        # the freeze seems to be needed to prevent unwanted
+        # drawing artefacts splattered over the display when the scroll
+        # bar is not at the top of its travel
+        with G_FrozenWindow(self._ScrollPanelSizer.GetContainingWindow()):
+            self.ShowEnabledColour(num_controls, show_descriptions)
 
 
     #-------------------------------------------------------
@@ -341,7 +454,7 @@ class G_EnabledColourNode:
 
 
     #-------------------------------------------------------
-    def SetEnabledColourTheme(self, labels):
+    def SetEnabledColourTheme(self):
         self.PostInitColour()
 
 

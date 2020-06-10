@@ -35,17 +35,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         overflow: hidden;
     }
 
-    .links line {
-        stroke: #aaa;
-    }
-
-    .nodes circle {
-        stroke: #fff;
-        stroke-width: 1.5px;
-        pointer-events: all;
-    }
-
-    .nodes text {
+    .node-text {
         font-family: sans-serif;
         font-size: x-small;
         pointer-events: none;
@@ -59,21 +49,229 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <script>
     //----------------------------------------------------------
-    function OnNodeClick(d) {
-        console.log("Node selected: " + d.event_id);
+    function OnNodeClick(node_data) {
+        console.log("Node selected: " + node_data.event_id);
     }
 
-    function OnLinkClick(d) {
-        console.log("Link selected: " + d.event_id);
+    function OnLinkClick(link) {
+        console.log("Link selected: " + link.event_id);
     }
 
 
     //----------------------------------------------------------
 
-    // retained data
-    var g_data = null;
+    // Style & behaviour configuration items. Override these
+    // functions in your plugin. Don't rely on 'this'; the functions
+    // are generally call'ed against a UI object.
+
+    function Config(data, svg) { }
+
+    // fetch a node's ID; link elements use the ID to identify
+    // the node's they connect
+    Config.prototype.GetNodeId = function (node_data) {
+        return node_data.event_id;
+    }
+
+    // populate the graphical elements of all display nodes
+    Config.prototype.CreateNode = function (display_nodes) {
+        display_nodes
+          .append("circle")
+            .attr("class", "node-shape")
+            .attr("r", 10)
+            .attr("fill", "green")
+            .attr("style", "stroke: white; stroke-width: 1.5px;");
+
+        display_nodes
+          .append("text")
+            .attr("class", "node-text")
+            .attr("x", 15)
+            .text(function (node_data) {
+                return node_data.title;
+            });
+    }
+
+    // style (set styles/attributes) on display nodes
+    // default behaviour sets node opacity according to selection state
+    Config.prototype.StyleNode = function (display_nodes) {
+        display_nodes
+            .attr("opacity", function (node_data) {
+                return NodeOpacity(node_data);
+            });
+    }
+
+    // style (set styles/attributes) on a display links
+    // default behaviour sets link opacity according to selection state
+    Config.prototype.StyleLink = function (display_links) {
+        display_links
+            .attr("opacity", function (link_data) {
+                return LinkOpacity(link_data);
+            });
+    }
+
+    // refine the D3 simulation; the link force is "link", and the attraction
+    // force is called "charge"
+    Config.prototype.StyleSimulation = function (simulation) {
+        simulation.force("link")
+            .distance(50);
+    }
+
+    var g_configConstructor = Config;
     var g_config = null;
 
+    function SetConfigConstructor(config_constructor) {
+        g_configConstructor = config_constructor;
+    }
+
+    function SetupConfig(data, svg) {
+        g_config = new g_configConstructor(data, svg);
+    }
+
+
+    //----------------------------------------------------------
+
+    // Customise the network configuration
+    var f_nodeScale = null;
+    function ProgramConfig(data, svg) {
+        // map node weights to node "padding"
+        const minNodeWeight = d3.min(data.nodes, function (node_data) {
+            return node_data.size;
+        });
+
+        const maxNodeWeight = d3.max(data.nodes, function (node_data) {
+            return node_data.size;
+        });
+
+        f_nodeScale = d3.scaleLinear()
+            .domain([minNodeWeight, maxNodeWeight])
+            .range([1, 5])
+            .clamp(true);
+
+        // arrow head
+        svg.append('defs').selectAll('marker')
+            .data(['end'])
+          .enter()
+          .append('marker')
+            .attr('id', String)
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 10)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .attr("style", "fill: #666; stroke: #666; stroke-width: 1.5px;")
+          .append('path')
+            .attr('d', 'M0,-5L10,0L0,5');
+
+        // base "class"
+        Config.call(this, data, svg);
+    }
+
+    ProgramConfig.prototype = Object.create(Config.prototype);
+
+    ProgramConfig.prototype.constructor = ProgramConfig;
+
+    ProgramConfig.prototype.GetNodeId = function (node_data) {
+        return node_data.title;
+    }
+
+    var f_nodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
+    ProgramConfig.prototype.CreateNode = function (display_nodes) {
+        function calc_pad(node_data) {
+            return f_nodeScale(node_data.size) + 4;
+        }
+
+        function calc_colour(node_data, darken) {
+            return d3.color(f_nodeColourScale(node_data.type)).darker(darken).toString();
+        }
+
+        display_nodes
+          .append("text")
+            .attr("class", "node-text")
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "middle")
+            .text(function (node_data) {
+                return node_data.title;
+            })
+            .each(function (node_data) {
+                node_data.text_extent = d3.select(this).node().getBBox();
+            });
+
+        display_nodes
+          .insert("rect", ":first-child")
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr("x", function (node_data) {
+                return node_data.text_extent.x - calc_pad(node_data);
+            })
+            .attr("y", function (node_data) {
+                return node_data.text_extent.y - calc_pad(node_data);
+            })
+            .attr("width", function (node_data) {
+                return node_data.text_extent.width + (2 * calc_pad(node_data));
+            })
+            .attr("height", function (node_data) {
+                return node_data.text_extent.height + (2 * calc_pad(node_data));
+            })
+            .style("fill", function (node_data) {
+                return calc_colour(node_data, -0.1);
+            })
+            .style("stroke", function (node_data) {
+                return calc_colour(node_data, 0.7);
+            })
+            .style("stroke-width", "2px")
+            .each(function (node_data) {
+                node_data.node_extent = d3.select(this).node().getBBox();
+            });
+    }
+
+    ProgramConfig.prototype.StyleLink = function (display_links) {
+        display_links
+            .attr("style", "stroke: #666; marker-end: url(#end);");
+
+        Config.prototype.StyleLink.call(this, display_links);
+    }
+
+    ProgramConfig.prototype.StyleSimulation = function (simulation) {
+        simulation.force("link")
+            .distance(100);
+
+        simulation
+            .force("collision", d3.forceCollide()
+                .radius(function (node_data) {
+                    var w = node_data.text_extent.width / 2;
+                    var h = node_data.text_extent.height / 2;
+                    return 1.5 * Math.sqrt(w * w + h * h);
+                })
+                .iterations(1)
+            );
+    }
+
+    SetConfigConstructor(ProgramConfig);
+
+
+    //----------------------------------------------------------
+
+    //
+    // data to display - schema:
+    //
+    //  nodes[]
+    //    event_id - number used by link structures to identify the node
+    //    type - arbitrary type; nodes of the same type will normally the same style
+    //    title - textual title displayed for the node
+    //    size - arbitrary size; after normalising, the displayed diameter is proportional to this value
+    //
+    //  links[]
+    //    source - initially node.event_id of source node; re-written to be reference to source node
+    //    target - initially node.event_id of target node; re-written to be reference to target node
+    //
+    var g_data = null;
+
+    //
+    // display/layout configuration - schema:
+    //
+    var g_options = null;
+
+    // retained data
     var g_simulation = null;
     var g_curZoom = 0;
     var g_curTransform = d3.zoomIdentity;
@@ -85,15 +283,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         .attr("height", "100%");
 
     var g_joined_links = null;
-    var g_links_group = g_svg.append("g")
-        .attr("class", "links");
+    var g_links_group = g_svg.append("g");
 
     var g_joined_nodes = null;
-    var g_joined_labels = null;
-    var g_nodes_group = g_svg.append("g")
-        .attr("class", "nodes");
-
-    const g_scale = d3.scaleOrdinal(d3.schemeCategory10);
+    var g_nodes_group = g_svg.append("g");
 
 
     //----------------------------------------------------------
@@ -103,12 +296,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_selected_nodes = new Set();
     var g_selected_links = new Set();
 
-    function GetNodeOpacity(id) {
-        return (!g_has_selection || g_selected_nodes.has(id)) ? 1.0 : 0.5;
+    function IsNodeSelected(node_data) {
+        return !g_has_selection || g_selected_nodes.has(node_data.event_id);
     }
 
-    function GetLinkOpacity(id) {
-        return (!g_has_selection || g_selected_links.has(id)) ? 1.0 : 0.5;
+    function NodeOpacity(node_data) {
+        return IsNodeSelected(node_data) ? 1.0 : 0.2;
+    }
+
+    function IsLinkSelected(link_data) {
+        return !g_has_selection || g_selected_links.has(link_data.event_id);
+    }
+
+    function LinkOpacity(link_data) {
+        return IsLinkSelected(link_data) ? 1.0 : 0.2;
     }
 
 
@@ -123,6 +324,51 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
+    // determine intersection of line L1 (x1, y1) -> (x2, y2) with L2 (x3, y3) -> (x4, y4)
+    // from https://stackoverflow.com/questions/9043805/test-if-two-lines-intersect-javascript-function
+    function LineIntersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+        // determinant
+        var D = (x2 - x1) * (y4 - y3) - (x4 - x3) * (y2 - y1);
+
+        if (D !== 0) {
+            // position of intersection along L1 (L) & L2 (G)
+            var L = ((y4 - y3) * (x4 - x1) + (x3 - x4) * (y4 - y1)) / D;
+            var G = ((y1 - y2) * (x4 - x1) + (x2 - x1) * (y4 - y1)) / D;
+
+            if (0 <= L && L <= 1 && 0 <= G && G <= 1) {
+                return { intersects: true, x: x1 + (x2 - x1) * L, y: y1 + (y2 - y1) * L };
+            }
+        }
+
+        return { intersects: false };
+    };
+
+    // determine intersection of line L1 (x1, y1) -> (x2, y2) with rectangle (x3, y3, width, height)
+    function RectIntersect(x1, y1, x2, y2, x3, y3, width, height) {
+        var left_top = { x: x3, y: y3 },
+            right_top = { x: left_top.x + width, y: left_top.y },
+            right_bottom = { x: right_top.x, y: right_top.y + height },
+            left_bottom = { x: left_top.x, y: right_bottom.y };
+
+        var lines = [
+            { src: left_top, tgt: right_top },
+            { src: right_top, tgt: right_bottom },
+            { src: right_bottom, tgt: left_bottom },
+            { src: left_bottom, tgt: left_top }
+        ];
+
+        for (var idx in lines) {
+            var line = lines[idx];
+            var res = LineIntersect(x1, y1, x2, y2, line.src.x, line.src.y, line.tgt.x, line.tgt.y);
+
+            if (res.intersects) {
+                return res;
+            }
+        }
+
+        return { intersects: false };
+    }
+
     function Layout() {
         const doTransition = (g_curZoom != g_curTransform.k);
         g_curZoom = g_curTransform.k;
@@ -131,36 +377,51 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .duration(250);
 
         (doTransition ? g_joined_links.transition(ref_transition) : g_joined_links)
-            // map model coord system to SVG coord system
-            .attr("x1", function (link) {
-                return g_curTransform.applyX(link.source.x);
-            })
-            .attr("y1", function (link) {
-                return g_curTransform.applyY(link.source.y);
-            })
-            .attr("x2", function (link) {
-                return g_curTransform.applyX(link.target.x);
-            })
-            .attr("y2", function (link) {
-                return g_curTransform.applyY(link.target.y);
+            .each(function (link_data) {
+                // map model coord system to SVG coord system
+                var x1 = g_curTransform.applyX(link_data.source.x),
+                    y1 = g_curTransform.applyY(link_data.source.y),
+                    x2 = g_curTransform.applyX(link_data.target.x),
+                    y2 = g_curTransform.applyY(link_data.target.y);
+
+                // where extents are available, use them to trim link lines
+                var src_extent = link_data.source.node_extent;
+                if (src_extent) {
+                    var res = RectIntersect(x1, y1, x2, y2, src_extent.x + x1, src_extent.y + y1, src_extent.width, src_extent.height);
+                    if (res.intersects) {
+                        x1 = res.x;
+                        y1 = res.y;
+                    }
+                }
+
+                var tgt_extent = link_data.target.node_extent;
+                if (tgt_extent) {
+                    var res = RectIntersect(x1, y1, x2, y2, tgt_extent.x + x2, tgt_extent.y + y2, tgt_extent.width, tgt_extent.height);
+                    if (res.intersects) {
+                        x2 = res.x;
+                        y2 = res.y;
+                    }
+                }
+
+                d3.select(this)
+                    .attr("x1", x1)
+                    .attr("y1", y1)
+                    .attr("x2", x2)
+                    .attr("y2", y2)
             });
 
-        function translate(item) {
-            // map model coord system to SVG coord system
-            const x = g_curTransform.applyX(item.x);
-            const y = g_curTransform.applyY(item.y);
-            return "translate(" + x + "," + y + ")";
-        }
-
         (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
-            .attr("transform", translate);
-
-        (doTransition ? g_joined_labels.transition(ref_transition) : g_joined_labels)
-            .attr("transform", translate);
+            .attr("transform", function (node_data) {
+                // map model coord system to SVG coord system
+                const x = g_curTransform.applyX(node_data.x);
+                const y = g_curTransform.applyY(node_data.y);
+                return "translate(" + x + "," + y + ")";
+            });
     }
 
 
     function DoCreateChart() {
+        SetupConfig(g_data, g_svg);
         g_curZoom = g_curTransform.k;
 
         g_svg
@@ -181,62 +442,37 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_joined_links = g_links_group.selectAll("line")
           .data(g_data.links)
           .join("line")
+            .call(g_config.StyleLink)
             .on("click", OnLinkClick)
 
-        // map node counts to a node size
-        const minNodeWeight = d3.min(g_data.nodes, function (node) {
-            return node.size;
-        });
-        const maxNodeWeight = d3.max(g_data.nodes, function (node) {
-            return node.size;
-        });
-
-        var nodeScale = d3.scaleLinear()
-            .domain([minNodeWeight, maxNodeWeight])
-            .range([4, 20])
-            .clamp(true);
-
-        g_joined_nodes = g_nodes_group.selectAll("circle")
+        g_joined_nodes = g_nodes_group.selectAll(".node-group")
           .data(g_data.nodes)
-          .join("circle")
-            .attr("r", function (node) {
-                return nodeScale(node.size);
-            })
-            .attr("fill", function (node) {
-                return g_scale(node.type);
-            })
+          .join("g")
+            .attr("class", "node-group")
+            .call(g_config.CreateNode)
+            .call(g_config.StyleNode)
             .on("click", OnNodeClick)
             .call(d3.drag()
-                .on("start", function (node) {
+                .on("start", function (node_data) {
                     if (!d3.event.active)
                         g_simulation.alphaTarget(0.3).restart();
-                    node.fx = node.x;
-                    node.fy = node.y;
-                    node.dragged = false;
+                    node_data.fx = node_data.x;
+                    node_data.fy = node_data.y;
+                    node_data.dragged = false;
                 })
-                .on("drag", function (node) {
+                .on("drag", function (node_data) {
                     // map SVG coord system back to model coord system
-                    node.fx += d3.event.dx / g_curZoom;
-                    node.fy += d3.event.dy / g_curZoom;
-                    node.dragged = true;
+                    node_data.fx += d3.event.dx / g_curZoom;
+                    node_data.fy += d3.event.dy / g_curZoom;
+                    node_data.dragged = true;
                 })
-                .on("end", function (node) {
+                .on("end", function (node_data) {
                     if (!d3.event.active)
                         g_simulation.alphaTarget(0);
-                    node.fx = null;
-                    node.fy = null;
+                    node_data.fx = null;
+                    node_data.fy = null;
                 })
             );
-
-        g_joined_labels = g_nodes_group.selectAll("text")
-          .data(g_data.nodes)
-          .join("text")
-            .text(function (d) {
-                return d.title;
-            })
-            .attr("x", function (node) {
-                return nodeScale(node.size);
-            });
     }
 
 
@@ -246,16 +482,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         g_simulation = d3.forceSimulation(g_data.nodes)
             .force("link", d3.forceLink(g_data.links)
-                .id(function (node) {
-                    return node.title;
-                })
-                .distance(50)
+                .id(g_config.GetNodeId)
             )
             .force("charge", d3.forceManyBody())
             .on("tick", Layout)
             .stop();
-
-        if ("graph_is_disjoint" in g_config && g_config.graph_is_disjoint) {
+        
+        if ("graph_is_disjoint" in g_options && g_options.graph_is_disjoint) {
             g_simulation
                 .force("x", d3.forceX(centre_x))
                 .force("y", d3.forceY(centre_y));
@@ -265,13 +498,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 .force("center", d3.forceCenter(centre_x, centre_y));
         }
 
+        g_config.StyleSimulation(g_simulation);
         g_simulation.restart();
     }
 
 
-    function CreateChart(data_json, config_json) {
+    function CreateChart(data_json, options_json) {
         g_data = JSON.parse(data_json);
-        g_config = JSON.parse(config_json);
+        g_options = JSON.parse(options_json);
 
         DoCreateChart();
         DoSimulation();
@@ -281,19 +515,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //----------------------------------------------------------
     function DoSetSelection() {
         g_joined_nodes.transition(250)
-            .attr("opacity", function (node) {
-                return GetNodeOpacity(node.event_id);
-            })
-
-        g_joined_labels.transition(250)
-            .attr("opacity", function (node) {
-                return GetNodeOpacity(node.event_id);
-            })
+            .call(g_config.StyleNode);
 
         g_joined_links.transition(250)
-            .attr("opacity", function (node) {
-                return GetLinkOpacity(node.event_id);
-            })
+            .call(g_config.StyleLink);
     }
 
 
@@ -319,15 +544,434 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     
     function Update1() {
-        const data = '{"nodes":[{"event_id":1, "title":"Neighbours","type":1,"size":7},{"event_id":100, "title":"The Gadget Show","type":1,"size":2},{"event_id":3, "title":"Casualty","type":1,"size":2},{"event_id":4, "title":"Top Gear","type":1,"size":2},{"event_id":5, "title":"EastEnders","type":1,"size":4},{"event_id":6, "title":"Room 101","type":1,"size":1},{"event_id":7, "title":"Nightly Show with Gordon Ramsay","type":1,"size":4},{"event_id":8, "title":"MasterChef","type":1,"size":3},{"event_id":9, "title":"Eddie Stobart","type":1,"size":1},{"event_id":10, "title":"Channel-2005","type":2,"size":9},{"event_id":11, "title":"Channel-2001","type":2,"size":10},{"event_id":12, "title":"Channel-2002","type":2,"size":2},{"event_id":13, "title":"Channel-2003","type":2,"size":4},{"event_id":14, "title":"Channel-2012","type":2,"size":1},{"event_id":15, "title":"Channel-2055","type":2,"size":1},{"event_id":16, "title":"CardId-1","type":3,"size":29},{"event_id":17, "title":"CardId-2","type":3,"size":1},{"event_id":18, "title":"CardId-7","type":3,"size":2}],"links":[{"event_id":19, "source":"Neighbours","target":"Channel-2005"},{"event_id":20, "source":"Neighbours","target":"CardId-1"},{"event_id":21, "source":"The Gadget Show","target":"Channel-2005"},{"event_id":22, "source":"The Gadget Show","target":"CardId-1"},{"event_id":23, "source":"Casualty","target":"Channel-2001"},{"event_id":24, "source":"Casualty","target":"CardId-1"},{"event_id":25, "source":"Top Gear","target":"Channel-2002"},{"event_id":26, "source":"Top Gear","target":"CardId-1"},{"event_id":27, "source":"EastEnders","target":"Channel-2001"},{"event_id":28, "source":"EastEnders","target":"CardId-1"},{"event_id":29, "source":"EastEnders","target":"CardId-7"},{"event_id":30, "source":"Room 101","target":"Channel-2012"},{"event_id":31, "source":"Room 101","target":"CardId-7"},{"event_id":32, "source":"Nightly Show with Gordon Ramsay","target":"Channel-2003"},{"event_id":33, "source":"Nightly Show with Gordon Ramsay","target":"CardId-1"},{"event_id":34, "source":"MasterChef","target":"Channel-2001"},{"event_id":35, "source":"MasterChef","target":"CardId-1"},{"event_id":36, "source":"MasterChef","target":"CardId-2"},{"event_id":37, "source":"Eddie Stobart","target":"Channel-2055" },{"event_id":38, "source":"Eddie Stobart","target":"CardId-1"}]}';
+        const data = `
+        {
+        	"nodes": [{
+        		"event_id": 1,
+        		"title": "Neighbours",
+        		"type": 1,
+        		"size": 7
+            }, {
+        		"event_id": 100,
+        		"title": "The Gadget Show",
+        		"type": 1,
+        		"size": 2
+            }, {
+        		"event_id": 3,
+        		"title": "Casualty",
+        		"type": 1,
+        		"size": 2
+            }, {
+        		"event_id": 4,
+        		"title": "Top Gear",
+        		"type": 1,
+        		"size": 2
+            }, {
+        		"event_id": 5,
+        		"title": "EastEnders",
+        		"type": 1,
+        		"size": 4
+            }, {
+        		"event_id": 6,
+        		"title": "Room 101",
+        		"type": 1,
+        		"size": 1
+            }, {
+        		"event_id": 7,
+        		"title": "Nightly Show with Gordon Ramsay",
+        		"type": 1,
+        		"size": 4
+            }, {
+        		"event_id": 8,
+        		"title": "MasterChef",
+        		"type": 1,
+        		"size": 3
+            }, {
+        		"event_id": 9,
+        		"title": "Eddie Stobart",
+        		"type": 1,
+        		"size": 1
+            }, {
+        		"event_id": 10,
+        		"title": "Channel-2005",
+        		"type": 2,
+        		"size": 9
+            }, {
+        		"event_id": 11,
+        		"title": "Channel-2001",
+        		"type": 2,
+        		"size": 10
+            }, {
+        		"event_id": 12,
+        		"title": "Channel-2002",
+        		"type": 2,
+        		"size": 2
+            }, {
+        		"event_id": 13,
+        		"title": "Channel-2003",
+        		"type": 2,
+        		"size": 4
+            }, {
+        		"event_id": 14,
+        		"title": "Channel-2012",
+        		"type": 2,
+        		"size": 1
+            }, {
+        		"event_id": 15,
+        		"title": "Channel-2055",
+        		"type": 2,
+        		"size": 1
+            }, {
+        		"event_id": 16,
+        		"title": "CardId-1",
+        		"type": 3,
+        		"size": 29
+            }, {
+        		"event_id": 17,
+        		"title": "CardId-2",
+        		"type": 3,
+        		"size": 1
+            }, {
+        		"event_id": 18,
+        		"title": "CardId-7",
+        		"type": 3,
+        		"size": 2
+            }],
+        	"links": [{
+        		"event_id": 19,
+        		"source": "Neighbours",
+        		"target": "Channel-2005"
+            }, {
+        		"event_id": 20,
+        		"source": "Neighbours",
+        		"target": "CardId-1"
+            }, {
+        		"event_id": 21,
+        		"source": "The Gadget Show",
+        		"target": "Channel-2005"
+            }, {
+        		"event_id": 22,
+        		"source": "The Gadget Show",
+        		"target": "CardId-1"
+            }, {
+        		"event_id": 23,
+        		"source": "Casualty",
+        		"target": "Channel-2001"
+            }, {
+        		"event_id": 24,
+        		"source": "Casualty",
+        		"target": "CardId-1"
+            }, {
+        		"event_id": 25,
+        		"source": "Top Gear",
+        		"target": "Channel-2002"
+            }, {
+        		"event_id": 26,
+        		"source": "Top Gear",
+        		"target": "CardId-1"
+            }, {
+        		"event_id": 27,
+        		"source": "EastEnders",
+        		"target": "Channel-2001"
+            }, {
+        		"event_id": 28,
+        		"source": "EastEnders",
+        		"target": "CardId-1"
+            }, {
+        		"event_id": 29,
+        		"source": "EastEnders",
+        		"target": "CardId-7"
+            }, {
+        		"event_id": 30,
+        		"source": "Room 101",
+        		"target": "Channel-2012"
+            }, {
+        		"event_id": 31,
+        		"source": "Room 101",
+        		"target": "CardId-7"
+            }, {
+        		"event_id": 32,
+        		"source": "Nightly Show with Gordon Ramsay",
+        		"target": "Channel-2003"
+            }, {
+        		"event_id": 33,
+        		"source": "Nightly Show with Gordon Ramsay",
+        		"target": "CardId-1"
+            }, {
+        		"event_id": 34,
+        		"source": "MasterChef",
+        		"target": "Channel-2001"
+            }, {
+        		"event_id": 35,
+        		"source": "MasterChef",
+        		"target": "CardId-1"
+            }, {
+        		"event_id": 36,
+        		"source": "MasterChef",
+        		"target": "CardId-2"
+            }, {
+        		"event_id": 37,
+        		"source": "Eddie Stobart",
+        		"target": "Channel-2055"
+            }, {
+        		"event_id": 38,
+        		"source": "Eddie Stobart",
+        		"target": "CardId-1"
+            }]
+        }`;
         CreateChart(data, "{}");
     }
 
     function Update2() {
-        const data = '{"nodes": [{"event_id": 1, "type": "Program", "title": "Casualty", "size": 2}, {"event_id": 2, "type": "Program", "title": "Celebrity Apprentice USA", "size": 1}, {"event_id": 3, "type": "Program", "title": "Come Dine with Me", "size": 1}, {"event_id": 4, "type": "Program", "title": "EastEnders", "size": 4}, {"event_id": 5, "type": "Program", "title": "Eddie Stobart", "size": 1}, {"event_id": 6, "type": "Program", "title": "Good Will Hunting", "size": 1}, {"event_id": 7, "type": "Program", "title": "MasterChef", "size": 3}, {"event_id": 8, "type": "Program", "title": "Neighbours", "size": 7}, {"event_id": 9, "type": "Program", "title": "Nightly Show with Gordon Ramsay", "size": 4}, {"event_id": 10, "type": "Program", "title": "Room 101", "size": 1}, {"event_id": 11, "type": "Program", "title": "Snake Boss", "size": 2}, {"event_id": 12, "type": "Program", "title": "The Gadget Show", "size": 2}, {"event_id": 13, "type": "Program", "title": "Top Gear", "size": 2}, {"event_id": 14, "type": "Channel", "title": "Channel-2001", "size": 10}, {"event_id": 15, "type": "Channel", "title": "Channel-2002", "size": 2}, {"event_id": 16, "type": "Channel", "title": "Channel-2003", "size": 4}, {"event_id": 17, "type": "Channel", "title": "Channel-2004", "size": 1}, {"event_id": 18, "type": "Channel", "title": "Channel-2005", "size": 9}, {"event_id": 19, "type": "Channel", "title": "Channel-2010", "size": 1}, {"event_id": 20, "type": "Channel", "title": "Channel-2011", "size": 2}, {"event_id": 21, "type": "Channel", "title": "Channel-2012", "size": 1}, {"event_id": 22, "type": "Channel", "title": "Channel-2055", "size": 1}, {"event_id": 23, "type": "CardID", "title": "CardID-1", "size": 28}, {"event_id": 24, "type": "CardID", "title": "CardID-2", "size": 1}, {"event_id": 25, "type": "CardID", "title": "CardID-7", "size": 2}], "links": [{"event_id": 14, "source": "Neighbours", "target": "CardID-1"}, {"event_id": 15, "source": "The Gadget Show", "target": "CardID-1"}, {"event_id": 16, "source": "Good Will Hunting", "target": "CardID-1"}, {"event_id": 17, "source": "Casualty", "target": "CardID-1"}, {"event_id": 18, "source": "Snake Boss", "target": "CardID-1"}, {"event_id": 19, "source": "Top Gear", "target": "CardID-1"}, {"event_id": 20, "source": "Celebrity Apprentice USA", "target": "CardID-1"}, {"event_id": 21, "source": "EastEnders", "target": "CardID-1"}, {"event_id": 23, "source": "Nightly Show with Gordon Ramsay", "target": "CardID-1"}, {"event_id": 24, "source": "MasterChef", "target": "CardID-1"}, {"event_id": 27, "source": "Come Dine with Me", "target": "CardID-1"}, {"event_id": 28, "source": "Eddie Stobart", "target": "CardID-1"}, {"event_id": 25, "source": "MasterChef", "target": "CardID-2"}, {"event_id": 22, "source": "Room 101", "target": "CardID-7"}, {"event_id": 26, "source": "EastEnders", "target": "CardID-7"}, {"event_id": 4, "source": "Casualty", "target": "Channel-2001"}, {"event_id": 7, "source": "Celebrity Apprentice USA", "target": "Channel-2001"}, {"event_id": 8, "source": "EastEnders", "target": "Channel-2001"}, {"event_id": 11, "source": "MasterChef", "target": "Channel-2001"}, {"event_id": 6, "source": "Top Gear", "target": "Channel-2002"}, {"event_id": 10, "source": "Nightly Show with Gordon Ramsay", "target": "Channel-2003"}, {"event_id": 12, "source": "Come Dine with Me", "target": "Channel-2004"}, {"event_id": 1, "source": "Neighbours", "target": "Channel-2005"}, {"event_id": 2, "source": "The Gadget Show", "target": "Channel-2005"}, {"event_id": 3, "source": "Good Will Hunting", "target": "Channel-2010"}, {"event_id": 5, "source": "Snake Boss", "target": "Channel-2011"}, {"event_id": 9, "source": "Room 101", "target": "Channel-2012"}, {"event_id": 13, "source": "Eddie Stobart", "target": "Channel-2055"}]}';
+        const data = `
+        {
+        	"nodes": [{
+        		"event_id": 1,
+        		"type": "Program",
+        		"title": "Casualty",
+        		"size": 2
+            }, {
+        		"event_id": 2,
+        		"type": "Program",
+        		"title": "Celebrity Apprentice USA",
+        		"size": 1
+            }, {
+        		"event_id": 3,
+        		"type": "Program",
+        		"title": "Come Dine with Me",
+        		"size": 1
+            }, {
+        		"event_id": 4,
+        		"type": "Program",
+        		"title": "EastEnders",
+        		"size": 4
+            }, {
+        		"event_id": 5,
+        		"type": "Program",
+        		"title": "Eddie Stobart",
+        		"size": 1
+            }, {
+        		"event_id": 6,
+        		"type": "Program",
+        		"title": "Good Will Hunting",
+        		"size": 1
+            }, {
+        		"event_id": 7,
+        		"type": "Program",
+        		"title": "MasterChef",
+        		"size": 3
+            }, {
+        		"event_id": 8,
+        		"type": "Program",
+        		"title": "Neighbours",
+        		"size": 7
+            }, {
+        		"event_id": 9,
+        		"type": "Program",
+        		"title": "Nightly Show with Gordon Ramsay",
+        		"size": 4
+            }, {
+        		"event_id": 10,
+        		"type": "Program",
+        		"title": "Room 101",
+        		"size": 1
+            }, {
+        		"event_id": 11,
+        		"type": "Program",
+        		"title": "Snake Boss",
+        		"size": 2
+            }, {
+        		"event_id": 12,
+        		"type": "Program",
+        		"title": "The Gadget Show",
+        		"size": 2
+            }, {
+        		"event_id": 13,
+        		"type": "Program",
+        		"title": "Top Gear",
+        		"size": 2
+            }, {
+        		"event_id": 14,
+        		"type": "Channel",
+        		"title": "Channel-2001",
+        		"size": 10
+            }, {
+        		"event_id": 15,
+        		"type": "Channel",
+        		"title": "Channel-2002",
+        		"size": 2
+            }, {
+        		"event_id": 16,
+        		"type": "Channel",
+        		"title": "Channel-2003",
+        		"size": 4
+            }, {
+        		"event_id": 17,
+        		"type": "Channel",
+        		"title": "Channel-2004",
+        		"size": 1
+            }, {
+        		"event_id": 18,
+        		"type": "Channel",
+        		"title": "Channel-2005",
+        		"size": 9
+            }, {
+        		"event_id": 19,
+        		"type": "Channel",
+        		"title": "Channel-2010",
+        		"size": 1
+            }, {
+        		"event_id": 20,
+        		"type": "Channel",
+        		"title": "Channel-2011",
+        		"size": 2
+            }, {
+        		"event_id": 21,
+        		"type": "Channel",
+        		"title": "Channel-2012",
+        		"size": 1
+            }, {
+        		"event_id": 22,
+        		"type": "Channel",
+        		"title": "Channel-2055",
+        		"size": 1
+            }, {
+        		"event_id": 23,
+        		"type": "CardID",
+        		"title": "CardID-1",
+        		"size": 28
+            }, {
+        		"event_id": 24,
+        		"type": "CardID",
+        		"title": "CardID-2",
+        		"size": 1
+            }, {
+        		"event_id": 25,
+        		"type": "CardID",
+        		"title": "CardID-7",
+        		"size": 2
+            }],
+        	"links": [{
+        		"event_id": 14,
+        		"source": "Neighbours",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 15,
+        		"source": "The Gadget Show",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 16,
+        		"source": "Good Will Hunting",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 17,
+        		"source": "Casualty",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 18,
+        		"source": "Snake Boss",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 19,
+        		"source": "Top Gear",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 20,
+        		"source": "Celebrity Apprentice USA",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 21,
+        		"source": "EastEnders",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 23,
+        		"source": "Nightly Show with Gordon Ramsay",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 24,
+        		"source": "MasterChef",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 27,
+        		"source": "Come Dine with Me",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 28,
+        		"source": "Eddie Stobart",
+        		"target": "CardID-1"
+            }, {
+        		"event_id": 25,
+        		"source": "MasterChef",
+        		"target": "CardID-2"
+            }, {
+        		"event_id": 22,
+        		"source": "Room 101",
+        		"target": "CardID-7"
+            }, {
+        		"event_id": 26,
+        		"source": "EastEnders",
+        		"target": "CardID-7"
+            }, {
+        		"event_id": 4,
+        		"source": "Casualty",
+        		"target": "Channel-2001"
+            }, {
+        		"event_id": 7,
+        		"source": "Celebrity Apprentice USA",
+        		"target": "Channel-2001"
+            }, {
+        		"event_id": 8,
+        		"source": "EastEnders",
+        		"target": "Channel-2001"
+            }, {
+        		"event_id": 11,
+        		"source": "MasterChef",
+        		"target": "Channel-2001"
+            }, {
+        		"event_id": 6,
+        		"source": "Top Gear",
+        		"target": "Channel-2002"
+            }, {
+        		"event_id": 10,
+        		"source": "Nightly Show with Gordon Ramsay",
+        		"target": "Channel-2003"
+            }, {
+        		"event_id": 12,
+        		"source": "Come Dine with Me",
+        		"target": "Channel-2004"
+            }, {
+        		"event_id": 1,
+        		"source": "Neighbours",
+        		"target": "Channel-2005"
+            }, {
+        		"event_id": 2,
+        		"source": "The Gadget Show",
+        		"target": "Channel-2005"
+            }, {
+        		"event_id": 3,
+        		"source": "Good Will Hunting",
+        		"target": "Channel-2010"
+            }, {
+        		"event_id": 5,
+        		"source": "Snake Boss",
+        		"target": "Channel-2011"
+            }, {
+        		"event_id": 9,
+        		"source": "Room 101",
+        		"target": "Channel-2012"
+            }, {
+        		"event_id": 13,
+        		"source": "Eddie Stobart",
+        		"target": "Channel-2055"
+            }]
+        }`;
         CreateChart(data, "{}");
 
-        const selection = '{"nodes": [25, 10, 21], "links": [9, 22]}';
+        const selection = `
+        {
+	        "nodes": [25, 10, 21],
+	        "links": [9, 22]
+        }`;
         SetSelection(selection);
     }
 

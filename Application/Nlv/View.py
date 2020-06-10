@@ -423,16 +423,13 @@ class G_ViewFieldNode(G_ViewChildNode, G_ThemeNode, G_EnabledColourNode, G_TabCo
     #-------------------------------------------------------
     def Activate(self):
         self.ActivateCommon()
-        self.ActivateEnabledColour(self.GetFieldNames())
+        self.ActivateEnabledColour(self.GetLogSchema().GetFieldDescriptions())
         self.SetNodeHelp("View Field Visibility", "views.html", "viewfields")
 
 
     #-------------------------------------------------------
     def GetLogSchema(self):
         return self.GetLogNode().GetLogSchema()
-
-    def GetFieldNames(self):
-        return self.GetLogSchema().GetFieldNames()
 
 
     #-------------------------------------------------------
@@ -449,7 +446,7 @@ class G_ViewFieldNode(G_ViewChildNode, G_ThemeNode, G_EnabledColourNode, G_TabCo
     #-------------------------------------------------------
     def OnThemeChange(self, theme_cls, theme_id):
         if self.IsThemeApplicable(theme_cls, theme_id, G_Const.ViewThemeCls):
-            self.SetEnabledColourTheme(self.GetFieldNames())
+            self.SetEnabledColourTheme()
 
 
 
@@ -936,7 +933,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         editor.SetDocPointer(self._S_Document)
 
         # setup default text style
-        face = "Segoe UI"
+        face = G_Const.FontFaceName
         editor.StyleSetSpec(wx.stc.STC_STYLE_DEFAULT, "face:{face},size:9".format(face = face))
         editor.StyleClearAll()
 
