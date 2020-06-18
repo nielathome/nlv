@@ -672,7 +672,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
     def PostAnalyse(self):
         self._ForallProjectors(lambda node : node.PostAnalyse(self._AnalysisResults), [
-            G_Project.NodeID_EventProjector
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_NetworkDataProjector
         ])
 
 
@@ -1577,6 +1578,14 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
+    def PostAnalyse(self, analysis_results):
+        if analysis_results is not None:
+            event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
+            settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
+            self.FindChildNode(factory_id = G_Project.NodeID_EventField).OverrideSettings(settings)
+
+
+    #-------------------------------------------------------
     def Activate(self):
         self.ActivateContainer()
 
@@ -1689,14 +1698,6 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             self.UpdateMetricContent()
 
         return ok
-
-
-    #-------------------------------------------------------
-    def PostAnalyse(self, analysis_results):
-        if analysis_results is not None:
-            event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
-            settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
-            self.FindChildNode(factory_id = G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
@@ -1909,6 +1910,15 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         table_ctrl = self.GetParentNode().GetViewCtrl().SetupDataTable(self._TableIndex, self._Name, self.GetNodeId())
         self.SetDisplayCtrl(table_ctrl, owns_display_ctrl = False)
         self.SetupTableCtrl(table_ctrl)
+
+
+    #-------------------------------------------------------
+    def PostAnalyse(self, analysis_results):
+        if analysis_results is not None:
+            network_info = analysis_results.GetProjectorInfo(self.GetParentNode()._Name)
+            event_schema = network_info.GetNetworkProjector(self._Name).GetSchema()
+            settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
+            self.FindChildNode(factory_id = G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
