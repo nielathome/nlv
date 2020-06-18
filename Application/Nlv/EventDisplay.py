@@ -407,7 +407,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             builder.AddField("Location", node_name)
 
             for col_num, field in enumerate(schema):
-                if field.Available:
+                if field.Available or field.ExplorerFormatter is not None:
                     display_value = self.GetFieldDisplayValue(item, col_num)
                     if isinstance(display_value, str):
                         text = display_value

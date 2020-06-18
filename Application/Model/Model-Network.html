@@ -103,6 +103,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     // default behaviour sets link opacity according to selection state
     Config.prototype.StyleLink = function (display_links) {
         display_links
+            .style("stroke", "black")
             .attr("opacity", function (link_data) {
                 return LinkOpacity(link_data);
             });

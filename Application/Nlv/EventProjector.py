@@ -688,9 +688,9 @@ class G_ProjectionSchema(G_FieldSchemata):
 
 
     #-------------------------------------------------------
-    def MakeHiddenFieldSchema(self, name, type):
+    def MakeHiddenFieldSchema(self, name, type, explorer_formatter = None):
         G_ProjectionTypeManager.ValidateType(type)
-        return self.Append(G_ProjectionFieldSchema(name, "None", type, False))
+        return self.Append(G_ProjectionFieldSchema(name, "None", type, False, explorer_formatter = explorer_formatter))
 
 
     def MakeFieldSchema(self, name, description, type, width = 30, align = "centre", view_formatter = None, data_col_offset = 0, scale_factor = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
@@ -704,8 +704,8 @@ class G_ProjectionSchema(G_FieldSchemata):
         self.PermitNesting = enable
         return self
 
-    def AddHiddenField(self, name, type):
-        self.MakeHiddenFieldSchema(name, type)
+    def AddHiddenField(self, name, type, explorer_formatter = None):
+        self.MakeHiddenFieldSchema(name, type, explorer_formatter)
         return self
 
     def AddField(self, name, description, type, width = 30, align = "centre", view_formatter = None, scale = None, initial_visibility = True, initial_colour = "BLACK", explorer_formatter = None):
@@ -907,6 +907,17 @@ class G_NetworkInfo:
         links_db_info = self.NetworkProjectors[1].ProjectionDbInfo
         self.ChartInfo = G_NetworkChartInfo(self.ProjectionName, want_selection, builder, nodes_db_info, links_db_info)
 
+
+    #-------------------------------------------------------
+    def GetNetworkProjector(self, projection_name):
+        if self.NetworkProjectors[0].ProjectionName == projection_name:
+            return self.NetworkProjectors[0]
+
+        elif self.NetworkProjectors[1].ProjectionName == projection_name:
+            return self.NetworkProjectors[1]
+
+        else:
+            return None
 
 
 ## G_AnalysisResults #######################################

@@ -18,6 +18,9 @@
 // Customise the network configuration
 var f_nodeScale = null;
 function ProgramConfig(data, svg) {
+    // base "class"
+    Config.call(this, data, svg);
+
     // map node weights to node "padding"
     const minNodeWeight = d3.min(data.nodes, function (node_data) {
         return node_data.size;
@@ -47,9 +50,6 @@ function ProgramConfig(data, svg) {
         .attr("style", "fill: #666; stroke: #666; stroke-width: 1.5px;")
       .append('path')
         .attr('d', 'M0,-5L10,0L0,5');
-
-    // base "class"
-    Config.call(this, data, svg);
 }
 
 ProgramConfig.prototype = Object.create(Config.prototype);
@@ -107,10 +107,11 @@ ProgramConfig.prototype.CreateNode = function (display_nodes) {
 }
 
 ProgramConfig.prototype.StyleLink = function (display_links) {
+    // base "class"
+    Config.prototype.StyleLink.call(this, display_links);
+
     display_links
         .attr("style", "stroke: #666; marker-end: url(#end);");
-
-    Config.prototype.StyleLink.call(this, display_links);
 }
 
 ProgramConfig.prototype.StyleSimulation = function (simulation) {
