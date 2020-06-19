@@ -120,25 +120,25 @@ class Recogniser:
             CREATE TABLE relationships
             (
                 event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
-                source TEXT,
-                source_id INT,
-                target TEXT,
-                target_id INT
+                source_name TEXT,
+                source INT,
+                target_name TEXT,
+                target INT
             )""")
 
         self.Cursor.execute("""
             INSERT INTO relationships
             (
+                source_name,
                 source,
-                source_id,
-                target,
-                target_id
+                target_name,
+                target
             )
             SELECT DISTINCT
-                program.title as source,
-                source_entities.event_id as source_id,
-                'Channel-' || program.channel as target,
-                target_entities.event_id as target_id
+                program.title as source_name,
+                source_entities.event_id as source,
+                'Channel-' || program.channel as target_name,
+                target_entities.event_id as target
             FROM
                 program
             JOIN
@@ -152,10 +152,10 @@ class Recogniser:
 
             UNION ALL
             SELECT DISTINCT
-                program.title as source,
-                source_entities.event_id as source_id,
-                'CardID-' || program.cardid as target,
-                target_entities.event_id as target_id
+                program.title as source_name,
+                source_entities.event_id as source,
+                'CardID-' || program.cardid as target_name,
+                target_entities.event_id as target
             FROM
                 program
             JOIN
@@ -289,21 +289,21 @@ def DataExplorerNodesDetails(context, builder):
 
         cursor.execute("""
             SELECT
-                target,
-                target_id
+                target_name,
+                target
             FROM
                 analysis.relationships
             WHERE
-                source_id = {event_id}
+                source = {event_id}
 
             UNION ALL
             SELECT
-                source,
-                source_id
+                source_name,
+                source
             FROM
                 analysis.relationships
             WHERE
-                target_id = {event_id}
+                target = {event_id}
         """.format(event_id = context.EventId))
 
         for row in cursor:
@@ -327,27 +327,27 @@ def LinksProjector(connection, cursor, context):
         CREATE TABLE projection
         (
             event_id INT,
-            source TEXT,
-            source_id INT,
-            target TEXT,
-            target_id INT
+            source_name TEXT,
+            source INT,
+            target_name TEXT,
+            target INT
         )""")
 
     cursor.execute("""
         INSERT INTO projection
         (
             event_id,
+            source_name,
             source,
-            source_id,
-            target,
-            target_id
+            target_name,
+            target
         )
         SELECT
             event_id,
+            source_name,
             source,
-            source_id,
-            target,
-            target_id
+            target_name,
+            target
         FROM
             relationships
     """)
@@ -358,9 +358,9 @@ links = Links(
     LinksProjector,
     MakeDisplaySchema()
         .AddField("Source", "A program, channel, or card.", "text", 200)
-        .AddHiddenField("SourceId", "int")
+        .AddHiddenField("SourceEventId", "int")
         .AddField("Target", "A program, channel, or card.", "text", 200, align = "left")
-        .AddHiddenField("TargetId", "int")
+        .AddHiddenField("TargetEventId", "int")
 )
 
 

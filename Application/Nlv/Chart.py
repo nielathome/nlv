@@ -18,7 +18,39 @@
 # Python imports
 import json
 
-        
+def SqlColumnNames(cursor, table_name, database = None):
+    if database is None:
+        database = ""
+    else:
+        database = database + "."
+
+    cursor.execute("""
+        SELECT
+			sql
+		FROM
+			{database}sqlite_master
+		WHERE
+			tbl_name = "{table_name}"
+			AND type = "table"        
+            """.format(table_name = table_name, database = database))
+
+    #
+    # result looks something like:
+    #
+	#   CREATE TABLE projection
+    #   (
+    #       event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
+    #       type TEXT,
+    #       source_entity_id INT,
+    #       target_entity_id INT,
+    #       ...
+    #   )
+    #
+    text = cursor.fetchone()[0]
+    columns = text[text.find("(") + 1:].split(",")
+    return [col.strip().split(" ")[0] for col in columns]
+
+
 
 ## Bar #########################################################
 
@@ -159,6 +191,13 @@ class Pie:
 
 ## Network #####################################################
 
+def _EscapeJsonField(field):
+    # the JavaScript JSON decoder doesn't like quoted backslashes in string
+    # values - even though that is correct. Workaround here for the time being.
+    if isinstance(field, str):
+        field = field.replace("\\", "/")
+    return field        
+
 class Network:
 
     #-----------------------------------------------------------
@@ -180,26 +219,26 @@ class Network:
 
     #-----------------------------------------------------------
     def SetSelection(self, connection, cursor, context):
-        selected_nodes = set(context.GetSelection(0))
-        selected_links = set(context.GetSelection(1))
+        selected_nodes_event_ids = set(context.GetSelection(0))
+        selected_links_event_ids = set(context.GetSelection(1))
 
-        have_nodes = len(selected_nodes) != 0
-        have_links = len(selected_links) != 0
+        have_selected_nodes = len(selected_nodes_event_ids) != 0
+        have_selected_links = len(selected_links_event_ids) != 0
 
-        if have_nodes or have_links:
+        if have_selected_nodes or have_selected_links:
             where = ""
-            if have_nodes:
-                nodes = ", ".join([str(node) for node in selected_nodes])
-                where = "source_id IN ({nodes}) OR target_id IN ({nodes})".format(nodes = nodes)
+            if have_selected_nodes:
+                node_event_ids = ", ".join([str(event_id) for event_id in selected_nodes_event_ids])
+                where = "source_id IN ({node_event_ids}) OR target_id IN ({node_event_ids})".format(node_event_ids = node_event_ids)
 
-            if have_links:
-                if have_nodes:
+            if have_selected_links:
+                if have_selected_nodes:
                     where = where + " OR "
-                links = ", ".join([str(link) for link in selected_links])
-                text = " event_id IN ({links})".format(links = links)
+                link_event_ids = ", ".join([str(event_id) for event_id in selected_links_event_ids])
+                text = " event_id IN ({link_event_ids})".format(link_event_ids = link_event_ids)
                 where = where + text
 
-            # find everything "reachable" from the selected links
+            # find everything "reachable" from the selected nodes & links
             cursor.execute("""
                 SELECT
                     event_id,
@@ -212,47 +251,39 @@ class Network:
                 """.format(where = where))
 
             for row in cursor:
-                selected_links.add(row[0])
-                selected_nodes.add(row[1])
-                selected_nodes.add(row[2])
+                selected_links_event_ids.add(row[0])
+                selected_nodes_event_ids.add(row[1])
+                selected_nodes_event_ids.add(row[2])
 
-        selection = dict(nodes = [node for node in selected_nodes], links = [link for link in selected_links])
+        selection = dict(nodes = [node for node in selected_nodes_event_ids], links = [link for link in selected_links_event_ids])
         selection_json = json.dumps(selection)
         context.CallJavaScript("SetSelection", selection_json)
 
 
     #-----------------------------------------------------------
     def CreateChart(self, connection, cursor, context):
+        node_fields = SqlColumnNames(cursor, "display", "main")
         cursor.execute("""
             SELECT
-                event_id,
-                type,
-                title,
-                size
+                *
             FROM
                 main.display
             """)
 
-        nodes = []
-        for row in cursor:
-            nodes.append(dict(zip(["event_id", "type", "title", "size"], [row[0], row[1], row[2], row[3]])))
+        nodes = [dict(zip(node_fields, [_EscapeJsonField(field) for field in row])) for row in cursor]
 
-
+        link_fields = SqlColumnNames(cursor, "display", "links")
         cursor.execute("""
             SELECT
-                event_id,
-                source_id,
-                target_id
+                *
             FROM
                 links.display
             WHERE
-                source_id IN (SELECT event_id FROM main.display) AND
-                target_id IN (SELECT event_id FROM main.display)
+                source IN (SELECT event_id FROM main.display) AND
+                target IN (SELECT event_id FROM main.display)
             """)
 
-        links = []
-        for row in cursor:
-            links.append(dict(zip(["event_id", "source", "target"], [row[0], row[1], row[2]])))
+        links = [dict(zip(link_fields, [_EscapeJsonField(field) for field in row])) for row in cursor]
 
         options = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
         options_json = json.dumps(options)
