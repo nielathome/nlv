@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -10,8 +10,7 @@
     <OutputPath>.</OutputPath>
     <Name>Nlv</Name>
     <RootNamespace>Nlv</RootNamespace>
-    <InterpreterId>{5b49e450-29e5-40b1-9881-8a79375309f5}</InterpreterId>
-    <InterpreterVersion>3.5</InterpreterVersion>
+    <InterpreterId>MSBuild|{2255ebd9-4fe6-405c-ac64-063adf3f719e}|$(MSBuildProjectFullPath)</InterpreterId>
     <IsWindowsApplication>True</IsWindowsApplication>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
@@ -78,10 +77,9 @@
   </ItemGroup>
   <ItemGroup>
     <Interpreter Include="..\..\_Work\PyEnv\Dbg\">
-      <Id>{5b49e450-29e5-40b1-9881-8a79375309f5}</Id>
-      <BaseInterpreter>{46ea2118-904e-4e1d-ab14-224c9bd1cc95}</BaseInterpreter>
+      <Id>{2255ebd9-4fe6-405c-ac64-063adf3f719e}</Id>
       <Version>3.5</Version>
-      <Description>Dbg (Python 3.6 x64)</Description>
+      <Description>Dbg (Python 3.7 x64)</Description>
       <InterpreterPath>Scripts\python.exe</InterpreterPath>
       <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
       <LibraryPath>Lib\</LibraryPath>
@@ -92,10 +90,7 @@
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
-    <PtvsTargetsFile>$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets</PtvsTargetsFile>
   </PropertyGroup>
-  <Import Condition="Exists($(PtvsTargetsFile))" Project="$(PtvsTargetsFile)" />
-  <Import Condition="!Exists($(PtvsTargetsFile))" Project="$(MSBuildToolsPath)\Microsoft.Common.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
        Visual Studio and specify your pre- and post-build commands in
        the BeforeBuild and AfterBuild targets below. -->
@@ -104,4 +99,5 @@
   </Target>
   <Target Name="AfterBuild">
   </Target>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
 </Project>
