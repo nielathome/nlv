@@ -58,9 +58,9 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="BarChart.html" />
-    <Content Include="data.css" />
     <Content Include="Network.html" />
     <Content Include="PieChart.html" />
+    <Content Include="style.css" />
     <Content Include="theme.event.default.xml" />
     <Content Include="theme.log.default.xml" />
     <Content Include="theme.view.default.xml" />
