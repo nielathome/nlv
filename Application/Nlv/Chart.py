@@ -229,7 +229,7 @@ class Network:
             where = ""
             if have_selected_nodes:
                 node_event_ids = ", ".join([str(event_id) for event_id in selected_nodes_event_ids])
-                where = "source_id IN ({node_event_ids}) OR target_id IN ({node_event_ids})".format(node_event_ids = node_event_ids)
+                where = "source IN ({node_event_ids}) OR target IN ({node_event_ids})".format(node_event_ids = node_event_ids)
 
             if have_selected_links:
                 if have_selected_nodes:
@@ -242,8 +242,8 @@ class Network:
             cursor.execute("""
                 SELECT
                     event_id,
-                    source_id,
-                    target_id
+                    source,
+                    target
                 FROM
                     links.display
                 WHERE

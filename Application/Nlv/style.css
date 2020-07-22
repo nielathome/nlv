@@ -3,18 +3,18 @@ html, body, h1, h2, h3, h4, h5, h6, button {
 }
 
 h1 {
-  font-size: medium;
+  font-size: 12pt;
   color: steelblue;
   border: solid;
   border-color: grey;
   border-width: 1px;
   padding-left: 0.25em;
   margin-top: 1em;
-  margin-bottom: 1em;
+  margin-bottom: 0.2em;
 }
 
 h2 {
-  font-size: small;
+  font-size: 10pt;
   color: steelblue;
   border-bottom: 1px solid grey;
   margin-top: 0.5em;
@@ -22,14 +22,14 @@ h2 {
 }
 
 p {
-  font-size: smaller;
+  font-size: 9pt;
   margin-top: 0.1em;
   margin-bottom: 0.1em;
 }
 
 pre {
   font-family: "Consolas", monospace;
-  font-size: smaller;
+  font-size: 9pt;
 }
 
 a {
@@ -37,10 +37,10 @@ a {
 }
 
 .select-button {
-  font-size: smaller;
+  font-size: 9pt;
   background-color: white;
-  border: 2px solid steelblue;
-  padding: 4px 8px;
-  margin: 4px 2px;
+  border: 1px solid grey;
+  padding: 2pt 4pt;
+  margin: 2pt 4pt 2pt 0pt;
   cursor: pointer;
 }
