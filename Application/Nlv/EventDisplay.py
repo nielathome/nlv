@@ -1208,15 +1208,15 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    @classmethod
-    def InitCharting(cls):
-        if not cls._InitCharting:
+    @G_Global.TimeFunction
+    def InitCharting(self):
+        if not __class__._InitCharting:
             return
 
         # Ensure JavaScript runs in embedded browser. Can be simplified
         # after wxPython-4.1.0. See https://github.com/wxWidgets/Phoenix/issues/1256.
         reg_path = r"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"
-        cls._SetRegistryValue(os.path.basename(sys.executable), reg_path, 11001)
+        self._SetRegistryValue(os.path.basename(sys.executable), reg_path, 11001)
 
         # makepy.py -i
         # {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
@@ -1224,7 +1224,7 @@ class G_HtmlHostCtrl(wx.Panel):
         module = com.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
         _IIDMap = module.NamesToIIDMap
 
-        cls._InitCharting = False
+        __class__._InitCharting = False
 
 
     #-------------------------------------------------------
