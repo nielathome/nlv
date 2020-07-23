@@ -40,6 +40,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         font-size: x-small;
         pointer-events: none;
     }
+
+    .link-text {
+        font-family: sans-serif;
+        font-size: x-small;
+    }
 </style>
 
 
@@ -72,7 +77,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         return node_data.event_id;
     }
 
-    // populate the graphical elements of all display nodes
+    // populate the graphical elements of all displayed nodes
     Config.prototype.CreateNode = function (display_nodes) {
         display_nodes
           .append("circle")
@@ -97,6 +102,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("opacity", function (node_data) {
                 return NodeOpacity(node_data);
             });
+    }
+
+    // populate the graphical elements of all displayed links
+    Config.prototype.CreateLink = function (display_links) {
+        display_links
+            .append("line");
     }
 
     // style (set styles/attributes) on a display links
@@ -225,8 +236,47 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
-    ProgramConfig.prototype.StyleLink = function (display_links) {
+    ProgramConfig.prototype.CreateLink = function (display_links) {
         display_links
+            .append("line");
+
+        display_links
+            .append("g");
+
+        display_links.select("g")
+            .append("text")
+            .attr("class", "link-text")
+            .text(function (link_data) {
+                return link_data.label;
+            })
+            .each(function (link_data) {
+                link_data.label_extent = d3.select(this).node().getBBox();
+            })
+            .attr("text-anchor", "middle")
+            .attr("y", function (link_data) {
+                return link_data.label_extent.height / 2;
+            });
+
+        display_links.select("g")
+            .insert("rect", ":first-child")
+            .attr("x", function (link_data) {
+                return - link_data.label_extent.width / 2;
+            })
+            .attr("y", function (link_data) {
+                return - link_data.label_extent.height / 2;
+            })
+            .attr("width", function (link_data) {
+                return link_data.label_extent.width;
+            })
+            .attr("height", function (link_data) {
+                return link_data.label_extent.height;
+            })
+            .style("stroke", "white")
+            .style("fill", "white");
+    }
+
+    ProgramConfig.prototype.StyleLink = function (display_links) {
+        display_links.select("line")
             .attr("style", "stroke: #666; marker-end: url(#end);");
 
         Config.prototype.StyleLink.call(this, display_links);
@@ -264,6 +314,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //  links[]
     //    source - initially node.event_id of source node; re-written to be reference to source node
     //    target - initially node.event_id of target node; re-written to be reference to target node
+    //    label - name for the link
     //
     var g_data = null;
 
@@ -283,11 +334,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         .attr("width", "100%")
         .attr("height", "100%");
 
-    var g_joined_links = null;
     var g_links_group = g_svg.append("g");
+    var g_joined_links = null;
 
-    var g_joined_nodes = null;
     var g_nodes_group = g_svg.append("g");
+    var g_joined_nodes = null;
 
 
     //----------------------------------------------------------
@@ -404,11 +455,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     }
                 }
 
-                d3.select(this)
+                d3.select(this).select("line")
                     .attr("x1", x1)
                     .attr("y1", y1)
                     .attr("x2", x2)
-                    .attr("y2", y2)
+                    .attr("y2", y2);
+
+                var tx = x1 + (x2 - x1) / 2,
+                    ty = y1 + (y2 - y1) / 2;
+
+                d3.select(this).select("g")
+                    .attr("transform", "translate(" + tx + "," + ty + ")");
             });
 
         (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
@@ -440,9 +497,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 })
             );
 
-        g_joined_links = g_links_group.selectAll("line")
+        g_joined_links = g_links_group.selectAll(".link-group")
           .data(g_data.links)
-          .join("line")
+          .join("g")
+            .attr("class", "link-group")
+            .call(g_config.CreateLink)
             .call(g_config.StyleLink)
             .on("click", OnLinkClick)
 
@@ -545,434 +604,481 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     
     function Update1() {
-        const data = `
-        {
-        	"nodes": [{
-        		"event_id": 1,
-        		"title": "Neighbours",
-        		"type": 1,
-        		"size": 7
-            }, {
-        		"event_id": 100,
-        		"title": "The Gadget Show",
-        		"type": 1,
-        		"size": 2
-            }, {
-        		"event_id": 3,
-        		"title": "Casualty",
-        		"type": 1,
-        		"size": 2
-            }, {
-        		"event_id": 4,
-        		"title": "Top Gear",
-        		"type": 1,
-        		"size": 2
-            }, {
-        		"event_id": 5,
-        		"title": "EastEnders",
-        		"type": 1,
-        		"size": 4
-            }, {
-        		"event_id": 6,
-        		"title": "Room 101",
-        		"type": 1,
-        		"size": 1
-            }, {
-        		"event_id": 7,
-        		"title": "Nightly Show with Gordon Ramsay",
-        		"type": 1,
-        		"size": 4
-            }, {
-        		"event_id": 8,
-        		"title": "MasterChef",
-        		"type": 1,
-        		"size": 3
-            }, {
-        		"event_id": 9,
-        		"title": "Eddie Stobart",
-        		"type": 1,
-        		"size": 1
-            }, {
-        		"event_id": 10,
-        		"title": "Channel-2005",
-        		"type": 2,
-        		"size": 9
-            }, {
-        		"event_id": 11,
-        		"title": "Channel-2001",
-        		"type": 2,
-        		"size": 10
-            }, {
-        		"event_id": 12,
-        		"title": "Channel-2002",
-        		"type": 2,
-        		"size": 2
-            }, {
-        		"event_id": 13,
-        		"title": "Channel-2003",
-        		"type": 2,
-        		"size": 4
-            }, {
-        		"event_id": 14,
-        		"title": "Channel-2012",
-        		"type": 2,
-        		"size": 1
-            }, {
-        		"event_id": 15,
-        		"title": "Channel-2055",
-        		"type": 2,
-        		"size": 1
-            }, {
-        		"event_id": 16,
-        		"title": "CardId-1",
-        		"type": 3,
-        		"size": 29
-            }, {
-        		"event_id": 17,
-        		"title": "CardId-2",
-        		"type": 3,
-        		"size": 1
-            }, {
-        		"event_id": 18,
-        		"title": "CardId-7",
-        		"type": 3,
-        		"size": 2
-            }],
-        	"links": [{
-        		"event_id": 19,
-        		"source": "Neighbours",
-        		"target": "Channel-2005"
-            }, {
-        		"event_id": 20,
-        		"source": "Neighbours",
-        		"target": "CardId-1"
-            }, {
-        		"event_id": 21,
-        		"source": "The Gadget Show",
-        		"target": "Channel-2005"
-            }, {
-        		"event_id": 22,
-        		"source": "The Gadget Show",
-        		"target": "CardId-1"
-            }, {
-        		"event_id": 23,
-        		"source": "Casualty",
-        		"target": "Channel-2001"
-            }, {
-        		"event_id": 24,
-        		"source": "Casualty",
-        		"target": "CardId-1"
-            }, {
-        		"event_id": 25,
-        		"source": "Top Gear",
-        		"target": "Channel-2002"
-            }, {
-        		"event_id": 26,
-        		"source": "Top Gear",
-        		"target": "CardId-1"
-            }, {
-        		"event_id": 27,
-        		"source": "EastEnders",
-        		"target": "Channel-2001"
-            }, {
-        		"event_id": 28,
-        		"source": "EastEnders",
-        		"target": "CardId-1"
-            }, {
-        		"event_id": 29,
-        		"source": "EastEnders",
-        		"target": "CardId-7"
-            }, {
-        		"event_id": 30,
-        		"source": "Room 101",
-        		"target": "Channel-2012"
-            }, {
-        		"event_id": 31,
-        		"source": "Room 101",
-        		"target": "CardId-7"
-            }, {
-        		"event_id": 32,
-        		"source": "Nightly Show with Gordon Ramsay",
-        		"target": "Channel-2003"
-            }, {
-        		"event_id": 33,
-        		"source": "Nightly Show with Gordon Ramsay",
-        		"target": "CardId-1"
-            }, {
-        		"event_id": 34,
-        		"source": "MasterChef",
-        		"target": "Channel-2001"
-            }, {
-        		"event_id": 35,
-        		"source": "MasterChef",
-        		"target": "CardId-1"
-            }, {
-        		"event_id": 36,
-        		"source": "MasterChef",
-        		"target": "CardId-2"
-            }, {
-        		"event_id": 37,
-        		"source": "Eddie Stobart",
-        		"target": "Channel-2055"
-            }, {
-        		"event_id": 38,
-        		"source": "Eddie Stobart",
-        		"target": "CardId-1"
-            }]
-        }`;
+        const data = " \
+        { \
+        	\"nodes\": [{ \
+        		\"event_id\": 1, \
+        		\"title\": \"Neighbours\", \
+        		\"type\": 1, \
+        		\"size\": 7 \
+            }, { \
+        		\"event_id\": 100, \
+        		\"title\": \"The Gadget Show\", \
+        		\"type\": 1, \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 3, \
+        		\"title\": \"Casualty\", \
+        		\"type\": 1, \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 4, \
+        		\"title\": \"Top Gear\", \
+        		\"type\": 1, \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 5, \
+        		\"title\": \"EastEnders\", \
+        		\"type\": 1, \
+        		\"size\": 4 \
+            }, { \
+        		\"event_id\": 6, \
+        		\"title\": \"Room 101\", \
+        		\"type\": 1, \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 7, \
+        		\"title\": \"Nightly Show with Gordon Ramsay\", \
+        		\"type\": 1, \
+        		\"size\": 4 \
+            }, { \
+        		\"event_id\": 8, \
+        		\"title\": \"MasterChef\", \
+        		\"type\": 1, \
+        		\"size\": 3 \
+            }, { \
+        		\"event_id\": 9, \
+        		\"title\": \"Eddie Stobart\", \
+        		\"type\": 1, \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 10, \
+        		\"title\": \"Channel-2005\", \
+        		\"type\": 2, \
+        		\"size\": 9 \
+            }, { \
+        		\"event_id\": 11, \
+        		\"title\": \"Channel-2001\", \
+        		\"type\": 2, \
+        		\"size\": 10 \
+            }, { \
+        		\"event_id\": 12, \
+        		\"title\": \"Channel-2002\", \
+        		\"type\": 2, \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 13, \
+        		\"title\": \"Channel-2003\", \
+        		\"type\": 2, \
+        		\"size\": 4 \
+            }, { \
+        		\"event_id\": 14, \
+        		\"title\": \"Channel-2012\", \
+        		\"type\": 2, \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 15, \
+        		\"title\": \"Channel-2055\", \
+        		\"type\": 2, \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 16, \
+        		\"title\": \"CardId-1\", \
+        		\"type\": 3, \
+        		\"size\": 29 \
+            }, { \
+        		\"event_id\": 17, \
+        		\"title\": \"CardId-2\", \
+        		\"type\": 3, \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 18, \
+        		\"title\": \"CardId-7\", \
+        		\"type\": 3, \
+        		\"size\": 2 \
+            }], \
+        	\"links\": [{ \
+        		\"event_id\": 19, \
+        		\"source\": \"Neighbours\", \
+        		\"target\": \"Channel-2005\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 20, \
+        		\"source\": \"Neighbours\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 21, \
+        		\"source\": \"The Gadget Show\", \
+        		\"target\": \"Channel-2005\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 22, \
+        		\"source\": \"The Gadget Show\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 23, \
+        		\"source\": \"Casualty\", \
+        		\"target\": \"Channel-2001\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 24, \
+        		\"source\": \"Casualty\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 25, \
+        		\"source\": \"Top Gear\", \
+        		\"target\": \"Channel-2002\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 26, \
+        		\"source\": \"Top Gear\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 27, \
+        		\"source\": \"EastEnders\", \
+        		\"target\": \"Channel-2001\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 28, \
+        		\"source\": \"EastEnders\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 29, \
+        		\"source\": \"EastEnders\", \
+        		\"target\": \"CardId-7\" \
+            }, { \
+        		\"event_id\": 30, \
+        		\"source\": \"Room 101\", \
+        		\"target\": \"Channel-2012\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 31, \
+        		\"source\": \"Room 101\", \
+        		\"target\": \"CardId-7\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 32, \
+        		\"source\": \"Nightly Show with Gordon Ramsay\", \
+        		\"target\": \"Channel-2003\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 33, \
+        		\"source\": \"Nightly Show with Gordon Ramsay\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 34, \
+        		\"source\": \"MasterChef\", \
+        		\"target\": \"Channel-2001\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 35, \
+        		\"source\": \"MasterChef\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 36, \
+        		\"source\": \"MasterChef\", \
+        		\"target\": \"CardId-2\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 37, \
+        		\"source\": \"Eddie Stobart\", \
+        		\"target\": \"Channel-2055\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 38, \
+        		\"source\": \"Eddie Stobart\", \
+        		\"target\": \"CardId-1\", \
+                \"label\": \"d\" \
+            }] \
+        }";
         CreateChart(data, "{}");
     }
 
     function Update2() {
-        const data = `
-        {
-        	"nodes": [{
-        		"event_id": 1,
-        		"type": "Program",
-        		"title": "Casualty",
-        		"size": 2
-            }, {
-        		"event_id": 2,
-        		"type": "Program",
-        		"title": "Celebrity Apprentice USA",
-        		"size": 1
-            }, {
-        		"event_id": 3,
-        		"type": "Program",
-        		"title": "Come Dine with Me",
-        		"size": 1
-            }, {
-        		"event_id": 4,
-        		"type": "Program",
-        		"title": "EastEnders",
-        		"size": 4
-            }, {
-        		"event_id": 5,
-        		"type": "Program",
-        		"title": "Eddie Stobart",
-        		"size": 1
-            }, {
-        		"event_id": 6,
-        		"type": "Program",
-        		"title": "Good Will Hunting",
-        		"size": 1
-            }, {
-        		"event_id": 7,
-        		"type": "Program",
-        		"title": "MasterChef",
-        		"size": 3
-            }, {
-        		"event_id": 8,
-        		"type": "Program",
-        		"title": "Neighbours",
-        		"size": 7
-            }, {
-        		"event_id": 9,
-        		"type": "Program",
-        		"title": "Nightly Show with Gordon Ramsay",
-        		"size": 4
-            }, {
-        		"event_id": 10,
-        		"type": "Program",
-        		"title": "Room 101",
-        		"size": 1
-            }, {
-        		"event_id": 11,
-        		"type": "Program",
-        		"title": "Snake Boss",
-        		"size": 2
-            }, {
-        		"event_id": 12,
-        		"type": "Program",
-        		"title": "The Gadget Show",
-        		"size": 2
-            }, {
-        		"event_id": 13,
-        		"type": "Program",
-        		"title": "Top Gear",
-        		"size": 2
-            }, {
-        		"event_id": 14,
-        		"type": "Channel",
-        		"title": "Channel-2001",
-        		"size": 10
-            }, {
-        		"event_id": 15,
-        		"type": "Channel",
-        		"title": "Channel-2002",
-        		"size": 2
-            }, {
-        		"event_id": 16,
-        		"type": "Channel",
-        		"title": "Channel-2003",
-        		"size": 4
-            }, {
-        		"event_id": 17,
-        		"type": "Channel",
-        		"title": "Channel-2004",
-        		"size": 1
-            }, {
-        		"event_id": 18,
-        		"type": "Channel",
-        		"title": "Channel-2005",
-        		"size": 9
-            }, {
-        		"event_id": 19,
-        		"type": "Channel",
-        		"title": "Channel-2010",
-        		"size": 1
-            }, {
-        		"event_id": 20,
-        		"type": "Channel",
-        		"title": "Channel-2011",
-        		"size": 2
-            }, {
-        		"event_id": 21,
-        		"type": "Channel",
-        		"title": "Channel-2012",
-        		"size": 1
-            }, {
-        		"event_id": 22,
-        		"type": "Channel",
-        		"title": "Channel-2055",
-        		"size": 1
-            }, {
-        		"event_id": 23,
-        		"type": "CardID",
-        		"title": "CardID-1",
-        		"size": 28
-            }, {
-        		"event_id": 24,
-        		"type": "CardID",
-        		"title": "CardID-2",
-        		"size": 1
-            }, {
-        		"event_id": 25,
-        		"type": "CardID",
-        		"title": "CardID-7",
-        		"size": 2
-            }],
-        	"links": [{
-        		"event_id": 14,
-        		"source": "Neighbours",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 15,
-        		"source": "The Gadget Show",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 16,
-        		"source": "Good Will Hunting",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 17,
-        		"source": "Casualty",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 18,
-        		"source": "Snake Boss",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 19,
-        		"source": "Top Gear",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 20,
-        		"source": "Celebrity Apprentice USA",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 21,
-        		"source": "EastEnders",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 23,
-        		"source": "Nightly Show with Gordon Ramsay",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 24,
-        		"source": "MasterChef",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 27,
-        		"source": "Come Dine with Me",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 28,
-        		"source": "Eddie Stobart",
-        		"target": "CardID-1"
-            }, {
-        		"event_id": 25,
-        		"source": "MasterChef",
-        		"target": "CardID-2"
-            }, {
-        		"event_id": 22,
-        		"source": "Room 101",
-        		"target": "CardID-7"
-            }, {
-        		"event_id": 26,
-        		"source": "EastEnders",
-        		"target": "CardID-7"
-            }, {
-        		"event_id": 4,
-        		"source": "Casualty",
-        		"target": "Channel-2001"
-            }, {
-        		"event_id": 7,
-        		"source": "Celebrity Apprentice USA",
-        		"target": "Channel-2001"
-            }, {
-        		"event_id": 8,
-        		"source": "EastEnders",
-        		"target": "Channel-2001"
-            }, {
-        		"event_id": 11,
-        		"source": "MasterChef",
-        		"target": "Channel-2001"
-            }, {
-        		"event_id": 6,
-        		"source": "Top Gear",
-        		"target": "Channel-2002"
-            }, {
-        		"event_id": 10,
-        		"source": "Nightly Show with Gordon Ramsay",
-        		"target": "Channel-2003"
-            }, {
-        		"event_id": 12,
-        		"source": "Come Dine with Me",
-        		"target": "Channel-2004"
-            }, {
-        		"event_id": 1,
-        		"source": "Neighbours",
-        		"target": "Channel-2005"
-            }, {
-        		"event_id": 2,
-        		"source": "The Gadget Show",
-        		"target": "Channel-2005"
-            }, {
-        		"event_id": 3,
-        		"source": "Good Will Hunting",
-        		"target": "Channel-2010"
-            }, {
-        		"event_id": 5,
-        		"source": "Snake Boss",
-        		"target": "Channel-2011"
-            }, {
-        		"event_id": 9,
-        		"source": "Room 101",
-        		"target": "Channel-2012"
-            }, {
-        		"event_id": 13,
-        		"source": "Eddie Stobart",
-        		"target": "Channel-2055"
-            }]
-        }`;
+        const data = " \
+        { \
+        	\"nodes\": [{ \
+        		\"event_id\": 1, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Casualty\", \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 2, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Celebrity Apprentice USA\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 3, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Come Dine with Me\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 4, \
+        		\"type\": \"Program\", \
+        		\"title\": \"EastEnders\", \
+        		\"size\": 4 \
+            }, { \
+        		\"event_id\": 5, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Eddie Stobart\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 6, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Good Will Hunting\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 7, \
+        		\"type\": \"Program\", \
+        		\"title\": \"MasterChef\", \
+        		\"size\": 3 \
+            }, { \
+        		\"event_id\": 8, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Neighbours\", \
+        		\"size\": 7 \
+            }, { \
+        		\"event_id\": 9, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Nightly Show with Gordon Ramsay\", \
+        		\"size\": 4 \
+            }, { \
+        		\"event_id\": 10, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Room 101\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 11, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Snake Boss\", \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 12, \
+        		\"type\": \"Program\", \
+        		\"title\": \"The Gadget Show\", \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 13, \
+        		\"type\": \"Program\", \
+        		\"title\": \"Top Gear\", \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 14, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2001\", \
+        		\"size\": 10 \
+            }, { \
+        		\"event_id\": 15, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2002\", \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 16, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2003\", \
+        		\"size\": 4 \
+            }, { \
+        		\"event_id\": 17, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2004\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 18, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2005\", \
+        		\"size\": 9 \
+            }, { \
+        		\"event_id\": 19, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2010\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 20, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2011\", \
+        		\"size\": 2 \
+            }, { \
+        		\"event_id\": 21, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2012\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 22, \
+        		\"type\": \"Channel\", \
+        		\"title\": \"Channel-2055\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 23, \
+        		\"type\": \"CardID\", \
+        		\"title\": \"CardID-1\", \
+        		\"size\": 28 \
+            }, { \
+        		\"event_id\": 24, \
+        		\"type\": \"CardID\", \
+        		\"title\": \"CardID-2\", \
+        		\"size\": 1 \
+            }, { \
+        		\"event_id\": 25, \
+        		\"type\": \"CardID\", \
+        		\"title\": \"CardID-7\", \
+        		\"size\": 2 \
+            }], \
+        	\"links\": [{ \
+        		\"event_id\": 14, \
+        		\"source\": \"Neighbours\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 15, \
+        		\"source\": \"The Gadget Show\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 16, \
+        		\"source\": \"Good Will Hunting\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 17, \
+        		\"source\": \"Casualty\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 18, \
+        		\"source\": \"Snake Boss\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 19, \
+        		\"source\": \"Top Gear\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 20, \
+        		\"source\": \"Celebrity Apprentice USA\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 21, \
+        		\"source\": \"EastEnders\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 23, \
+        		\"source\": \"Nightly Show with Gordon Ramsay\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 24, \
+        		\"source\": \"MasterChef\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 27, \
+        		\"source\": \"Come Dine with Me\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 28, \
+        		\"source\": \"Eddie Stobart\", \
+        		\"target\": \"CardID-1\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 25, \
+        		\"source\": \"MasterChef\", \
+        		\"target\": \"CardID-2\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 22, \
+        		\"source\": \"Room 101\", \
+        		\"target\": \"CardID-7\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 26, \
+        		\"source\": \"EastEnders\", \
+        		\"target\": \"CardID-7\", \
+                \"label\": \"d\" \
+            }, { \
+        		\"event_id\": 4, \
+        		\"source\": \"Casualty\", \
+        		\"target\": \"Channel-2001\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 7, \
+        		\"source\": \"Celebrity Apprentice USA\", \
+        		\"target\": \"Channel-2001\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 8, \
+        		\"source\": \"EastEnders\", \
+        		\"target\": \"Channel-2001\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 11, \
+        		\"source\": \"MasterChef\", \
+        		\"target\": \"Channel-2001\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 6, \
+        		\"source\": \"Top Gear\", \
+        		\"target\": \"Channel-2002\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 10, \
+        		\"source\": \"Nightly Show with Gordon Ramsay\", \
+        		\"target\": \"Channel-2003\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 12, \
+        		\"source\": \"Come Dine with Me\", \
+        		\"target\": \"Channel-2004\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 1, \
+        		\"source\": \"Neighbours\", \
+        		\"target\": \"Channel-2005\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 2, \
+        		\"source\": \"The Gadget Show\", \
+        		\"target\": \"Channel-2005\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 3, \
+        		\"source\": \"Good Will Hunting\", \
+        		\"target\": \"Channel-2010\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 5, \
+        		\"source\": \"Snake Boss\", \
+        		\"target\": \"Channel-2011\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 9, \
+        		\"source\": \"Room 101\", \
+        		\"target\": \"Channel-2012\", \
+                \"label\": \"h\" \
+            }, { \
+        		\"event_id\": 13, \
+        		\"source\": \"Eddie Stobart\", \
+        		\"target\": \"Channel-2055\", \
+                \"label\": \"h\" \
+            }] \
+        }";
         CreateChart(data, "{}");
 
-        const selection = `
-        {
-	        "nodes": [25, 10, 21],
-	        "links": [9, 22]
-        }`;
+        const selection = " \
+        { \
+	        \"nodes\": [25, 10, 21], \
+	        \"links\": [9, 22] \
+        }";
         SetSelection(selection);
     }
 
