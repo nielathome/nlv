@@ -61,7 +61,15 @@
     }
 
     var f_colourScale = d3.scaleOrdinal(d3.schemeCategory10);
-    ProgramConfig.prototype.CreateNode = function (display_nodes) {
+    ProgramConfig.prototype.EnterNode = function (display_node) {
+        display_node
+          .append("text");
+
+        display_node
+          .insert("rect", ":first-child");
+    }
+
+    ProgramConfig.prototype.UpdateNode = function (display_node) {
         function calc_pad(node_data) {
             return f_nodeScale(node_data.size) + 4;
         }
@@ -70,8 +78,8 @@
             return d3.color(f_colourScale(node_data.type)).darker(darken).toString();
         }
 
-        display_nodes
-          .append("text")
+        display_node
+          .select("text")
             .attr("class", "node-text")
             .attr("text-anchor", "middle")
             .attr("dominant-baseline", "middle")
@@ -82,8 +90,8 @@
                 node_data.text_extent = d3.select(this).node().getBBox();
             });
 
-        display_nodes
-          .insert("rect", ":first-child")
+        display_node
+          .select("rect")
             .attr("rx", 5)
             .attr("ry", 5)
             .attr("x", function (node_data) {
@@ -110,15 +118,25 @@
             });
     }
 
-    ProgramConfig.prototype.CreateLink = function (display_links) {
-        display_links
+    ProgramConfig.prototype.EnterLink = function (display_link) {
+        display_link
           .append("line");
 
-        display_links
-          .append("g");
+        label = display_link
+            .append("g");
 
-        display_links.select("g")
-          .append("text")
+        label
+            .append("text");
+
+        label
+            .insert("rect", ":first-child");
+    }
+
+    ProgramConfig.prototype.UpdateLink = function (display_link) {
+        label = display_link.select("g")
+
+        label
+          .select("text")
             .attr("class", "link-text")
             .text(function (link_data) {
                 return link_data.label;
@@ -131,8 +149,8 @@
                 return link_data.label_extent.height / 2;
             });
 
-        display_links.select("g")
-          .insert("rect", ":first-child")
+        label
+          .select("rect", ":first-child")
             .attr("x", function (link_data) {
                 return - link_data.label_extent.width / 2;
             })
@@ -149,7 +167,7 @@
             .style("fill", "white");
     }
 
-    ProgramConfig.prototype.StyleLink = function (display_links) {
+    ProgramConfig.prototype.StyleLink = function (display_link) {
         function calc_link_colour(link_data, darken) {
             if (link_data.type) {
                 return d3.color(f_colourScale(link_data.type)).darker(darken).toString();
@@ -159,13 +177,14 @@
             }
         }
 
-        display_links.select("line")
+        display_link
+          .select("line")
             .attr("style", function (link_data) {
                 colour = calc_link_colour(link_data, 0.7);
                 return "marker-end: url(#end); stroke: " + colour + "; fill: " + colour + ";"
             });
 
-        Config.prototype.StyleLink.call(this, display_links);
+        Config.prototype.StyleLink.call(this, display_link);
     }
 
     ProgramConfig.prototype.StyleSimulation = function (simulation) {

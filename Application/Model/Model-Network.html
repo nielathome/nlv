@@ -44,6 +44,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     .link-text {
         font-family: sans-serif;
         font-size: 7pt;
+        cursor: default
     }
 </style>
 
@@ -78,16 +79,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     // populate the graphical elements of all displayed nodes
-    Config.prototype.CreateNode = function (display_nodes) {
-        display_nodes
+    Config.prototype.EnterNode = function (display_node) {
+        display_node
           .append("circle")
+            .attr("class", "node-shape");
+
+        display_node
+          .append("text");
+    }
+
+    Config.prototype.UpdateNode = function (display_node) {
+        display_node
+          .select("circle")
             .attr("class", "node-shape")
             .attr("r", 10)
             .attr("fill", "green")
             .attr("style", "stroke: white; stroke-width: 1.5px;");
 
-        display_nodes
-          .append("text")
+        display_node
+          .select("text")
             .attr("class", "node-text")
             .attr("x", 15)
             .text(function (node_data) {
@@ -97,23 +107,29 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     // style (set styles/attributes) on display nodes
     // default behaviour sets node opacity according to selection state
-    Config.prototype.StyleNode = function (display_nodes) {
-        display_nodes
+    Config.prototype.StyleNode = function (display_node) {
+        display_node
             .attr("opacity", function (node_data) {
                 return NodeOpacity(node_data);
             });
     }
 
     // populate the graphical elements of all displayed links
-    Config.prototype.CreateLink = function (display_links) {
-        display_links
-            .append("line");
+    Config.prototype.EnterLink = function (display_link) {
+        display_link
+          .append("line");
+    }
+
+    Config.prototype.UpdateLink = function (display_link) {
+        display_link
+          .select("line")
+            .attr("stroke", "black");
     }
 
     // style (set styles/attributes) on a display links
     // default behaviour sets link opacity according to selection state
-    Config.prototype.StyleLink = function (display_links) {
-        display_links
+    Config.prototype.StyleLink = function (display_link) {
+        display_link
             .attr("opacity", function (link_data) {
                 return LinkOpacity(link_data);
             });
@@ -167,8 +183,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_curTransform = d3.zoomIdentity;
 
     // append the svg object to the body of the page
-    var g_svg = d3.select("#graph")
-        .append("svg")
+    var g_svg = d3
+      .select("#graph")
+      .append("svg")
         .attr("width", "100%")
         .attr("height", "100%");
 
@@ -293,7 +310,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     }
                 }
 
-                d3.select(this).select("line")
+                d3.select(this)
+                  .select("line")
                     .attr("x1", x1)
                     .attr("y1", y1)
                     .attr("x2", x2)
@@ -302,7 +320,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 var tx = x1 + (x2 - x1) / 2,
                     ty = y1 + (y2 - y1) / 2;
 
-                d3.select(this).select("g")
+                d3.select(this)
+                  .select("g")
                     .attr("transform", "translate(" + tx + "," + ty + ")");
             });
 
@@ -316,7 +335,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function DoCreateChart(data, svg) {
+    function DoCreateChart(data) {
         SetupConfig(data);
         g_curZoom = g_curTransform.k;
 
@@ -337,17 +356,29 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         g_joined_links = g_links_group.selectAll(".link-group")
           .data(data.links)
-          .join("g")
+          .join(
+            function (enter) {
+                return enter
+                  .append("g")
+                    .call(g_config.EnterLink)
+            }
+          )
             .attr("class", "link-group")
-            .call(g_config.CreateLink)
+            .call(g_config.UpdateLink)
             .call(g_config.StyleLink)
             .on("click", OnLinkClick)
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
           .data(data.nodes)
-          .join("g")
+          .join(
+            function (enter) {
+                return enter
+                  .append("g")
+                    .call(g_config.EnterNode)
+            }
+          )
             .attr("class", "node-group")
-            .call(g_config.CreateNode)
+            .call(g_config.UpdateNode)
             .call(g_config.StyleNode)
             .on("click", OnNodeClick)
             .call(d3.drag()
@@ -487,7 +518,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     var f_colourScale = d3.scaleOrdinal(d3.schemeCategory10);
-    ProgramConfig.prototype.CreateNode = function (display_nodes) {
+    ProgramConfig.prototype.EnterNode = function (display_node) {
+        display_node
+          .append("text");
+
+        display_node
+          .insert("rect", ":first-child");
+    }
+
+    ProgramConfig.prototype.UpdateNode = function (display_node) {
         function calc_pad(node_data) {
             return f_nodeScale(node_data.size) + 4;
         }
@@ -496,8 +535,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             return d3.color(f_colourScale(node_data.type)).darker(darken).toString();
         }
 
-        display_nodes
-          .append("text")
+        display_node
+          .select("text")
             .attr("class", "node-text")
             .attr("text-anchor", "middle")
             .attr("dominant-baseline", "middle")
@@ -508,8 +547,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 node_data.text_extent = d3.select(this).node().getBBox();
             });
 
-        display_nodes
-          .insert("rect", ":first-child")
+        display_node
+          .select("rect")
             .attr("rx", 5)
             .attr("ry", 5)
             .attr("x", function (node_data) {
@@ -536,15 +575,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
-    ProgramConfig.prototype.CreateLink = function (display_links) {
-        display_links
+    ProgramConfig.prototype.EnterLink = function (display_link) {
+        display_link
           .append("line");
 
-        display_links
-          .append("g");
+        label = display_link
+            .append("g");
 
-        display_links.select("g")
-          .append("text")
+        label
+            .append("text");
+
+        label
+            .insert("rect", ":first-child");
+    }
+
+    ProgramConfig.prototype.UpdateLink = function (display_link) {
+        label = display_link.select("g")
+
+        label
+          .select("text")
             .attr("class", "link-text")
             .text(function (link_data) {
                 return link_data.label;
@@ -557,8 +606,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 return link_data.label_extent.height / 2;
             });
 
-        display_links.select("g")
-          .insert("rect", ":first-child")
+        label
+          .select("rect", ":first-child")
             .attr("x", function (link_data) {
                 return - link_data.label_extent.width / 2;
             })
@@ -575,7 +624,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .style("fill", "white");
     }
 
-    ProgramConfig.prototype.StyleLink = function (display_links) {
+    ProgramConfig.prototype.StyleLink = function (display_link) {
         function calc_link_colour(link_data, darken) {
             if (link_data.type) {
                 return d3.color(f_colourScale(link_data.type)).darker(darken).toString();
@@ -585,13 +634,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             }
         }
 
-        display_links.select("line")
+        display_link
+          .select("line")
             .attr("style", function (link_data) {
                 colour = calc_link_colour(link_data, 0.7);
                 return "marker-end: url(#end); stroke: " + colour + "; fill: " + colour + ";"
             });
 
-        Config.prototype.StyleLink.call(this, display_links);
+        Config.prototype.StyleLink.call(this, display_link);
     }
 
     ProgramConfig.prototype.StyleSimulation = function (simulation) {
