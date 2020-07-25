@@ -36,8 +36,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     .node-text {
         font-family: sans-serif;
-        font-size: x-small;
+        font-size: 8pt;
         pointer-events: none;
+    }
+
+    .link-text {
+        font-family: sans-serif;
+        font-size: 7pt;
     }
 </style>
 
@@ -95,10 +100,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     // fetch a node's ID; link elements use the ID to identify
     // the node's they connect
     Config.prototype.GetNodeId = function (node_data) {
-        return node_data.event_id;
+        return node_data.title;
     }
 
-    // populate the graphical elements of all display nodes
+    // populate the graphical elements of all displayed nodes
     Config.prototype.CreateNode = function (display_nodes) {
         display_nodes
           .append("circle")
@@ -125,11 +130,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
+    // populate the graphical elements of all displayed links
+    Config.prototype.CreateLink = function (display_links) {
+        display_links
+            .append("line");
+    }
+
     // style (set styles/attributes) on a display links
     // default behaviour sets link opacity according to selection state
     Config.prototype.StyleLink = function (display_links) {
         display_links
-            .style("stroke", "black")
             .attr("opacity", function (link_data) {
                 return LinkOpacity(link_data);
             });
@@ -149,8 +159,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_configConstructor = config_constructor;
     }
 
-    function SetupConfig(data, svg) {
-        g_config = new g_configConstructor(data, svg);
+    function SetupConfig(data) {
+        g_config = new g_configConstructor(data, g_svg);
     }
 
     
@@ -168,8 +178,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //  links[]
     //    source - initially node.event_id of source node; re-written to be reference to source node
     //    target - initially node.event_id of target node; re-written to be reference to target node
+    //    type - (optional) arbitrary type; typically used to determine line style/colour
+    //    label - (optional) name for the link
     //
-    var g_data = null;
 
     //
     // display/layout configuration - schema:
@@ -187,11 +198,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         .attr("width", "100%")
         .attr("height", "100%");
 
-    var g_joined_links = null;
     var g_links_group = g_svg.append("g");
+    var g_joined_links = null;
 
-    var g_joined_nodes = null;
     var g_nodes_group = g_svg.append("g");
+    var g_joined_nodes = null;
 
 
     //----------------------------------------------------------
@@ -308,11 +319,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     }
                 }
 
-                d3.select(this)
+                d3.select(this).select("line")
                     .attr("x1", x1)
                     .attr("y1", y1)
                     .attr("x2", x2)
-                    .attr("y2", y2)
+                    .attr("y2", y2);
+
+                var tx = x1 + (x2 - x1) / 2,
+                    ty = y1 + (y2 - y1) / 2;
+
+                d3.select(this).select("g")
+                    .attr("transform", "translate(" + tx + "," + ty + ")");
             });
 
         (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
@@ -325,8 +342,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function DoCreateChart() {
-        SetupConfig(g_data, g_svg);
+    function DoCreateChart(data, svg) {
+        SetupConfig(data);
         g_curZoom = g_curTransform.k;
 
         g_svg
@@ -344,14 +361,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 })
             );
 
-        g_joined_links = g_links_group.selectAll("line")
-          .data(g_data.links)
-          .join("line")
+        g_joined_links = g_links_group.selectAll(".link-group")
+          .data(data.links)
+          .join("g")
+            .attr("class", "link-group")
+            .call(g_config.CreateLink)
             .call(g_config.StyleLink)
             .on("click", OnLinkClick)
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
-          .data(g_data.nodes)
+          .data(data.nodes)
           .join("g")
             .attr("class", "node-group")
             .call(g_config.CreateNode)
@@ -381,18 +400,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function DoSimulation() {
+    function DoSimulation(data) {
         centre_x = GetWindowWidth() / 2;
         centre_y = GetWindowHeight() / 2;
 
-        g_simulation = d3.forceSimulation(g_data.nodes)
-            .force("link", d3.forceLink(g_data.links)
+        g_simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links)
                 .id(g_config.GetNodeId)
             )
             .force("charge", d3.forceManyBody())
             .on("tick", Layout)
             .stop();
-        
+
         if ("graph_is_disjoint" in g_options && g_options.graph_is_disjoint) {
             g_simulation
                 .force("x", d3.forceX(centre_x))
@@ -409,11 +428,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     function CreateChart(data_json, options_json) {
-        g_data = JSON.parse(data_json);
+        data = JSON.parse(data_json);
         g_options = JSON.parse(options_json);
 
-        DoCreateChart();
-        DoSimulation();
+        DoCreateChart(data);
+        DoSimulation(data);
     }
 
 
@@ -444,6 +463,4 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DoSetSelection();
     }
-
-
 </script>

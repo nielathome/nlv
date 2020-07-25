@@ -37,13 +37,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     .node-text {
         font-family: sans-serif;
-        font-size: x-small;
+        font-size: 8pt;
         pointer-events: none;
     }
 
     .link-text {
         font-family: sans-serif;
-        font-size: x-small;
+        font-size: 7pt;
     }
 </style>
 
@@ -114,7 +114,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     // default behaviour sets link opacity according to selection state
     Config.prototype.StyleLink = function (display_links) {
         display_links
-            .style("stroke", "black")
             .attr("opacity", function (link_data) {
                 return LinkOpacity(link_data);
             });
@@ -134,184 +133,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_configConstructor = config_constructor;
     }
 
-    function SetupConfig(data, svg) {
-        g_config = new g_configConstructor(data, svg);
+    function SetupConfig(data) {
+        g_config = new g_configConstructor(data, g_svg);
     }
 
-
-    //----------------------------------------------------------
-
-    // Customise the network configuration
-    var f_nodeScale = null;
-    function ProgramConfig(data, svg) {
-        // map node weights to node "padding"
-        const minNodeWeight = d3.min(data.nodes, function (node_data) {
-            return node_data.size;
-        });
-
-        const maxNodeWeight = d3.max(data.nodes, function (node_data) {
-            return node_data.size;
-        });
-
-        f_nodeScale = d3.scaleLinear()
-            .domain([minNodeWeight, maxNodeWeight])
-            .range([1, 5])
-            .clamp(true);
-
-        // arrow head
-        svg.append('defs').selectAll('marker')
-            .data(['end'])
-          .enter()
-          .append('marker')
-            .attr('id', String)
-            .attr('viewBox', '0 -5 10 10')
-            .attr('refX', 10)
-            .attr('refY', 0)
-            .attr('markerWidth', 6)
-            .attr('markerHeight', 6)
-            .attr('orient', 'auto')
-            .attr("style", "stroke-width: 1.5px;")
-          .append('path')
-            .attr('d', 'M0,-5L10,0L0,5');
-
-        // base "class"
-        Config.call(this, data, svg);
-    }
-
-    ProgramConfig.prototype = Object.create(Config.prototype);
-
-    ProgramConfig.prototype.constructor = ProgramConfig;
-
-    ProgramConfig.prototype.GetNodeId = function (node_data) {
-        return node_data.title;
-    }
-
-    var f_colourScale = d3.scaleOrdinal(d3.schemeCategory10);
-    ProgramConfig.prototype.CreateNode = function (display_nodes) {
-        function calc_pad(node_data) {
-            return f_nodeScale(node_data.size) + 4;
-        }
-
-        function calc_node_colour(node_data, darken) {
-            return d3.color(f_colourScale(node_data.type)).darker(darken).toString();
-        }
-
-        display_nodes
-          .append("text")
-            .attr("class", "node-text")
-            .attr("text-anchor", "middle")
-            .attr("dominant-baseline", "middle")
-            .text(function (node_data) {
-                return node_data.title;
-            })
-            .each(function (node_data) {
-                node_data.text_extent = d3.select(this).node().getBBox();
-            });
-
-        display_nodes
-          .insert("rect", ":first-child")
-            .attr("rx", 5)
-            .attr("ry", 5)
-            .attr("x", function (node_data) {
-                return node_data.text_extent.x - calc_pad(node_data);
-            })
-            .attr("y", function (node_data) {
-                return node_data.text_extent.y - calc_pad(node_data);
-            })
-            .attr("width", function (node_data) {
-                return node_data.text_extent.width + (2 * calc_pad(node_data));
-            })
-            .attr("height", function (node_data) {
-                return node_data.text_extent.height + (2 * calc_pad(node_data));
-            })
-            .style("fill", function (node_data) {
-                return calc_node_colour(node_data, -0.1);
-            })
-            .style("stroke", function (node_data) {
-                return calc_node_colour(node_data, 0.7);
-            })
-            .style("stroke-width", "2px")
-            .each(function (node_data) {
-                node_data.node_extent = d3.select(this).node().getBBox();
-            });
-    }
-
-    ProgramConfig.prototype.CreateLink = function (display_links) {
-        display_links
-            .append("line");
-
-        display_links
-            .append("g");
-
-        display_links.select("g")
-            .append("text")
-            .attr("class", "link-text")
-            .text(function (link_data) {
-                return link_data.label;
-            })
-            .each(function (link_data) {
-                link_data.label_extent = d3.select(this).node().getBBox();
-            })
-            .attr("text-anchor", "middle")
-            .attr("y", function (link_data) {
-                return link_data.label_extent.height / 2;
-            });
-
-        display_links.select("g")
-            .insert("rect", ":first-child")
-            .attr("x", function (link_data) {
-                return - link_data.label_extent.width / 2;
-            })
-            .attr("y", function (link_data) {
-                return - link_data.label_extent.height / 2;
-            })
-            .attr("width", function (link_data) {
-                return link_data.label_extent.width;
-            })
-            .attr("height", function (link_data) {
-                return link_data.label_extent.height;
-            })
-            .style("stroke", "white")
-            .style("fill", "white");
-    }
-
-    ProgramConfig.prototype.StyleLink = function (display_links) {
-        function calc_link_colour(link_data, darken) {
-            if (link_data.type) {
-                return d3.color(f_colourScale(link_data.type)).darker(darken).toString();
-            }
-            else {
-                return "#666";
-            }
-        }
-
-        display_links.select("line")
-            .attr("style", function (link_data) {
-                colour = calc_link_colour(link_data, 0.7);
-                return "marker-end: url(#end); stroke: " + colour + "; fill: " + colour + ";"
-            });
-
-        Config.prototype.StyleLink.call(this, display_links);
-    }
-
-    ProgramConfig.prototype.StyleSimulation = function (simulation) {
-        simulation.force("link")
-            .distance(100);
-
-        simulation
-            .force("collision", d3.forceCollide()
-                .radius(function (node_data) {
-                    var w = node_data.text_extent.width / 2;
-                    var h = node_data.text_extent.height / 2;
-                    return 1.5 * Math.sqrt(w * w + h * h);
-                })
-                .iterations(1)
-            );
-    }
-
-    SetConfigConstructor(ProgramConfig);
-
-
+    
     //----------------------------------------------------------
 
     //
@@ -329,7 +155,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //    type - (optional) arbitrary type; typically used to determine line style/colour
     //    label - (optional) name for the link
     //
-    var g_data = null;
 
     //
     // display/layout configuration - schema:
@@ -491,8 +316,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function DoCreateChart() {
-        SetupConfig(g_data, g_svg);
+    function DoCreateChart(data, svg) {
+        SetupConfig(data);
         g_curZoom = g_curTransform.k;
 
         g_svg
@@ -511,7 +336,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             );
 
         g_joined_links = g_links_group.selectAll(".link-group")
-          .data(g_data.links)
+          .data(data.links)
           .join("g")
             .attr("class", "link-group")
             .call(g_config.CreateLink)
@@ -519,7 +344,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .on("click", OnLinkClick)
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
-          .data(g_data.nodes)
+          .data(data.nodes)
           .join("g")
             .attr("class", "node-group")
             .call(g_config.CreateNode)
@@ -549,18 +374,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function DoSimulation() {
+    function DoSimulation(data) {
         centre_x = GetWindowWidth() / 2;
         centre_y = GetWindowHeight() / 2;
 
-        g_simulation = d3.forceSimulation(g_data.nodes)
-            .force("link", d3.forceLink(g_data.links)
+        g_simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links)
                 .id(g_config.GetNodeId)
             )
             .force("charge", d3.forceManyBody())
             .on("tick", Layout)
             .stop();
-        
+
         if ("graph_is_disjoint" in g_options && g_options.graph_is_disjoint) {
             g_simulation
                 .force("x", d3.forceX(centre_x))
@@ -577,11 +402,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     function CreateChart(data_json, options_json) {
-        g_data = JSON.parse(data_json);
+        data = JSON.parse(data_json);
         g_options = JSON.parse(options_json);
 
-        DoCreateChart();
-        DoSimulation();
+        DoCreateChart(data);
+        DoSimulation(data);
     }
 
 
@@ -612,221 +437,394 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DoSetSelection();
     }
+</script>
 
-    //----------------------------------------------------------
 
-    
+<script>
+    // Customise the network configuration
+    var f_nodeScale = null;
+    function ProgramConfig(data, svg) {
+        // base "class"
+        Config.call(this, data, svg);
+
+        // map node weights to node "padding"
+        const minNodeWeight = d3.min(data.nodes, function (node_data) {
+            return node_data.size;
+        });
+
+        const maxNodeWeight = d3.max(data.nodes, function (node_data) {
+            return node_data.size;
+        });
+
+        f_nodeScale = d3.scaleLinear()
+            .domain([minNodeWeight, maxNodeWeight])
+            .range([1, 5])
+            .clamp(true);
+
+        // arrow head
+        svg.append('defs').selectAll('marker')
+            .data(['end'])
+          .enter()
+          .append('marker')
+            .attr('id', String)
+            .attr('viewBox', '0 -5 10 10')
+            .attr('refX', 10)
+            .attr('refY', 0)
+            .attr('markerWidth', 6)
+            .attr('markerHeight', 6)
+            .attr('orient', 'auto')
+            .attr("style", "stroke-width: 1.5px;")
+          .append('path')
+            .attr('d', 'M0,-5L10,0L0,5');
+    }
+
+    ProgramConfig.prototype = Object.create(Config.prototype);
+
+    ProgramConfig.prototype.constructor = ProgramConfig;
+
+    ProgramConfig.prototype.GetNodeId = function (node_data) {
+        return node_data.title;
+    }
+
+    var f_colourScale = d3.scaleOrdinal(d3.schemeCategory10);
+    ProgramConfig.prototype.CreateNode = function (display_nodes) {
+        function calc_pad(node_data) {
+            return f_nodeScale(node_data.size) + 4;
+        }
+
+        function calc_node_colour(node_data, darken) {
+            return d3.color(f_colourScale(node_data.type)).darker(darken).toString();
+        }
+
+        display_nodes
+          .append("text")
+            .attr("class", "node-text")
+            .attr("text-anchor", "middle")
+            .attr("dominant-baseline", "middle")
+            .text(function (node_data) {
+                return node_data.title;
+            })
+            .each(function (node_data) {
+                node_data.text_extent = d3.select(this).node().getBBox();
+            });
+
+        display_nodes
+          .insert("rect", ":first-child")
+            .attr("rx", 5)
+            .attr("ry", 5)
+            .attr("x", function (node_data) {
+                return node_data.text_extent.x - calc_pad(node_data);
+            })
+            .attr("y", function (node_data) {
+                return node_data.text_extent.y - calc_pad(node_data);
+            })
+            .attr("width", function (node_data) {
+                return node_data.text_extent.width + (2 * calc_pad(node_data));
+            })
+            .attr("height", function (node_data) {
+                return node_data.text_extent.height + (2 * calc_pad(node_data));
+            })
+            .style("fill", function (node_data) {
+                return calc_node_colour(node_data, -0.1);
+            })
+            .style("stroke", function (node_data) {
+                return calc_node_colour(node_data, 0.7);
+            })
+            .style("stroke-width", "2px")
+            .each(function (node_data) {
+                node_data.node_extent = d3.select(this).node().getBBox();
+            });
+    }
+
+    ProgramConfig.prototype.CreateLink = function (display_links) {
+        display_links
+          .append("line");
+
+        display_links
+          .append("g");
+
+        display_links.select("g")
+          .append("text")
+            .attr("class", "link-text")
+            .text(function (link_data) {
+                return link_data.label;
+            })
+            .each(function (link_data) {
+                link_data.label_extent = d3.select(this).node().getBBox();
+            })
+            .attr("text-anchor", "middle")
+            .attr("y", function (link_data) {
+                return link_data.label_extent.height / 2;
+            });
+
+        display_links.select("g")
+          .insert("rect", ":first-child")
+            .attr("x", function (link_data) {
+                return - link_data.label_extent.width / 2;
+            })
+            .attr("y", function (link_data) {
+                return - link_data.label_extent.height / 2;
+            })
+            .attr("width", function (link_data) {
+                return link_data.label_extent.width;
+            })
+            .attr("height", function (link_data) {
+                return link_data.label_extent.height;
+            })
+            .style("stroke", "white")
+            .style("fill", "white");
+    }
+
+    ProgramConfig.prototype.StyleLink = function (display_links) {
+        function calc_link_colour(link_data, darken) {
+            if (link_data.type) {
+                return d3.color(f_colourScale(link_data.type)).darker(darken).toString();
+            }
+            else {
+                return "#666";
+            }
+        }
+
+        display_links.select("line")
+            .attr("style", function (link_data) {
+                colour = calc_link_colour(link_data, 0.7);
+                return "marker-end: url(#end); stroke: " + colour + "; fill: " + colour + ";"
+            });
+
+        Config.prototype.StyleLink.call(this, display_links);
+    }
+
+    ProgramConfig.prototype.StyleSimulation = function (simulation) {
+        simulation.force("link")
+            .distance(100);
+
+        simulation
+            .force("collision", d3.forceCollide()
+                .radius(function (node_data) {
+                    var w = node_data.text_extent.width / 2;
+                    var h = node_data.text_extent.height / 2;
+                    return 1.5 * Math.sqrt(w * w + h * h);
+                })
+                .iterations(1)
+            );
+    }
+
+    SetConfigConstructor(ProgramConfig);
+</script>
+
+
+<script>
     function Update1() {
         const data = " \
         { \
-        	\"nodes\": [{ \
-        		\"event_id\": 1, \
-        		\"title\": \"Neighbours\", \
-        		\"type\": 1, \
-        		\"size\": 7 \
+            \"nodes\": [{ \
+                \"event_id\": 1, \
+                \"title\": \"Neighbours\", \
+                \"type\": 1, \
+                \"size\": 7 \
             }, { \
-        		\"event_id\": 100, \
-        		\"title\": \"The Gadget Show\", \
-        		\"type\": 1, \
-        		\"size\": 2 \
+                \"event_id\": 100, \
+                \"title\": \"The Gadget Show\", \
+                \"type\": 1, \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 3, \
-        		\"title\": \"Casualty\", \
-        		\"type\": 1, \
-        		\"size\": 2 \
+                \"event_id\": 3, \
+                \"title\": \"Casualty\", \
+                \"type\": 1, \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 4, \
-        		\"title\": \"Top Gear\", \
-        		\"type\": 1, \
-        		\"size\": 2 \
+                \"event_id\": 4, \
+                \"title\": \"Top Gear\", \
+                \"type\": 1, \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 5, \
-        		\"title\": \"EastEnders\", \
-        		\"type\": 1, \
-        		\"size\": 4 \
+                \"event_id\": 5, \
+                \"title\": \"EastEnders\", \
+                \"type\": 1, \
+                \"size\": 4 \
             }, { \
-        		\"event_id\": 6, \
-        		\"title\": \"Room 101\", \
-        		\"type\": 1, \
-        		\"size\": 1 \
+                \"event_id\": 6, \
+                \"title\": \"Room 101\", \
+                \"type\": 1, \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 7, \
-        		\"title\": \"Nightly Show with Gordon Ramsay\", \
-        		\"type\": 1, \
-        		\"size\": 4 \
+                \"event_id\": 7, \
+                \"title\": \"Nightly Show with Gordon Ramsay\", \
+                \"type\": 1, \
+                \"size\": 4 \
             }, { \
-        		\"event_id\": 8, \
-        		\"title\": \"MasterChef\", \
-        		\"type\": 1, \
-        		\"size\": 3 \
+                \"event_id\": 8, \
+                \"title\": \"MasterChef\", \
+                \"type\": 1, \
+                \"size\": 3 \
             }, { \
-        		\"event_id\": 9, \
-        		\"title\": \"Eddie Stobart\", \
-        		\"type\": 1, \
-        		\"size\": 1 \
+                \"event_id\": 9, \
+                \"title\": \"Eddie Stobart\", \
+                \"type\": 1, \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 10, \
-        		\"title\": \"Channel-2005\", \
-        		\"type\": 2, \
-        		\"size\": 9 \
+                \"event_id\": 10, \
+                \"title\": \"Channel-2005\", \
+                \"type\": 2, \
+                \"size\": 9 \
             }, { \
-        		\"event_id\": 11, \
-        		\"title\": \"Channel-2001\", \
-        		\"type\": 2, \
-        		\"size\": 10 \
+                \"event_id\": 11, \
+                \"title\": \"Channel-2001\", \
+                \"type\": 2, \
+                \"size\": 10 \
             }, { \
-        		\"event_id\": 12, \
-        		\"title\": \"Channel-2002\", \
-        		\"type\": 2, \
-        		\"size\": 2 \
+                \"event_id\": 12, \
+                \"title\": \"Channel-2002\", \
+                \"type\": 2, \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 13, \
-        		\"title\": \"Channel-2003\", \
-        		\"type\": 2, \
-        		\"size\": 4 \
+                \"event_id\": 13, \
+                \"title\": \"Channel-2003\", \
+                \"type\": 2, \
+                \"size\": 4 \
             }, { \
-        		\"event_id\": 14, \
-        		\"title\": \"Channel-2012\", \
-        		\"type\": 2, \
-        		\"size\": 1 \
+                \"event_id\": 14, \
+                \"title\": \"Channel-2012\", \
+                \"type\": 2, \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 15, \
-        		\"title\": \"Channel-2055\", \
-        		\"type\": 2, \
-        		\"size\": 1 \
+                \"event_id\": 15, \
+                \"title\": \"Channel-2055\", \
+                \"type\": 2, \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 16, \
-        		\"title\": \"CardId-1\", \
-        		\"type\": 3, \
-        		\"size\": 29 \
+                \"event_id\": 16, \
+                \"title\": \"CardId-1\", \
+                \"type\": 3, \
+                \"size\": 29 \
             }, { \
-        		\"event_id\": 17, \
-        		\"title\": \"CardId-2\", \
-        		\"type\": 3, \
-        		\"size\": 1 \
+                \"event_id\": 17, \
+                \"title\": \"CardId-2\", \
+                \"type\": 3, \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 18, \
-        		\"title\": \"CardId-7\", \
-        		\"type\": 3, \
-        		\"size\": 2 \
+                \"event_id\": 18, \
+                \"title\": \"CardId-7\", \
+                \"type\": 3, \
+                \"size\": 2 \
             }], \
-        	\"links\": [{ \
-        		\"event_id\": 19, \
-        		\"source\": \"Neighbours\", \
-        		\"target\": \"Channel-2005\", \
-        		\"type\": 2, \
+            \"links\": [{ \
+                \"event_id\": 19, \
+                \"source\": \"Neighbours\", \
+                \"target\": \"Channel-2005\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 20, \
-        		\"source\": \"Neighbours\", \
-        		\"target\": \"CardId-1\", \
+                \"event_id\": 20, \
+                \"source\": \"Neighbours\", \
+                \"target\": \"CardId-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 21, \
-        		\"source\": \"The Gadget Show\", \
-        		\"target\": \"Channel-2005\", \
-        		\"type\": 2, \
+                \"event_id\": 21, \
+                \"source\": \"The Gadget Show\", \
+                \"target\": \"Channel-2005\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 22, \
-        		\"source\": \"The Gadget Show\", \
-        		\"target\": \"CardId-1\", \
-        		\"type\": 3, \
+                \"event_id\": 22, \
+                \"source\": \"The Gadget Show\", \
+                \"target\": \"CardId-1\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 23, \
-        		\"source\": \"Casualty\", \
-        		\"target\": \"Channel-2001\", \
-        		\"type\": 2, \
+                \"event_id\": 23, \
+                \"source\": \"Casualty\", \
+                \"target\": \"Channel-2001\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 24, \
-        		\"source\": \"Casualty\", \
-        		\"target\": \"CardId-1\", \
-        		\"type\": 3, \
+                \"event_id\": 24, \
+                \"source\": \"Casualty\", \
+                \"target\": \"CardId-1\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 25, \
-        		\"source\": \"Top Gear\", \
-        		\"target\": \"Channel-2002\", \
-        		\"type\": 2, \
+                \"event_id\": 25, \
+                \"source\": \"Top Gear\", \
+                \"target\": \"Channel-2002\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 26, \
-        		\"source\": \"Top Gear\", \
-        		\"target\": \"CardId-1\", \
-        		\"type\": 3, \
+                \"event_id\": 26, \
+                \"source\": \"Top Gear\", \
+                \"target\": \"CardId-1\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 27, \
-        		\"source\": \"EastEnders\", \
-        		\"target\": \"Channel-2001\", \
-        		\"type\": 2, \
+                \"event_id\": 27, \
+                \"source\": \"EastEnders\", \
+                \"target\": \"Channel-2001\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 28, \
-        		\"source\": \"EastEnders\", \
-        		\"target\": \"CardId-1\", \
-        		\"type\": 3, \
+                \"event_id\": 28, \
+                \"source\": \"EastEnders\", \
+                \"target\": \"CardId-1\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 29, \
-        		\"source\": \"EastEnders\", \
-        		\"target\": \"CardId-7\", \
-        		\"type\": 3 \
+                \"event_id\": 29, \
+                \"source\": \"EastEnders\", \
+                \"target\": \"CardId-7\", \
+                \"type\": 3 \
             }, { \
-        		\"event_id\": 30, \
-        		\"source\": \"Room 101\", \
-        		\"target\": \"Channel-2012\", \
-        		\"type\": 2, \
+                \"event_id\": 30, \
+                \"source\": \"Room 101\", \
+                \"target\": \"Channel-2012\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 31, \
-        		\"source\": \"Room 101\", \
-        		\"target\": \"CardId-7\", \
-        		\"type\": 3, \
+                \"event_id\": 31, \
+                \"source\": \"Room 101\", \
+                \"target\": \"CardId-7\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 32, \
-        		\"source\": \"Nightly Show with Gordon Ramsay\", \
-        		\"target\": \"Channel-2003\", \
-        		\"type\": 2, \
+                \"event_id\": 32, \
+                \"source\": \"Nightly Show with Gordon Ramsay\", \
+                \"target\": \"Channel-2003\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 33, \
-        		\"source\": \"Nightly Show with Gordon Ramsay\", \
-        		\"target\": \"CardId-1\", \
-        		\"type\": 3, \
+                \"event_id\": 33, \
+                \"source\": \"Nightly Show with Gordon Ramsay\", \
+                \"target\": \"CardId-1\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 34, \
-        		\"source\": \"MasterChef\", \
-        		\"target\": \"Channel-2001\", \
-        		\"type\": 2, \
+                \"event_id\": 34, \
+                \"source\": \"MasterChef\", \
+                \"target\": \"Channel-2001\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 35, \
-        		\"source\": \"MasterChef\", \
-        		\"target\": \"CardId-1\", \
-        		\"type\": 3, \
+                \"event_id\": 35, \
+                \"source\": \"MasterChef\", \
+                \"target\": \"CardId-1\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 36, \
-        		\"source\": \"MasterChef\", \
-        		\"target\": \"CardId-2\", \
-        		\"type\": 3, \
+                \"event_id\": 36, \
+                \"source\": \"MasterChef\", \
+                \"target\": \"CardId-2\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 37, \
-        		\"source\": \"Eddie Stobart\", \
-        		\"target\": \"Channel-2055\", \
-        		\"type\": 2, \
+                \"event_id\": 37, \
+                \"source\": \"Eddie Stobart\", \
+                \"target\": \"Channel-2055\", \
+                \"type\": 2, \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 38, \
-        		\"source\": \"Eddie Stobart\", \
-        		\"target\": \"CardId-1\", \
-        		\"type\": 3, \
+                \"event_id\": 38, \
+                \"source\": \"Eddie Stobart\", \
+                \"target\": \"CardId-1\", \
+                \"type\": 3, \
                 \"label\": \"d\" \
             }] \
         }";
@@ -836,271 +834,271 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     function Update2() {
         const data = " \
         { \
-        	\"nodes\": [{ \
-        		\"event_id\": 1, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Casualty\", \
-        		\"size\": 2 \
+            \"nodes\": [{ \
+                \"event_id\": 1, \
+                \"type\": \"Program\", \
+                \"title\": \"Casualty\", \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 2, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Celebrity Apprentice USA\", \
-        		\"size\": 1 \
+                \"event_id\": 2, \
+                \"type\": \"Program\", \
+                \"title\": \"Celebrity Apprentice USA\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 3, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Come Dine with Me\", \
-        		\"size\": 1 \
+                \"event_id\": 3, \
+                \"type\": \"Program\", \
+                \"title\": \"Come Dine with Me\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 4, \
-        		\"type\": \"Program\", \
-        		\"title\": \"EastEnders\", \
-        		\"size\": 4 \
+                \"event_id\": 4, \
+                \"type\": \"Program\", \
+                \"title\": \"EastEnders\", \
+                \"size\": 4 \
             }, { \
-        		\"event_id\": 5, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Eddie Stobart\", \
-        		\"size\": 1 \
+                \"event_id\": 5, \
+                \"type\": \"Program\", \
+                \"title\": \"Eddie Stobart\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 6, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Good Will Hunting\", \
-        		\"size\": 1 \
+                \"event_id\": 6, \
+                \"type\": \"Program\", \
+                \"title\": \"Good Will Hunting\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 7, \
-        		\"type\": \"Program\", \
-        		\"title\": \"MasterChef\", \
-        		\"size\": 3 \
+                \"event_id\": 7, \
+                \"type\": \"Program\", \
+                \"title\": \"MasterChef\", \
+                \"size\": 3 \
             }, { \
-        		\"event_id\": 8, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Neighbours\", \
-        		\"size\": 7 \
+                \"event_id\": 8, \
+                \"type\": \"Program\", \
+                \"title\": \"Neighbours\", \
+                \"size\": 7 \
             }, { \
-        		\"event_id\": 9, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Nightly Show with Gordon Ramsay\", \
-        		\"size\": 4 \
+                \"event_id\": 9, \
+                \"type\": \"Program\", \
+                \"title\": \"Nightly Show with Gordon Ramsay\", \
+                \"size\": 4 \
             }, { \
-        		\"event_id\": 10, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Room 101\", \
-        		\"size\": 1 \
+                \"event_id\": 10, \
+                \"type\": \"Program\", \
+                \"title\": \"Room 101\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 11, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Snake Boss\", \
-        		\"size\": 2 \
+                \"event_id\": 11, \
+                \"type\": \"Program\", \
+                \"title\": \"Snake Boss\", \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 12, \
-        		\"type\": \"Program\", \
-        		\"title\": \"The Gadget Show\", \
-        		\"size\": 2 \
+                \"event_id\": 12, \
+                \"type\": \"Program\", \
+                \"title\": \"The Gadget Show\", \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 13, \
-        		\"type\": \"Program\", \
-        		\"title\": \"Top Gear\", \
-        		\"size\": 2 \
+                \"event_id\": 13, \
+                \"type\": \"Program\", \
+                \"title\": \"Top Gear\", \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 14, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2001\", \
-        		\"size\": 10 \
+                \"event_id\": 14, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2001\", \
+                \"size\": 10 \
             }, { \
-        		\"event_id\": 15, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2002\", \
-        		\"size\": 2 \
+                \"event_id\": 15, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2002\", \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 16, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2003\", \
-        		\"size\": 4 \
+                \"event_id\": 16, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2003\", \
+                \"size\": 4 \
             }, { \
-        		\"event_id\": 17, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2004\", \
-        		\"size\": 1 \
+                \"event_id\": 17, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2004\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 18, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2005\", \
-        		\"size\": 9 \
+                \"event_id\": 18, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2005\", \
+                \"size\": 9 \
             }, { \
-        		\"event_id\": 19, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2010\", \
-        		\"size\": 1 \
+                \"event_id\": 19, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2010\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 20, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2011\", \
-        		\"size\": 2 \
+                \"event_id\": 20, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2011\", \
+                \"size\": 2 \
             }, { \
-        		\"event_id\": 21, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2012\", \
-        		\"size\": 1 \
+                \"event_id\": 21, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2012\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 22, \
-        		\"type\": \"Channel\", \
-        		\"title\": \"Channel-2055\", \
-        		\"size\": 1 \
+                \"event_id\": 22, \
+                \"type\": \"Channel\", \
+                \"title\": \"Channel-2055\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 23, \
-        		\"type\": \"CardID\", \
-        		\"title\": \"CardID-1\", \
-        		\"size\": 28 \
+                \"event_id\": 23, \
+                \"type\": \"CardID\", \
+                \"title\": \"CardID-1\", \
+                \"size\": 28 \
             }, { \
-        		\"event_id\": 24, \
-        		\"type\": \"CardID\", \
-        		\"title\": \"CardID-2\", \
-        		\"size\": 1 \
+                \"event_id\": 24, \
+                \"type\": \"CardID\", \
+                \"title\": \"CardID-2\", \
+                \"size\": 1 \
             }, { \
-        		\"event_id\": 25, \
-        		\"type\": \"CardID\", \
-        		\"title\": \"CardID-7\", \
-        		\"size\": 2 \
+                \"event_id\": 25, \
+                \"type\": \"CardID\", \
+                \"title\": \"CardID-7\", \
+                \"size\": 2 \
             }], \
-        	\"links\": [{ \
-        		\"event_id\": 14, \
-        		\"source\": \"Neighbours\", \
-        		\"target\": \"CardID-1\", \
+            \"links\": [{ \
+                \"event_id\": 14, \
+                \"source\": \"Neighbours\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 15, \
-        		\"source\": \"The Gadget Show\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 15, \
+                \"source\": \"The Gadget Show\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 16, \
-        		\"source\": \"Good Will Hunting\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 16, \
+                \"source\": \"Good Will Hunting\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 17, \
-        		\"source\": \"Casualty\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 17, \
+                \"source\": \"Casualty\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 18, \
-        		\"source\": \"Snake Boss\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 18, \
+                \"source\": \"Snake Boss\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 19, \
-        		\"source\": \"Top Gear\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 19, \
+                \"source\": \"Top Gear\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 20, \
-        		\"source\": \"Celebrity Apprentice USA\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 20, \
+                \"source\": \"Celebrity Apprentice USA\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 21, \
-        		\"source\": \"EastEnders\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 21, \
+                \"source\": \"EastEnders\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 23, \
-        		\"source\": \"Nightly Show with Gordon Ramsay\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 23, \
+                \"source\": \"Nightly Show with Gordon Ramsay\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 24, \
-        		\"source\": \"MasterChef\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 24, \
+                \"source\": \"MasterChef\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 27, \
-        		\"source\": \"Come Dine with Me\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 27, \
+                \"source\": \"Come Dine with Me\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 28, \
-        		\"source\": \"Eddie Stobart\", \
-        		\"target\": \"CardID-1\", \
+                \"event_id\": 28, \
+                \"source\": \"Eddie Stobart\", \
+                \"target\": \"CardID-1\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 25, \
-        		\"source\": \"MasterChef\", \
-        		\"target\": \"CardID-2\", \
+                \"event_id\": 25, \
+                \"source\": \"MasterChef\", \
+                \"target\": \"CardID-2\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 22, \
-        		\"source\": \"Room 101\", \
-        		\"target\": \"CardID-7\", \
+                \"event_id\": 22, \
+                \"source\": \"Room 101\", \
+                \"target\": \"CardID-7\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 26, \
-        		\"source\": \"EastEnders\", \
-        		\"target\": \"CardID-7\", \
+                \"event_id\": 26, \
+                \"source\": \"EastEnders\", \
+                \"target\": \"CardID-7\", \
                 \"label\": \"d\" \
             }, { \
-        		\"event_id\": 4, \
-        		\"source\": \"Casualty\", \
-        		\"target\": \"Channel-2001\", \
+                \"event_id\": 4, \
+                \"source\": \"Casualty\", \
+                \"target\": \"Channel-2001\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 7, \
-        		\"source\": \"Celebrity Apprentice USA\", \
-        		\"target\": \"Channel-2001\", \
+                \"event_id\": 7, \
+                \"source\": \"Celebrity Apprentice USA\", \
+                \"target\": \"Channel-2001\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 8, \
-        		\"source\": \"EastEnders\", \
-        		\"target\": \"Channel-2001\", \
+                \"event_id\": 8, \
+                \"source\": \"EastEnders\", \
+                \"target\": \"Channel-2001\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 11, \
-        		\"source\": \"MasterChef\", \
-        		\"target\": \"Channel-2001\", \
+                \"event_id\": 11, \
+                \"source\": \"MasterChef\", \
+                \"target\": \"Channel-2001\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 6, \
-        		\"source\": \"Top Gear\", \
-        		\"target\": \"Channel-2002\", \
+                \"event_id\": 6, \
+                \"source\": \"Top Gear\", \
+                \"target\": \"Channel-2002\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 10, \
-        		\"source\": \"Nightly Show with Gordon Ramsay\", \
-        		\"target\": \"Channel-2003\", \
+                \"event_id\": 10, \
+                \"source\": \"Nightly Show with Gordon Ramsay\", \
+                \"target\": \"Channel-2003\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 12, \
-        		\"source\": \"Come Dine with Me\", \
-        		\"target\": \"Channel-2004\", \
+                \"event_id\": 12, \
+                \"source\": \"Come Dine with Me\", \
+                \"target\": \"Channel-2004\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 1, \
-        		\"source\": \"Neighbours\", \
-        		\"target\": \"Channel-2005\", \
+                \"event_id\": 1, \
+                \"source\": \"Neighbours\", \
+                \"target\": \"Channel-2005\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 2, \
-        		\"source\": \"The Gadget Show\", \
-        		\"target\": \"Channel-2005\", \
+                \"event_id\": 2, \
+                \"source\": \"The Gadget Show\", \
+                \"target\": \"Channel-2005\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 3, \
-        		\"source\": \"Good Will Hunting\", \
-        		\"target\": \"Channel-2010\", \
+                \"event_id\": 3, \
+                \"source\": \"Good Will Hunting\", \
+                \"target\": \"Channel-2010\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 5, \
-        		\"source\": \"Snake Boss\", \
-        		\"target\": \"Channel-2011\", \
+                \"event_id\": 5, \
+                \"source\": \"Snake Boss\", \
+                \"target\": \"Channel-2011\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 9, \
-        		\"source\": \"Room 101\", \
-        		\"target\": \"Channel-2012\", \
+                \"event_id\": 9, \
+                \"source\": \"Room 101\", \
+                \"target\": \"Channel-2012\", \
                 \"label\": \"h\" \
             }, { \
-        		\"event_id\": 13, \
-        		\"source\": \"Eddie Stobart\", \
-        		\"target\": \"Channel-2055\", \
+                \"event_id\": 13, \
+                \"source\": \"Eddie Stobart\", \
+                \"target\": \"Channel-2055\", \
                 \"label\": \"h\" \
             }] \
         }";
@@ -1108,8 +1106,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         const selection = " \
         { \
-	        \"nodes\": [25, 10, 21], \
-	        \"links\": [9, 22] \
+            \"nodes\": [25, 10, 21], \
+            \"links\": [9, 22] \
         }";
         SetSelection(selection);
     }

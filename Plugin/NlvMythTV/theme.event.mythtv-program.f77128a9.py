@@ -123,7 +123,8 @@ class Recogniser:
                 source_name TEXT,
                 source INT,
                 target_name TEXT,
-                target INT
+                target INT,
+                label TEXT
             )""")
 
         self.Cursor.execute("""
@@ -132,13 +133,15 @@ class Recogniser:
                 source_name,
                 source,
                 target_name,
-                target
+                target,
+                label
             )
             SELECT DISTINCT
                 program.title as source_name,
                 source_entities.event_id as source,
                 'Channel-' || program.channel as target_name,
-                target_entities.event_id as target
+                target_entities.event_id as target,
+                'Channel'
             FROM
                 program
             JOIN
@@ -155,7 +158,8 @@ class Recogniser:
                 program.title as source_name,
                 source_entities.event_id as source,
                 'CardID-' || program.cardid as target_name,
-                target_entities.event_id as target
+                target_entities.event_id as target,
+                'CardID'
             FROM
                 program
             JOIN
@@ -330,7 +334,9 @@ def LinksProjector(connection, cursor, context):
             source_name TEXT,
             source INT,
             target_name TEXT,
-            target INT
+            target INT,
+            label TEXT,
+            type TEXT
         )""")
 
     cursor.execute("""
@@ -340,14 +346,18 @@ def LinksProjector(connection, cursor, context):
             source_name,
             source,
             target_name,
-            target
+            target,
+            label,
+            type
         )
         SELECT
             event_id,
             source_name,
             source,
             target_name,
-            target
+            target,
+            label,
+            label
         FROM
             relationships
     """)
@@ -361,6 +371,8 @@ links = Links(
         .AddHiddenField("SourceEventId", "int")
         .AddField("Target", "A program, channel, or card.", "text", 200, align = "left")
         .AddHiddenField("TargetEventId", "int")
+        .AddHiddenField("Label", "text")
+        .AddHiddenField("Type", "text")
 )
 
 
