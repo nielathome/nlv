@@ -248,7 +248,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._DataExplorerIcon = wx.ArtProvider.GetIcon(wx.ART_REDO, wx.ART_TOOLBAR, (16, 16))
         self._DataExplorerKey = None
 
-        self._SelectedIcon = wx.ArtProvider.GetIcon(wx.ART_PLUS, wx.ART_TOOLBAR, (16, 16))
+        self._SelectedIcon = wx.ArtProvider.GetIcon(wx.ART_TIP, wx.ART_TOOLBAR, (16, 16))
         self._SelectedKeys = set()
 
         self._ColumnColours = []

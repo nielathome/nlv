@@ -363,6 +363,32 @@ def LinksProjector(connection, cursor, context):
     """)
 
 
+def DataExplorerLinksDetails(context, builder):
+    builder.AddPageHeading("Goto")
+    node_id = context.GetTargetId("Entities")
+
+    with context.DbInfo.ConnectionManager() as connection:
+        cursor = connection.cursor()
+        context.DbInfo.AttachBases(cursor)
+
+        cursor.execute("""
+            SELECT
+                source_name,
+                source,
+                target_name,
+                target
+            FROM
+                analysis.relationships
+            WHERE
+                event_id = {event_id}
+        """.format(event_id = context.EventId))
+
+        row = cursor.fetchone()
+        if row is not None:
+            builder.AddAction(node_id, row[0], row[1])
+            builder.AddAction(node_id, row[2], row[3])
+
+
 links = Links(
     "Relationships",
     LinksProjector,
@@ -373,6 +399,7 @@ links = Links(
         .AddHiddenField("TargetEventId", "int")
         .AddHiddenField("Label", "text")
         .AddHiddenField("Type", "text")
+        .OnDataExplorerClose(DataExplorerLinksDetails)
 )
 
 
