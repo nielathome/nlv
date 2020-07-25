@@ -74,7 +74,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     // fetch a node's ID; link elements use the ID to identify
     // the node's they connect
     Config.prototype.GetNodeId = function (node_data) {
-        return node_data.event_id;
+        return node_data.title;
     }
 
     // populate the graphical elements of all displayed nodes
@@ -170,7 +170,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr('markerWidth', 6)
             .attr('markerHeight', 6)
             .attr('orient', 'auto')
-            .attr("style", "fill: #666; stroke: #666; stroke-width: 1.5px;")
+            .attr("style", "stroke-width: 1.5px;")
           .append('path')
             .attr('d', 'M0,-5L10,0L0,5');
 
@@ -186,14 +186,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         return node_data.title;
     }
 
-    var f_nodeColourScale = d3.scaleOrdinal(d3.schemeCategory10);
+    var f_colourScale = d3.scaleOrdinal(d3.schemeCategory10);
     ProgramConfig.prototype.CreateNode = function (display_nodes) {
         function calc_pad(node_data) {
             return f_nodeScale(node_data.size) + 4;
         }
 
-        function calc_colour(node_data, darken) {
-            return d3.color(f_nodeColourScale(node_data.type)).darker(darken).toString();
+        function calc_node_colour(node_data, darken) {
+            return d3.color(f_colourScale(node_data.type)).darker(darken).toString();
         }
 
         display_nodes
@@ -225,10 +225,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 return node_data.text_extent.height + (2 * calc_pad(node_data));
             })
             .style("fill", function (node_data) {
-                return calc_colour(node_data, -0.1);
+                return calc_node_colour(node_data, -0.1);
             })
             .style("stroke", function (node_data) {
-                return calc_colour(node_data, 0.7);
+                return calc_node_colour(node_data, 0.7);
             })
             .style("stroke-width", "2px")
             .each(function (node_data) {
@@ -276,8 +276,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     ProgramConfig.prototype.StyleLink = function (display_links) {
+        function calc_link_colour(link_data, darken) {
+            if (link_data.type) {
+                return d3.color(f_colourScale(link_data.type)).darker(darken).toString();
+            }
+            else {
+                return "#666";
+            }
+        }
+
         display_links.select("line")
-            .attr("style", "stroke: #666; marker-end: url(#end);");
+            .attr("style", function (link_data) {
+                colour = calc_link_colour(link_data, 0.7);
+                return "marker-end: url(#end); stroke: " + colour + "; fill: " + colour + ";"
+            });
 
         Config.prototype.StyleLink.call(this, display_links);
     }
@@ -314,7 +326,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //  links[]
     //    source - initially node.event_id of source node; re-written to be reference to source node
     //    target - initially node.event_id of target node; re-written to be reference to target node
-    //    label - name for the link
+    //    type - (optional) arbitrary type; typically used to determine line style/colour
+    //    label - (optional) name for the link
     //
     var g_data = null;
 
@@ -701,6 +714,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         		\"event_id\": 19, \
         		\"source\": \"Neighbours\", \
         		\"target\": \"Channel-2005\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 20, \
@@ -711,90 +725,108 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         		\"event_id\": 21, \
         		\"source\": \"The Gadget Show\", \
         		\"target\": \"Channel-2005\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 22, \
         		\"source\": \"The Gadget Show\", \
         		\"target\": \"CardId-1\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 23, \
         		\"source\": \"Casualty\", \
         		\"target\": \"Channel-2001\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 24, \
         		\"source\": \"Casualty\", \
         		\"target\": \"CardId-1\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 25, \
         		\"source\": \"Top Gear\", \
         		\"target\": \"Channel-2002\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 26, \
         		\"source\": \"Top Gear\", \
         		\"target\": \"CardId-1\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 27, \
         		\"source\": \"EastEnders\", \
         		\"target\": \"Channel-2001\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 28, \
         		\"source\": \"EastEnders\", \
         		\"target\": \"CardId-1\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 29, \
         		\"source\": \"EastEnders\", \
-        		\"target\": \"CardId-7\" \
+        		\"target\": \"CardId-7\", \
+        		\"type\": 3 \
             }, { \
         		\"event_id\": 30, \
         		\"source\": \"Room 101\", \
         		\"target\": \"Channel-2012\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 31, \
         		\"source\": \"Room 101\", \
         		\"target\": \"CardId-7\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 32, \
         		\"source\": \"Nightly Show with Gordon Ramsay\", \
         		\"target\": \"Channel-2003\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 33, \
         		\"source\": \"Nightly Show with Gordon Ramsay\", \
         		\"target\": \"CardId-1\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 34, \
         		\"source\": \"MasterChef\", \
         		\"target\": \"Channel-2001\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 35, \
         		\"source\": \"MasterChef\", \
         		\"target\": \"CardId-1\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 36, \
         		\"source\": \"MasterChef\", \
         		\"target\": \"CardId-2\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }, { \
         		\"event_id\": 37, \
         		\"source\": \"Eddie Stobart\", \
         		\"target\": \"Channel-2055\", \
+        		\"type\": 2, \
                 \"label\": \"h\" \
             }, { \
         		\"event_id\": 38, \
         		\"source\": \"Eddie Stobart\", \
         		\"target\": \"CardId-1\", \
+        		\"type\": 3, \
                 \"label\": \"d\" \
             }] \
         }";
