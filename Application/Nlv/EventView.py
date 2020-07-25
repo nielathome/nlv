@@ -1268,22 +1268,26 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
         location = self._Field.idxLocateChart.Value
         self.GetViewCtrl().SetChartLocation(location)
 
-    def PushParameterValues(self, activate_chart):
+    def PushParameterValues(self, activate_chart, changed_parameter_name = None):
         chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
         if chart_ctrl is not None:
             self.PushChartLocation()
             values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
-            chart_ctrl.Realise(self.GetErrorReporter(), parameters = values)
+            chart_ctrl.Realise(self.GetErrorReporter(), parameters = values, changed_parameter_name = changed_parameter_name)
 
 
     #-------------------------------------------------------
-    def OnDynamicCtrl(self, event = None):
+    def OnDynamicCtrl(self, event):
         chart_no = self._Field.idxSelectChart.Value
+        id = event.GetId()
+        param_name = None
         for param in self._Parameters:
-            self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
+            if param.CtrlId == id:
+                self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
+                param_name = param.Name
 
         self._Field.ParameterValues.Value = self._ParameterValues.GetAsString()
-        self.PushParameterValues(activate_chart = False)
+        self.PushParameterValues(activate_chart = False, changed_parameter_name = param_name)
 
 
 

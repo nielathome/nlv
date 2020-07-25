@@ -208,6 +208,7 @@ class Network:
     #-----------------------------------------------------------
     def DefineParameters(self, connection, cursor, context):
         context.AddBool("graph_is_disjoint", "Network is disjoint", False)
+        context.AddBool("show_link_labels", "Show relationship names", False)
         
 
     #-----------------------------------------------------------
@@ -215,6 +216,14 @@ class Network:
         context.LoadPage("Network.html")
         if self._SetupScript is not None:
             context.LoadScript(self._SetupScript)
+
+    #-----------------------------------------------------------
+    def MakeOptions(self, context):
+        options = dict(
+            graph_is_disjoint = context.GetParameter("graph_is_disjoint", False),
+            show_link_labels = context.GetParameter("show_link_labels", False)
+        )
+        return json.dumps(options)
 
 
     #-----------------------------------------------------------
@@ -257,7 +266,7 @@ class Network:
 
         selection = dict(nodes = [node for node in selected_nodes_event_ids], links = [link for link in selected_links_event_ids])
         selection_json = json.dumps(selection)
-        context.CallJavaScript("SetSelection", selection_json)
+        context.CallJavaScript("SetSelection", selection_json, self.MakeOptions(context))
 
 
     #-----------------------------------------------------------
@@ -285,20 +294,27 @@ class Network:
 
         links = [dict(zip(link_fields, [_EscapeJsonField(field) for field in row])) for row in cursor]
 
-        options = dict(graph_is_disjoint = context.GetParameter("graph_is_disjoint", False))
-        options_json = json.dumps(options)
-
         network = dict(nodes = nodes, links = links)
         data_json = json.dumps(network)
-        context.CallJavaScript("CreateChart", data_json, options_json)
+        context.CallJavaScript("CreateChart", data_json, self.MakeOptions(context))
 
         self.SetSelection(connection, cursor, context)
 
 
     #-----------------------------------------------------------
     def Realise(self, name, connection, cursor, context):
-        if context.DataChanged() or context.ParamatersChanged():
+        structural_param_change = False
+        display_param_change = False
+
+        changed_parameter = context.ChangedParameterName()
+        if changed_parameter is not None:
+            if changed_parameter == "graph_is_disjoint":
+                structural_param_change = True
+            else:
+                display_param_change = True
+
+        if context.DataChanged() or structural_param_change:
             self.CreateChart(connection, cursor, context)
 
-        elif context.SelectionChanged():
+        elif context.SelectionChanged() or display_param_change:
             self.SetSelection(connection, cursor, context)

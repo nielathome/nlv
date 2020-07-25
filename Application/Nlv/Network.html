@@ -159,6 +159,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("opacity", function (link_data) {
                 return LinkOpacity(link_data);
             });
+
+        visibility = g_options.show_link_labels ? "visible" : "hidden";
+        label = display_link
+          .select("g")
+            .attr("visibility", visibility);
     }
 
     // refine the D3 simulation; the link force is "link", and the attraction
@@ -477,8 +482,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function SetSelection(selection_json) {
+    function SetSelection(selection_json, options_json) {
         selection = JSON.parse(selection_json);
+        g_options = JSON.parse(options_json);
 
         g_selected_nodes = new Set();
         selection.nodes.forEach(function (event_id) {
