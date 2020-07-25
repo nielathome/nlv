@@ -248,7 +248,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         self._DataExplorerIcon = wx.ArtProvider.GetIcon(wx.ART_REDO, wx.ART_TOOLBAR, (16, 16))
         self._DataExplorerKey = None
 
-        self._SelectedIcon = wx.ArtProvider.GetIcon(wx.ART_PLUS, wx.ART_TOOLBAR, (16, 16))
+        self._SelectedIcon = wx.ArtProvider.GetIcon(wx.ART_TIP, wx.ART_TOOLBAR, (16, 16))
         self._SelectedKeys = set()
 
         self._ColumnColours = []
@@ -407,7 +407,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             builder.AddField("Location", node_name)
 
             for col_num, field in enumerate(schema):
-                if field.Available:
+                if field.Available or field.ExplorerFormatter is not None:
                     display_value = self.GetFieldDisplayValue(item, col_num)
                     if isinstance(display_value, str):
                         text = display_value
@@ -1038,6 +1038,7 @@ class G_Param:
         self.Title = title
         self.Default = default
         self.Values = values
+        self.CtrlId = -1
 
 
     #-------------------------------------------------------
@@ -1060,6 +1061,7 @@ class G_BoolParam(G_Param):
     #-------------------------------------------------------
     def MakeControl(self, parent, value, handler):
         self._Ctrl = wx.CheckBox(parent)
+        self.CtrlId = self._Ctrl.GetId()
         self._Ctrl.SetValue(self.GetValueOrDefault(value))
         self._Ctrl.Bind(wx.EVT_CHECKBOX, handler)
         return self._Ctrl
@@ -1083,6 +1085,7 @@ class G_ChoiceParam(G_Param):
     #-------------------------------------------------------
     def MakeControl(self, parent, value, handler):
         self._Ctrl = wx.Choice(parent)
+        self.CtrlId = self._Ctrl.GetId()
         self._Ctrl.Set(self.Values)
 
         if value is None or value >= len(self.Values):
@@ -1208,15 +1211,15 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    @classmethod
-    def InitCharting(cls):
-        if not cls._InitCharting:
+    @G_Global.TimeFunction
+    def InitCharting(self):
+        if not __class__._InitCharting:
             return
 
         # Ensure JavaScript runs in embedded browser. Can be simplified
         # after wxPython-4.1.0. See https://github.com/wxWidgets/Phoenix/issues/1256.
         reg_path = r"Software\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION"
-        cls._SetRegistryValue(os.path.basename(sys.executable), reg_path, 11001)
+        self._SetRegistryValue(os.path.basename(sys.executable), reg_path, 11001)
 
         # makepy.py -i
         # {3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}, lcid=0, major=4, minor=0
@@ -1224,7 +1227,7 @@ class G_HtmlHostCtrl(wx.Panel):
         module = com.gencache.EnsureModule('{3050F1C5-98B5-11CF-BB82-00AA00BDCE0B}', 0, 4, 0)
         _IIDMap = module.NamesToIIDMap
 
-        cls._InitCharting = False
+        __class__._InitCharting = False
 
 
     #-------------------------------------------------------
@@ -1434,16 +1437,16 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
-    def Realise(self, error_reporter, data_changed = False, selection_changed = False, parameters = None):
+    def Realise(self, error_reporter, data_changed = False, selection_changed = False, parameters = None, changed_parameter_name = None):
         """Redraw the chart if needed"""
 
         class Context:
             #-----------------------------------------------
-            def __init__(self, host, data_changed, selection_changed, parameters_changed):
+            def __init__(self, host, data_changed, selection_changed, changed_parameter_name):
                 self._Host = host
                 self._DataChanged = data_changed
                 self._SelectionChanged = selection_changed
-                self._ParametersChanged = parameters_changed
+                self._ChangedParameterName = changed_parameter_name
 
             #-----------------------------------------------
             def DataChanged(self):
@@ -1452,8 +1455,8 @@ class G_HtmlHostCtrl(wx.Panel):
             def SelectionChanged(self):
                 return self._SelectionChanged
 
-            def ParamatersChanged(self):
-                return self._ParametersChanged
+            def ChangedParameterName(self):
+                return self._ChangedParameterName
 
             #-----------------------------------------------
             def GetSelection(self, set = None):
@@ -1468,7 +1471,6 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
         do_realize = False
-        parameters_changed = False
         if data_changed:
             do_realize = True
 
@@ -1477,14 +1479,13 @@ class G_HtmlHostCtrl(wx.Panel):
 
         if parameters is not None and parameters != self._ParameterValues:
             do_realize = True
-            parameters_changed = True
             self._ParameterValues = parameters.copy()
 
         db_info = self.GetDbInfo()
         if do_realize and db_info is not None:
             with G_ScriptGuard("Realise", error_reporter), db_info.ConnectionManager() as connection:
                 cursor = self.MakeDbCursor(connection)
-                context = Context(self, data_changed, selection_changed, parameters_changed)
+                context = Context(self, data_changed, selection_changed, changed_parameter_name)
                 self._ChartInfo.Realise(connection, cursor, context)
 
 

@@ -36,8 +36,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     .node-text {
         font-family: sans-serif;
-        font-size: x-small;
+        font-size: 8pt;
         pointer-events: none;
+    }
+
+    .link-text {
+        font-family: sans-serif;
+        font-size: 7pt;
+        cursor: default
     }
 </style>
 
@@ -95,20 +101,29 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     // fetch a node's ID; link elements use the ID to identify
     // the node's they connect
     Config.prototype.GetNodeId = function (node_data) {
-        return node_data.event_id;
+        return node_data.title;
     }
 
-    // populate the graphical elements of all display nodes
-    Config.prototype.CreateNode = function (display_nodes) {
-        display_nodes
+    // populate the graphical elements of all displayed nodes
+    Config.prototype.EnterNode = function (display_node) {
+        display_node
           .append("circle")
+            .attr("class", "node-shape");
+
+        display_node
+          .append("text");
+    }
+
+    Config.prototype.UpdateNode = function (display_node) {
+        display_node
+          .select("circle")
             .attr("class", "node-shape")
             .attr("r", 10)
             .attr("fill", "green")
             .attr("style", "stroke: white; stroke-width: 1.5px;");
 
-        display_nodes
-          .append("text")
+        display_node
+          .select("text")
             .attr("class", "node-text")
             .attr("x", 15)
             .text(function (node_data) {
@@ -118,20 +133,37 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     // style (set styles/attributes) on display nodes
     // default behaviour sets node opacity according to selection state
-    Config.prototype.StyleNode = function (display_nodes) {
-        display_nodes
+    Config.prototype.StyleNode = function (display_node) {
+        display_node
             .attr("opacity", function (node_data) {
                 return NodeOpacity(node_data);
             });
     }
 
+    // populate the graphical elements of all displayed links
+    Config.prototype.EnterLink = function (display_link) {
+        display_link
+          .append("line");
+    }
+
+    Config.prototype.UpdateLink = function (display_link) {
+        display_link
+          .select("line")
+            .attr("stroke", "black");
+    }
+
     // style (set styles/attributes) on a display links
     // default behaviour sets link opacity according to selection state
-    Config.prototype.StyleLink = function (display_links) {
-        display_links
+    Config.prototype.StyleLink = function (display_link) {
+        display_link
             .attr("opacity", function (link_data) {
                 return LinkOpacity(link_data);
             });
+
+        visibility = g_options.show_link_labels ? "visible" : "hidden";
+        label = display_link
+          .select("g")
+            .attr("visibility", visibility);
     }
 
     // refine the D3 simulation; the link force is "link", and the attraction
@@ -148,8 +180,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_configConstructor = config_constructor;
     }
 
-    function SetupConfig(data, svg) {
-        g_config = new g_configConstructor(data, svg);
+    function SetupConfig(data) {
+        g_config = new g_configConstructor(data, g_svg);
     }
 
     
@@ -167,8 +199,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //  links[]
     //    source - initially node.event_id of source node; re-written to be reference to source node
     //    target - initially node.event_id of target node; re-written to be reference to target node
+    //    type - (optional) arbitrary type; typically used to determine line style/colour
+    //    label - (optional) name for the link
     //
-    var g_data = null;
 
     //
     // display/layout configuration - schema:
@@ -181,16 +214,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_curTransform = d3.zoomIdentity;
 
     // append the svg object to the body of the page
-    var g_svg = d3.select("#graph")
-        .append("svg")
+    var g_svg = d3
+      .select("#graph")
+      .append("svg")
         .attr("width", "100%")
         .attr("height", "100%");
 
-    var g_joined_links = null;
     var g_links_group = g_svg.append("g");
+    var g_joined_links = null;
 
-    var g_joined_nodes = null;
     var g_nodes_group = g_svg.append("g");
+    var g_joined_nodes = null;
 
 
     //----------------------------------------------------------
@@ -308,10 +342,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 }
 
                 d3.select(this)
+                  .select("line")
                     .attr("x1", x1)
                     .attr("y1", y1)
                     .attr("x2", x2)
-                    .attr("y2", y2)
+                    .attr("y2", y2);
+
+                var tx = x1 + (x2 - x1) / 2,
+                    ty = y1 + (y2 - y1) / 2;
+
+                d3.select(this)
+                  .select("g")
+                    .attr("transform", "translate(" + tx + "," + ty + ")");
             });
 
         (doTransition ? g_joined_nodes.transition(ref_transition) : g_joined_nodes)
@@ -324,8 +366,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function DoCreateChart() {
-        SetupConfig(g_data, g_svg);
+    function DoCreateChart(data) {
+        SetupConfig(data);
         g_curZoom = g_curTransform.k;
 
         g_svg
@@ -343,17 +385,31 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 })
             );
 
-        g_joined_links = g_links_group.selectAll("line")
-          .data(g_data.links)
-          .join("line")
+        g_joined_links = g_links_group.selectAll(".link-group")
+          .data(data.links)
+          .join(
+            function (enter) {
+                return enter
+                  .append("g")
+                    .call(g_config.EnterLink)
+            }
+          )
+            .attr("class", "link-group")
+            .call(g_config.UpdateLink)
             .call(g_config.StyleLink)
             .on("click", OnLinkClick)
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
-          .data(g_data.nodes)
-          .join("g")
+          .data(data.nodes)
+          .join(
+            function (enter) {
+                return enter
+                  .append("g")
+                    .call(g_config.EnterNode)
+            }
+          )
             .attr("class", "node-group")
-            .call(g_config.CreateNode)
+            .call(g_config.UpdateNode)
             .call(g_config.StyleNode)
             .on("click", OnNodeClick)
             .call(d3.drag()
@@ -380,18 +436,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function DoSimulation() {
+    function DoSimulation(data) {
         centre_x = GetWindowWidth() / 2;
         centre_y = GetWindowHeight() / 2;
 
-        g_simulation = d3.forceSimulation(g_data.nodes)
-            .force("link", d3.forceLink(g_data.links)
+        g_simulation = d3.forceSimulation(data.nodes)
+            .force("link", d3.forceLink(data.links)
                 .id(g_config.GetNodeId)
             )
             .force("charge", d3.forceManyBody())
             .on("tick", Layout)
             .stop();
-        
+
         if ("graph_is_disjoint" in g_options && g_options.graph_is_disjoint) {
             g_simulation
                 .force("x", d3.forceX(centre_x))
@@ -408,11 +464,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     function CreateChart(data_json, options_json) {
-        g_data = JSON.parse(data_json);
+        data = JSON.parse(data_json);
         g_options = JSON.parse(options_json);
 
-        DoCreateChart();
-        DoSimulation();
+        DoCreateChart(data);
+        DoSimulation(data);
     }
 
 
@@ -426,8 +482,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
 
-    function SetSelection(selection_json) {
+    function SetSelection(selection_json, options_json) {
         selection = JSON.parse(selection_json);
+        g_options = JSON.parse(options_json);
 
         g_selected_nodes = new Set();
         selection.nodes.forEach(function (event_id) {
@@ -443,6 +500,4 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         DoSetSelection();
     }
-
-
 </script>

@@ -672,7 +672,8 @@ class G_LogAnalysisNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
     def PostAnalyse(self):
         self._ForallProjectors(lambda node : node.PostAnalyse(self._AnalysisResults), [
-            G_Project.NodeID_EventProjector
+            G_Project.NodeID_EventProjector,
+            G_Project.NodeID_NetworkDataProjector
         ])
 
 
@@ -1267,22 +1268,26 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
         location = self._Field.idxLocateChart.Value
         self.GetViewCtrl().SetChartLocation(location)
 
-    def PushParameterValues(self, activate_chart):
+    def PushParameterValues(self, activate_chart, changed_parameter_name = None):
         chart_ctrl = self.GetChartViewCtrl(activate = activate_chart)
         if chart_ctrl is not None:
             self.PushChartLocation()
             values = self._ParameterValues.GetValues(self._Field.idxSelectChart.Value)
-            chart_ctrl.Realise(self.GetErrorReporter(), parameters = values)
+            chart_ctrl.Realise(self.GetErrorReporter(), parameters = values, changed_parameter_name = changed_parameter_name)
 
 
     #-------------------------------------------------------
-    def OnDynamicCtrl(self, event = None):
+    def OnDynamicCtrl(self, event):
         chart_no = self._Field.idxSelectChart.Value
+        id = event.GetId()
+        param_name = None
         for param in self._Parameters:
-            self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
+            if param.CtrlId == id:
+                self._ParameterValues.SetValue(chart_no, param.Name, param.GetValue())
+                param_name = param.Name
 
         self._Field.ParameterValues.Value = self._ParameterValues.GetAsString()
-        self.PushParameterValues(activate_chart = False)
+        self.PushParameterValues(activate_chart = False, changed_parameter_name = param_name)
 
 
 
@@ -1510,6 +1515,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     def OnChartSelection(self, event_id, ctrl_key):
         """Pass (HTML) chart selection event on to table"""
+        self.MakeActive()
         self.GetTableViewCtrl().OnChartSelection(event_id, ctrl_key)
 
 
@@ -1574,6 +1580,14 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             projector_info, valid = self.GetProjectorInfo()
             for quantifier in projector_info.Quantifiers.values():
                 self.BuildNodeFromDefaults(G_Project.NodeID_MetricsProjector, quantifier.Name)
+
+
+    #-------------------------------------------------------
+    def PostAnalyse(self, analysis_results):
+        if analysis_results is not None:
+            event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
+            settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
+            self.FindChildNode(factory_id = G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
@@ -1689,14 +1703,6 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
             self.UpdateMetricContent()
 
         return ok
-
-
-    #-------------------------------------------------------
-    def PostAnalyse(self, analysis_results):
-        if analysis_results is not None:
-            event_schema = analysis_results.GetProjectorInfo(self._Name).ProjectionSchema
-            settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
-            self.FindChildNode(factory_id = G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
@@ -1909,6 +1915,15 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         table_ctrl = self.GetParentNode().GetViewCtrl().SetupDataTable(self._TableIndex, self._Name, self.GetNodeId())
         self.SetDisplayCtrl(table_ctrl, owns_display_ctrl = False)
         self.SetupTableCtrl(table_ctrl)
+
+
+    #-------------------------------------------------------
+    def PostAnalyse(self, analysis_results):
+        if analysis_results is not None:
+            network_info = analysis_results.GetProjectorInfo(self.GetParentNode()._Name)
+            event_schema = network_info.GetNetworkProjector(self._Name).GetSchema()
+            settings = [(field.InitialVisibility, field.InitialColour) for field in event_schema if field.Available]
+            self.FindChildNode(factory_id = G_Project.NodeID_EventField).OverrideSettings(settings)
 
 
     #-------------------------------------------------------
