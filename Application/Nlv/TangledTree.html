@@ -1,0 +1,172 @@
+﻿<!--
+Copyright (C) Niel Clausen 2020. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<script src="https://d3js.org/d3.v5.js"></script>
+
+<style>
+    html, body {
+        height: 100%;
+        margin: 0;
+    }
+
+    .node-text {
+        font-family: sans-serif;
+        font-size: 8pt;
+        pointer-events: none;
+    }
+
+    .bundle-background {
+        fill: none;
+        stroke: white;
+        stroke-width: 5;
+    }
+
+    .bundle-foreground {
+        fill: none;
+        stroke-width: 2;
+    }
+
+    .node-background {
+        stroke: black;
+        stroke-linecap: round;
+    }
+
+    .node-foreground {
+        stroke: white;
+        stroke-linecap: round;
+    }
+</style>
+
+
+<!-- Create a div for the SVG graph -->
+<div id="graph" overflow="scroll"></div>
+
+
+<script>
+    function DoCreateChart(data) {
+        node_data = data.nodes;
+        bundle_data = data.bundles;
+        config = data.config
+        color = d3.scaleOrdinal(d3.schemeDark2)
+
+        // append the svg object to the body of the page
+        var svg = d3
+            .select("#graph")
+            .append("svg")
+            .attr("width", config.Width + "px")
+            .attr("height", config.Height + "px")
+
+        var bundles_group = svg.append("g");
+        bundles_group.selectAll(".bundle-group")
+            .data(bundle_data)
+            .join(
+                function (enter) {
+                    return enter
+                        .append("g")
+                        .call(function (group) {
+                            function CalcPath(path) {
+                                path.attr("d", function (bundle) {
+                                    R = config.LinkRadius
+                                    return bundle.links.map(function (link) {
+                                        return "M " + link.px + " " + link.py
+                                            + " H" + (link.x - R)
+                                            + " A" + R + " " + R + " 0 0 1 " + link.x + " " + (link.py + R)
+                                            + " V" + (link.cy - R)
+                                            + " A" + R + " " + R + " 0 0 0 " + (link.x + R) + " " + link.cy
+                                            + " H" + link.cx
+                                    }).join(" ");
+                                });
+                            }
+
+                            group
+                                .append("path")
+                                .attr("class", "bundle-background")
+                                .call(CalcPath);
+
+                            group
+                                .append("path")
+                                .attr("class", "bundle-foreground")
+                                .call(CalcPath)
+                                .attr("stroke", function (bundle) {
+                                    return color(bundle.id);
+                                });
+
+                        })
+                }
+            );
+
+        var nodes_group = svg.append("g");
+        nodes_group.selectAll(".node-group")
+            .data(node_data)
+            .join("text")
+            .attr("class", "node-text")
+            .attr("x", function (n) {
+                return n.x + config.BallRadius + config.TextOffsetX;
+            })
+            .attr("y", function (n) {
+                return n.y - n.bundle_height / 2 - config.TextOffsetY;
+            })
+            .text(function (n) {
+                return n.id;
+            })
+
+        function MakeNode(css_class, width) {
+            nodes_group.selectAll("." + css_class)
+                .data(node_data)
+                .join("line")
+                .attr("class", css_class)
+                .attr("x1", function (n) { return n.x })
+                .attr("y1", function (n) { return n.y - n.bundle_height / 2 })
+                .attr("x2", function (n) { return n.x })
+                .attr("y2", function (n) { return n.y + n.bundle_height / 2 })
+                .attr("stroke-width", width);
+        }
+
+        MakeNode("node-background", 2 * config.BallRadius);
+        MakeNode("node-foreground", config.BallRadius);
+    }
+
+    function CreateChart(data_json, options_json) {
+        data = JSON.parse(data_json);
+        g_options = JSON.parse(options_json);
+
+        DoCreateChart(data);
+    }
+
+    function SetSelection(selection_json, options_json) {
+        //selection = JSON.parse(selection_json);
+        //g_options = JSON.parse(options_json);
+
+        //g_selected_nodes = new Set();
+        //selection.nodes.forEach(function (event_id) {
+        //    g_selected_nodes.add(event_id);
+        //});
+
+        //g_selected_links = new Set();
+        //selection.links.forEach(function (event_id) {
+        //    g_selected_links.add(event_id);
+        //});
+
+        //g_has_selection = g_selected_nodes.size != 0 || g_selected_links.size != 0;
+
+        //DoSetSelection();
+    }
+
+</script>
+
