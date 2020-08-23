@@ -81,10 +81,108 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
 
+    // Style & behaviour configuration items. Override these
+    // functions in your plugin. Don't rely on 'this'; the functions
+    // are generally call'ed against a UI object.
+
+    function Config(data, svg) { }
+
+    // populate the graphical elements of all displayed nodes
+    Config.prototype.EnterNode = function (display_node) {
+        display_node
+          .append("text")
+            .attr("class", "node-text");
+
+        display_node
+          .append("line")
+            .attr("class", "node-outline");
+
+        display_node
+          .append("line")
+            .attr("class", "node-fill");
+    }
+
+    Config.prototype.UpdateNode = function (display_node) {
+        display_node
+            .attr("transform", function (node_data) { return "translate(" + node_data.x + "," + node_data.y + ")" });
+
+        display_node
+          .select(".node-text")
+            .attr("x", g_layout.BallRadius + g_layout.TextOffsetX)
+            .attr("y", function (node_data) { return - g_layout.TextOffsetY; })
+            .text(function (node_data) { return node_data.title; });
+
+        function SetBall(node) {
+            node
+                .attr("y2", function (node_data) { return node_data.bundle_height; });
+        }
+
+        display_node
+          .select(".node-outline")
+            .call(SetBall);
+
+        display_node
+            .select(".node-fill")
+            .call(SetBall);
+    }
+
+    // style (set styles/attributes) on display nodes
+    Config.prototype.StyleNode = function (display_node) {
+        display_node
+          .select(".node-outline")
+            .attr("stroke-width", 2 * g_layout.BallRadius);
+
+        display_node
+            .select(".node-fill")
+            .attr("stroke", NodeFillColour)
+            .attr("stroke-width", g_layout.BallRadius);
+    }
+
+    // populate the graphical elements of all displayed links
+    Config.prototype.EnterLink = function (display_link) {
+        display_link
+            .append("line");
+    }
+
+    Config.prototype.UpdateLink = function (display_link) {
+        display_link
+            .select("line")
+            .attr("stroke", "black");
+    }
+
+    // style (set styles/attributes) on a display links
+    // default behaviour sets link opacity according to selection state
+    Config.prototype.StyleLink = function (display_link) {
+        display_link
+            .attr("opacity", function (link_data) {
+                return LinkOpacity(link_data);
+            });
+
+        visibility = g_options.show_link_labels ? "visible" : "hidden";
+        label = display_link
+            .select("g")
+            .attr("visibility", visibility);
+    }
+
+    var g_configConstructor = Config;
+    var g_config = null;
+
+    function SetConfigConstructor(config_constructor) {
+        g_configConstructor = config_constructor;
+    }
+
+    function SetupConfig(data) {
+        g_config = new g_configConstructor(data, g_svg);
+    }
+
+
+    //----------------------------------------------------------
+
     //
     // display/layout configuration:
     //
     var g_options = null;
+    var g_layout = null;
 
     // append the svg object to the body of the page
     var g_svg = d3
@@ -116,15 +214,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
     function DoCreateChart(data) {
+        SetupConfig(data);
+
         node_data = data.nodes;
         bundle_data = data.bundles;
-        config = data.config
+        g_layout = data.config
         colour_scale = d3.scaleOrdinal(d3.schemeDark2)
 
         // set chart size
         g_svg
-            .attr("width", config.Width + "px")
-            .attr("height", config.Height + "px");
+            .attr("width", g_layout.Width + "px")
+            .attr("height", g_layout.Height + "px");
 
         g_bundles_group.selectAll(".bundle-group")
             .data(bundle_data)
@@ -153,7 +253,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .call(function (group) {
                 function CalcPath(path, include) {
                     path.attr("d", function (bundle) {
-                        R = config.LinkRadius
+                        R = g_layout.LinkRadius
                         return bundle.links.map(function (link) {
                             return !include(link) ? "M 0 0" : "M " + link.px + " " + link.py
                                 + " H" + (link.x - R)
@@ -184,37 +284,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     });
             });
 
-        g_nodes_group.selectAll(".node-text")
+
+        g_joined_nodes = g_nodes_group.selectAll(".node-group")
             .data(node_data)
-            .join("text")
-            .attr("class", "node-text")
-            .on("click", OnNodeClick)
-            .attr("x", function (n) {
-                return n.x + config.BallRadius + config.TextOffsetX;
-            })
-            .attr("y", function (n) {
-                return n.y - n.bundle_height / 2 - config.TextOffsetY;
-            })
-            .text(function (n) {
-                return n.title;
-            })
-
-        function MakeNode(css_class, width) {
-            g_nodes_group.selectAll("." + css_class)
-                .data(node_data)
-                .join("line")
-                .attr("class", css_class)
-                .on("click", OnNodeClick)
-                .attr("x1", function (n) { return n.x })
-                .attr("y1", function (n) { return n.y - n.bundle_height / 2 })
-                .attr("x2", function (n) { return n.x })
-                .attr("y2", function (n) { return n.y + n.bundle_height / 2 })
-                .attr("stroke", NodeFillColour)
-                .attr("stroke-width", width);
-        }
-
-        MakeNode("node-outline", 2 * config.BallRadius);
-        MakeNode("node-fill", config.BallRadius);
+            .join(
+                function (enter) {
+                    return enter
+                        .append("g")
+                        .call(g_config.EnterNode)
+                }
+            )
+            .attr("class", "node-group")
+            .call(g_config.UpdateNode)
+            .call(g_config.StyleNode)
+            .on("click", OnNodeClick);
     }
 
 
