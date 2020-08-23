@@ -95,8 +95,9 @@ class D_Bundle(Data):
     "Graphical layout data for a group of Links - a bundle of vertical connections"
 
     #-------------------------------------------------------
-    def __init__(self, name, parents):
+    def __init__(self, id, name, parents):
         self.Generation = None
+        self.Id = id
         self.Name = name
         self.ParentEntities = sorted(parents)
         self.ChildEntities = []
@@ -161,6 +162,9 @@ class D_Bundle(Data):
             self.AssignAncestorGeneration(generation)
             self.AssignDescendentGeneration(generation)
 
+    def AssignDefaultGeneration(self):
+        self.SetGeneration(0)
+
 
     #-------------------------------------------------------
     def AssignNodeLevels(self, level_offset):
@@ -190,7 +194,7 @@ class D_NetworkBuilder:
 
 
     #-------------------------------------------------------
-    def AddRelationship(self, child_id, parent_id):
+    def AddRelationship(self, parent_id, child_id):
         child_entity = self.Entities[child_id]
         parent_entity = self.Entities[parent_id]
 
@@ -222,7 +226,7 @@ class D_Network(D_NetworkBuilder):
 
         if got is None:
             name = "-".join([parent.Name for parent in parents])
-            got = D_Bundle(name, parents)
+            got = D_Bundle(id, name, parents)
             self.Bundles[id] = got
         
         return got
@@ -240,21 +244,22 @@ class D_Network(D_NetworkBuilder):
     #-------------------------------------------------------
     def AssignNodeLevels(self):
         # assign bundles generations first
-        roots = []
         for bundle in self.Bundles.values():
             if bundle.IsRootBundle():
-                roots.append(bundle.AssignGeneration(0))
-                break # temp
+                bundle.AssignGeneration(0)
+
+        # assign default generation for any bundles not covered
+        for bundle in self.Bundles.values():
+            bundle.AssignDefaultGeneration()
 
         # then build bundle generations into a "list"
         generations = dict()
         for bundle in self.Bundles.values():
             generation = bundle.Generation
-            if generation is not None:
-                if generation in generations:
-                    generations[generation].append(bundle)
-                else:
-                    generations[generation] = [bundle]
+            if generation in generations:
+                generations[generation].append(bundle)
+            else:
+                generations[generation] = [bundle]
 
         # translate that to node levels
         indices = [key for key in generations.keys()]
@@ -348,6 +353,7 @@ class G_Node(Data):
     #-------------------------------------------------------
     def __init__(self, data):
         self.Data = data
+        self.Id = data.Id
         self.Name = data.Name
         data.ChildBundles.sort()
 
@@ -398,6 +404,7 @@ class G_Bundle(Data):
 
     #-------------------------------------------------------
     def __init__(self, data, store):
+        self.Id = data.Id
         self.Name = data.Name
         self.Data = data
         self.Links = []
@@ -496,12 +503,15 @@ class Level:
 
         # remake nodes in bundle order
         remainder = set(self.Nodes)
+        nodes = set()
         self.Nodes = []
         for bundle in self.Bundles:
             parents = [store.GetNode(parent) for parent in  bundle.Data.ParentEntities]
-            self.Nodes.extend(parents)
             for parent in parents:
-                remainder.remove(parent)
+                remainder.discard(parent)
+                if parent not in nodes:
+                    nodes.add(parent)
+                    self.Nodes.append(parent)
 
         self.Nodes.extend(sorted([node for node in remainder]))
 
@@ -602,8 +612,8 @@ class Tree:
         self.Builder.AddEntity(properties)
 
 
-    def AddRelationship(self, child_id, parent_id):
-        self.Builder.AddRelationship(child_id, parent_id)
+    def AddRelationship(self, parent_id, child_id):
+        self.Builder.AddRelationship(parent_id, child_id)
 
 
     #-------------------------------------------------------

@@ -1358,7 +1358,7 @@ class G_HtmlHostCtrl(wx.Panel):
     def CallJavaScript(self, method, *args):
         def ConvertArg(arg):
             if isinstance(arg, str):
-                return "'{}'".format(arg)
+                return "'{}'".format(arg.replace("\n", ""))
             else:
                 return str(arg)
 
