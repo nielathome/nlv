@@ -47,12 +47,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         stroke-width: 2;
     }
 
-    .node-background {
+    .node-outline {
         stroke: black;
         stroke-linecap: round;
     }
 
-    .node-foreground {
+    .node-standard-fill {
         stroke: white;
         stroke-linecap: round;
     }
@@ -75,60 +75,78 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
+
+    //
+    // display/layout configuration - schema:
+    //
+    var g_options = null;
+
+    // append the svg object to the body of the page
+    var g_svg = d3
+        .select("#graph")
+        .append("svg");
+
+    var g_bundles_group = g_svg.append("g");
+    var g_nodes_group = g_svg.append("g");
+
+
+    //----------------------------------------------------------
     function DoCreateChart(data) {
         node_data = data.nodes;
         bundle_data = data.bundles;
         config = data.config
         color = d3.scaleOrdinal(d3.schemeDark2)
 
-        // append the svg object to the body of the page
-        var svg = d3
-            .select("#graph")
-            .append("svg")
+        // set chart size
+        g_svg
             .attr("width", config.Width + "px")
-            .attr("height", config.Height + "px")
+            .attr("height", config.Height + "px");
 
-        var bundles_group = svg.append("g");
-        bundles_group.selectAll(".bundle-group")
+        g_bundles_group.selectAll(".bundle-group")
             .data(bundle_data)
             .join(
                 function (enter) {
                     return enter
                         .append("g")
+                        .attr("class", "bundle-group")
                         .call(function (group) {
-                            function CalcPath(path) {
-                                path.attr("d", function (bundle) {
-                                    R = config.LinkRadius
-                                    return bundle.links.map(function (link) {
-                                        return "M " + link.px + " " + link.py
-                                            + " H" + (link.x - R)
-                                            + " A" + R + " " + R + " 0 0 1 " + link.x + " " + (link.py + R)
-                                            + " V" + (link.cy - R)
-                                            + " A" + R + " " + R + " 0 0 0 " + (link.x + R) + " " + link.cy
-                                            + " H" + link.cx
-                                    }).join(" ");
-                                });
-                            }
-
                             group
                                 .append("path")
-                                .attr("class", "bundle-background")
-                                .call(CalcPath);
+                                .attr("class", "bundle-background");
 
                             group
                                 .append("path")
                                 .attr("class", "bundle-foreground")
-                                .call(CalcPath)
                                 .attr("stroke", function (bundle) {
                                     return color(bundle.id);
                                 });
-
                         })
+                })
+            .call(function (group) {
+                function CalcPath(path) {
+                    path.attr("d", function (bundle) {
+                        R = config.LinkRadius
+                        return bundle.links.map(function (link) {
+                            return "M " + link.px + " " + link.py
+                                + " H" + (link.x - R)
+                                + " A" + R + " " + R + " 0 0 1 " + link.x + " " + (link.py + R)
+                                + " V" + (link.cy - R)
+                                + " A" + R + " " + R + " 0 0 0 " + (link.x + R) + " " + link.cy
+                                + " H" + link.cx
+                        }).join(" ");
+                    });
                 }
-            );
 
-        var nodes_group = svg.append("g");
-        nodes_group.selectAll(".node-group")
+                group
+                    .select(".bundle-background")
+                    .call(CalcPath);
+
+                group
+                    .select(".bundle-foreground")
+                    .call(CalcPath);
+            });
+
+        g_nodes_group.selectAll(".node-text")
             .data(node_data)
             .join("text")
             .attr("class", "node-text")
@@ -143,7 +161,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             })
 
         function MakeNode(css_class, width) {
-            nodes_group.selectAll("." + css_class)
+            g_nodes_group.selectAll("." + css_class)
                 .data(node_data)
                 .join("line")
                 .attr("class", css_class)
@@ -154,8 +172,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 .attr("stroke-width", width);
         }
 
-        MakeNode("node-background", 2 * config.BallRadius);
-        MakeNode("node-foreground", config.BallRadius);
+        MakeNode("node-outline", 2 * config.BallRadius);
+        MakeNode("node-standard-fill", config.BallRadius);
     }
 
 
