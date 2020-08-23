@@ -42,6 +42,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         stroke-width: 5;
     }
 
+    .bundle-selected {
+        fill: none;
+        stroke: wheat;
+        stroke-width: 5;
+    }
+
     .bundle-foreground {
         fill: none;
         stroke-width: 2;
@@ -52,8 +58,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         stroke-linecap: round;
     }
 
-    .node-standard-fill {
-        stroke: white;
+    .node-fill {
         stroke-linecap: round;
     }
 </style>
@@ -77,7 +82,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     //----------------------------------------------------------
 
     //
-    // display/layout configuration - schema:
+    // display/layout configuration:
     //
     var g_options = null;
 
@@ -91,11 +96,30 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
+
+    // selection support
+    var g_selected_nodes = new Set();
+    var g_selected_links = new Set();
+
+    function IsNodeSelected(node_data) {
+        return g_selected_nodes.has(node_data.event_id);
+    }
+
+    function NodeFillColour(node_data) {
+        return IsNodeSelected(node_data) ? "gold" : "white";
+    }
+
+    function IsLinkSelected(link_data) {
+        return g_selected_links.has(link_data.event_id);
+    }
+
+
+    //----------------------------------------------------------
     function DoCreateChart(data) {
         node_data = data.nodes;
         bundle_data = data.bundles;
         config = data.config
-        color = d3.scaleOrdinal(d3.schemeDark2)
+        colour_scale = d3.scaleOrdinal(d3.schemeDark2)
 
         // set chart size
         g_svg
@@ -116,18 +140,22 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
                             group
                                 .append("path")
+                                .attr("class", "bundle-selected");
+
+                            group
+                                .append("path")
                                 .attr("class", "bundle-foreground")
                                 .attr("stroke", function (bundle) {
-                                    return color(bundle.id);
+                                    return colour_scale(bundle.id);
                                 });
                         })
                 })
             .call(function (group) {
-                function CalcPath(path) {
+                function CalcPath(path, include) {
                     path.attr("d", function (bundle) {
                         R = config.LinkRadius
                         return bundle.links.map(function (link) {
-                            return "M " + link.px + " " + link.py
+                            return !include(link) ? "M 0 0" : "M " + link.px + " " + link.py
                                 + " H" + (link.x - R)
                                 + " A" + R + " " + R + " 0 0 1 " + link.x + " " + (link.py + R)
                                 + " V" + (link.cy - R)
@@ -139,17 +167,28 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
                 group
                     .select(".bundle-background")
-                    .call(CalcPath);
+                    .call(CalcPath, function (link) {
+                        return !IsLinkSelected(link);
+                    });
+
+                group
+                    .select(".bundle-selected")
+                    .call(CalcPath, function (link) {
+                        return IsLinkSelected(link);
+                    });
 
                 group
                     .select(".bundle-foreground")
-                    .call(CalcPath);
+                    .call(CalcPath, function (link) {
+                        return true;
+                    });
             });
 
         g_nodes_group.selectAll(".node-text")
             .data(node_data)
             .join("text")
             .attr("class", "node-text")
+            .on("click", OnNodeClick)
             .attr("x", function (n) {
                 return n.x + config.BallRadius + config.TextOffsetX;
             })
@@ -165,45 +204,29 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 .data(node_data)
                 .join("line")
                 .attr("class", css_class)
+                .on("click", OnNodeClick)
                 .attr("x1", function (n) { return n.x })
                 .attr("y1", function (n) { return n.y - n.bundle_height / 2 })
                 .attr("x2", function (n) { return n.x })
                 .attr("y2", function (n) { return n.y + n.bundle_height / 2 })
+                .attr("stroke", NodeFillColour)
                 .attr("stroke-width", width);
         }
 
         MakeNode("node-outline", 2 * config.BallRadius);
-        MakeNode("node-standard-fill", config.BallRadius);
+        MakeNode("node-fill", config.BallRadius);
     }
 
 
     //----------------------------------------------------------
+    var g_data = null;
+
     function CreateChart(data_json, options_json) {
-        data = JSON.parse(data_json);
+        g_data = JSON.parse(data_json);
         g_options = JSON.parse(options_json);
 
-        DoCreateChart(data);
+        DoCreateChart(g_data);
     }
-
-    function SetSelection(selection_json, options_json) {
-        //selection = JSON.parse(selection_json);
-        //g_options = JSON.parse(options_json);
-
-        //g_selected_nodes = new Set();
-        //selection.nodes.forEach(function (event_id) {
-        //    g_selected_nodes.add(event_id);
-        //});
-
-        //g_selected_links = new Set();
-        //selection.links.forEach(function (event_id) {
-        //    g_selected_links.add(event_id);
-        //});
-
-        //g_has_selection = g_selected_nodes.size != 0 || g_selected_links.size != 0;
-
-        //DoSetSelection();
-    }
-
 </script>
 
 

@@ -184,6 +184,7 @@ class D_NetworkBuilder:
     #-------------------------------------------------------
     def __init__(self):
         self.Entities = dict()
+        self.Links = dict()
         self.Bundles = dict()
 
 
@@ -194,7 +195,12 @@ class D_NetworkBuilder:
 
 
     #-------------------------------------------------------
-    def AddRelationship(self, parent_id, child_id):
+    def GetLinkId(self, parent_id, child_id):
+        return self.Links["{}-{}".format(parent_id, child_id)]
+
+
+    def AddRelationship(self, parent_id, child_id, link_id):
+        self.Links["{}-{}".format(parent_id, child_id)] = link_id
         child_entity = self.Entities[child_id]
         parent_entity = self.Entities[parent_id]
 
@@ -323,7 +329,8 @@ class G_LayoutConfig:
 class G_LayoutStore:
 
     #-------------------------------------------------------
-    def __init__(self):
+    def __init__(self, network):
+        self.Network = network
         self.Nodes = dict()
 
 
@@ -341,7 +348,8 @@ class G_LayoutStore:
 
     #-------------------------------------------------------
     def MakeLink(self, bundle_data, parent, child):
-        return G_Link(bundle_data, self.GetNode(parent), self.GetNode(child))
+        link_id = self.Network.GetLinkId(parent.Id, child.Id)
+        return G_Link(bundle_data, self.GetNode(parent), self.GetNode(child), link_id)
 
 
 
@@ -445,10 +453,11 @@ class G_Link(Data):
     "Graphical layout data for parent-child relationship line"
 
     #-------------------------------------------------------
-    def __init__(self, bundle_data, parent_node, child_node):
+    def __init__(self, bundle_data, parent_node, child_node, link_id):
         self.Name = parent_node.Name + " -> " + child_node.Name
         self.ParentNode = parent_node
         self.ChildNode = child_node
+        self.LinkId = link_id
         self.ParentBundleNo = parent_node.AllocateOutboundBundle(bundle_data)
 
 
@@ -467,7 +476,7 @@ class G_Link(Data):
     #-------------------------------------------------------
     def Extract(self):
         return dict(
-            id = self.Name,
+            event_id = self.LinkId,
             px = self.ParentNode.X,
             py = self.ParentNode.Y + self.Y,
             x = self.X,
@@ -557,7 +566,7 @@ class Layout:
 
     #-------------------------------------------------------
     def __init__(self, network):
-        store = G_LayoutStore()
+        store = G_LayoutStore(network)
         levels = self.Levels = [Level() for i in range(network.GetNumLevels() + 1)]
         for entity in network.GetEntities():
             levels[entity.Level].AddEntity(entity, store)
@@ -597,7 +606,6 @@ class Layout:
 
 
 
-
 ## GLOBAL ##################################################
 
 class Tree:
@@ -612,8 +620,8 @@ class Tree:
         self.Builder.AddEntity(properties)
 
 
-    def AddRelationship(self, parent_id, child_id):
-        self.Builder.AddRelationship(parent_id, child_id)
+    def AddRelationship(self, properties):
+        self.Builder.AddRelationship(properties["source"], properties["target"], properties["event_id"])
 
 
     #-------------------------------------------------------

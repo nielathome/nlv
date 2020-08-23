@@ -368,7 +368,7 @@ class TangledTree(NetworkCore):
             tree.AddEntity(node)
 
         for link in links:
-            tree.AddRelationship(link["source"], link["target"])
+            tree.AddRelationship(link)
 
         return tree.Extract()
 
