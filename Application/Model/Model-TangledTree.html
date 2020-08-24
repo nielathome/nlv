@@ -74,8 +74,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         console.log("Node selected: " + node_data.event_id);
     }
 
-    function OnLinkClick(link) {
-        console.log("Link selected: " + link.event_id);
+    function OnLinkClick(link_data) {
+        console.log("Link selected: " + link_data.event_id);
     }
 
 
@@ -85,7 +85,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     // functions in your plugin. Don't rely on 'this'; the functions
     // are generally call'ed against a UI object.
 
-    function Config(data, svg) { }
+    var f_colourScale = null;
+    function Config(data, svg) {
+        f_colourScale = d3.scaleOrdinal(d3.schemeDark2)
+    }
 
     // populate the graphical elements of all displayed nodes
     Config.prototype.EnterNode = function (display_node) {
@@ -139,29 +142,61 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     }
 
     // populate the graphical elements of all displayed links
-    Config.prototype.EnterLink = function (display_link) {
-        display_link
-            .append("line");
+    Config.prototype.EnterBundle = function (display_bundle) {
+        display_bundle
+          .append("path")
+            .attr("class", "bundle-background");
+
+        display_bundle
+          .append("path")
+            .attr("class", "bundle-selected");
+
+        display_bundle
+          .append("path")
+            .attr("class", "bundle-foreground");
     }
 
-    Config.prototype.UpdateLink = function (display_link) {
-        display_link
-            .select("line")
-            .attr("stroke", "black");
-    }
+    Config.prototype.UpdateBundle = function (display_bundle) {
+        function CalcPath(path, include) {
+            path.attr("d", function (bundle_data) {
+                R = g_layout.LinkRadius
+                return bundle_data.links.map(function (link) {
+                    return !include(link) ? "M 0 0" : "M " + link.px + " " + link.py
+                        + " H " + (link.x - R)
+                        + " A " + R + " " + R + " 0 0 1 " + link.x + " " + (link.py + R)
+                        + " V " + (link.cy - R)
+                        + " A " + R + " " + R + " 0 0 0 " + (link.x + R) + " " + link.cy
+                        + " H " + link.cx
+                }).join(" ");
+            });
+        }
 
-    // style (set styles/attributes) on a display links
-    // default behaviour sets link opacity according to selection state
-    Config.prototype.StyleLink = function (display_link) {
-        display_link
-            .attr("opacity", function (link_data) {
-                return LinkOpacity(link_data);
+        display_bundle
+          .select(".bundle-background")
+            .call(CalcPath, function (link) {
+                return !IsLinkSelected(link);
             });
 
-        visibility = g_options.show_link_labels ? "visible" : "hidden";
-        label = display_link
-            .select("g")
-            .attr("visibility", visibility);
+        display_bundle
+          .select(".bundle-selected")
+            .call(CalcPath, function (link) {
+                return IsLinkSelected(link);
+            });
+
+        display_bundle
+          .select(".bundle-foreground")
+            .call(CalcPath, function (link) {
+                return true;
+            });
+    }
+
+    // style (set styles/attributes) on a displayed bundle
+    Config.prototype.StyleBundle = function (display_bundle) {
+        display_bundle
+          .select(".bundle-foreground")
+            .attr("stroke", function (bundle_data) {
+                return f_colourScale(bundle_data.id);
+            });
     }
 
     var g_configConstructor = Config;
@@ -219,7 +254,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         node_data = data.nodes;
         bundle_data = data.bundles;
         g_layout = data.config
-        colour_scale = d3.scaleOrdinal(d3.schemeDark2)
 
         // set chart size
         g_svg
@@ -231,66 +265,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .join(
                 function (enter) {
                     return enter
-                        .append("g")
-                        .attr("class", "bundle-group")
-                        .call(function (group) {
-                            group
-                                .append("path")
-                                .attr("class", "bundle-background");
-
-                            group
-                                .append("path")
-                                .attr("class", "bundle-selected");
-
-                            group
-                                .append("path")
-                                .attr("class", "bundle-foreground")
-                                .attr("stroke", function (bundle) {
-                                    return colour_scale(bundle.id);
-                                });
-                        })
+                      .append("g")
+                        .call(g_config.EnterBundle)
                 })
-            .call(function (group) {
-                function CalcPath(path, include) {
-                    path.attr("d", function (bundle) {
-                        R = g_layout.LinkRadius
-                        return bundle.links.map(function (link) {
-                            return !include(link) ? "M 0 0" : "M " + link.px + " " + link.py
-                                + " H" + (link.x - R)
-                                + " A" + R + " " + R + " 0 0 1 " + link.x + " " + (link.py + R)
-                                + " V" + (link.cy - R)
-                                + " A" + R + " " + R + " 0 0 0 " + (link.x + R) + " " + link.cy
-                                + " H" + link.cx
-                        }).join(" ");
-                    });
-                }
-
-                group
-                    .select(".bundle-background")
-                    .call(CalcPath, function (link) {
-                        return !IsLinkSelected(link);
-                    });
-
-                group
-                    .select(".bundle-selected")
-                    .call(CalcPath, function (link) {
-                        return IsLinkSelected(link);
-                    });
-
-                group
-                    .select(".bundle-foreground")
-                    .call(CalcPath, function (link) {
-                        return true;
-                    });
-            });
-
+            .attr("class", "bundle-group")
+            .call(g_config.UpdateBundle)
+            .call(g_config.StyleBundle);
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
             .data(node_data)
             .join(
                 function (enter) {
                     return enter
-                        .append("g")
+                      .append("g")
                         .call(g_config.EnterNode)
                 }
             )
