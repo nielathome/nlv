@@ -96,6 +96,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
           .append("text")
             .attr("class", "node-text");
 
+        // the rect is solely to allow the text to be clicked/selected
+        display_node
+          .insert("rect", ":first-child");
+
         display_node
           .append("line")
             .attr("class", "node-outline");
@@ -107,17 +111,45 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     Config.prototype.UpdateNode = function (display_node) {
         display_node
-            .attr("transform", function (node_data) { return "translate(" + node_data.x + "," + node_data.y + ")" });
+            .attr("transform", function (node_data) {
+                return "translate(" + node_data.x + "," + node_data.y + ")"
+            });
 
         display_node
           .select(".node-text")
             .attr("x", g_layout.BallRadius + g_layout.TextOffsetX)
-            .attr("y", function (node_data) { return - g_layout.TextOffsetY; })
-            .text(function (node_data) { return node_data.title; });
+            .attr("y", function (node_data) {
+                return - g_layout.TextOffsetY;
+            })
+            .text(function (node_data) {
+                return node_data.title;
+            })
+            .each(function (node_data) {
+                node_data.text_extent = d3.select(this).node().getBBox();
+            });
+
+        display_node
+            .select("rect")
+            .attr("x", function (node_data) {
+                return node_data.text_extent.x;
+            })
+            .attr("y", function (node_data) {
+                return node_data.text_extent.y;
+            })
+            .attr("width", function (node_data) {
+                return node_data.text_extent.width;
+            })
+            .attr("height", function (node_data) {
+                return node_data.text_extent.height;
+            })
+            .style("fill", "white")
+            .style("stroke", "white");
 
         function SetBall(node) {
             node
-                .attr("y2", function (node_data) { return node_data.bundle_height; });
+                .attr("y2", function (node_data) {
+                    return node_data.bundle_height;
+                });
         }
 
         display_node
