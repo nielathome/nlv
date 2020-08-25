@@ -18,6 +18,10 @@
 # Python imports
 import json
 
+# Application imports
+from Nlv.TangledTree import Tree
+
+
 def SqlColumnNames(cursor, table_name, database = None):
     if database is None:
         database = ""
@@ -189,7 +193,7 @@ class Pie:
 
 
 
-## Network #####################################################
+## NetworkCore #################################################
 
 def _EscapeJsonField(field):
     # the JavaScript JSON decoder doesn't like quoted backslashes in string
@@ -198,32 +202,30 @@ def _EscapeJsonField(field):
         field = field.replace("\\", "/")
     return field        
 
-class Network:
+
+class NetworkCore:
 
     #-----------------------------------------------------------
-    def __init__(self, setup_script = None):
+    def __init__(self, html_page, setup_script = None):
+        self.HtmlPage = html_page
         self._SetupScript = setup_script
 
 
     #-----------------------------------------------------------
     def DefineParameters(self, connection, cursor, context):
-        context.AddBool("graph_is_disjoint", "Network is disjoint", False)
-        context.AddBool("show_link_labels", "Show relationship names", False)
-        
+        pass
+
 
     #-----------------------------------------------------------
     def Setup(self, context):
-        context.LoadPage("Network.html")
+        context.LoadPage(self.HtmlPage)
         if self._SetupScript is not None:
             context.LoadScript(self._SetupScript)
 
+
     #-----------------------------------------------------------
     def MakeOptions(self, context):
-        options = dict(
-            graph_is_disjoint = context.GetParameter("graph_is_disjoint", False),
-            show_link_labels = context.GetParameter("show_link_labels", False)
-        )
-        return json.dumps(options)
+        return "{}"
 
 
     #-----------------------------------------------------------
@@ -294,11 +296,40 @@ class Network:
 
         links = [dict(zip(link_fields, [_EscapeJsonField(field) for field in row])) for row in cursor]
 
-        network = dict(nodes = nodes, links = links)
-        data_json = json.dumps(network)
+        data_json = self.NetworkToJson(nodes, links)
         context.CallJavaScript("CreateChart", data_json, self.MakeOptions(context))
 
         self.SetSelection(connection, cursor, context)
+
+
+
+## Network #####################################################
+
+class Network(NetworkCore):
+
+    #-----------------------------------------------------------
+    def __init__(self, setup_script = None):
+        super().__init__("Network.html", setup_script)
+
+
+    #-----------------------------------------------------------
+    def DefineParameters(self, connection, cursor, context):
+        context.AddBool("graph_is_disjoint", "Network is disjoint", False)
+        context.AddBool("show_link_labels", "Show relationship names", False)
+        
+
+    #-----------------------------------------------------------
+    def MakeOptions(self, context):
+        options = dict(
+            graph_is_disjoint = context.GetParameter("graph_is_disjoint", False),
+            show_link_labels = context.GetParameter("show_link_labels", False)
+        )
+        return json.dumps(options)
+
+
+    #-----------------------------------------------------------
+    def NetworkToJson(self, nodes, links):
+        return json.dumps(dict(nodes = nodes, links = links))
 
 
     #-----------------------------------------------------------
@@ -318,3 +349,30 @@ class Network:
 
         elif context.SelectionChanged() or display_param_change:
             self.SetSelection(connection, cursor, context)
+
+
+
+## TangledTree #################################################
+
+class TangledTree(NetworkCore):
+
+    #-----------------------------------------------------------
+    def __init__(self, setup_script = None):
+        super().__init__("TangledTree.html", setup_script)
+
+
+    #-----------------------------------------------------------
+    def NetworkToJson(self, nodes, links):
+        tree = Tree()
+        for node in nodes:
+            tree.AddEntity(node)
+
+        for link in links:
+            tree.AddRelationship(link)
+
+        return tree.Extract()
+
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
+        self.CreateChart(connection, cursor, context)

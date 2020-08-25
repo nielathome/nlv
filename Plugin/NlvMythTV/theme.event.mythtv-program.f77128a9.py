@@ -137,10 +137,10 @@ class Recogniser:
                 label
             )
             SELECT DISTINCT
-                program.title as source_name,
-                source_entities.event_id as source,
                 'Channel-' || program.channel as target_name,
                 target_entities.event_id as target,
+                program.title as source_name,
+                source_entities.event_id as source,
                 'Channel'
             FROM
                 program
@@ -155,10 +155,10 @@ class Recogniser:
 
             UNION ALL
             SELECT DISTINCT
-                program.title as source_name,
-                source_entities.event_id as source,
                 'CardID-' || program.cardid as target_name,
                 target_entities.event_id as target,
+                program.title as source_name,
+                source_entities.event_id as source,
                 'CardID'
             FROM
                 program
@@ -403,9 +403,11 @@ links = Links(
 )
 
 
-Network(
+network = Network(
     "Recordings",
     nodes,
     links
-).Chart(True, Chart.Network(setup_script = "theme.event.mythtv-program.f77128a9.network.js"))
+)
 
+network.Chart("Network", True, Chart.Network(setup_script = "theme.event.mythtv-program.f77128a9.network.js"))
+network.Chart("Tree", True, Chart.TangledTree())

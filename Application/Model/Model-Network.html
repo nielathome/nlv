@@ -371,7 +371,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("class", "link-group")
             .call(g_config.UpdateLink)
             .call(g_config.StyleLink)
-            .on("click", OnLinkClick)
+            .on("click", OnLinkClick);
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
           .data(data.nodes)

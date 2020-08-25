@@ -1188,26 +1188,21 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
 
 
     #-------------------------------------------------------
-    def ActivateSelectChart(self, chart_names = [""]):
+    def ActivateSelectChart(self, charts):
+        chart_names = [chart.Name for chart in charts]
         num_charts = len(chart_names)
-        if num_charts != 0:
-            chart_no = self._Field.idxSelectChart.Value
-            if chart_no >= num_charts:
-                chart_no = self._Field.idxSelectChart.Value = 0
 
-            location = self._Field.idxLocateChart.Value
-            self.Rebind(self._LocateChartCtl, wx.EVT_CHOICE, self.OnLocateChart)
-            self._LocateChartCtl.SetSelection(location)
+        chart_no = self._Field.idxSelectChart.Value
+        if chart_no >= num_charts:
+            chart_no = self._Field.idxSelectChart.Value = 0
 
-            self._SelectChartCtl.Set(chart_names)
-            self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
-            self._SelectChartCtl.SetSelection(chart_no)
+        location = self._Field.idxLocateChart.Value
+        self.Rebind(self._LocateChartCtl, wx.EVT_CHOICE, self.OnLocateChart)
+        self._LocateChartCtl.SetSelection(location)
 
-        else:
-            self._LocateChartCtl.Unbind(wx.EVT_CHOICE)
-
-            self._SelectChartCtl.Clear()
-            self._SelectChartCtl.Unbind(wx.EVT_CHOICE)
+        self._SelectChartCtl.Set(chart_names)
+        self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
+        self._SelectChartCtl.SetSelection(chart_no)
 
         self._Sizer.Show(self._ChartOptionsSubtitle, num_charts != 0, True)
         self._Sizer.Show(self._LocateChartSizer, num_charts != 0, True)
@@ -1332,9 +1327,7 @@ class G_EventProjectorOptionsNode(G_CommonProjectorOptionsNode, G_ThemeNode, G_T
         self._ChkNesting.Enable(permit_nesting)
 
         projector_info, is_valid = self.GetProjectorNode().GetProjectorInfo()
-        chart_names = [c.Name for c in projector_info.Charts]
-
-        self.ActivateSelectChart(chart_names)
+        self.ActivateSelectChart(projector_info.Charts)
         self.ActivateDynamicPane()
 
 
@@ -1379,10 +1372,9 @@ class G_MetricsProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
     #-------------------------------------------------------
     def Activate(self):
         quantifier_info, is_valid = self.GetProjectorNode().GetQuantifierInfo()
-        chart_names = [c.Name for c in quantifier_info.Charts]
 
         self.ActivateCommon()
-        self.ActivateSelectChart(chart_names)
+        self.ActivateSelectChart(quantifier_info.Charts)
         self.ActivateDynamicPane()
 
 
@@ -1408,8 +1400,10 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
 
     #-------------------------------------------------------
     def Activate(self):
+        projector_info, is_valid = self.GetProjectorNode().GetProjectorInfo()
+
         self.ActivateCommon()
-        self.ActivateSelectChart()
+        self.ActivateSelectChart(projector_info.Charts)
         self.ActivateDynamicPane()
 
 
@@ -1875,15 +1869,18 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def UpdateChart(self, data_changed = False, selection_changed = False):
-        projector_info, is_valid = self.GetProjectorInfo()
-        self.GetViewCtrl().UpdateChart(self.MakeChartCreateContext(), projector_info, data_changed, selection_changed)
+    def UpdateCharts(self, data_changed = False, selection_changed = False):
+        self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed, selection_changed)
 
+
+    #-------------------------------------------------------
     @G_Global.TimeFunction
     def UpdateEventContent(self):
-        # relies on caller to ensure child data node are
-        # run first
-        self.UpdateChart(data_changed = True)
+        # relies on caller to ensure child data nodes (entities & relationships)
+        # are run first
+
+        projector_info, is_valid = self.GetProjectorInfo()
+        self.GetViewCtrl().CreateCharts(self.MakeChartCreateContext(), projector_info.Charts)
         self.GetOptionsNode().PushParameterValues(activate_chart = True)
         
 
@@ -1944,7 +1941,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
-        self.GetParentNode().UpdateChart(selection_changed = True)
+        self.GetParentNode().UpdateCharts(selection_changed = True)
 
         # ignore de-selection and non-events
         if item is not None and item.IsOk():
@@ -1966,7 +1963,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetParentNode().UpdateChart(data_changed = True)
+            self.GetParentNode().UpdateCharts(data_changed = True)
             return True
         else:
             return False
