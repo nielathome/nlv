@@ -896,16 +896,16 @@ class G_NetworkInfo:
     #-------------------------------------------------------
     def __init__(self, name, nodes_projector, links_projector):
         self.ProjectionName = name
-        self.ChartInfo = None
+        self.Charts = []
         self.DocumentNodeID = G_Project.NodeID_NetworkProjector
         self.NetworkProjectors = [nodes_projector, links_projector]
 
 
     #-------------------------------------------------------
-    def Chart(self, want_selection, builder):
+    def Chart(self, name, want_selection, builder):
         nodes_db_info = self.NetworkProjectors[0].ProjectionDbInfo
         links_db_info = self.NetworkProjectors[1].ProjectionDbInfo
-        self.ChartInfo = G_NetworkChartInfo(self.ProjectionName, want_selection, builder, nodes_db_info, links_db_info)
+        self.Charts.append(G_NetworkChartInfo(name, want_selection, builder, nodes_db_info, links_db_info))
 
 
     #-------------------------------------------------------
