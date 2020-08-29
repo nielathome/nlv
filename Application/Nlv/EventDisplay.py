@@ -677,7 +677,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self.Reset(table_schema, db_info, reason = display_props.Reason)
         self.UpdateNesting(display_props.Nesting, False)
-        self.UpdateDataPartition(display_props.Partition, False)
+        self.UpdateDataPartition(display_props.Partition, display_props.Reason, False)
         self.UpdateValidity(display_props.Valid)
 
         num_fields = self.GetColumnCount()
@@ -714,11 +714,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def UpdateFilter(self, match):
+    def UpdateFilter(self, match, reason = None):
         if not self.FilterLineSet(match):
             return False
         
-        self.SetNavigationValidityReason("Filter: {match}".format(match = match.GetDescription()))
+        if reason is None:
+            reason = "Filter: {match}".format(match = match.GetDescription())
+
+        self.SetNavigationValidityReason(reason)
         self.ClearDataExplorerLine()
         self.Cleared()
         return True
@@ -807,13 +810,13 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             self.Cleared()
 
 
-    def UpdateDataPartition(self, partition, do_rebuild = True):
+    def UpdateDataPartition(self, partition, reason, do_filter = True):
         if partition is None:
             return
 
         self._DataPartition = partition
-        if do_rebuild:
-            self.Cleared()
+        if do_filter:
+            self.UpdateFilter(self._FilterMatch, reason)
 
 
     def UpdateValidity(self, valid):
@@ -831,7 +834,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
     def UpdateDisplay(self, display_props):
         self.UpdateNesting(display_props.Nesting)
-        self.UpdateDataPartition(display_props.Partition)
+        self.UpdateDataPartition(display_props.Partition, display_props.Reason)
         return self.UpdateValidity(display_props.Valid)
 
 

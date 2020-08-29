@@ -269,14 +269,15 @@ class D_Network(D_NetworkBuilder):
 
         # translate that to node levels
         indices = [key for key in generations.keys()]
-        indices.sort()
-        level_offset = - indices[0]
         self.NumLevels = len(indices)
+        if self.NumLevels > 0:
+            indices.sort()
+            level_offset = - indices[0]
 
-        for index in indices:
-            bundles = generations[index]
-            for bundle in bundles:
-                bundle.AssignNodeLevels(level_offset)
+            for index in indices:
+                bundles = generations[index]
+                for bundle in bundles:
+                    bundle.AssignNodeLevels(level_offset)
 
 
     #-------------------------------------------------------

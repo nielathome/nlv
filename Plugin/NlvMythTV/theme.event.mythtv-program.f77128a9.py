@@ -376,9 +376,9 @@ def LinksProjector(connection, cursor, context):
                 event_id + ({partition_id} * 1000),
                 {partition_id},
                 source_name,
-                source,
+                source + ({partition_id} * 1000),
                 target_name,
-                target,
+                target + ({partition_id} * 1000),
                 label,
                 label
             FROM

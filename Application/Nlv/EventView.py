@@ -1418,17 +1418,23 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
         projector_info = self.GetProjectorInfo()
 
         partition_names = [partition[1] for partition in projector_info.Partitions]
-        self.Rebind(self._DataPartitionCtl, wx.EVT_CHOICE, self.OnDataPartition)
-        self._DataPartitionCtl.Set(partition_names)
+        partition_ctl = self._DataPartitionCtl
+        self.Rebind(partition_ctl, wx.EVT_CHOICE, self.OnDataPartition)
+        partition_ctl.Set(partition_names)
 
-        target_partition = self.GetDataPartition()
-        selection = 0
-        for idx, partition in enumerate(projector_info.Partitions):
-            if partition[0] == target_partition:
-                selection = idx
-                break
+        if len(partition_names) != 0:
+            target_partition = self.GetDataPartition()
+            selection = 0
+            for idx, partition in enumerate(projector_info.Partitions):
+                if partition[0] == target_partition:
+                    selection = idx
+                    break
 
-        self._DataPartitionCtl.SetSelection(selection)
+            partition_ctl.SetSelection(selection)
+            partition_ctl.Enable(True)
+
+        else:
+            partition_ctl.Enable(False)
 
         self.ActivateCommon()
         self.ActivateSelectChart(projector_info.Charts)
@@ -1929,6 +1935,7 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     #-------------------------------------------------------
     def UpdatePartition(self, partition):
         self.VisitSubNodes(lambda node: node.UpdatePartition(partition), factory_id = G_Project.NodeID_NetworkDataProjector, recursive = True)
+        self.UpdateCharts(data_changed = True)
 
 
 
@@ -2010,7 +2017,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
     #-------------------------------------------------------
     def UpdatePartition(self, partition):
-        self.GetTableViewCtrl().UpdateDisplay(G_DisplayProperties(partition = partition))
+        self.GetTableViewCtrl().UpdateDisplay(G_DisplayProperties(partition = partition, reason = "Data partitioned"))
 
 
     #-------------------------------------------------------
