@@ -668,7 +668,7 @@ protected:
 		return m_ColumnNames[ m_SortColumn ];
 	}
 
-	std::vector<nlineno_t> MapViewLines( const char * projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool push_id );
+	std::vector<nlineno_t> MapViewLines( const std::string & projection, nlineno_t num_visit_lines, selector_ptr_a selector, LineAdornmentsProvider * adornments_provider, bool push_id );
 	SqlViewLineAccessor CaptureLine( Error status, statement_ptr_t & statement ) const;
 	const SqlViewLineAccessor & GetCachedLine( nlineno_t line_no ) const;
 
@@ -1049,7 +1049,7 @@ void SqlViewAccessor::VisitLine( Task & task, nlineno_t visit_line_no ) const
 
 std::vector<nlineno_t> SqlViewAccessor::MapViewLines
 (
-	const char * projection,
+	const std::string & projection,
 	nlineno_t num_visit_lines,
 	selector_ptr_a selector,
 	LineAdornmentsProvider * adornments_provider,
@@ -1061,7 +1061,7 @@ std::vector<nlineno_t> SqlViewAccessor::MapViewLines
 
 	m_LogAccessor->VisitLines
 	(
-		projection,
+		projection.c_str(),
 		[&map, &selector, adornments_provider, push_id] ( const LineAccessor & line )
 		{
 			const nlineno_t log_line_no{ line.GetLineNo() };
@@ -1082,9 +1082,21 @@ void SqlViewAccessor::Filter( selector_ptr_a selector, LineAdornmentsProvider * 
 {
 	PythonPerfTimer map_timer{"Nlog::SqlViewAccessor::Filter::Map"};
 
+	const std::pair<bool, int> partition{ selector->GetDataPartition() };
+	std::string projection{ "SELECT * FROM projection" };
+	if( partition.first )
+	{
+		std::ostringstream strm;
+		strm << projection << R"__(
+			WHERE
+				partition_id =)__" << partition.second;
+
+		projection = strm.str();
+	}
+
 	const nlineno_t num_log_lines{ m_LogAccessor->GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
-		"SELECT * FROM projection",
+		projection,
 		num_log_lines,
 		selector,
 		adornments_provider,
@@ -1126,7 +1138,7 @@ std::vector<nlineno_t> SqlViewAccessor::Search( selector_ptr_a selector, LineAdo
 
 	const nlineno_t num_view_lines{ GetNumLines() };
 	std::vector<nlineno_t> map{ MapViewLines(
-		MakeViewSql().c_str(),
+		MakeViewSql(),
 		num_view_lines,
 		selector,
 		adornments_provider,

@@ -130,6 +130,8 @@ class G_MatchItem(D_Document.D_Value):
         self.MatchType = match_type
         self.MatchText = match_text
         self.MatchCase = match_case
+        self.HasDataPartition = False
+        self.DataPartition = 0
 
         # confirm the MatchType is valid
         self.GetMetaData()
@@ -167,6 +169,12 @@ class G_MatchItem(D_Document.D_Value):
             return "Cleared"
         else:
             return "{type}=[{text}]".format(type = self.MatchType, text = self.MatchText)
+
+
+    #-------------------------------------------------------
+    def SetDataPartition(self, partition):
+        self.HasDataPartition = True
+        self.DataPartition = partition
 
 
 

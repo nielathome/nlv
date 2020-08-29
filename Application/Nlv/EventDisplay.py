@@ -34,6 +34,7 @@ import winreg
 from .DataExplorer import G_DataExplorerProvider
 from .Logfile import G_DisplayControl
 from .Logfile import G_NotebookDisplayControl
+from .MatchNode import G_MatchItem
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
@@ -658,6 +659,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._N_Logfile is None:
             return False
 
+        if self._DataPartition is not None:
+            if match is None:
+                match = G_MatchItem()
+            match.SetDataPartition(self._DataPartition)
+
         if match is not None and self._N_EventView is not None:
             return self._N_EventView.Filter(match)
 
@@ -671,6 +677,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
         self.Reset(table_schema, db_info, reason = display_props.Reason)
         self.UpdateNesting(display_props.Nesting, False)
+        self.UpdateDataPartition(display_props.Partition, False)
         self.UpdateValidity(display_props.Valid)
 
         num_fields = self.GetColumnCount()
