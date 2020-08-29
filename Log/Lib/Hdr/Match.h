@@ -80,12 +80,26 @@ struct Match
 
 	std::string m_Text;
 	bool m_Case;
+	bool m_HasDataPartition;
+	int m_DataPartition;
 
-	Match( Type type, const std::string & text, bool cs )
-		: m_Type{ type }, m_Text{ text }, m_Case{ cs } {}
+	Match( Type type, const std::string & text, bool cs, bool has_data_partition = false, int data_partition = 0 )
+		:
+		m_Type{ type },
+		m_Text{ text },
+		m_Case{ cs },
+		m_HasDataPartition{ has_data_partition },
+		m_DataPartition{ data_partition }
+	{}
 
 	Match( const Match & match )
-		: m_Type{ match.m_Type }, m_Text{ match.m_Text }, m_Case{ match.m_Case } {}
+		:
+		m_Type{ match.m_Type },
+		m_Text{ match.m_Text },
+		m_Case{ match.m_Case },
+		m_HasDataPartition{ match.m_HasDataPartition },
+		m_DataPartition{ match.m_DataPartition }
+	{}
 };
 
 
@@ -114,6 +128,10 @@ struct Selector
 	virtual bool Hit( const char * first, const char * last ) const;
 	virtual bool Hit( const LineAccessor & line ) const;
 	virtual bool Hit( const LineAccessor & line, const LineAdornmentsAccessor & adornments ) const;
+
+	const std::pair<bool, int> GetDataPartition( void ) const {
+		return std::make_pair( m_Match.m_HasDataPartition, m_Match.m_DataPartition );
+	}
 
 	struct Visitor
 	{
