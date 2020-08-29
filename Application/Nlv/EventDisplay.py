@@ -230,6 +230,19 @@ class G_TableFieldFormatter:
 
 
 
+## G_DisplayProperties #####################################
+
+class G_DisplayProperties:
+
+    #-------------------------------------------------------
+    def __init__(self, nesting = None, partition = None, valid = None, reason = None):
+        self.Nesting = nesting
+        self.Partition = partition
+        self.Valid = valid
+        self.Reason = reason
+
+
+
 ## G_TableDataModel ########################################
 
 class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
@@ -239,6 +252,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         super().__init__()
 
         self._ViewFlat = True
+        self._DataPartition = None
         self._Name = name
         self._RawFieldMask = 0
         self._IsValid = True
@@ -651,13 +665,13 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     @G_Global.TimeFunction
-    def UpdateContent(self, nesting, table_info, valid, reason):
+    def UpdateContent(self, display_props, table_info):
         table_schema = table_info.GetSchema()
         db_info = table_info.GetDbInfo()
 
-        self.Reset(table_schema, db_info, reason = reason)
-        self.UpdateNesting(nesting, False)
-        self.UpdateValidity(valid)
+        self.Reset(table_schema, db_info, reason = display_props.Reason)
+        self.UpdateNesting(display_props.Nesting, False)
+        self.UpdateValidity(display_props.Valid)
 
         num_fields = self.GetColumnCount()
         db_path = db_info.Path
@@ -786,6 +800,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             self.Cleared()
 
 
+    def UpdateDataPartition(self, partition, do_rebuild = True):
+        if partition is None:
+            return
+
+        self._DataPartition = partition
+        if do_rebuild:
+            self.Cleared()
+
+
     def UpdateValidity(self, valid):
         # the view is deemed valid if an analysis has taken place
         # since the last time the recogniser was modified
@@ -799,9 +822,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         return True
 
 
-    def UpdateDisplay(self, nesting, valid):
-        self.UpdateNesting(nesting)
-        return self.UpdateValidity(valid)
+    def UpdateDisplay(self, display_props):
+        self.UpdateNesting(display_props.Nesting)
+        self.UpdateDataPartition(display_props.Partition)
+        return self.UpdateValidity(display_props.Valid)
 
 
 
@@ -848,14 +872,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateContent(self, nesting, table_info, valid, reason = None):
+    def UpdateContent(self, display_props, table_info):
         """Update the data view with new content"""
 
         # note: number of DataView columns is not the same as the number of
         # model columns; as some are hidden for internal use
         try:
             self.ClearColumns()
-            self.GetModel().UpdateContent(nesting, table_info, valid, reason = reason)
+            self.GetModel().UpdateContent(display_props, table_info)
             self.UpdateColumns()
 
         except FileNotFoundError as ex:
@@ -863,8 +887,8 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateDisplay(self, nesting = None, valid = None):
-        if self.GetModel().UpdateDisplay(nesting, valid):
+    def UpdateDisplay(self, display_props):
+        if self.GetModel().UpdateDisplay(display_props):
             self.Refresh()        
 
 
@@ -1747,7 +1771,8 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             self._CollectorLocked = False
 
             table_ctrl = self.GetTableViewCtrl()
-            table_ctrl.UpdateContent(False, quantifier_info, valid, reason = "Metric quantification (triggered when parent data is filtered or when the analysis is re-run)")
+            display_props = G_DisplayProperties(nesting = False, valid = valid, reason = "Metric quantification (triggered when parent data is filtered or when the analysis is re-run)")
+            table_ctrl.UpdateContent(display_props, quantifier_info )
             table_ctrl.SetFieldMask(-1)
 
             self.CreateCharts(context, quantifier_info.Charts)

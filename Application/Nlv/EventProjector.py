@@ -768,21 +768,6 @@ class G_DbInfo:
 
 
 
-## G_PartitionInfo #########################################
-
-class G_PartitionInfo:
-
-    #-------------------------------------------------------
-    def __init__(self):
-        self.Partitions = dict()
-
-
-    #-------------------------------------------------------
-    def AddPartition(self, id, description):
-        self.Partitions[id] = description
-
-
-
 ## G_ChartInfo #############################################
 
 class G_ChartInfo:
@@ -1102,7 +1087,7 @@ class G_Projector:
     
 
     def GetPartitions(self, db_info):
-        partitions = G_PartitionInfo()
+        partitions = []
 
         with db_info.ConnectionManager() as connection:
             cursor = connection.cursor()
@@ -1117,7 +1102,7 @@ class G_Projector:
             """)
 
             for row in cursor:
-                partitions.AddPartition(row[0], row[1])
+                partitions.append((row[0], row[1]))
 
         return partitions
 
