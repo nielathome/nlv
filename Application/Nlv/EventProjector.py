@@ -1124,7 +1124,7 @@ class G_Projector:
     #-------------------------------------------------------
     def Network(self, name, node_projector, link_projector, define_partitions = None):
         """Implements user analyse script Network() function"""
-        partitions = None
+        partitions = []
         if define_partitions is not None:
             self.DefinePartitions(node_projector.ProjectionDbInfo, define_partitions)
             partitions = self.GetPartitions(node_projector.ProjectionDbInfo)
