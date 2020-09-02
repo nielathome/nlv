@@ -435,4 +435,4 @@ network = Network(
 )
 
 network.Chart("Network", True, Chart.Network(setup_script = "theme.event.mythtv-program.f77128a9.network.js"))
-network.Chart("Tree", True, Chart.TangledTree())
+network.Chart("Tree", True, Chart.TangledTree("title"))

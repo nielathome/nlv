@@ -357,15 +357,16 @@ class Network(NetworkCore):
 class TangledTree(NetworkCore):
 
     #-----------------------------------------------------------
-    def __init__(self, setup_script = None):
+    def __init__(self, entity_name_field, setup_script = None):
         super().__init__("TangledTree.html", setup_script)
+        self._EntityNameField = entity_name_field
 
 
     #-----------------------------------------------------------
     def NetworkToJson(self, nodes, links):
         tree = Tree()
         for node in nodes:
-            tree.AddEntity(node)
+            tree.AddEntity(node[self._EntityNameField], node)
 
         for link in links:
             tree.AddRelationship(link)

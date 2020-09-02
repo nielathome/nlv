@@ -47,10 +47,10 @@ class Data:
 class D_Entity(Data):
 
     #-------------------------------------------------------
-    def __init__(self, properties):
+    def __init__(self, name, properties):
         self.Properties = properties
         self.Id = properties["event_id"]
-        self.Name = properties["title"]
+        self.Name = name
 
         self.ParentEntities = []
         self.ChildEntities = []
@@ -189,8 +189,8 @@ class D_NetworkBuilder:
 
 
     #-------------------------------------------------------
-    def AddEntity(self, properties):
-        entity = D_Entity(properties)
+    def AddEntity(self, name, properties):
+        entity = D_Entity(name, properties)
         self.Entities[entity.Id] = entity
 
 
@@ -617,8 +617,8 @@ class Tree:
 
 
     #-------------------------------------------------------
-    def AddEntity(self, properties):
-        self.Builder.AddEntity(properties)
+    def AddEntity(self, name, properties):
+        self.Builder.AddEntity(name, properties)
 
 
     def AddRelationship(self, properties):
