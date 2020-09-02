@@ -1410,7 +1410,7 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
     def PostInitNode(self):
         super().PostInitNode()
         self._Field = D_Document(self.GetDocument(), self)
-        self._Field.Add(-1, "DataPartition", replace_existing = False)
+        self._Field.Add(0, "DataPartition", replace_existing = False)
 
 
     #-------------------------------------------------------
@@ -1422,17 +1422,11 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
         self.Rebind(partition_ctl, wx.EVT_CHOICE, self.OnDataPartition)
         partition_ctl.Set(partition_names)
 
-        if len(partition_names) != 0:
-            target_partition = self.GetDataPartition()
-            selection = 0
-            for idx, partition in enumerate(projector_info.Partitions):
-                if partition[0] == target_partition:
-                    selection = idx
-                    break
+        selection, partition_id = self.ValidateDataPartition()
 
+        if partition_id is not None:
             partition_ctl.SetSelection(selection)
             partition_ctl.Enable(True)
-
         else:
             partition_ctl.Enable(False)
 
@@ -1450,8 +1444,20 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
 
 
     #-------------------------------------------------------
-    def GetDataPartition(self):
-        return self._Field.DataPartition.Value
+    def ValidateDataPartition(self):
+        last_partition_id = self._Field.DataPartition.Value
+        current_partitions = self.GetProjectorInfo().Partitions
+
+        for idx, partition in enumerate(current_partitions):
+            if partition[0] == last_partition_id:
+                return idx, last_partition_id
+
+        return (0, None)
+
+
+    def GetDataPartitionId(self):
+        selection, partition = self.ValidateDataPartition()
+        return partition
 
 
 
@@ -1990,8 +1996,8 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
     def GetTableViewCtrl(self):
         return self.GetViewCtrl()
 
-    def GetDataPartition(self):
-        return self.GetParentNode().GetOptionsNode().GetDataPartition()
+    def GetDataPartitionId(self):
+        return self.GetParentNode().GetOptionsNode().GetDataPartitionId()
 
 
     #-------------------------------------------------------
@@ -2010,7 +2016,7 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
         # load events into event viewer data control
         projector_info, is_valid = self.GetProjectorInfo()
-        display_props = G_DisplayProperties(nesting = False, partition = self.GetDataPartition(), valid = is_valid, reason = "Analyser run")
+        display_props = G_DisplayProperties(nesting = False, partition = self.GetDataPartitionId(), valid = is_valid, reason = "Analyser run")
         self.GetTableViewCtrl().UpdateContent(display_props, projector_info)
         self.EnsureDisplayControlVisible()
 
