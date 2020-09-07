@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 14
-VisualStudioVersion = 14.0.25420.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.1169
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application", "Application", "{E6FC98CA-2142-491A-8CE3-73056F7E4507}"
 EndProject
@@ -41,7 +41,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Models", "Models", "{937885
 		Application\Model\Model-BarChart.html = Application\Model\Model-BarChart.html
 		Application\Model\Model-Network.html = Application\Model\Model-Network.html
 		Application\Model\Model-PieChart.html = Application\Model\Model-PieChart.html
+		Application\Model\Model-TangledTree.html = Application\Model\Model-TangledTree.html
 	EndProjectSection
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvLaunch", "Application\Nlv\NlvLaunch.pyproj", "{D863EBA4-7074-4957-92EA-FEAECA3441E5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -91,6 +94,12 @@ Global
 		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Release|x64.ActiveCfg = Release|Any CPU
 		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}.Release|x86.ActiveCfg = Release|Any CPU
+		{D863EBA4-7074-4957-92EA-FEAECA3441E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D863EBA4-7074-4957-92EA-FEAECA3441E5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D863EBA4-7074-4957-92EA-FEAECA3441E5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D863EBA4-7074-4957-92EA-FEAECA3441E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D863EBA4-7074-4957-92EA-FEAECA3441E5}.Release|x64.ActiveCfg = Release|Any CPU
+		{D863EBA4-7074-4957-92EA-FEAECA3441E5}.Release|x86.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -103,5 +112,8 @@ Global
 		{A88329AC-1E38-42F1-9E1B-19D730BCAFDF} = {E6FC98CA-2142-491A-8CE3-73056F7E4507}
 		{6CFDE18D-34FA-4EC4-88A1-FBEA3472BA20} = {2A5E6D2B-7364-4F8B-A93C-DB0962B7ECB8}
 		{9378850E-74FB-4FEE-A64D-1168094AF060} = {E6FC98CA-2142-491A-8CE3-73056F7E4507}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {1C51157C-C784-4BA6-B8E6-69D8996D197E}
 	EndGlobalSection
 EndGlobal
