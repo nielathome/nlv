@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,28 +18,11 @@
 # Python imports
 from pathlib import Path
 
-# NLV imports
-from Nlv.Extension import G_Extension
-import Nlv.Logmeta as Schema
-from Nlv.Theme import GetThemeStore
-
-
-
-## E_MythTV ################################################
-
-class E_MythTV(G_Extension):
-
-    #-------------------------------------------------------
-    def __init__(self, name):
-        super().__init__(name)
-
-        install_dir = Path(__file__).parent
-        Schema.RegisterLogSchemata(install_dir)
-        GetThemeStore().RegisterDirectory(install_dir)
-
 
 
 ## MODULE ##################################################
 
-def MakeExtension(name):
-    return E_MythTV(name)
+def MakeExtension(context):
+    install_dir = Path(__file__).parent
+    context.RegisterLogSchemata(install_dir)
+    context.RegisterThemeDirectory(install_dir)

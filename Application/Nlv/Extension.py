@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2018. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,14 +18,18 @@
 # System imports
 from pkg_resources import iter_entry_points
 
+# NLV imports
+import Nlv.Logmeta as Schema
+from Nlv.Theme import GetThemeStore
 
 
-## G_Extension #############################################
 
-class G_Extension:
-    """
-    Default extension class
-    """
+## G_ExtensionInfo #########################################
+
+class G_ExtensionInfo:
+
+    _ExtensionsValid = False
+    _Extensions = []
 
     #-------------------------------------------------------
     def __init__(self, name):
@@ -33,38 +37,50 @@ class G_Extension:
 
 
     #-------------------------------------------------------
-    def GetName(self):
-        return self._Name
+    @classmethod
+    def LoadExtensions(cls):
+
+        #
+        # references:
+        # http://setuptools.readthedocs.io/en/latest/pkg_resources.html
+        # https://docs.pylonsproject.org/projects/pylons-webframework/en/latest/advanced_pylons/entry_points_and_plugins.html
+        #
+
+        if cls._ExtensionsValid:
+            return
+
+        # Interface between NLV plugins (extensions) and the application
+        class Context:
+            def __init__(self, name):
+                self._Info = G_ExtensionInfo(name)
+
+            def RegisterLogSchemata(self, install_dir):
+                Schema.RegisterLogSchemata(install_dir)
+
+            def RegisterThemeDirectory(self, install_dir):
+                GetThemeStore().RegisterDirectory(install_dir)
 
 
+        cls._ExtensionsValid = True
+        for entry_point in iter_entry_points(group = "nlv.extensions", name = None):
+            context = Context(entry_point.name)
+            extension_func = entry_point.load()
+            extension = extension_func(context)
+            cls._Extensions.append(context._Info)
 
-## PRIVATE #################################################
 
-_ExtensionsValid = False
-
-_Extensions = []
+    #-------------------------------------------------------
+    @classmethod
+    def GetExtensionNames(cls):
+        cls.LoadExtensions()
+        return [ext.GetName() for ext in cls._Extensions]
 
 
 
 ## MODULE ##################################################
 
-#
-# references:
-# http://setuptools.readthedocs.io/en/latest/pkg_resources.html
-# https://docs.pylonsproject.org/projects/pylons-webframework/en/latest/advanced_pylons/entry_points_and_plugins.html
-#
 def LoadExtensions():
-    global _ExtensionsValid
-    if _ExtensionsValid:
-        return
-
-    _ExtensionsValid = True
-    for entry_point in iter_entry_points(group = "nlv.extensions", name = None):
-        extension_func = entry_point.load()
-        extension = extension_func(entry_point.name)
-        _Extensions.append(extension)
-
+    G_ExtensionInfo.LoadExtensions()
 
 def GetExtensionNames():
-    LoadExtensions()
-    return [ext.GetName() for ext in _Extensions]
+    return G_ExtensionInfo.GetExtensionNames()
