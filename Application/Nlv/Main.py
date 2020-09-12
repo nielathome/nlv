@@ -462,10 +462,10 @@ class G_LogViewApp(wx.App):
 
             return False
 
-        user_dir = self._SetupApplicationConfiguration()
-        self._SetupLogging(user_dir)
-        self._SetupMetaData(user_dir)
-        self._SetupExtensions()
+        user_dir = self.SetupApplicationConfiguration()
+        self.SetupLogging(user_dir)
+        self.SetupMetaData(user_dir)
+        self.SetupExtensions()
 
         # startup the GUI window
         frame = G_LogViewFrame(None, appname)
@@ -477,7 +477,7 @@ class G_LogViewApp(wx.App):
 
 
     #-------------------------------------------------------
-    def _SetupApplicationConfiguration(self):
+    def SetupApplicationConfiguration(self):
         user_dir = Path(wx.StandardPaths.Get().GetUserDataDir())
         user_dir.mkdir(exist_ok = True)
         config = wx.FileConfig(localFilename = str(user_dir / "nlv.ini"))
@@ -487,7 +487,7 @@ class G_LogViewApp(wx.App):
 
 
     #-------------------------------------------------------
-    def _SetupLogging(self, user_dir):
+    def SetupLogging(self, user_dir):
         logfile = open(str(user_dir / "nlv.log"), "a")
 
         logger = logging.getLogger()
@@ -505,7 +505,7 @@ class G_LogViewApp(wx.App):
 
 
     #-------------------------------------------------------
-    def _SetupMetaData(self, user_dir):
+    def SetupMetaData(self, user_dir):
         import Nlog
         style_format_base = Nlog.EnumStyle.UserFormatBase
 
@@ -514,7 +514,7 @@ class G_LogViewApp(wx.App):
 
 
     #-------------------------------------------------------
-    def _SetupExtensions(self):
+    def SetupExtensions(self):
         from Nlv.Logmeta import GetMetaStore
         from Nlv.Theme import GetThemeStore
 
