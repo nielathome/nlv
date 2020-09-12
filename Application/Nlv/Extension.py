@@ -46,10 +46,11 @@ class G_ExtensionInfo:
 
         cls._ExtensionsValid = True
         for entry_point in iter_entry_points(group = "nlv.extensions", name = None):
-            context = context_cls(G_ExtensionInfo(entry_point.name))
+            info = G_ExtensionInfo(entry_point.name)
+            context = context_cls(info)
             extension_func = entry_point.load()
             extension = extension_func(context)
-            cls._Extensions.append(context._Info)
+            cls._Extensions.append(info)
 
 
 
