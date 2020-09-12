@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,12 +21,13 @@ from pathlib import Path
 import re
 import xml.etree.ElementTree as et
 
-# wxWidgets imports
-import wx
 
-# Application imports
-import Nlog
-from .Project import G_Global
+
+## PRIVATE #################################################
+
+_MetaStore = None
+_ConfigDir = None
+_StyleFormatBase = None
 
 
 
@@ -137,7 +138,7 @@ class G_FieldSchemata(G_FieldList):
         if self._FormatterGuid is None:
             return G_Formatter()
         else:
-            return GetFormatter(self._FormatterGuid)
+            return _MetaStore.GetFormatter(self._FormatterGuid)
 
 
     #-------------------------------------------------------
@@ -386,7 +387,7 @@ class G_StyleSet:
     #-------------------------------------------------------
     def __init__(self, element):
         
-        g = G_NumGenerator(Nlog.EnumStyle.UserFormatBase)
+        g = G_NumGenerator(_StyleFormatBase)
 
         self._Styles = dict(
             [(s.get("name"), G_Style(g, s)) for s in element.iterfind("style")]
@@ -422,7 +423,7 @@ class G_Formatter(list):
         if element is None:
             return
 
-        styleset = self._StyleSet = GetStyleSet(element.find("styleset").text)
+        styleset = self._StyleSet = _MetaStore.GetStyleSet(element.find("styleset").text)
         for f in element.iterfind("format"):
             self.append(G_Format(f, styleset))
 
@@ -500,7 +501,7 @@ class G_XmlStore:
         # data directory; can't be done earlier, as the wx.ConfigBase lookup
         # requires wx.App to exist
         if self._MakeStore():
-            self.AppendDir(Path(G_Global.GetConfigDir()))
+            self.AppendDir(_ConfigDir)
 
         return self._XmlTree
 
@@ -537,52 +538,56 @@ class G_XmlStore:
 
 
 
-## PRIVATE ##################################################
+## G_MetaStore ##############################################
 
-_XmlDb = {
-    "schema": G_XmlStore("schema", G_LogSchema),
-    "styleset": G_XmlStore("styleset", G_StyleSet),
-    "formatter": G_XmlStore("formatter", G_Formatter)
-}
+class G_MetaStore:
+    """
+    A group of named G_XmlStores
+    """
 
+    #-------------------------------------------------------
+    def __init__(self):
+        self._XmlDb = {
+            "schema": G_XmlStore("schema", G_LogSchema),
+            "styleset": G_XmlStore("styleset", G_StyleSet),
+            "formatter": G_XmlStore("formatter", G_Formatter)
+        }
+
+
+    #-------------------------------------------------------
+    def GetFormatter(self, guid):
+        return self._XmlDb["formatter"].GetObjectByGuid(guid)
+
+
+    def GetStyleSet(self, guid):
+        return self._XmlDb["styleset"].GetObjectByGuid(guid)
+
+
+    #-------------------------------------------------------
+    def RegisterLogSchemata(self, directory):
+        for store in self._XmlDb.values():
+            store.AppendDir(directory)
+
+
+    def GetLogSchemataNames(self):
+        return self._XmlDb["schema"].GetNameGuidList()
+
+
+    def GetLogSchema(self, guid):
+        """Fetch a G_LogSchema object describing the schema"""
+        return self._XmlDb["schema"].GetObjectByGuid(guid)
+    
 
 
 ## MODULE ##################################################
 
-def RegisterLogSchemata(directory):
-    global _XmlDb
-    for store in _XmlDb.values():
-        store.AppendDir(directory)
+def InitMetaStore(config_dir, style_format_base):
+    global _MetaStore
+    _MetaStore = G_MetaStore()
+
+    global _ConfigDir, _StyleFormatBase
+    _ConfigDir, _StyleFormatBase = config_dir, style_format_base
 
 
-def GetLogSchemataNames():
-
-    global _XmlDb
-    return _XmlDb["schema"].GetNameGuidList()
-
-
-def GetLogSchema(guid):
-    """Fetch a G_LogSchema object describing the schema"""
-
-    global _XmlDb
-    return _XmlDb["schema"].GetObjectByGuid(guid)
-    
-
-def GetFormatterNames():
-
-    global _XmlDb
-    return _XmlDb["formatter"].GetNameGuidList()
-
-def GetFormatter(guid):
-    global _XmlDb
-    return _XmlDb["formatter"].GetObjectByGuid(guid)
-
-
-def GetStyleSetNames():
-
-    global _XmlDb
-    return _XmlDb["styleset"].GetNameGuidList()
-
-def GetStyleSet(guid):
-    global _XmlDb
-    return _XmlDb["styleset"].GetObjectByGuid(guid)
+def GetMetaStore():
+    return _MetaStore

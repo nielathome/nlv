@@ -1557,11 +1557,12 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         Nlog.Setup(_LogForwarder, PerfTimerFactory)
 
         # create a "public" list of the notfication channels for use by receivers
+        from .Logmeta import GetMetaStore
+        meta_store = GetMetaStore()
+
         root = et.Element("root")
-        from .Logmeta import GetLogSchemataNames
-        from .Logmeta import GetLogSchema
-        for (schema_name, schema_guid) in GetLogSchemataNames():
-            channel_guid = GetLogSchema(schema_guid).GetChannelGuid()
+        for (schema_name, schema_guid) in meta_store.GetLogSchemataNames():
+            channel_guid = meta_store.GetLogSchema(schema_guid).GetChannelGuid()
             if channel_guid is not None:
                 et.SubElement(root, "channel", name = schema_name).text = channel_guid
         et.ElementTree(root).write(str(Path(G_Global.GetConfigDir()) / "Channels.xml"))

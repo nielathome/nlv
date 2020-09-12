@@ -18,11 +18,6 @@
 # System imports
 from pkg_resources import iter_entry_points
 
-# NLV imports
-import Nlv.Logmeta as Schema
-from Nlv.Theme import GetThemeStore
-
-
 
 ## G_ExtensionInfo #########################################
 
@@ -38,7 +33,7 @@ class G_ExtensionInfo:
 
     #-------------------------------------------------------
     @classmethod
-    def LoadExtensions(cls):
+    def LoadExtensions(cls, context_cls):
 
         #
         # references:
@@ -49,38 +44,16 @@ class G_ExtensionInfo:
         if cls._ExtensionsValid:
             return
 
-        # Interface between NLV plugins (extensions) and the application
-        class Context:
-            def __init__(self, name):
-                self._Info = G_ExtensionInfo(name)
-
-            def RegisterLogSchemata(self, install_dir):
-                Schema.RegisterLogSchemata(install_dir)
-
-            def RegisterThemeDirectory(self, install_dir):
-                GetThemeStore().RegisterDirectory(install_dir)
-
-
         cls._ExtensionsValid = True
         for entry_point in iter_entry_points(group = "nlv.extensions", name = None):
-            context = Context(entry_point.name)
+            context = context_cls(G_ExtensionInfo(entry_point.name))
             extension_func = entry_point.load()
             extension = extension_func(context)
             cls._Extensions.append(context._Info)
 
 
-    #-------------------------------------------------------
-    @classmethod
-    def GetExtensionNames(cls):
-        cls.LoadExtensions()
-        return [ext.GetName() for ext in cls._Extensions]
-
-
 
 ## MODULE ##################################################
 
-def LoadExtensions():
-    G_ExtensionInfo.LoadExtensions()
-
-def GetExtensionNames():
-    return G_ExtensionInfo.GetExtensionNames()
+def LoadExtensions(context_cls):
+    G_ExtensionInfo.LoadExtensions(context_cls)

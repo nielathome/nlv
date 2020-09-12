@@ -29,11 +29,10 @@ import wx
 from .DataExplorer import G_DataExplorer
 from .DataExplorer import G_DataExplorerChildNode
 from .Document import D_Document
-from .Extension import GetExtensionNames
 from .Global import G_Const
 from .Global import G_FrozenWindow
 from .Global import G_Global
-from .Logmeta import GetLogSchema, GetLogSchemataNames
+from .Logmeta import GetMetaStore
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_NodeFactory
@@ -263,7 +262,7 @@ class G_SessionManager:
                 return
 
             base_path = Path.cwd()
-            schemata = dict(GetLogSchemataNames())
+            schemata = dict(GetMetaStore().GetLogSchemataNames())
 
             for desc in logfile_descs:
                 try:
@@ -282,7 +281,7 @@ class G_SessionManager:
                         return
 
                     schema_guid = schemata[schema_name]
-                    builders = dict(GetLogSchema(schema_guid).GetBuildersNameGuidList())
+                    builders = dict(GetMetaStore().GetLogSchema(schema_guid).GetBuildersNameGuidList())
 
                     builder_guid = None
                     if builder_name is not None:
@@ -506,7 +505,7 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
 
         # add log schema label, chooser and description
         window = parent.GetWindow()
-        me._SchemataNames = GetLogSchemataNames()
+        me._SchemataNames = GetMetaStore().GetLogSchemataNames()
         names = [name[0] for name in me._SchemataNames]
         me._ChoiceLogSchema = wx.Choice(window, size = (-1, G_Const.ComboRowHeight), choices = names)
         me.BuildLabelledRow(parent, "Log file schema:", me._ChoiceLogSchema)
@@ -560,7 +559,7 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
         return self._Field.SchemaGuid.Value
 
     def GetLogSchema(self):
-        return GetLogSchema(self.GetLogSchemaGuid())
+        return GetMetaStore().GetLogSchema(self.GetLogSchemaGuid())
 
 
     #-------------------------------------------------------

@@ -46,7 +46,6 @@ import Nlv.Session
 import Nlv.Logfile
 import Nlv.View
 import Nlv.EventView
-from Nlv.Extension import LoadExtensions
 from Nlv.Project import G_Project
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
@@ -463,15 +462,33 @@ class G_LogViewApp(wx.App):
 
             return False
 
-        # setup application configuration
-        path = Path(wx.StandardPaths.Get().GetUserDataDir())
-        path.mkdir(exist_ok = True)
-        config = wx.FileConfig(localFilename = str(path / "nlv.ini"))
-        config.Write("/NLV/DataDir", str(path))
-        wx.ConfigBase.Set(config)
+        user_dir = self._SetupApplicationConfiguration()
+        self._SetupLogging(user_dir)
+        self._SetupMetaData(user_dir)
+        self._SetupExtensions()
 
-        # setup logging
-        logfile = open(str(path / "nlv.log"), "a")
+        # startup the GUI window
+        frame = G_LogViewFrame(None, appname)
+
+        with G_PerfTimerScope("G_LogViewFrame.Show"):
+            frame.Show()
+
+        return True
+
+
+    #-------------------------------------------------------
+    def _SetupApplicationConfiguration(self):
+        user_dir = Path(wx.StandardPaths.Get().GetUserDataDir())
+        user_dir.mkdir(exist_ok = True)
+        config = wx.FileConfig(localFilename = str(user_dir / "nlv.ini"))
+        config.Write("/NLV/DataDir", str(user_dir))
+        wx.ConfigBase.Set(config)
+        return user_dir
+
+
+    #-------------------------------------------------------
+    def _SetupLogging(self, user_dir):
+        logfile = open(str(user_dir / "nlv.log"), "a")
 
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)
@@ -486,17 +503,36 @@ class G_LogViewApp(wx.App):
         # the text window display for logging is setup once the frame is created
         # see G_ConsoleLog
 
+
+    #-------------------------------------------------------
+    def _SetupMetaData(self, user_dir):
+        import Nlog
+        style_format_base = Nlog.EnumStyle.UserFormatBase
+
+        from Nlv.Logmeta import InitMetaStore
+        InitMetaStore(user_dir, style_format_base)
+
+
+    #-------------------------------------------------------
+    def _SetupExtensions(self):
+        from Nlv.Logmeta import GetMetaStore
+        from Nlv.Theme import GetThemeStore
+
+        # Interface between NLV plugins (extensions) and the application
+        class Context:
+            def __init__(self, info):
+                self._Info = info
+
+            def RegisterLogSchemata(self, install_dir):
+                GetMetaStore().RegisterLogSchemata(install_dir)
+
+            def RegisterThemeDirectory(self, install_dir):
+                GetThemeStore().RegisterDirectory(install_dir)
+
         # load site specific extensions
+        from Nlv.Extension import LoadExtensions
         with G_PerfTimerScope("LoadExtensions"):
-            LoadExtensions()
-
-        # startup the GUI window
-        frame = G_LogViewFrame(None, appname)
-
-        with G_PerfTimerScope("G_LogViewFrame.Show"):
-            frame.Show()
-
-        return True
+            LoadExtensions(Context)
 
 
 

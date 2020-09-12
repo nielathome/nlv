@@ -28,7 +28,7 @@ import wx
 from .Document import D_Document
 from .Global import G_Const
 from .Global import G_Global
-from .Logmeta import GetLogSchema
+from .Logmeta import GetMetaStore
 from .MatchNode import G_MatchItem
 from .MatchNode import G_MatchNode
 from .Project import G_TabContainerNode
@@ -1121,7 +1121,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         return str(Path(self._Field.RelativeLogfilePath.Value).as_posix())
 
     def GetLogSchema(self):
-        return GetLogSchema(self._Field.SchemaGuid.Value)
+        return GetMetaStore().GetLogSchema(self._Field.SchemaGuid.Value)
 
     def MakeSessionDir(self):
         session_guid = self.GetSessionNode().GetSessionGuid()
