@@ -29,6 +29,7 @@ from Nlv.Logmeta import GetMetaStore
 ## PRIVATE #################################################
 
 _Border = 5
+_Spacer = 10
 
 
 
@@ -47,21 +48,79 @@ class G_FileDropTarget(wx.FileDropTarget):
         return self._Handler(files)
 
 
+
 ## G_Action ################################################
 
 class G_Action(wx.StaticBoxSizer):
 
-    def __init__(self, parent, path):
+    #-------------------------------------------------------
+    def __init__(self, parent, path, schemata):
         super().__init__(wx.VERTICAL, parent, label = path)
 
-        action_ctrl = wx.StaticText(self.GetStaticBox(), label = "None")
-        self.Add(action_ctrl, flag = wx.ALL | wx.EXPAND, border = _Border)
+        self._Schemata = schemata
+        self._SchemaIdx = 0
+        self._BuilderIdx = wx.NOT_FOUND 
+        window = self.GetStaticBox()
+        
+        schemata_combo = wx.ComboBox(window,
+            choices = [schema.GetName() for schema in schemata],
+            style = wx.CB_DROPDOWN
+                | wx.CB_READONLY
+        )
+        schemata_combo.SetSelection(self._SchemaIdx)
+        schemata_combo.Bind(wx.EVT_COMBOBOX, self.OnSchema)
+        self.BuildLabelledRow("Schema", schemata_combo)
+
+        builder_combo = self.BuilderCombo = wx.ComboBox(window,
+            style = wx.CB_DROPDOWN
+                | wx.CB_READONLY
+        )
+        builder_combo.Bind(wx.EVT_COMBOBOX, self.OnBuilder)
+        self.SetupBuilderCombo()
+        self.BuildLabelledRow("Initial view(s)", builder_combo)
 
 
+    #-------------------------------------------------------
+    def BuildRow(self, left, right):
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.Add(hsizer, flag = wx.ALL | wx.EXPAND, border = _Border)
 
-        #self.SetBackgroundColour(wx.Colour(255,255,255))
+        hsizer.Add(left, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+        hsizer.AddSpacer(_Spacer)
+        hsizer.Add(right, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+        hsizer.AddStretchSpacer(1)
 
-        #static = wx.StaticText(self, -1, "Label", pos=(10, 10))
+
+    #-------------------------------------------------------
+    def BuildLabelledRow(self, name, control):
+        label = wx.StaticText(self.GetStaticBox(), label = name)
+        return self.BuildRow(label, control)
+
+
+    #-------------------------------------------------------
+    def OnSchema(self, event):
+        idx = event.GetSelection()
+        if idx != self._SchemaIdx:
+            self._SchemaIdx = idx
+            self.SetupBuilderCombo()
+
+
+    #-------------------------------------------------------
+    def SetupBuilderCombo(self):
+        builders = [name for (name, guid) in self._Schemata[self._SchemaIdx].GetBuildersNameGuidList()]
+        if len(builders) == 0:
+            self.BuilderCombo.Clear()
+            self._BuilderIdx = wx.NOT_FOUND 
+        else:
+            self.BuilderCombo.SetItems(builders)
+            self._BuilderIdx = 0
+
+        self.BuilderCombo.SetSelection(self._BuilderIdx)
+
+    def OnBuilder(self, event):
+        idx = event.GetSelection()
+        if idx != self._BuilderIdx:
+            self._BuilderIdx = idx
 
 
 
@@ -81,7 +140,7 @@ class G_LaunchFrame(wx.Frame):
     def __init__(self, parent, title, schemata):
         super().__init__(
             parent, -1, title,
-            size = (970, 720),
+            size = (720, 970),
             style = wx.DEFAULT_FRAME_STYLE
                 | wx.NO_FULL_REPAINT_ON_RESIZE
         )
@@ -117,36 +176,21 @@ class G_LaunchFrame(wx.Frame):
         commands.Add(reset_btn)
         frame_sizer.Add(commands, flag = wx.ALL | wx.EXPAND, border = _Border)
 
-
-        #action_sizer = self._ActionPane = wx.StaticBoxSizer(wx.VERTICAL, self, label = "Action")
-        #frame_sizer.Add(action_sizer, flag = wx.ALL | wx.EXPAND, border = _Border)
-        #action_ctrl = self._ActionCtrl = wx.StaticText(action_sizer.GetStaticBox(), label = "None")
-        #action_sizer.Add(action_ctrl, flag = wx.ALL | wx.EXPAND, border = _Border)
-        #frame_sizer.Hide(action_sizer)
-
-        #book = self._LabelBook = wx.lib.agw.labelbook.LabelBook(self,
-        #    style = wx.BORDER_THEME,
-        #    agwStyle = INB_LEFT
-        #    | INB_SHOW_ONLY_TEXT
-        #    | INB_BORDER
-        #    | INB_WEB_HILITE
-        #    | INB_FIT_LABELTEXT
-        #)
-        #book.AddPage(G_ActionStep(book), "Hello1")
-        #book.AddPage(G_ActionStep(book), "Hello2")
-
-        #frame_sizer.Add(book, proportion = 1, flag = wx.ALL | wx.EXPAND, border = border)
-        #frame_sizer.Hide(book)
-
         self.CenterOnScreen()
+
+
+    #-------------------------------------------------------
+    def GetActions(self):
+        return [sizer_item.GetSizer() for sizer_item in self._Actions]
 
 
     #-------------------------------------------------------
     def Reset(self):
         frame_sizer = self.GetSizer()
 
-        for sizer_item in self._Actions:
-            sizer_item.GetSizer().GetStaticBox().DestroyChildren()
+        # seem to have to remove child window(s) manually
+        for action in self.GetActions():
+            action.GetStaticBox().DestroyChildren()
         frame_sizer.Remove(self._Actions)
 
         actions = self._Actions = wx.BoxSizer(wx.VERTICAL)
@@ -160,19 +204,19 @@ class G_LaunchFrame(wx.Frame):
 
 
     #-------------------------------------------------------
-    def AddAction(self, action):
-        self._Actions.Add(action, flag = wx.EXPAND)
-
-
-    #-------------------------------------------------------
     def SetupActions(self, paths):
         self.Reset()
         for path in paths:
-            self.AddAction(G_Action(self, path))
+            suffix = Path(path).suffix[1:]
+            schemata = self._Schemata.get(suffix)
+            if schemata is not None:
+                action = G_Action(self, path, schemata)
+                self._Actions.Add(action, flag = wx.TOP | wx.BOTTOM | wx.EXPAND, border = _Border)
 
         self.GetSizer().Hide(self._FileDropperPane)
 
 
+    #-------------------------------------------------------
     def OnDropFiles(self, paths):
         self.SetupActions(paths)
         self.GetSizer().Layout()
