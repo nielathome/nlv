@@ -136,6 +136,9 @@ class G_StdLauncher:
 
 class G_LaunchFrame(wx.Frame):
 
+    _DropperText = "Drop log file(s) here"
+
+
     #-------------------------------------------------------
     def __init__(self, parent, title, schemata):
         super().__init__(
@@ -159,22 +162,30 @@ class G_LaunchFrame(wx.Frame):
         self.SetSizer(frame_sizer)
         self.SetBackgroundColour(wx.Colour(255, 255, 255))
 
-        dropper = self._FileDropperPane = wx.StaticBoxSizer(wx.VERTICAL, self, label = "File(s) to launch")
-        frame_sizer.Add(dropper, flag = wx.ALL | wx.EXPAND, border = _Border)
+        dropper_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, label = "File(s) to launch")
+        frame_sizer.Add(dropper_sizer, flag = wx.ALL | wx.EXPAND, border = _Border)
+        dropper_window = dropper_sizer.GetStaticBox()
 
-        path_ctrl = self._PathCtrl = wx.StaticText(dropper.GetStaticBox(), label = "Drop file(s) here")
+        path_ctrl = self._PathCtrl = wx.StaticText(dropper_window, label = self._DropperText)
         path_ctrl.SetDropTarget(G_FileDropTarget(self.OnDropFiles))
-        dropper.Add(path_ctrl, flag = wx.ALL | wx.EXPAND, border = _Border)
+        dropper_sizer.Add(path_ctrl, flag = wx.ALL | wx.EXPAND, border = _Border)
 
         actions = self._Actions = wx.BoxSizer(wx.VERTICAL)
         frame_sizer.Add(actions, flag = wx.ALL | wx.EXPAND, border = _Border)
 
-        reset_btn = wx.Button(self, label = "Reset")
-        reset_btn.Bind(wx.EVT_BUTTON, self.OnReset)
+        action_sizer = wx.StaticBoxSizer(wx.HORIZONTAL, self, label = "Action")
+        frame_sizer.Add(action_sizer, flag = wx.ALL | wx.EXPAND, border = _Border)
+        action_window = action_sizer.GetStaticBox()
 
-        commands = self.Commands = wx.BoxSizer(wx.HORIZONTAL)
-        commands.Add(reset_btn)
-        frame_sizer.Add(commands, flag = wx.ALL | wx.EXPAND, border = _Border)
+        self._CloseAfterLaunch = True
+        close_chkbox = wx.CheckBox(action_window, label = "Close after launch")
+        close_chkbox.SetValue(self._CloseAfterLaunch)
+        close_chkbox.Bind(wx.EVT_CHECKBOX, self.OnCloseCheck)
+        action_sizer.Add(close_chkbox, flag = wx.ALL | wx.ALIGN_CENTER_VERTICAL, border = _Border)
+
+        launch_btn = wx.Button(action_window, label = "Launch")
+        launch_btn.Bind(wx.EVT_BUTTON, self.OnLaunch)
+        action_sizer.Add(launch_btn, flag = wx.ALL | wx.ALIGN_CENTER_VERTICAL, border = _Border)
 
         self.CenterOnScreen()
 
@@ -195,25 +206,36 @@ class G_LaunchFrame(wx.Frame):
 
         actions = self._Actions = wx.BoxSizer(wx.VERTICAL)
         frame_sizer.Insert(1, actions, flag = wx.ALL | wx.EXPAND, border = _Border)
-        frame_sizer.Show(self._FileDropperPane)
+        self._PathCtrl.SetLabel(self._DropperText)
 
 
-    def OnReset(self, event):
-        self.Reset()
-        self.GetSizer().Layout()
+    #-------------------------------------------------------
+    def OnCloseCheck(self, event):
+        self._CloseAfterLaunch = event.GetInt()
+
+
+    #-------------------------------------------------------
+    def OnLaunch(self, event):
+        pass
 
 
     #-------------------------------------------------------
     def SetupActions(self, paths):
         self.Reset()
+
+        actionable_paths = []
         for path in paths:
             suffix = Path(path).suffix[1:]
             schemata = self._Schemata.get(suffix)
             if schemata is not None:
+                actionable_paths.append(path)
                 action = G_Action(self, path, schemata)
                 self._Actions.Add(action, flag = wx.TOP | wx.BOTTOM | wx.EXPAND, border = _Border)
 
-        self.GetSizer().Hide(self._FileDropperPane)
+        label = self._DropperText
+        if len(actionable_paths) != 0:
+            label = ",\n".join(actionable_paths)
+        self._PathCtrl.SetLabel(label)
 
 
     #-------------------------------------------------------
