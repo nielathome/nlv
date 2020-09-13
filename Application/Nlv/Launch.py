@@ -103,11 +103,11 @@ class G_SessionAction(G_Action):
 
         session_names = []
         if len(paths) == 1:
-            p = Path(paths[0])
+            p = paths[0]
             common_dir = p.parent
             session_names.append(p.with_suffix(suffix).name)
         else:
-            common_dir = Path(os.path.commonpath(paths))
+            common_dir = Path(os.path.commonpath([str(p) for p in paths]))
 
         # convert .parents to a real list
         candidate_dirs = [common_dir] + [dir for dir in common_dir.parents]
@@ -160,7 +160,7 @@ class G_LogAction(G_Action):
 
     #-------------------------------------------------------
     def __init__(self, parent, path, schemata):
-        super().__init__(parent, path)
+        super().__init__(parent, str(path))
 
         self._Schemata = schemata
         self._SchemaIdx = 0
@@ -302,30 +302,46 @@ class G_LaunchFrame(wx.Frame):
 
 
     #-------------------------------------------------------
-    def OnCloseCheck(self, event):
-        self._CloseAfterLaunch = event.GetInt()
+    def SearchDir(self, dir):
+        res = []
 
+        for suffix in self._Schemata.keys():
+            res += [dir/p for p in dir.rglob("*." + suffix)]
+
+        return res
+            
 
     #-------------------------------------------------------
-    def OnLaunch(self, event):
-        pass
+    def ExpandPaths(self, paths):
+        res = []
+
+        for p in paths:
+            path = Path(p)
+            if path.is_file():
+                res.append(path)
+            elif path.is_dir():
+                res.extend(self.SearchDir(path))
+
+        return res
 
 
     #-------------------------------------------------------
     def AddAction(self, action):
         self._Actions.Add(action, flag = wx.TOP | wx.BOTTOM | wx.EXPAND, border = _Border)
 
+
     def SetupActions(self, paths):
         self.Reset()
 
+        paths = self.ExpandPaths(paths)
         self.AddAction(G_SessionAction(self, paths))
 
         actionable_paths = []
         for path in paths:
-            suffix = Path(path).suffix[1:]
+            suffix = path.suffix[1:]
             schemata = self._Schemata.get(suffix)
             if schemata is not None:
-                actionable_paths.append(path)
+                actionable_paths.append(str(path))
                 self.AddAction(G_LogAction(self, path, schemata))
 
         label = self._DropperText
@@ -339,6 +355,16 @@ class G_LaunchFrame(wx.Frame):
         self.SetupActions(paths)
         self.GetSizer().Layout()
         return True
+
+
+    #-------------------------------------------------------
+    def OnCloseCheck(self, event):
+        self._CloseAfterLaunch = event.GetInt()
+
+
+    #-------------------------------------------------------
+    def OnLaunch(self, event):
+        pass
 
 
 
