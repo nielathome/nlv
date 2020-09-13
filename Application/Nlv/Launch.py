@@ -18,6 +18,7 @@
 # Python imports
 import argparse
 from pathlib import Path
+import os.path
 
 # wxWidgets imports
 import wx
@@ -48,19 +49,115 @@ class G_FileDropTarget(wx.FileDropTarget):
         return self._Handler(files)
 
 
-
 ## G_Action ################################################
 
 class G_Action(wx.StaticBoxSizer):
 
     #-------------------------------------------------------
+    def __init__(self, parent, label):
+        super().__init__(wx.VERTICAL, parent, label = label)
+
+
+    #-------------------------------------------------------
+    def GetWindow(self):
+        return self.GetStaticBox()
+
+
+    #-------------------------------------------------------
+    def BuildRow(self, left, right):
+        hsizer = wx.BoxSizer(wx.HORIZONTAL)
+        self.Add(hsizer, flag = wx.ALL | wx.EXPAND, border = _Border)
+
+        hsizer.Add(left, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+        hsizer.AddSpacer(_Spacer)
+        hsizer.Add(right, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+        hsizer.AddStretchSpacer(1)
+
+
+    #-------------------------------------------------------
+    def BuildLabelledRow(self, name, control):
+        label = wx.StaticText(self.GetWindow(), label = name)
+        return self.BuildRow(label, control)
+
+
+
+## G_SessionAction #########################################
+
+class G_SessionAction(G_Action):
+
+    #-------------------------------------------------------
+    def __init__(self, parent, paths):
+        super().__init__(parent, "NLV Session File")
+
+        self._DirectoryIdx = 0
+        self._NameIdx = 0
+        suffix = ".tbd"
+
+        session_names = []
+        if len(paths) == 1:
+            p = Path(paths[0])
+            common_dir = p.parent
+            session_names.append(p.with_suffix(suffix).name)
+        else:
+            common_dir = Path(os.path.commonpath(paths))
+
+        # convert .parents to a real list
+        candidate_dirs = [common_dir] + [dir for dir in common_dir.parents]
+        num_parents = len(candidate_dirs)
+
+        if num_parents == 1:
+            # root directory, e.g. C:\
+            session_dirs = candidate_dirs
+        else:
+            want_parents = min(num_parents - 1, 3)
+            session_dirs = candidate_dirs[:want_parents]
+            for dir in session_dirs:
+                session_names.append(dir.with_suffix(suffix).name)
+
+        if len(session_names) == 0:
+            session_names.append("session" + suffix)
+
+        window = self.GetWindow()
+        directory_combo = wx.ComboBox(window,
+            choices = [str(dir) for dir in session_dirs],
+            style = wx.CB_DROPDOWN
+                | wx.CB_READONLY
+        )
+        directory_combo.SetSelection(self._DirectoryIdx)
+        directory_combo.Bind(wx.EVT_COMBOBOX, self.OnDirectory)
+        self.BuildLabelledRow("Save to directory", directory_combo)
+
+        name_combo = wx.ComboBox(window,
+            choices = session_names[:3],
+            style = wx.CB_DROPDOWN
+                | wx.CB_READONLY
+        )
+        name_combo.SetSelection(self._NameIdx)
+        name_combo.Bind(wx.EVT_COMBOBOX, self.OnName)
+        self.BuildLabelledRow("Session file name", name_combo)
+
+
+    #-------------------------------------------------------
+    def OnDirectory(self, event):
+        self._DirectoryIdx = event.GetSelection()
+
+    def OnName(self, event):
+        self._NameIdx = event.GetSelection()
+
+
+
+## G_LogAction #############################################
+
+class G_LogAction(G_Action):
+
+    #-------------------------------------------------------
     def __init__(self, parent, path, schemata):
-        super().__init__(wx.VERTICAL, parent, label = path)
+        super().__init__(parent, path)
 
         self._Schemata = schemata
         self._SchemaIdx = 0
         self._BuilderIdx = wx.NOT_FOUND 
-        window = self.GetStaticBox()
+        window = self.GetWindow()
         
         schemata_combo = wx.ComboBox(window,
             choices = [schema.GetName() for schema in schemata],
@@ -78,23 +175,6 @@ class G_Action(wx.StaticBoxSizer):
         builder_combo.Bind(wx.EVT_COMBOBOX, self.OnBuilder)
         self.SetupBuilderCombo()
         self.BuildLabelledRow("Initial view(s)", builder_combo)
-
-
-    #-------------------------------------------------------
-    def BuildRow(self, left, right):
-        hsizer = wx.BoxSizer(wx.HORIZONTAL)
-        self.Add(hsizer, flag = wx.ALL | wx.EXPAND, border = _Border)
-
-        hsizer.Add(left, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-        hsizer.AddSpacer(_Spacer)
-        hsizer.Add(right, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-        hsizer.AddStretchSpacer(1)
-
-
-    #-------------------------------------------------------
-    def BuildLabelledRow(self, name, control):
-        label = wx.StaticText(self.GetStaticBox(), label = name)
-        return self.BuildRow(label, control)
 
 
     #-------------------------------------------------------
@@ -118,9 +198,7 @@ class G_Action(wx.StaticBoxSizer):
         self.BuilderCombo.SetSelection(self._BuilderIdx)
 
     def OnBuilder(self, event):
-        idx = event.GetSelection()
-        if idx != self._BuilderIdx:
-            self._BuilderIdx = idx
+        self._BuilderIdx = event.GetSelection()
 
 
 
@@ -220,8 +298,13 @@ class G_LaunchFrame(wx.Frame):
 
 
     #-------------------------------------------------------
+    def AddAction(self, action):
+        self._Actions.Add(action, flag = wx.TOP | wx.BOTTOM | wx.EXPAND, border = _Border)
+
     def SetupActions(self, paths):
         self.Reset()
+
+        self.AddAction(G_SessionAction(self, paths))
 
         actionable_paths = []
         for path in paths:
@@ -229,8 +312,7 @@ class G_LaunchFrame(wx.Frame):
             schemata = self._Schemata.get(suffix)
             if schemata is not None:
                 actionable_paths.append(path)
-                action = G_Action(self, path, schemata)
-                self._Actions.Add(action, flag = wx.TOP | wx.BOTTOM | wx.EXPAND, border = _Border)
+                self.AddAction(G_LogAction(self, path, schemata))
 
         label = self._DropperText
         if len(actionable_paths) != 0:
