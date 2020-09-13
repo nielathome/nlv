@@ -25,6 +25,8 @@ import wx
 
 # Application imports
 from Nlv.Logmeta import GetMetaStore
+from Nlv.Shell import G_Shell
+
 
 
 ## PRIVATE #################################################
@@ -49,6 +51,7 @@ class G_FileDropTarget(wx.FileDropTarget):
         return self._Handler(files)
 
 
+
 ## G_Action ################################################
 
 class G_Action(wx.StaticBoxSizer):
@@ -64,20 +67,25 @@ class G_Action(wx.StaticBoxSizer):
 
 
     #-------------------------------------------------------
-    def BuildRow(self, left, right):
+    def BuildControls(self, ctrls):
         hsizer = wx.BoxSizer(wx.HORIZONTAL)
         self.Add(hsizer, flag = wx.ALL | wx.EXPAND, border = _Border)
 
-        hsizer.Add(left, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-        hsizer.AddSpacer(_Spacer)
-        hsizer.Add(right, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
-        hsizer.AddStretchSpacer(1)
+        for ctrl in ctrls:
+            if isinstance(ctrl, str):
+                label = wx.StaticText(self.GetWindow(), label = ctrl)
+                hsizer.Add(label, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
+
+            elif isinstance(ctrl, int):
+                hsizer.AddSpacer(ctrl)
+
+            else:
+                hsizer.Add(ctrl, flag = wx.ALIGN_LEFT | wx.ALIGN_CENTER_VERTICAL)
 
 
     #-------------------------------------------------------
-    def BuildLabelledRow(self, name, control):
-        label = wx.StaticText(self.GetWindow(), label = name)
-        return self.BuildRow(label, control)
+    def BuildLabelledRow(self, name, ctrl):
+        self.BuildControls([name, _Spacer, ctrl])
 
 
 
@@ -91,7 +99,7 @@ class G_SessionAction(G_Action):
 
         self._DirectoryIdx = 0
         self._NameIdx = 0
-        suffix = ".tbd"
+        suffix = G_Shell.Extension()
 
         session_names = []
         if len(paths) == 1:
@@ -125,7 +133,7 @@ class G_SessionAction(G_Action):
         )
         directory_combo.SetSelection(self._DirectoryIdx)
         directory_combo.Bind(wx.EVT_COMBOBOX, self.OnDirectory)
-        self.BuildLabelledRow("Save to directory", directory_combo)
+        self.BuildLabelledRow("Save in directory", directory_combo)
 
         name_combo = wx.ComboBox(window,
             choices = session_names[:3],
@@ -160,21 +168,27 @@ class G_LogAction(G_Action):
         window = self.GetWindow()
         
         schemata_combo = wx.ComboBox(window,
+            size = (200, -1),
             choices = [schema.GetName() for schema in schemata],
             style = wx.CB_DROPDOWN
                 | wx.CB_READONLY
         )
         schemata_combo.SetSelection(self._SchemaIdx)
         schemata_combo.Bind(wx.EVT_COMBOBOX, self.OnSchema)
-        self.BuildLabelledRow("Schema", schemata_combo)
 
         builder_combo = self.BuilderCombo = wx.ComboBox(window,
+            size = (200, -1),
             style = wx.CB_DROPDOWN
                 | wx.CB_READONLY
         )
         builder_combo.Bind(wx.EVT_COMBOBOX, self.OnBuilder)
         self.SetupBuilderCombo()
-        self.BuildLabelledRow("Initial view(s)", builder_combo)
+
+        self.BuildControls([
+            "Schema", _Spacer, schemata_combo,
+            2 * _Spacer,
+            "Initial view(s)", _Spacer, builder_combo
+        ])
 
 
     #-------------------------------------------------------

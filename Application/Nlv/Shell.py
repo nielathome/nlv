@@ -25,7 +25,6 @@ import win32con
 import winnt
 
 # Application imports
-from .Global import G_Global
 from Nlv.Version import NLV_VERSION
 
 
@@ -52,7 +51,7 @@ class G_Shell:
     #-------------------------------------------------------
     @staticmethod
     def GetPackageDir():
-        return G_Global.GetInstallDir()
+        return Path( __file__ ).parent
 
 
     @classmethod
