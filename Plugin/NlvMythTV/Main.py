@@ -19,6 +19,16 @@
 from pathlib import Path
 
 
+## LAUNCHER ################################################
+
+def OnDirectorySearch(dir):
+    return [dir/p for p in dir.rglob("*.log")]
+
+
+def OnFileConvert(file):
+    pass
+
+
 
 ## MODULE ##################################################
 
@@ -26,3 +36,5 @@ def MakeExtension(context):
     install_dir = Path(__file__).parent
     context.RegisterLogSchemata(install_dir)
     context.RegisterThemeDirectory(install_dir)
+#    context.RegisterFileConverter(extension, converter)
+    context.RegisterDirectorySearch(OnDirectorySearch)

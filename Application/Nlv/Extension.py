@@ -23,6 +23,16 @@ from pkg_resources import iter_entry_points
 
 class G_ExtensionInfo:
 
+    #-------------------------------------------------------
+    def __init__(self, name):
+        self._Name = name
+
+
+
+## G_Extensions ############################################
+
+class G_Extensions:
+
     _ExtensionsValid = False
     _Extensions = []
 
@@ -42,7 +52,7 @@ class G_ExtensionInfo:
         #
 
         if cls._ExtensionsValid:
-            return
+            return cls._Extensions
 
         cls._ExtensionsValid = True
         for entry_point in iter_entry_points(group = "nlv.extensions", name = None):
@@ -52,9 +62,11 @@ class G_ExtensionInfo:
             extension = extension_func(context)
             cls._Extensions.append(info)
 
+        return cls._Extensions
+
 
 
 ## MODULE ##################################################
 
 def LoadExtensions(context_cls):
-    G_ExtensionInfo.LoadExtensions(context_cls)
+    return G_Extensions.LoadExtensions(context_cls)

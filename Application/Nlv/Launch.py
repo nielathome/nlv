@@ -232,7 +232,7 @@ class G_LaunchFrame(wx.Frame):
 
 
     #-------------------------------------------------------
-    def __init__(self, parent, title, schemata):
+    def __init__(self, parent, title, extensions, schemata):
         super().__init__(
             parent, -1, title,
             size = (720, 970),
@@ -240,6 +240,7 @@ class G_LaunchFrame(wx.Frame):
                 | wx.NO_FULL_REPAINT_ON_RESIZE
         )
 
+        self._Extensions = extensions
         self._Schemata = schemata
         self.SetupUI()
 
@@ -305,8 +306,9 @@ class G_LaunchFrame(wx.Frame):
     def SearchDir(self, dir):
         res = []
 
-        for suffix in self._Schemata.keys():
-            res += [dir/p for p in dir.rglob("*." + suffix)]
+        for extension in self._Extensions:
+            for searcher in extension._DirectorySearch:
+                res += searcher(dir)
 
         return res
             
@@ -384,11 +386,11 @@ class G_LaunchApp(wx.App):
         self.SetAppName(appname)
 
         self.SetupMetaData(user_dir)
-        self.SetupExtensions()
+        extensions = self.SetupExtensions()
         schemata = self.SetupLaunchers()
 
         # startup the GUI window
-        G_LaunchFrame(None, appname, schemata).Show()
+        G_LaunchFrame(None, appname, extensions, schemata).Show()
         return True
 
 
@@ -406,6 +408,8 @@ class G_LaunchApp(wx.App):
         class Context:
             def __init__(self, info):
                 self._Info = info
+                info._Converters = []
+                info._DirectorySearch = []
 
             def RegisterLogSchemata(self, install_dir):
                 GetMetaStore().RegisterLogSchemata(install_dir)
@@ -413,9 +417,16 @@ class G_LaunchApp(wx.App):
             def RegisterThemeDirectory(self, install_dir):
                 pass
 
+            def RegisterFileConverter(self, extension, converter):
+                self._Info._Converters.append((extension, converter))
+
+            def RegisterDirectorySearch(self, searcher):
+                self._Info._DirectorySearch.append(searcher)
+
+
         # load site specific extensions
         from Nlv.Extension import LoadExtensions
-        LoadExtensions(Context)
+        return LoadExtensions(Context)
 
 
     #-------------------------------------------------------

@@ -529,6 +529,13 @@ class G_LogViewApp(wx.App):
             def RegisterThemeDirectory(self, install_dir):
                 GetThemeStore().RegisterDirectory(install_dir)
 
+            def RegisterFileConverter(self, extension, converter):
+                pass
+
+            def RegisterDirectorySearch(self, searcher):
+                pass
+
+
         # load site specific extensions
         from Nlv.Extension import LoadExtensions
         with G_PerfTimerScope("LoadExtensions"):
