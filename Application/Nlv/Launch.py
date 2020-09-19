@@ -94,7 +94,7 @@ class G_Action(wx.StaticBoxSizer):
 class G_SessionAction(G_Action):
 
     #-------------------------------------------------------
-    def __init__(self, parent, paths):
+    def __init__(self, parent, path_descs):
         super().__init__(parent, "NLV Session File")
 
         self._DirectoryIdx = 0
@@ -102,12 +102,12 @@ class G_SessionAction(G_Action):
         suffix = G_Shell.Extension()
 
         session_names = []
-        if len(paths) == 1:
-            p = paths[0]
+        if len(path_descs) == 1:
+            p = path_descs[0][0]
             common_dir = p.parent
             session_names.append(p.with_suffix(suffix).name)
         else:
-            common_dir = Path(os.path.commonpath([str(p) for p in paths]))
+            common_dir = Path(os.path.commonpath([str(p[0]) for p in path_descs]))
 
         # convert .parents to a real list
         candidate_dirs = [common_dir] + [dir for dir in common_dir.parents]
@@ -153,10 +153,39 @@ class G_SessionAction(G_Action):
         self._NameIdx = event.GetSelection()
 
 
+## G_LogFixedAction ########################################
 
-## G_LogAction #############################################
+class G_LogFixedAction(G_Action):
 
-class G_LogAction(G_Action):
+    #-------------------------------------------------------
+    def __init__(self, parent, path_desc):
+        super().__init__(parent, str(path_desc[0]))
+
+        window = self.GetWindow()
+        
+        schemata_text = wx.TextCtrl(window,
+            size = (200, -1),
+            value = path_desc[1],
+            style = wx.TE_READONLY
+        )
+
+        builder_text = wx.TextCtrl(window,
+            size = (200, -1),
+            value = path_desc[2],
+            style = wx.TE_READONLY
+        )
+
+        self.BuildControls([
+            "Schema", _Spacer, schemata_text,
+            2 * _Spacer,
+            "Initial view(s)", _Spacer, builder_text
+        ])
+
+
+
+## G_LogUserAction #########################################
+
+class G_LogUserAction(G_Action):
 
     #-------------------------------------------------------
     def __init__(self, parent, path, schemata):
@@ -315,12 +344,18 @@ class G_LaunchFrame(wx.Frame):
 
     #-------------------------------------------------------
     def ExpandPaths(self, paths):
+        """
+        Expand the list of paths (strings) to a list of path
+        descriptions. Each description is either a tuple containing
+        just a pathlib Path, or a tuple of a pathlib path, schema
+        GUID and builder GUID.
+        """
         res = []
 
         for p in paths:
             path = Path(p)
             if path.is_file():
-                res.append(path)
+                res.append((path,))
             elif path.is_dir():
                 res.extend(self.SearchDir(path))
 
@@ -335,16 +370,24 @@ class G_LaunchFrame(wx.Frame):
     def SetupActions(self, paths):
         self.Reset()
 
-        paths = self.ExpandPaths(paths)
-        self.AddAction(G_SessionAction(self, paths))
+        path_descs = self.ExpandPaths(paths)
+        self.AddAction(G_SessionAction(self, path_descs))
 
         actionable_paths = []
-        for path in paths:
-            suffix = path.suffix[1:]
-            schemata = self._Schemata.get(suffix)
-            if schemata is not None:
+        for path_desc in path_descs:
+            path = path_desc[0]
+            if len(path_desc) == 1:
+                # normal case; user chooses schema and builder
+                suffix = path.suffix[1:]
+                schemata = self._Schemata.get(suffix)
+                if schemata is not None:
+                    actionable_paths.append(str(path))
+                    self.AddAction(G_LogUserAction(self, path, schemata))
+
+            else:
+                # special case; schema and builder are pre-determined
                 actionable_paths.append(str(path))
-                self.AddAction(G_LogAction(self, path, schemata))
+                self.AddAction(G_LogFixedAction(self, path_desc))
 
         label = self._DropperText
         if len(actionable_paths) != 0:
