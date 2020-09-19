@@ -42,6 +42,9 @@ class G_Builder:
 
 
     #-------------------------------------------------------
+    def GetName(self):
+        return self._Name
+
     def GetLogTheme(self):
         return self._LogTheme
 

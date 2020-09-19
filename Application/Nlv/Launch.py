@@ -58,6 +58,7 @@ class G_Action(wx.StaticBoxSizer):
 
     #-------------------------------------------------------
     def __init__(self, parent, label):
+        self._Label = label
         super().__init__(wx.VERTICAL, parent, label = label)
 
 
@@ -88,6 +89,14 @@ class G_Action(wx.StaticBoxSizer):
         self.BuildControls([name, _Spacer, ctrl])
 
 
+    #-------------------------------------------------------
+    def CalcLogCmd(self, schema, builder):
+        res = "--log {path}@{schema}".format(path = self._Label, schema = schema)
+        if builder is not None:
+            res += "@" + builder
+        return res
+
+
 
 ## G_SessionAction #########################################
 
@@ -97,8 +106,6 @@ class G_SessionAction(G_Action):
     def __init__(self, parent, path_descs):
         super().__init__(parent, "NLV Session File")
 
-        self._DirectoryIdx = 0
-        self._NameIdx = 0
         suffix = G_Shell.Extension()
 
         session_names = []
@@ -126,31 +133,29 @@ class G_SessionAction(G_Action):
             session_names.append("session" + suffix)
 
         window = self.GetWindow()
-        directory_combo = wx.ComboBox(window,
+        self._DirectoryCombo = directory_combo = wx.ComboBox(window,
             choices = [str(dir) for dir in session_dirs],
             style = wx.CB_DROPDOWN
                 | wx.CB_READONLY
         )
-        directory_combo.SetSelection(self._DirectoryIdx)
-        directory_combo.Bind(wx.EVT_COMBOBOX, self.OnDirectory)
+        directory_combo.SetSelection(0)
         self.BuildLabelledRow("Save in directory", directory_combo)
 
-        name_combo = wx.ComboBox(window,
+        self._NameCombo = name_combo = wx.ComboBox(window,
             choices = session_names[:3],
             style = wx.CB_DROPDOWN
                 | wx.CB_READONLY
         )
-        name_combo.SetSelection(self._NameIdx)
-        name_combo.Bind(wx.EVT_COMBOBOX, self.OnName)
+        name_combo.SetSelection(0)
         self.BuildLabelledRow("Session file name", name_combo)
 
 
     #-------------------------------------------------------
-    def OnDirectory(self, event):
-        self._DirectoryIdx = event.GetSelection()
+    def CalcCmd(self):
+        dir = self._DirectoryCombo.GetStringSelection()
+        name = self._NameCombo.GetStringSelection()
+        return "--new " + dir + "\\" + name
 
-    def OnName(self, event):
-        self._NameIdx = event.GetSelection()
 
 
 ## G_LogFixedAction ########################################
@@ -161,17 +166,21 @@ class G_LogFixedAction(G_Action):
     def __init__(self, parent, path_desc):
         super().__init__(parent, str(path_desc[0]))
 
+        self._Cmd = self.CalcLogCmd(path_desc[1], path_desc[2])
+        schema = GetMetaStore().GetLogSchema(path_desc[1])
+        builder = schema.GetBuilders().GetObjectByGuid(path_desc[2])
+
         window = self.GetWindow()
         
         schemata_text = wx.TextCtrl(window,
             size = (200, -1),
-            value = path_desc[1],
+            value = schema.GetName(),
             style = wx.TE_READONLY
         )
 
         builder_text = wx.TextCtrl(window,
             size = (200, -1),
-            value = path_desc[2],
+            value = builder.GetName(),
             style = wx.TE_READONLY
         )
 
@@ -180,6 +189,11 @@ class G_LogFixedAction(G_Action):
             2 * _Spacer,
             "Initial view(s)", _Spacer, builder_text
         ])
+
+
+    #-------------------------------------------------------
+    def CalcCmd(self):
+        return self._Cmd
 
 
 
@@ -205,7 +219,7 @@ class G_LogUserAction(G_Action):
         schemata_combo.SetSelection(self._SchemaIdx)
         schemata_combo.Bind(wx.EVT_COMBOBOX, self.OnSchema)
 
-        builder_combo = self.BuilderCombo = wx.ComboBox(window,
+        builder_combo = self._BuilderCombo = wx.ComboBox(window,
             size = (200, -1),
             style = wx.CB_DROPDOWN
                 | wx.CB_READONLY
@@ -230,19 +244,28 @@ class G_LogUserAction(G_Action):
 
     #-------------------------------------------------------
     def SetupBuilderCombo(self):
-        builders = [name for (name, guid) in self._Schemata[self._SchemaIdx].GetBuildersNameGuidList()]
+        builders = self._Builders = self._Schemata[self._SchemaIdx].GetBuildersNameGuidList()
         if len(builders) == 0:
-            self.BuilderCombo.Clear()
+            self._BuilderCombo.Clear()
             self._BuilderIdx = wx.NOT_FOUND 
         else:
-            self.BuilderCombo.SetItems(builders)
+            self._BuilderCombo.SetItems([name for (name, guid) in builders])
             self._BuilderIdx = 0
 
-        self.BuilderCombo.SetSelection(self._BuilderIdx)
+        self._BuilderCombo.SetSelection(self._BuilderIdx)
 
     def OnBuilder(self, event):
         self._BuilderIdx = event.GetSelection()
 
+
+    #-------------------------------------------------------
+    def CalcCmd(self):
+        schema = self._Schemata[self._SchemaIdx].Guid
+        builder = None
+        if self._BuilderIdx != wx.NOT_FOUND:
+            builder = self._Builders[self._BuilderIdx][1]
+
+        return self.CalcLogCmd(schema, builder)
 
 
 class G_StdLauncher:
@@ -308,6 +331,19 @@ class G_LaunchFrame(wx.Frame):
         launch_btn = wx.Button(action_window, label = "Launch")
         launch_btn.Bind(wx.EVT_BUTTON, self.OnLaunch)
         action_sizer.Add(launch_btn, flag = wx.ALL | wx.ALIGN_CENTER_VERTICAL, border = _Border)
+
+        global _Args
+        if _Args.debug:
+            debug_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, label = "Debug")
+            frame_sizer.Add(debug_sizer, flag = wx.ALL | wx.EXPAND, border = _Border)
+            debug_window = debug_sizer.GetStaticBox()
+
+            update_btn = wx.Button(debug_window, label = "Update")
+            update_btn.Bind(wx.EVT_BUTTON, self.OnUpdate)
+            debug_sizer.Add(update_btn, flag = wx.ALL | wx.ALIGN_CENTER_VERTICAL, border = _Border)
+
+            debug_ctrl = self._DebugCtrl = wx.StaticText(debug_window)
+            debug_sizer.Add(debug_ctrl, flag = wx.ALL | wx.EXPAND, border = _Border)
 
         self.CenterOnScreen()
 
@@ -408,6 +444,13 @@ class G_LaunchFrame(wx.Frame):
 
 
     #-------------------------------------------------------
+    def OnUpdate(self, event):
+        cmds = [action.CalcCmd() for action in self.GetActions()]
+        self._DebugCtrl.SetLabel("\n".join(cmds))
+        self.GetSizer().Layout()
+
+
+    #-------------------------------------------------------
     def OnLaunch(self, event):
         pass
 
@@ -489,6 +532,7 @@ class G_LaunchApp(wx.App):
 
 _Parser = argparse.ArgumentParser( prog = "launch", description = "NlvLaunch" )
 _Parser.add_argument( "-l", "--launch", type = str, default = None, help = "Launch file" )
+_Parser.add_argument( "-d", "--debug", action = "store_true", help = "Debug support" )
 _Args = _Parser.parse_args()
 
 
