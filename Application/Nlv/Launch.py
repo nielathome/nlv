@@ -475,8 +475,12 @@ class G_LaunchApp(wx.App):
         extensions = self.SetupExtensions()
         schemata = self.SetupLaunchers()
 
-        # startup the GUI window
-        G_LaunchFrame(None, appname, extensions, schemata).Show()
+        global _Args
+        if _Args.integration:
+            G_Shell().SetupLaunchIntegration()
+        else:
+            G_LaunchFrame(None, appname, extensions, schemata).Show()
+
         return True
 
 
@@ -531,8 +535,9 @@ class G_LaunchApp(wx.App):
 ## COMMAND LINE ############################################
 
 _Parser = argparse.ArgumentParser( prog = "launch", description = "NlvLaunch" )
-_Parser.add_argument( "-l", "--launch", type = str, default = None, help = "Launch file" )
-_Parser.add_argument( "-d", "--debug", action = "store_true", help = "Debug support" )
+_Parser.add_argument( "-d", "--debug", action = "store_true", help = "debug support" )
+_Parser.add_argument( "-i", "--integration", action = "store_true", help = "integrate Launcher into the shell" )
+_Parser.add_argument( "-l", "--launch", type = str, default = None, help = "launch file(s)" )
 _Args = _Parser.parse_args()
 
 

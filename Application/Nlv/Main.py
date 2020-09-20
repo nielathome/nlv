@@ -295,7 +295,7 @@ class G_LogViewFrame(wx.Frame):
         self.SetMinSize((640,480))
         self.Centre(wx.BOTH)
 
-        icon_path = G_Shell.GetIconPath()
+        icon_path = G_Shell.GetAppIconPath()
         if icon_path.exists():
             self.SetIcons(wx.IconBundle(str(icon_path)))
 
@@ -560,7 +560,7 @@ _Args = _Parser.parse_args()
 
 def main():
     if _Args.integration:
-        G_Shell().SetupIntegration()
+        G_Shell().SetupAppIntegration()
     else:
         with tempfile.TemporaryDirectory(prefix = "NLV.") as tmp_dir:
             G_Global.TempDir = Path(tmp_dir)
