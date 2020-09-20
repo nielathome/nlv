@@ -167,10 +167,12 @@ if __name__ == '__main__':
 
         entry_points={
             'console_scripts': [
-                'nlvc=Nlv.Main:main'
+                'nlvc=Nlv.Main:main',
+                'launchc=Nlv.Launch:main'
             ],
             'gui_scripts': [
-                'nlvw=Nlv.Main:main'
+                'nlvw=Nlv.Main:main',
+                'launchw=Nlv.Launch:main'
             ]
             
         },

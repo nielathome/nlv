@@ -268,13 +268,6 @@ class G_LogUserAction(G_Action):
         return self.CalcLogCmd(schema, builder)
 
 
-class G_StdLauncher:
-
-    #-------------------------------------------------------
-    def __init__(self, schema):
-        self._Schema = schema
-
-
 
 ## G_LaunchFrame ###########################################
 
@@ -473,11 +466,11 @@ class G_LaunchApp(wx.App):
 
         self.SetupMetaData(user_dir)
         extensions = self.SetupExtensions()
-        schemata = self.SetupLaunchers()
+        schemata = self.SetupSchemata()
 
         global _Args
         if _Args.integration:
-            G_Shell().SetupLaunchIntegration()
+            G_Shell().SetupLaunchIntegration(schemata.keys())
         else:
             G_LaunchFrame(None, appname, extensions, schemata).Show()
 
@@ -520,7 +513,7 @@ class G_LaunchApp(wx.App):
 
 
     #-------------------------------------------------------
-    def SetupLaunchers(self):
+    def SetupSchemata(self):
         meta_store = GetMetaStore()
         schema_list = [meta_store.GetLogSchema(guid) for (name, guid) in meta_store.GetLogSchemataNames()]
 
@@ -544,4 +537,8 @@ _Args = _Parser.parse_args()
 
 ## MODULE ##################################################
 
-G_LaunchApp().MainLoop()
+def main():
+    G_LaunchApp().MainLoop()
+
+if __name__ == "__main__":
+    main()

@@ -153,6 +153,9 @@ class G_Shell:
     def GetLaunchIconPath():
         return G_LaunchTraits.GetIconPath()
 
+    def GetDocumentVersion():
+        return G_AppData.GetDocumentVersion()
+
 
     #-------------------------------------------------------
     def Extension():
@@ -187,23 +190,23 @@ class G_Shell:
         return key
 
 
-    def _GetStrValue(self, key):
-        cur = ""
+    def _GetStrValue(self, key, value_name):
+        cur = None
         type = win32con.REG_SZ
 
         try:
-            (cur, type) = win32api.RegQueryValueEx(key, "")
+            (cur, type) = win32api.RegQueryValueEx(key, value_name)
         except:
             pass
 
         return (cur, type)
 
 
-    def _SetStrValue(self, key, value):
-        (cur, type) = self._GetStrValue(key)
+    def _SetStrValue(self, key, value, value_name = None):
+        (cur, type) = self._GetStrValue(key, value_name)
         if type != win32con.REG_SZ or value != cur:
             self._Changed = True
-            win32api.RegSetValue(key, None, win32con.REG_SZ, value)
+            win32api.RegSetValueEx(key, value_name, 0, win32con.REG_SZ, value)
 
 
     #-------------------------------------------------------
@@ -222,10 +225,17 @@ class G_Shell:
 
 
     #-------------------------------------------------------
-    def _SetupFileType(self, traits):
+    def _SetupFileOpen(self, traits):
         type_key = self._GetKey(self._HKEY_CLASSES_ROOT, __class__.Extension())
         self._SetStrValue(type_key, traits.GetProgId())
         
+
+    #-------------------------------------------------------
+    def _SetupFileOpenWith(self, extension, traits):
+        # https://docs.microsoft.com/en-us/windows/win32/shell/how-to-include-an-application-on-the-open-with-dialog-box
+        open_key = self._GetKey(self._HKEY_CLASSES_ROOT, extension + r"\OpenWithProgids")
+        self._SetStrValue(open_key, "", traits.GetProgId())
+
 
     #-------------------------------------------------------
     def _SetupStartMenu(self, traits):
@@ -254,7 +264,7 @@ class G_Shell:
 
         traits = G_AppTraits
         self._SetupProgId(traits)
-        self._SetupFileType(traits)
+        self._SetupFileOpen(traits)
         self._SetupStartMenu(traits)
 
         if self._Changed:
@@ -262,10 +272,13 @@ class G_Shell:
 
 
     #-------------------------------------------------------
-    def SetupLaunchIntegration(self):
+    def SetupLaunchIntegration(self, extensions):
         traits = G_LaunchTraits
         self._SetupProgId(traits)
         self._SetupStartMenu(traits)
+
+        for extension in extensions:
+            self._SetupFileOpenWith("." + extension, traits)
 
         if self._Changed:
             shell.SHChangeNotify(shellcon.SHCNE_ASSOCCHANGED, shellcon.SHCNF_IDLIST, None, None)
