@@ -548,6 +548,7 @@ class G_LogViewApp(wx.App):
 _Parser = argparse.ArgumentParser( prog = "nlv", description = "NLV" )
 _Parser.add_argument( "-i", "--integration", action = "store_true", help = "integrate NLV into the shell" )
 _Parser.add_argument( "-l", "--log", action = "append", help = "add a logfile to the session; log specified as 'path@schema'" )
+_Parser.add_argument( "-n", "--new", type = str, default = None, help = "create new session document" )
 _Parser.add_argument( "-r", "--recent", action = "store_true", help = "open most recently accessed session" )
 _Parser.add_argument( "-s", "--session", type = str, default = None, help = "open session document" )
 _Args = _Parser.parse_args()

@@ -17,8 +17,9 @@
 
 # Python imports
 import argparse
-from pathlib import Path
 import os.path
+from pathlib import Path
+import subprocess
 
 # wxWidgets imports
 import wx
@@ -91,10 +92,10 @@ class G_Action(wx.StaticBoxSizer):
 
     #-------------------------------------------------------
     def CalcLogCmd(self, schema, builder):
-        res = "--log {path}@{schema}".format(path = self._Label, schema = schema)
+        path = "{path}@{schema}".format(path = self._Label, schema = schema)
         if builder is not None:
-            res += "@" + builder
-        return res
+            path += "@" + builder
+        return ["--log", path]
 
 
 
@@ -154,7 +155,7 @@ class G_SessionAction(G_Action):
     def CalcCmd(self):
         dir = self._DirectoryCombo.GetStringSelection()
         name = self._NameCombo.GetStringSelection()
-        return "--new " + dir + "\\" + name
+        return ["--new", dir + "\\" + name]
 
 
 
@@ -287,6 +288,11 @@ class G_LaunchFrame(wx.Frame):
 
         self._Extensions = extensions
         self._Schemata = schemata
+
+        icon_path = G_Shell.GetLaunchIconPath()
+        if icon_path.exists():
+            self.SetIcons(wx.IconBundle(str(icon_path)))
+
         self.SetupUI()
 
         global _Args
@@ -437,15 +443,21 @@ class G_LaunchFrame(wx.Frame):
 
 
     #-------------------------------------------------------
-    def OnUpdate(self, event):
-        cmds = [action.CalcCmd() for action in self.GetActions()]
-        self._DebugCtrl.SetLabel("\n".join(cmds))
-        self.GetSizer().Layout()
+    def CalcCmd(self):
+        cmds = [G_Shell().GetInstalledAppPath()]
+        for action in self.GetActions():
+            cmds += action.CalcCmd()
+        return cmds
+
+
+    def OnLaunch(self, event):
+        subprocess.Popen(self.CalcCmd())
 
 
     #-------------------------------------------------------
-    def OnLaunch(self, event):
-        pass
+    def OnUpdate(self, event):
+        self._DebugCtrl.SetLabel("\n".join(self.CalcCmd()))
+        self.GetSizer().Layout()
 
 
 

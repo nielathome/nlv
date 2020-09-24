@@ -181,9 +181,9 @@ class G_SessionManager:
 
 
     #-------------------------------------------------------
-    def SessionNew(self):
-        self.SetSessionFilename()
-        self.GetRootNode().LoadNode(self.SessionPathToName())
+    def SessionNew(self, doc_path = None):
+        self.SetSessionFilename(doc_path)
+        self.GetRootNode().LoadNode(self.SessionPathToName(doc_path))
         self.GetSessionNode().Select()
 
 
@@ -242,6 +242,64 @@ class G_SessionManager:
 
 
     #-------------------------------------------------------
+    def MakeNameGuidDicts(self, pair_list):
+        guid_by_name = dict(pair_list)
+        name_by_guid = dict([(guid, name) for (name, guid) in pair_list])
+        return guid_by_name, name_by_guid
+
+
+    def HandleCmdlineLog(self, desc):
+        base_path = Path.cwd()
+        schemata = GetMetaStore().GetLogSchemataNames()
+        schema_guids_by_name, schema_names_by_guid = self.MakeNameGuidDicts(schemata)
+        schemata_names = ", ".join(["{} ({})".format(name, guid) for name, guid in schemata])
+
+        try:
+            elems = desc.count('@')
+            builder_name = None
+            if elems == 1:
+                (path, schema_name_or_guid) = desc.split('@')
+            elif elems == 2:
+                (path, schema_name_or_guid, builder_name_or_guid) = desc.split('@')
+            else:
+                logging.error("Unrecognised logfile descriptor: '{}'".format(desc))
+
+        except ValueError:
+            logging.error("No schema in log descriptor '{}'; expected 'path@schema@builder' where valid schema names are: '{}'".format(desc, schemata_names))
+
+        if schema_name_or_guid in schema_guids_by_name:
+            schema_guid = schema_guids_by_name[schema_name_or_guid]
+        elif schema_name_or_guid in schema_names_by_guid:
+            schema_guid = schema_name_or_guid
+        else:
+            logging.error("Unrecognised schema in '{}'; valid schemata are: '{}'".format(desc, schemata_names))
+            return
+
+        builders = GetMetaStore().GetLogSchema(schema_guid).GetBuildersNameGuidList()
+        builder_guids_by_name, builder_names_by_guid = self.MakeNameGuidDicts(builders)
+
+        builder_guid = None
+        if builder_name_or_guid is not None:
+            if len(builders) == 0:
+                logging.error("Builder name included in logfile descriptor '{}', but schema defined no builders".format(builder_name_or_guid))
+                return
+
+            if builder_name_or_guid in builder_guids_by_name:
+                builder_guid = builder_guids_by_name[builder_name_or_guid]
+            elif builder_name_or_guid in builder_names_by_guid:
+                builder_guid = builder_name_or_guid
+            else:
+                builder_names = ", ".join(["{} ({})".format(name, guid) for name, guid in builders])
+                logging.error("Unrecognised builder in '{}'; valid builders are: '{}'".format(desc, builder_names))
+                return
+
+        p = Path(path)
+        if p.is_absolute():
+            p = G_Global.RelPath(p, base_path).as_posix()
+
+        self.GetSessionNode().AppendLog(str(p), schema_guid, builder_guid)
+
+
     def SessionSetup(self, root_node, program_args):
         """Initialise the session manager; makes it operational"""
 
@@ -249,61 +307,26 @@ class G_SessionManager:
         self._CurrentPath = None
 
         with G_FrozenWindow(self.GetFrame()):
-            path = program_args.session
-            if path is not None:
-                self.SessionOpen(path)
+            path_to_open = program_args.session
+            path_to_create = program_args.new
+
+            if path_to_create is not None:
+                self.SessionNew(path_to_create)
+            elif path_to_open is not None:
+                self.SessionOpen(path_to_open)
             elif program_args.recent:
                 self.SessionOpen(0)
             else:
                 self.SessionNew()
 
             logfile_descs = program_args.log
-            if logfile_descs is None:
-                return
+            if logfile_descs is not None:
+                for desc in logfile_descs:
+                    self.HandleCmdlineLog(desc)
 
-            base_path = Path.cwd()
-            schemata = dict(GetMetaStore().GetLogSchemataNames())
+            if path_to_create is not None:
+                self.SessionSave()
 
-            for desc in logfile_descs:
-                try:
-                    elems = desc.count('@')
-                    builder_name = None
-                    if elems == 2:
-                        (path, schema_name) = desc.split('@')
-                    elif elems == 3:
-                        (path, schema_name, builder_name) = desc.split('@')
-                    else:
-                        logging.error("Unrecognised logfile descriptor: '{}'".format(desc))
-
-                    if schema_name not in schemata:
-                        schemata_names = "".join(schemata.keys())
-                        logging.error("Unrecognised schema in '{}'; valid schemata are: '{}'".format(desc, schemata_names))
-                        return
-
-                    schema_guid = schemata[schema_name]
-                    builders = dict(GetMetaStore().GetLogSchema(schema_guid).GetBuildersNameGuidList())
-
-                    builder_guid = None
-                    if builder_name is not None:
-                        if len(builders) == 0:
-                            logging.error("Builder name included in logfile descriptor '{}', but schema defined no builders".format(builder_name))
-                            return
-
-                        if builder_name in builders:
-                            builder_guid = builders[builder_name]
-                        else:
-                            builder_names = "".join(builders.keys())
-                            logging.error("Unrecognised builder in '{}'; valid builders are: '{}'".format(desc, builder_names))
-                            return
-
-                    p = Path(path)
-                    if p.is_absolute():
-                        p = G_Global.RelPath(p, base_path).as_posix()
-
-                    self.GetSessionNode().AppendLog(str(p), builder_guid)
-
-                except ValueError:
-                    logging.error("No schema in log descriptor '{}'; expected 'path@schema@builder' where valid schema names are: '{}'".format(desc, schemata_names))
 
 
     #-------------------------------------------------------

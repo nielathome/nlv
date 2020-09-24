@@ -190,7 +190,7 @@ class G_Shell:
         return key
 
 
-    def _GetStrValue(self, key, value_name):
+    def _GetStrValue(self, key, value_name = None):
         cur = None
         type = win32con.REG_SZ
 
@@ -256,6 +256,20 @@ class G_Shell:
         menu_dir = shell.SHGetFolderPath (0, shellcon.CSIDL_STARTMENU, 0, 0)
         persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
         persist_file.Save(os.path.join(menu_dir, "Programs", traits.GetLinkName()), 0)
+
+
+    #-------------------------------------------------------
+    def GetInstalledAppPath(self):
+        traits = G_AppTraits
+        open_key = self._GetKey(self._HKEY_CLASSES_ROOT, traits.GetProgId() + r"\shell\open\command")
+        (value, type) = self._GetStrValue(open_key)
+
+        if type == win32con.REG_SZ and value is not None:
+            split = value.split(" ")
+            if len(split) > 0:
+                return split[0].strip('"')
+
+        return None
 
 
     #-------------------------------------------------------

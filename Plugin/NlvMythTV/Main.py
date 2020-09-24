@@ -24,7 +24,7 @@ from pathlib import Path
 def OnDirectorySearch(dir):
     schema_guid = "6E4169C7-97D2-4F98-9BB9-AB9CCA90AC70"
     builder_guid = "50F34148-43D8-452E-B2E3-CDF0FCE90DD4"
-    return [(dir/p, schema_guid, builder_guid) for p in dir.rglob("*.log")]
+    return [(dir/p, schema_guid, builder_guid) for p in dir.rglob("myth*.log")]
 
 
 def OnFileConvert(file):
