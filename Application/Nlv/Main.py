@@ -22,11 +22,11 @@ import http.server
 import json
 import logging
 from pathlib import Path
-from queue import Queue
 import socketserver 
 import sys
 import tempfile
 import threading
+import weakref
 
 # the only *reliable* way for Nlog to find and link against the sqlite3.dll
 # is to import the Python module first; in particular, this works around the fact
@@ -42,6 +42,7 @@ import winerror
 # wxWidgets imports
 import wx
 import wx.lib.agw.aui as aui
+import wx.lib.newevent as newevent
 
 # Application imports
 from Nlv.Global import G_ChannelLogFilter
@@ -66,6 +67,8 @@ if _G_WantProfiling:
 
 
 ## HttpRequestHandler ######################################
+
+HttpActionEvent, EVT_HTTP_ACTION = newevent.NewEvent()
 
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
@@ -143,11 +146,13 @@ def RunHttpServer(name = "localhost", port = 8000):
 
 ## CommandServer ###########################################
 
+IpcCommandEvent, EVT_IPC_COMMAND = newevent.NewEvent()
+
 class CommandServer:
 
     #-------------------------------------------------------
-    def __init__(self, queue):
-        self._Queue = queue
+    def __init__(self, handler):
+        self._Handler = weakref.ref(handler)
 
 
     #-------------------------------------------------------
@@ -188,9 +193,12 @@ class CommandServer:
             hr, encoded_cmds = win32file.ReadFile(self._Pipe, 1024)
             win32pipe.DisconnectNamedPipe(self._Pipe)
 
-            if hr == 0:
+            handler = self._Handler()
+            if handler is None:
+                return False
+            elif hr == 0:
                 cmds = json.loads(encoded_cmds.decode(encoding = "utf-8", errors = "replace"))
-                self._Queue.put(cmds)
+                handler.QueueEvent(IpcCommandEvent(cmds = cmds))
 
             return True
 
@@ -203,8 +211,8 @@ class CommandServer:
         return False
 
 
-def RunCommandServer(queue):
-    server = CommandServer(queue)
+def RunCommandServer(handler):
+    server = CommandServer(handler)
     if server.Setup():
         while server.Transact():
             pass
@@ -236,7 +244,6 @@ class G_ExceptionDialog(wx.Dialog):
         sizer.Add(self._Message, proportion = 1, flag = wx.BOTTOM | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, border = 5)
 
         self.SetSizer(sizer)
-#        sizer.Fit(self)
 
 
     #-------------------------------------------------------
@@ -458,22 +465,29 @@ class G_LogViewFrame(wx.Frame):
         self._AuiManager.Update()
 
         # launch command handler
-        self._CommandActions = Queue()
-        cmdd = threading.Thread(target = RunCommandServer, args = (self._CommandActions,))
+        cmdd = threading.Thread(target = RunCommandServer, args = (self,))
         cmdd.daemon = True
         cmdd.start()
+        self.Bind(EVT_IPC_COMMAND, self.OnIpcCommand)
 
-        # HTTP callback processors; used to move requests from HTTP clients
+        # HTTP callback processor; used to move requests from HTTP clients
         # from the HTTP thread to the UI thread
-        self._HttpActions = Queue()
-        HttpRequestHandler.RegisterCallback(self.OnHttpAction)
+        class HttpCallback:
+            def __init__(self, handler):
+                self._Handler = weakref.ref(handler)
+
+            def __call__(self, node_id, method, args):
+                handler = self._Handler()
+                if handler is not None:
+                    handler.QueueEvent(HttpActionEvent(node_id = node_id, method = method, args = args))
+
+        HttpRequestHandler.RegisterCallback(HttpCallback(self))
 
         # local HTTPD
         httpd = threading.Thread(target = RunHttpServer)
         httpd.daemon = True
         httpd.start()
-
-        self.Bind(wx.EVT_IDLE, self.OnIdle)
+        self.Bind(EVT_HTTP_ACTION, self.OnHttpAction)
 
 
     #-------------------------------------------------------
@@ -494,17 +508,14 @@ class G_LogViewFrame(wx.Frame):
 
 
     #-------------------------------------------------------
-    def OnHttpAction(self, node_id, method, args):
-        self._HttpActions.put((node_id, method, args))
+    def OnHttpAction(self, event):
+        self.GetProject().OnHttpAction(event.node_id, event.method, event.args)
 
-    def OnIdle(self, event):
-        if not self._HttpActions.empty():
-            node_id, method, args = self._HttpActions.get()
-            self.GetProject().OnHttpAction(node_id, method, args)
 
-        if not self._CommandActions.empty():
-            cmds = self._CommandActions.get()
-            logging.info(", ".join(cmds))
+    #-------------------------------------------------------
+    def OnIpcCommand(self, event):
+        cmds = event.cmds
+        logging.info(", ".join(cmds))
 
 
     #-------------------------------------------------------
