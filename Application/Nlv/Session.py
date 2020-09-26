@@ -300,11 +300,14 @@ class G_SessionManager:
         self.GetSessionNode().AppendLog(str(p), schema_guid, builder_guid)
 
 
-    def SessionSetup(self, root_node, program_args):
+    def SessionSetup(self, program_args, root_node_or_none):
         """Initialise the session manager; makes it operational"""
 
-        self._WRootNode = MakeWeakRef(root_node)
-        self._CurrentPath = None
+        if root_node_or_none is None:
+            self.SessionReap()
+        else:
+            self._WRootNode = MakeWeakRef(root_node_or_none)
+            self._CurrentPath = None
 
         with G_FrozenWindow(self.GetFrame()):
             path_to_open = program_args.session

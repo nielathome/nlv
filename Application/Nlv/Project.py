@@ -1787,9 +1787,12 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
 
     #-------------------------------------------------------
-    def OpenSession(self, program_args):
+    def OpenSession(self, program_args, is_first):
         from .Session import GetSessionManager
-        GetSessionManager().SessionSetup(self.GetRootNode(), program_args)
+        node_or_none = None
+        if is_first:
+            node_or_none = self.GetRootNode()
+        GetSessionManager().SessionSetup(program_args, node_or_none)
 
 
     #-------------------------------------------------------

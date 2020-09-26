@@ -463,13 +463,13 @@ class G_LaunchFrame(wx.Frame):
             handle = win32file.CreateFile(r"\\.\pipe\nlv-cmd", win32file.GENERIC_WRITE, 0, None, win32file.OPEN_EXISTING, 0, None)
             pipe_open = True
     
-            encoded_cmds = bytes(json.dumps(cmds), encoding = "utf-8")
+            encoded_cmds = bytes(json.dumps(cmds[1:]), encoding = "utf-8")
             win32file.WriteFile(handle, encoded_cmds)
             handle.Close()
 
         except pywintypes.error as werr:
-            a = 5
-#            subprocess.Popen(self.CalcCmd())
+            if not pipe_open:
+                subprocess.Popen(self.CalcCmd())
 
         except Exception as ex:
             pass

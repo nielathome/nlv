@@ -26,7 +26,7 @@ import socketserver
 import sys
 import tempfile
 import threading
-import weakref
+from weakref import ref as MakeWeakRef
 
 # the only *reliable* way for Nlog to find and link against the sqlite3.dll
 # is to import the Python module first; in particular, this works around the fact
@@ -66,6 +66,17 @@ if _G_WantProfiling:
 
 
 
+## COMMAND LINE ############################################
+
+_Parser = argparse.ArgumentParser( prog = "nlv", description = "NLV" )
+_Parser.add_argument( "-i", "--integration", action = "store_true", help = "integrate NLV into the shell" )
+_Parser.add_argument( "-l", "--log", action = "append", help = "add a logfile to the session; log specified as 'path@schema'" )
+_Parser.add_argument( "-n", "--new", type = str, default = None, help = "create new session document" )
+_Parser.add_argument( "-r", "--recent", action = "store_true", help = "open most recently accessed session" )
+_Parser.add_argument( "-s", "--session", type = str, default = None, help = "open session document" )
+
+
+
 ## HttpRequestHandler ######################################
 
 HttpActionEvent, EVT_HTTP_ACTION = newevent.NewEvent()
@@ -85,8 +96,8 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     #-------------------------------------------------------
     @classmethod
-    def RegisterCallback(cls, callabck):
-        cls._Callback = callabck
+    def RegisterCallback(cls, callback):
+        cls._Callback = callback
 
 
     #-------------------------------------------------------
@@ -152,7 +163,7 @@ class CommandServer:
 
     #-------------------------------------------------------
     def __init__(self, handler):
-        self._Handler = weakref.ref(handler)
+        self._Handler = MakeWeakRef(handler)
 
 
     #-------------------------------------------------------
@@ -459,7 +470,7 @@ class G_LogViewFrame(wx.Frame):
 
         # open session document
         global _Args
-        self._Project.OpenSession(_Args)
+        self._Project.OpenSession(_Args, True)
 
         # layout and display
         self._AuiManager.Update()
@@ -474,7 +485,7 @@ class G_LogViewFrame(wx.Frame):
         # from the HTTP thread to the UI thread
         class HttpCallback:
             def __init__(self, handler):
-                self._Handler = weakref.ref(handler)
+                self._Handler = MakeWeakRef(handler)
 
             def __call__(self, node_id, method, args):
                 handler = self._Handler()
@@ -514,8 +525,9 @@ class G_LogViewFrame(wx.Frame):
 
     #-------------------------------------------------------
     def OnIpcCommand(self, event):
-        cmds = event.cmds
-        logging.info(", ".join(cmds))
+        logging.info("Running launch request")
+        args = _Parser.parse_args(event.cmds)
+        self._Project.OpenSession(args, False)
 
 
     #-------------------------------------------------------
@@ -639,21 +651,11 @@ class G_LogViewApp(wx.App):
 
 
 
-## COMMAND LINE ############################################
-
-_Parser = argparse.ArgumentParser( prog = "nlv", description = "NLV" )
-_Parser.add_argument( "-i", "--integration", action = "store_true", help = "integrate NLV into the shell" )
-_Parser.add_argument( "-l", "--log", action = "append", help = "add a logfile to the session; log specified as 'path@schema'" )
-_Parser.add_argument( "-n", "--new", type = str, default = None, help = "create new session document" )
-_Parser.add_argument( "-r", "--recent", action = "store_true", help = "open most recently accessed session" )
-_Parser.add_argument( "-s", "--session", type = str, default = None, help = "open session document" )
-_Args = _Parser.parse_args()
-
-
-
 ## MODULE ##################################################
 
 # create and run the application
+
+_Args = _Parser.parse_args()
 
 def main():
     if _Args.integration:
