@@ -80,14 +80,14 @@ class Channel:
     def _StartConnection(self):
         self._Overlapped = pywintypes.OVERLAPPED()
         self._Overlapped.hEvent = self._Event
-        self._IoError = win32pipe.ConnectNamedPipe( self._Pipe, self._Overlapped )
-        return self._SetState( __class__._StateConnecting )
+        self._IoError = win32pipe.ConnectNamedPipe(self._Pipe, self._Overlapped)
+        return self._SetState(__class__._StateConnecting)
 
 
     def _CheckConnection(self):
         if self._CheckIO():
-            logging.info( "Notifier: started: channel:'{}'".format(self._Name) )
-            return self._SetState( __class__._StateReady )
+            logging.info("Notifier: started: channel:'{}'".format(self._Name))
+            return self._SetState(__class__._StateReady)
 
         return False
 
@@ -101,12 +101,12 @@ class Channel:
             self._NextMessage = None
 
             if self._MessageLen > self._MaxMessageSize:
-                logging.error( "Notifier: oversized message, skipping: channel:'{}' len:'{}'".format(self._Name, self._MessageLen) )
+                logging.error("Notifier: oversized message, skipping: channel:'{}' len:'{}'".format(self._Name, self._MessageLen))
             else:
                 self._Overlapped = pywintypes.OVERLAPPED()
                 self._Overlapped.hEvent = self._Event
                 self._IoError, self._IoSent = win32file.WriteFile(self._Pipe, byte_message, self._Overlapped)
-                return self._SetState( __class__._StateWriting )
+                return self._SetState(__class__._StateWriting)
 
         return False
 
@@ -116,14 +116,14 @@ class Channel:
             if self._IoSent != self._MessageLen:
                 raise Exception("Incomplete message write")
 
-            return self._SetState( __class__._StateReady )
+            return self._SetState(__class__._StateReady)
 
         return False
 
 
     def _Recover(self):
         win32pipe.DisconnectNamedPipe(self._Pipe)
-        return self._SetState( __class__._StateConnect )
+        return self._SetState(__class__._StateConnect)
 
 
     #-------------------------------------------------------
@@ -158,16 +158,16 @@ class Channel:
                 recover = False
 
             except pywintypes.error as werr:
-                logging.error( "Notifier: WinError: channel:'{}' func:'{}' code:'{}' error:'{}'".format( self._Name, werr.funcname, werr.winerror, werr.strerror) )
+                logging.error("Notifier: WinError: channel:'{}' func:'{}' code:'{}' error:'{}'".format(self._Name, werr.funcname, werr.winerror, werr.strerror))
 
             except Exception as ex:
-                logging.error( "Notifier: Exception: channel:'{}' message:'{}'".format(self._Name, str(ex)) )
+                logging.error("Notifier: Exception: channel:'{}' message:'{}'".format(self._Name, str(ex)))
 
             except:
-                logging.error( "Notifier: Unexpected error: channel:'{}'".format(self._Name) )
+                logging.error("Notifier: Unexpected error: channel:'{}'".format(self._Name))
 
             if recover:
-                cont = self._SetState( __class__._StateRecover )
+                cont = self._SetState(__class__._StateRecover)
 
             if not cont:
                 break
@@ -187,7 +187,7 @@ class Channel:
 
         try:
             # event for overlapped pipe I/O
-            self._Event = win32event.CreateEvent( None, True, False, None )
+            self._Event = win32event.CreateEvent(None, True, False, None)
 
             # create the pipe used as a transport
             self._Pipe = win32pipe.CreateNamedPipe(
@@ -199,17 +199,17 @@ class Channel:
                 self._PipeSize, # nInBufferSize
                 0, # nDefaultTimeOut
                 None # sa
-            )
+           )
 
             # initiate connection
             self._State = __class__._StateConnect
             self._Run()
 
         except pywintypes.error as werr:
-            logging.error( "Notifier: Pipe startup error: channel:'{}' func:'{}' code:'{}' error:'{}'".format(self._Name, werr.funcname, werr.winerror, werr.strerror) )
+            logging.error("Notifier: Pipe startup error: channel:'{}' func:'{}' code:'{}' error:'{}'".format(self._Name, werr.funcname, werr.winerror, werr.strerror))
 
         except:
-            logging.error( "Notifier: Pipe startup: unexpected error: channel:'{}'".format(self._Name) )
+            logging.error("Notifier: Pipe startup: unexpected error: channel:'{}'".format(self._Name))
 
     
     #-------------------------------------------------------
@@ -229,10 +229,10 @@ class Channel:
 
         # Best efforts pipe shutdown, ignore any errors
         try:
-            win32file.CancelIo( self._Pipe )
-            win32pipe.DisconnectNamedPipe( self._Pipe )
+            win32file.CancelIo(self._Pipe)
+            win32pipe.DisconnectNamedPipe(self._Pipe)
             self._Pipe.Close()
         except:
             pass
 
-        logging.debug( "Notifier: shut down: channel:'{}'".format(self._Name) )
+        logging.debug("Notifier: shut down: channel:'{}'".format(self._Name))

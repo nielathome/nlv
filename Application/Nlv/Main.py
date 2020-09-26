@@ -33,6 +33,11 @@ import threading
 # that the DLL path varies depending on whether NLV is running from a venv or not
 import sqlite3
  
+# pywin32 imports
+import pywintypes
+import win32file
+import win32pipe
+import winerror
 
 # wxWidgets imports
 import wx
@@ -49,7 +54,6 @@ import Nlv.EventView
 from Nlv.Project import G_Project
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
-
 
 # Enable/disable profiling (VisualStudio tools not working ...)
 _G_WantProfiling = False
@@ -134,6 +138,76 @@ def RunHttpServer(name = "localhost", port = 8000):
     server_address = (name, port)
     server = MyHttpServer(server_address, HttpRequestHandler)
     server.serve_forever()
+
+
+
+## CommandServer ###########################################
+
+class CommandServer:
+
+    #-------------------------------------------------------
+    def __init__(self, queue):
+        self._Queue = queue
+
+
+    #-------------------------------------------------------
+    @staticmethod
+    def LogError(werr):
+        logging.error("Command: Pipe error: func:'{}' code:'{}' error:'{}'".format(werr.funcname, werr.winerror, werr.strerror))
+
+
+    #-------------------------------------------------------
+    def Setup(self):
+        try:
+            self._Pipe = win32pipe.CreateNamedPipe(
+                r"\\.\pipe\nlv-cmd", # pipeName
+                win32pipe.PIPE_ACCESS_INBOUND, # openMode
+                win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE, # pipeMode
+                1, # nMaxInstances
+                4096, # nOutBufferSize
+                4096, # nInBufferSize
+                0, # nDefaultTimeOut
+                None # sa
+           )
+
+            return True
+
+        except pywintypes.error as werr:
+            self.LogError(werr)
+
+        except Exception as ex:
+            logging.error("Command: Pipe creation error")
+
+        return False
+
+
+    #-------------------------------------------------------
+    def Transact(self):
+        try:
+            win32pipe.ConnectNamedPipe(self._Pipe)
+            hr, encoded_cmds = win32file.ReadFile(self._Pipe, 1024)
+            win32pipe.DisconnectNamedPipe(self._Pipe)
+
+            if hr == 0:
+                cmds = json.loads(encoded_cmds.decode(encoding = "utf-8", errors = "replace"))
+                self._Queue.put(cmds)
+
+            return True
+
+        except pywintypes.error as werr:
+            self.LogError(werr)
+
+        except Exception as ex:
+            logging.error("Command: Pipe connection error")
+
+        return False
+
+
+def RunCommandServer(queue):
+    server = CommandServer(queue)
+    if server.Setup():
+        while server.Transact():
+            pass
 
 
 
@@ -383,16 +457,23 @@ class G_LogViewFrame(wx.Frame):
         # layout and display
         self._AuiManager.Update()
 
+        # launch command handler
+        self._CommandActions = Queue()
+        cmdd = threading.Thread(target = RunCommandServer, args = (self._CommandActions,))
+        cmdd.daemon = True
+        cmdd.start()
+
         # HTTP callback processors; used to move requests from HTTP clients
         # from the HTTP thread to the UI thread
         self._HttpActions = Queue()
         HttpRequestHandler.RegisterCallback(self.OnHttpAction)
-        self.Bind(wx.EVT_IDLE, self.OnIdle)
 
         # local HTTPD
         httpd = threading.Thread(target = RunHttpServer)
         httpd.daemon = True
         httpd.start()
+
+        self.Bind(wx.EVT_IDLE, self.OnIdle)
 
 
     #-------------------------------------------------------
@@ -420,6 +501,10 @@ class G_LogViewFrame(wx.Frame):
         if not self._HttpActions.empty():
             node_id, method, args = self._HttpActions.get()
             self.GetProject().OnHttpAction(node_id, method, args)
+
+        if not self._CommandActions.empty():
+            cmds = self._CommandActions.get()
+            logging.info(", ".join(cmds))
 
 
     #-------------------------------------------------------
