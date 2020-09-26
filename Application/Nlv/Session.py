@@ -232,7 +232,6 @@ class G_SessionManager:
         if touch:
             self._ListTouch(self._CurrentPath)
 
-
         self.GetRootNode().SaveNode(self._CurrentPath)
 
 

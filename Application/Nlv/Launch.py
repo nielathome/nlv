@@ -326,7 +326,8 @@ class G_LaunchFrame(wx.Frame):
         frame_sizer.Add(action_sizer, flag = wx.ALL | wx.EXPAND, border = _Border)
         action_window = action_sizer.GetStaticBox()
 
-        self._CloseAfterLaunch = True
+        global _Args
+        self._CloseAfterLaunch = _Args.launch is not None
         close_chkbox = wx.CheckBox(action_window, label = "Close after launch")
         close_chkbox.SetValue(self._CloseAfterLaunch)
         close_chkbox.Bind(wx.EVT_CHECKBOX, self.OnCloseCheck)
@@ -336,7 +337,6 @@ class G_LaunchFrame(wx.Frame):
         launch_btn.Bind(wx.EVT_BUTTON, self.OnLaunch)
         action_sizer.Add(launch_btn, flag = wx.ALL | wx.ALIGN_CENTER_VERTICAL, border = _Border)
 
-        global _Args
         if _Args.debug:
             debug_sizer = wx.StaticBoxSizer(wx.VERTICAL, self, label = "Debug")
             frame_sizer.Add(debug_sizer, flag = wx.ALL | wx.EXPAND, border = _Border)
@@ -474,6 +474,8 @@ class G_LaunchFrame(wx.Frame):
         except Exception as ex:
             pass
 
+        if self._CloseAfterLaunch:
+            self.Close()
 
 
     #-------------------------------------------------------

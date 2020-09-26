@@ -777,12 +777,12 @@ class G_DeletableTreeNode(G_TreeNode):
 
 
     #-------------------------------------------------------
-    def _DeleteNode(self):
+    def _DeleteNode(self, delete_temps = True):
         # ensure GUI stays clean
         self.GetParentNode().Select()
 
         # perform orderly closedown of resources
-        self.Close(True)
+        self.Close(delete_temps)
 
         # remove tree item from tree
         tritem = self.GetTrItem()
@@ -800,7 +800,7 @@ class G_DeletableTreeNode(G_TreeNode):
         node._DeleteNode()
 
     def OnCmdDelete(self, event = None):
-        self._DeleteNode()
+        self._DeleteNode(event is not None)
 
 
 
