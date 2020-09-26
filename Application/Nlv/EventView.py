@@ -46,6 +46,7 @@ import wx
 
 # Application imports 
 from .Document import D_Document
+from .EventDisplay import G_DisplayProperties
 from .EventDisplay import G_EventsViewCtrl
 from .EventDisplay import G_MetricsViewCtrl
 from .EventDisplay import G_NetworkViewCtrl
@@ -1188,26 +1189,21 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
 
 
     #-------------------------------------------------------
-    def ActivateSelectChart(self, chart_names = [""]):
+    def ActivateSelectChart(self, charts):
+        chart_names = [chart.Name for chart in charts]
         num_charts = len(chart_names)
-        if num_charts != 0:
-            chart_no = self._Field.idxSelectChart.Value
-            if chart_no >= num_charts:
-                chart_no = self._Field.idxSelectChart.Value = 0
 
-            location = self._Field.idxLocateChart.Value
-            self.Rebind(self._LocateChartCtl, wx.EVT_CHOICE, self.OnLocateChart)
-            self._LocateChartCtl.SetSelection(location)
+        chart_no = self._Field.idxSelectChart.Value
+        if chart_no >= num_charts:
+            chart_no = self._Field.idxSelectChart.Value = 0
 
-            self._SelectChartCtl.Set(chart_names)
-            self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
-            self._SelectChartCtl.SetSelection(chart_no)
+        location = self._Field.idxLocateChart.Value
+        self.Rebind(self._LocateChartCtl, wx.EVT_CHOICE, self.OnLocateChart)
+        self._LocateChartCtl.SetSelection(location)
 
-        else:
-            self._LocateChartCtl.Unbind(wx.EVT_CHOICE)
-
-            self._SelectChartCtl.Clear()
-            self._SelectChartCtl.Unbind(wx.EVT_CHOICE)
+        self._SelectChartCtl.Set(chart_names)
+        self.Rebind(self._SelectChartCtl, wx.EVT_CHOICE, self.OnSelectChart)
+        self._SelectChartCtl.SetSelection(chart_no)
 
         self._Sizer.Show(self._ChartOptionsSubtitle, num_charts != 0, True)
         self._Sizer.Show(self._LocateChartSizer, num_charts != 0, True)
@@ -1243,6 +1239,10 @@ class G_CommonProjectorOptionsNode(G_ProjectorChildNode):
     def GetChartViewCtrl(self, activate):
         chart_no = self._Field.idxSelectChart.Value
         return self.GetViewCtrl().GetChartViewCtrl(chart_no, activate)
+
+    def GetProjectorInfo(self):
+        projector_info, is_valid = self.GetProjectorNode().GetProjectorInfo()
+        return projector_info
 
 
     #-------------------------------------------------------
@@ -1331,10 +1331,7 @@ class G_EventProjectorOptionsNode(G_CommonProjectorOptionsNode, G_ThemeNode, G_T
         self._ChkNesting.Bind(wx.EVT_CHECKBOX, self.OnChkNesting)
         self._ChkNesting.Enable(permit_nesting)
 
-        projector_info, is_valid = self.GetProjectorNode().GetProjectorInfo()
-        chart_names = [c.Name for c in projector_info.Charts]
-
-        self.ActivateSelectChart(chart_names)
+        self.ActivateSelectChart(self.GetProjectorInfo().Charts)
         self.ActivateDynamicPane()
 
 
@@ -1379,10 +1376,9 @@ class G_MetricsProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
     #-------------------------------------------------------
     def Activate(self):
         quantifier_info, is_valid = self.GetProjectorNode().GetQuantifierInfo()
-        chart_names = [c.Name for c in quantifier_info.Charts]
 
         self.ActivateCommon()
-        self.ActivateSelectChart(chart_names)
+        self.ActivateSelectChart(quantifier_info.Charts)
         self.ActivateDynamicPane()
 
 
@@ -1397,6 +1393,12 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
         me = __class__
         me._Sizer = parent.GetSizer()
 
+        window = parent.GetWindow()
+
+        me._DataOptionsSubtitle = me.BuildSubtitle(parent, "Data options", True)
+
+        me._DataPartitionCtl = wx.Choice(window)
+        me.BuildLabelledRow(parent, "Data partition", me._DataPartitionCtl)
         G_CommonProjectorOptionsNode.BuildCommon(me, parent)
 
 
@@ -1405,12 +1407,57 @@ class G_NetworkProjectorOptionsNode(G_CommonProjectorOptionsNode, G_TabContained
         G_TabContainedNode.__init__(self, factory, wproject, witem)
         G_CommonProjectorOptionsNode.__init__(self)
 
+    def PostInitNode(self):
+        super().PostInitNode()
+        self._Field = D_Document(self.GetDocument(), self)
+        self._Field.Add(0, "DataPartition", replace_existing = False)
+
 
     #-------------------------------------------------------
     def Activate(self):
+        projector_info = self.GetProjectorInfo()
+
+        partition_names = [partition[1] for partition in projector_info.Partitions]
+        partition_ctl = self._DataPartitionCtl
+        self.Rebind(partition_ctl, wx.EVT_CHOICE, self.OnDataPartition)
+        partition_ctl.Set(partition_names)
+
+        selection, partition_id = self.ValidateDataPartition()
+
+        if partition_id is not None:
+            partition_ctl.SetSelection(selection)
+            partition_ctl.Enable(True)
+        else:
+            partition_ctl.Enable(False)
+
         self.ActivateCommon()
-        self.ActivateSelectChart()
+        self.ActivateSelectChart(projector_info.Charts)
         self.ActivateDynamicPane()
+
+
+    #-------------------------------------------------------
+    def OnDataPartition(self, event):
+        partitions = self.GetProjectorInfo().Partitions
+        selection = self._DataPartitionCtl.GetSelection()
+        partition = self._Field.DataPartition.Value = partitions[selection][0]
+        self.GetProjectorNode().UpdatePartition(partition)
+
+
+    #-------------------------------------------------------
+    def ValidateDataPartition(self):
+        last_partition_id = self._Field.DataPartition.Value
+        current_partitions = self.GetProjectorInfo().Partitions
+
+        for idx, partition in enumerate(current_partitions):
+            if partition[0] == last_partition_id:
+                return idx, last_partition_id
+
+        return (0, None)
+
+
+    def GetDataPartitionId(self):
+        selection, partition = self.ValidateDataPartition()
+        return partition
 
 
 
@@ -1484,7 +1531,7 @@ class G_CoreProjectorNode(G_DisplayNode, G_LogAnalysisChildNode, G_HideableTreeC
 
     #-------------------------------------------------------
     def UpdateValidity(self, valid):
-        self.GetTableViewCtrl().UpdateDisplay(valid = valid)
+        self.GetTableViewCtrl().UpdateDisplay(G_DisplayProperties(valid = valid))
 
 
     #-------------------------------------------------------
@@ -1717,7 +1764,8 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
 
         # load events into event viewer data control
         projector_info, is_valid = self.GetProjectorInfo()
-        self.GetTableViewCtrl().UpdateContent(self.GetNesting(), projector_info, is_valid, reason = "Analyser run")
+        display_props = G_DisplayProperties(nesting = self.GetNesting(), valid = is_valid, reason = "Analyser run")
+        self.GetTableViewCtrl().UpdateContent(display_props, projector_info)
         
         # make any required charts
         self.GetViewCtrl().CreateCharts(self.MakeChartCreateContext(), projector_info.Charts)
@@ -1734,7 +1782,7 @@ class G_EventProjectorNode(G_CommonProjectorNode, G_TabContainerNode):
         return projector_info.ProjectionSchema.PermitNesting
 
     def UpdateNesting(self, nesting):
-        self.GetTableViewCtrl().UpdateDisplay(nesting = nesting)
+        self.GetTableViewCtrl().UpdateDisplay(G_DisplayProperties(nesting = nesting))
 
 
 
@@ -1875,17 +1923,26 @@ class G_NetworkProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
 
     #-------------------------------------------------------
-    def UpdateChart(self, data_changed = False, selection_changed = False):
-        projector_info, is_valid = self.GetProjectorInfo()
-        self.GetViewCtrl().UpdateChart(self.MakeChartCreateContext(), projector_info, data_changed, selection_changed)
+    def UpdateCharts(self, data_changed = False, selection_changed = False):
+        self.GetViewCtrl().UpdateCharts(self.GetErrorReporter(), data_changed, selection_changed)
 
+
+    #-------------------------------------------------------
     @G_Global.TimeFunction
     def UpdateEventContent(self):
-        # relies on caller to ensure child data node are
-        # run first
-        self.UpdateChart(data_changed = True)
+        # relies on caller to ensure child data nodes (entities & relationships)
+        # are run first
+
+        projector_info, is_valid = self.GetProjectorInfo()
+        self.GetViewCtrl().CreateCharts(self.MakeChartCreateContext(), projector_info.Charts)
         self.GetOptionsNode().PushParameterValues(activate_chart = True)
         
+
+    #-------------------------------------------------------
+    def UpdatePartition(self, partition):
+        self.VisitSubNodes(lambda node: node.UpdatePartition(partition), factory_id = G_Project.NodeID_NetworkDataProjector, recursive = True)
+        self.UpdateCharts(data_changed = True)
+
 
 
 ## G_NetworkDataProjectorNode ##############################
@@ -1936,15 +1993,16 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
         projector_info, is_valid = self.GetParentNode().GetProjectorInfo()
         return projector_info.NetworkProjectors[self._TableIndex], is_valid
 
-
-    #-------------------------------------------------------
     def GetTableViewCtrl(self):
         return self.GetViewCtrl()
+
+    def GetDataPartitionId(self):
+        return self.GetParentNode().GetOptionsNode().GetDataPartitionId()
 
 
     #-------------------------------------------------------
     def OnTableSelectionChanged(self, item):
-        self.GetParentNode().UpdateChart(selection_changed = True)
+        self.GetParentNode().UpdateCharts(selection_changed = True)
 
         # ignore de-selection and non-events
         if item is not None and item.IsOk():
@@ -1958,15 +2016,21 @@ class G_NetworkDataProjectorNode(G_CoreProjectorNode, G_TabContainerNode):
 
         # load events into event viewer data control
         projector_info, is_valid = self.GetProjectorInfo()
-        self.GetTableViewCtrl().UpdateContent(False, projector_info, is_valid, reason = "Analyser run")
+        display_props = G_DisplayProperties(nesting = False, partition = self.GetDataPartitionId(), valid = is_valid, reason = "Analyser run")
+        self.GetTableViewCtrl().UpdateContent(display_props, projector_info)
         self.EnsureDisplayControlVisible()
+
+
+    #-------------------------------------------------------
+    def UpdatePartition(self, partition):
+        self.GetTableViewCtrl().UpdateDisplay(G_DisplayProperties(partition = partition, reason = "Data partitioned"))
 
 
     #-------------------------------------------------------
     def OnFilterMatch(self, match):
         """The filter has changed"""
         if self.GetTableViewCtrl().UpdateFilter(match):
-            self.GetParentNode().UpdateChart(data_changed = True)
+            self.GetParentNode().UpdateCharts(data_changed = True)
             return True
         else:
             return False

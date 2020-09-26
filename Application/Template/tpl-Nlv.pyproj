@@ -50,6 +50,7 @@
     </Compile>
     <Compile Include="Shell.py" />
     <Compile Include="StyleNode.py" />
+    <Compile Include="TangledTree.py" />
     <Compile Include="Theme.py" />
     <Compile Include="Version.py" />
     <Compile Include="View.py">
@@ -61,6 +62,7 @@
     <Content Include="Network.html" />
     <Content Include="PieChart.html" />
     <Content Include="style.css" />
+    <Content Include="TangledTree.html" />
     <Content Include="theme.event.default.xml" />
     <Content Include="theme.log.default.xml" />
     <Content Include="theme.view.default.xml" />

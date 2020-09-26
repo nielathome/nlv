@@ -137,10 +137,10 @@ class Recogniser:
                 label
             )
             SELECT DISTINCT
-                program.title as source_name,
-                source_entities.event_id as source,
                 'Channel-' || program.channel as target_name,
                 target_entities.event_id as target,
+                program.title as source_name,
+                source_entities.event_id as source,
                 'Channel'
             FROM
                 program
@@ -155,10 +155,10 @@ class Recogniser:
 
             UNION ALL
             SELECT DISTINCT
-                program.title as source_name,
-                source_entities.event_id as source,
                 'CardID-' || program.cardid as target_name,
                 target_entities.event_id as target,
+                program.title as source_name,
+                source_entities.event_id as source,
                 'CardID'
             FROM
                 program
@@ -254,12 +254,31 @@ projection.Chart("Pie", True, Chart.Pie("Title", "Count"))
 
 ## Network #####################################################
 
+def DataPartition(connection, cursor, context):
+    # somewhat forced, mainly to test the functionality
+    cursor.execute("DROP TABLE IF EXISTS main.partitions")
+    cursor.execute("""
+        CREATE TABLE partitions
+        (
+            id INT,
+            description TEXT
+        )""")
+
+    cursor.execute("""
+        INSERT INTO partitions
+        VALUES
+            (0, 'All entities'),
+            (1, 'Common entities')
+        """)
+
+
 def NodesProjector(connection, cursor, context):
     cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
         CREATE TABLE projection
         (
             event_id INT,
+            partition_id INT,
             type TEXT,
             title TEXT,
             size INT
@@ -267,19 +286,28 @@ def NodesProjector(connection, cursor, context):
 
     cursor.execute("""
         INSERT INTO projection
-        (
-            event_id,
-            type,
-            title,
-            size
-        )
         SELECT
             event_id,
+            0,
             type,
             title,
             size
         FROM
             analysis.entities
+        """)
+
+    cursor.execute("""
+        INSERT INTO projection
+        SELECT
+            event_id + 1000,
+            1,
+            type,
+            title,
+            size
+        FROM
+            analysis.entities
+        WHERE
+            size > 2
         """)
 
 
@@ -318,6 +346,7 @@ nodes = Nodes(
     "Entities",
     NodesProjector,
     MakeDisplaySchema()
+        .AddHiddenField("PartitionId", "int")
         .AddField("Type", "The entity type: program, channel, or card.", "text", 70)
         .AddField("Title", "The entity title: a program name, channel number, or card ID.", "text", 200, align = "left")
         .AddField("Size", "The number of times the entity is referenced: the number of recordings for a program, the number of time a particular channel was recorded from, or the number of times a particular card was recorded from.", "int", 60)
@@ -331,6 +360,7 @@ def LinksProjector(connection, cursor, context):
         CREATE TABLE projection
         (
             event_id INT,
+            partition_id INT,
             source_name TEXT,
             source INT,
             target_name TEXT,
@@ -339,28 +369,21 @@ def LinksProjector(connection, cursor, context):
             type TEXT
         )""")
 
-    cursor.execute("""
-        INSERT INTO projection
-        (
-            event_id,
-            source_name,
-            source,
-            target_name,
-            target,
-            label,
-            type
-        )
-        SELECT
-            event_id,
-            source_name,
-            source,
-            target_name,
-            target,
-            label,
-            label
-        FROM
-            relationships
-    """)
+    for partition_id in range(2):
+        cursor.execute("""
+            INSERT INTO projection
+            SELECT
+                event_id + ({partition_id} * 1000),
+                {partition_id},
+                source_name,
+                source + ({partition_id} * 1000),
+                target_name,
+                target + ({partition_id} * 1000),
+                label,
+                label
+            FROM
+                relationships
+        """.format(partition_id = partition_id))
 
 
 def DataExplorerLinksDetails(context, builder):
@@ -393,6 +416,7 @@ links = Links(
     "Relationships",
     LinksProjector,
     MakeDisplaySchema()
+        .AddHiddenField("PartitionId", "int")
         .AddField("Source", "A program, channel, or card.", "text", 200)
         .AddHiddenField("SourceEventId", "int")
         .AddField("Target", "A program, channel, or card.", "text", 200, align = "left")
@@ -403,9 +427,12 @@ links = Links(
 )
 
 
-Network(
+network = Network(
     "Recordings",
     nodes,
-    links
-).Chart(True, Chart.Network(setup_script = "theme.event.mythtv-program.f77128a9.network.js"))
+    links,
+    DataPartition
+)
 
+network.Chart("Network", True, Chart.Network(setup_script = "theme.event.mythtv-program.f77128a9.network.js"))
+network.Chart("Tree", True, Chart.TangledTree("title"))

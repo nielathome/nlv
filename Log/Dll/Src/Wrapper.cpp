@@ -186,7 +186,9 @@ selector_ptr_t MakeSelector( object match, bool empty_selects_all, const LogSche
 	Match descriptor{
 		extract<Match::Type>{ match.attr( "GetSelectorId" )() },
 		extract<std::string>{ match.attr( "MatchText" ) },
-		extract<bool>{ match.attr( "MatchCase" ) }
+		extract<bool>{ match.attr( "MatchCase" ) },
+		extract<bool>{ match.attr( "HasDataPartition" ) },
+		extract<int>{ match.attr( "DataPartition" ) }
 	};
 
 	selector_ptr_t selector{ Selector::MakeSelector( descriptor, empty_selects_all, log_schema ) };

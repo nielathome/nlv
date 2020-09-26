@@ -34,6 +34,7 @@ import winreg
 from .DataExplorer import G_DataExplorerProvider
 from .Logfile import G_DisplayControl
 from .Logfile import G_NotebookDisplayControl
+from .MatchNode import G_MatchItem
 from .EventProjector import G_Quantifier
 from .EventProjector import G_ProjectionSchema
 from .EventProjector import G_ProjectionTypeManager
@@ -230,6 +231,19 @@ class G_TableFieldFormatter:
 
 
 
+## G_DisplayProperties #####################################
+
+class G_DisplayProperties:
+
+    #-------------------------------------------------------
+    def __init__(self, nesting = None, partition = None, valid = None, reason = None):
+        self.Nesting = nesting
+        self.Partition = partition
+        self.Valid = valid
+        self.Reason = reason
+
+
+
 ## G_TableDataModel ########################################
 
 class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
@@ -239,6 +253,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         super().__init__()
 
         self._ViewFlat = True
+        self._DataPartition = None
         self._Name = name
         self._RawFieldMask = 0
         self._IsValid = True
@@ -644,6 +659,11 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         if self._N_Logfile is None:
             return False
 
+        if self._DataPartition is not None:
+            if match is None:
+                match = G_MatchItem()
+            match.SetDataPartition(self._DataPartition)
+
         if match is not None and self._N_EventView is not None:
             return self._N_EventView.Filter(match)
 
@@ -651,13 +671,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     @G_Global.TimeFunction
-    def UpdateContent(self, nesting, table_info, valid, reason):
+    def UpdateContent(self, display_props, table_info):
         table_schema = table_info.GetSchema()
         db_info = table_info.GetDbInfo()
 
-        self.Reset(table_schema, db_info, reason = reason)
-        self.UpdateNesting(nesting, False)
-        self.UpdateValidity(valid)
+        self.Reset(table_schema, db_info, reason = display_props.Reason)
+        self.UpdateNesting(display_props.Nesting, False)
+        self.UpdateDataPartition(display_props.Partition, display_props.Reason, False)
+        self.UpdateValidity(display_props.Valid)
 
         num_fields = self.GetColumnCount()
         db_path = db_info.Path
@@ -693,11 +714,14 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
 
 
     #-------------------------------------------------------
-    def UpdateFilter(self, match):
+    def UpdateFilter(self, match, reason = None):
         if not self.FilterLineSet(match):
             return False
         
-        self.SetNavigationValidityReason("Filter: {match}".format(match = match.GetDescription()))
+        if reason is None:
+            reason = "Filter: {match}".format(match = match.GetDescription())
+
+        self.SetNavigationValidityReason(reason)
         self.ClearDataExplorerLine()
         self.Cleared()
         return True
@@ -786,6 +810,15 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             self.Cleared()
 
 
+    def UpdateDataPartition(self, partition, reason, do_filter = True):
+        if partition is None:
+            return
+
+        self._DataPartition = partition
+        if do_filter:
+            self.UpdateFilter(self._FilterMatch, reason)
+
+
     def UpdateValidity(self, valid):
         # the view is deemed valid if an analysis has taken place
         # since the last time the recogniser was modified
@@ -799,9 +832,10 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         return True
 
 
-    def UpdateDisplay(self, nesting, valid):
-        self.UpdateNesting(nesting)
-        return self.UpdateValidity(valid)
+    def UpdateDisplay(self, display_props):
+        self.UpdateNesting(display_props.Nesting)
+        self.UpdateDataPartition(display_props.Partition, display_props.Reason)
+        return self.UpdateValidity(display_props.Valid)
 
 
 
@@ -848,14 +882,14 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateContent(self, nesting, table_info, valid, reason = None):
+    def UpdateContent(self, display_props, table_info):
         """Update the data view with new content"""
 
         # note: number of DataView columns is not the same as the number of
         # model columns; as some are hidden for internal use
         try:
             self.ClearColumns()
-            self.GetModel().UpdateContent(nesting, table_info, valid, reason = reason)
+            self.GetModel().UpdateContent(display_props, table_info)
             self.UpdateColumns()
 
         except FileNotFoundError as ex:
@@ -863,8 +897,8 @@ class G_DataViewCtrl(wx.dataview.DataViewCtrl):
 
 
     #-------------------------------------------------------
-    def UpdateDisplay(self, nesting = None, valid = None):
-        if self.GetModel().UpdateDisplay(nesting, valid):
+    def UpdateDisplay(self, display_props):
+        if self.GetModel().UpdateDisplay(display_props):
             self.Refresh()        
 
 
@@ -1358,7 +1392,7 @@ class G_HtmlHostCtrl(wx.Panel):
     def CallJavaScript(self, method, *args):
         def ConvertArg(arg):
             if isinstance(arg, str):
-                return "'{}'".format(arg)
+                return "'{}'".format(arg.replace("\n", ""))
             else:
                 return str(arg)
 
@@ -1606,31 +1640,6 @@ class G_CoreViewCtrl(wx.SplitterWindow, G_DisplayControl):
         self.ArrangeChildren()
 
 
-
-
-## G_CommonViewCtrl ########################################
-
-class G_CommonViewCtrl(G_CoreViewCtrl):
-    """
-    Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
-    """
-
-    #-------------------------------------------------------
-    def __init__(self, parent, multiple_selection, name):
-        super().__init__(parent)
-
-        self.SetMinimumPaneSize(150)
-        self.SetSashGravity(0.5)
-
-        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name)
-        self.ArrangeChildren()
-
-
-    #-------------------------------------------------------
-    def GetTableViewCtrl(self):
-        return self._TableViewCtrl
-
-
     #-------------------------------------------------------
     def GetChartPane(self, create = False):
         if self._ChartPane is None and create:
@@ -1668,12 +1677,10 @@ class G_CommonViewCtrl(G_CoreViewCtrl):
 
 
     #-------------------------------------------------------
-    def ResetModel(self):
+    def ResetCharts(self):
         pane = self.GetChartPane()
         if pane is not None:
             pane.GetSizer().Clear(delete_windows = True)
-
-        self.GetTableViewCtrl().ResetModel()
 
 
     #-------------------------------------------------------
@@ -1685,10 +1692,8 @@ class G_CommonViewCtrl(G_CoreViewCtrl):
         pane_sizer = pane.GetSizer()
 
         if pane_sizer.IsEmpty():
-            table_ctrl = self.GetTableViewCtrl()
-    
             for chart_info in chart_list:
-                chart_view_ctrl = G_HtmlChartCtrl(pane, context, chart_info, table_ctrl)
+                chart_view_ctrl = self.MakeHtmlChartCtrl(pane, context, chart_info)
                 pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
 
             pane_sizer.ShowItems(False)
@@ -1702,6 +1707,41 @@ class G_CommonViewCtrl(G_CoreViewCtrl):
         if pane is not None:
             for chart_view in pane.GetChildren():
                 chart_view.Realise(error_reporter, data_changed, selection_changed)
+
+
+
+## G_CommonViewCtrl ########################################
+
+class G_CommonViewCtrl(G_CoreViewCtrl):
+    """
+    Common behaviour for G_EventsViewCtrl and G_MetricsViewCtrl.
+    """
+
+    #-------------------------------------------------------
+    def __init__(self, parent, multiple_selection, name):
+        super().__init__(parent)
+
+        self.SetMinimumPaneSize(150)
+        self.SetSashGravity(0.5)
+
+        self._TablePane = self._TableViewCtrl = G_TableViewCtrl(self, multiple_selection, name)
+        self.ArrangeChildren()
+
+
+    #-------------------------------------------------------
+    def GetTableViewCtrl(self):
+        return self._TableViewCtrl
+
+
+    #-------------------------------------------------------
+    def MakeHtmlChartCtrl(self, pane, context, chart_info):
+        return G_HtmlChartCtrl(pane, context, chart_info, self.GetTableViewCtrl())
+
+
+    #-------------------------------------------------------
+    def ResetModel(self):
+        self.ResetCharts()
+        self.GetTableViewCtrl().ResetModel()
 
 
 
@@ -1741,7 +1781,8 @@ class G_MetricsViewCtrl(G_CommonViewCtrl):
             self._CollectorLocked = False
 
             table_ctrl = self.GetTableViewCtrl()
-            table_ctrl.UpdateContent(False, quantifier_info, valid, reason = "Metric quantification (triggered when parent data is filtered or when the analysis is re-run)")
+            display_props = G_DisplayProperties(nesting = False, valid = valid, reason = "Metric quantification (triggered when parent data is filtered or when the analysis is re-run)")
+            table_ctrl.UpdateContent(display_props, quantifier_info )
             table_ctrl.SetFieldMask(-1)
 
             self.CreateCharts(context, quantifier_info.Charts)
@@ -1756,8 +1797,7 @@ class G_NetworkViewCtrl(G_CoreViewCtrl):
     def __init__(self, parent):
         super().__init__(parent)
 
-        self._Notebook = self._TablePane = G_NotebookDisplayControl(self)
-        self._ChartView = None
+        self._TablePane = self._Notebook = G_NotebookDisplayControl(self)
         self._TableViewCtrls = [None, None]
         self._TableNodeIds = [None, None]
 
@@ -1772,29 +1812,19 @@ class G_NetworkViewCtrl(G_CoreViewCtrl):
 
 
     #-------------------------------------------------------
-    def GetChartViewCtrl(self, chart_no, activate):
-        return self._ChartView
-
     def GetTableViewCtrl(self, idx):
         return self._TableViewCtrls[idx]
 
 
     #-------------------------------------------------------
-    def ResetModel(self):
-        self.GetTableViewCtrl(0).ResetModel()
-        self.GetTableViewCtrl(1).ResetModel()
+    def MakeHtmlChartCtrl(self, pane, context, chart_info):
+        chart = G_HtmlNetworkCtrl(pane, context,  chart_info, self._TableViewCtrls)
+        chart.CallJavaScript("SetTableNodeIds", self._TableNodeIds[0], self._TableNodeIds[1])
+        return chart
 
 
     #-------------------------------------------------------
-    def UpdateChart(self, context, projector_info, data_changed, selection_changed):
-        if projector_info.Chart is None:
-            return
-
-        if self._ChartView is None:
-            chart = self._ChartView = self._ChartPane = G_HtmlNetworkCtrl(self,context,  projector_info.ChartInfo, self._TableViewCtrls)
-            chart.CallJavaScript("SetTableNodeIds", self._TableNodeIds[0], self._TableNodeIds[1])
-            self.ArrangeChildren()
-
-        self._ChartView.Realise(context.GetErrorReporter(), data_changed, selection_changed)
-
-
+    def ResetModel(self):
+        self.ResetCharts()
+        self.GetTableViewCtrl(0).ResetModel()
+        self.GetTableViewCtrl(1).ResetModel()

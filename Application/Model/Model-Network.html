@@ -371,7 +371,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("class", "link-group")
             .call(g_config.UpdateLink)
             .call(g_config.StyleLink)
-            .on("click", OnLinkClick)
+            .on("click", OnLinkClick);
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
           .data(data.nodes)
@@ -388,20 +388,23 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .on("click", OnNodeClick)
             .call(d3.drag()
                 .on("start", function (node_data) {
-                    if (!d3.event.active)
-                        g_simulation.alphaTarget(0.3).restart();
+                    // ignore active here, its for multi-touch screens
+                    // active - the number of currently active drag gestures (on start and end, not including this one).
+
                     node_data.fx = node_data.x;
                     node_data.fy = node_data.y;
                     node_data.dragged = false;
                 })
                 .on("drag", function (node_data) {
+                    if (!node_data.dragged)
+                        g_simulation.alphaTarget(0.3).restart();
                     // map SVG coord system back to model coord system
                     node_data.fx += d3.event.dx / g_curZoom;
                     node_data.fy += d3.event.dy / g_curZoom;
                     node_data.dragged = true;
                 })
                 .on("end", function (node_data) {
-                    if (!d3.event.active)
+                    if (node_data.dragged)
                         g_simulation.alphaTarget(0);
                     node_data.fx = null;
                     node_data.fy = null;

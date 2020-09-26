@@ -894,18 +894,19 @@ class G_NetworkChartInfo:
 class G_NetworkInfo:
 
     #-------------------------------------------------------
-    def __init__(self, name, nodes_projector, links_projector):
+    def __init__(self, name, nodes_projector, links_projector, partitions):
         self.ProjectionName = name
-        self.ChartInfo = None
+        self.Charts = []
         self.DocumentNodeID = G_Project.NodeID_NetworkProjector
         self.NetworkProjectors = [nodes_projector, links_projector]
+        self.Partitions = partitions
 
 
     #-------------------------------------------------------
-    def Chart(self, want_selection, builder):
+    def Chart(self, name, want_selection, builder):
         nodes_db_info = self.NetworkProjectors[0].ProjectionDbInfo
         links_db_info = self.NetworkProjectors[1].ProjectionDbInfo
-        self.ChartInfo = G_NetworkChartInfo(self.ProjectionName, want_selection, builder, nodes_db_info, links_db_info)
+        self.Charts.append(G_NetworkChartInfo(name, want_selection, builder, nodes_db_info, links_db_info))
 
 
     #-------------------------------------------------------
@@ -940,8 +941,8 @@ class G_AnalysisResults:
 
 
     #-------------------------------------------------------
-    def Network(self, name, node_projector, link_projector):
-        info = G_NetworkInfo(name, node_projector, link_projector)
+    def Network(self, name, node_projector, link_projector, partitions):
+        info = G_NetworkInfo(name, node_projector, link_projector, partitions)
         self.Projectors.update([(name, info)])
         return info
 
@@ -1071,6 +1072,42 @@ class G_Projector:
 
 
     #-------------------------------------------------------
+    def DefinePartitions(self, db_info, user_partition):
+        if self._SchemaOnly:
+            return
+
+        with db_info.ConnectionManager() as connection:
+            cursor = connection.cursor()
+            db_info.AttachBases(cursor)
+
+            user_partition(connection, cursor, None)
+
+            cursor.close()
+            connection.commit()
+    
+
+    def GetPartitions(self, db_info):
+        partitions = []
+
+        with db_info.ConnectionManager() as connection:
+            cursor = connection.cursor()
+            db_info.AttachBases(cursor)
+
+            cursor.execute("""
+                SELECT
+                    id,
+                    description
+                FROM
+                    partitions
+            """)
+
+            for row in cursor:
+                partitions.append((row[0], row[1]))
+
+        return partitions
+
+
+    #-------------------------------------------------------
     def Project(self, name, user_projector, projection_schema):
         """Implements user analyse script Project() function"""
         return self.DoProject(name, user_projector, projection_schema, True)
@@ -1085,9 +1122,14 @@ class G_Projector:
 
 
     #-------------------------------------------------------
-    def Network(self, name, node_projector, link_projector):
+    def Network(self, name, node_projector, link_projector, define_partitions = None):
         """Implements user analyse script Network() function"""
-        return self._Results.Network(name, node_projector, link_projector)
+        partitions = []
+        if define_partitions is not None:
+            self.DefinePartitions(node_projector.ProjectionDbInfo, define_partitions)
+            partitions = self.GetPartitions(node_projector.ProjectionDbInfo)
+
+        return self._Results.Network(name, node_projector, link_projector, partitions)
 
 
 
