@@ -796,9 +796,9 @@ vint_t NLogView::GetLocalTrackerLine( void )
 }
 
 
-vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
+vint_t NLogView::GetGlobalTrackerLine( unsigned tracker_idx )
 {
-	const GlobalTracker & tracker{ GlobalTrackers::GetGlobalTracker( idx ) };
+	const GlobalTracker & tracker{ GlobalTrackers::GetGlobalTracker(tracker_idx) };
 	if( !tracker.IsInUse() )
 		return -1;
 
@@ -808,23 +808,31 @@ vint_t NLogView::GetGlobalTrackerLine( unsigned idx )
 	vint_t low_idx{ 0 }, high_idx{ view_map->m_NumLinesOrOne - 1 };
 	do
 	{
-		vint_t idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
-		while( !m_ViewTimecode->HasTimeCode( idx ) )
-			idx -= 1;
+		const vint_t sample_idx{ (high_idx + low_idx + 1) / 2 }; 	// Round high
+		vint_t usable_idx{ sample_idx };
+
+		while( !m_ViewTimecode->HasTimeCode(usable_idx) )
+			usable_idx -= 1;
 		
-		if( idx < 0 )
+		if(usable_idx < 0 )
 			break;
 		
-		if( idx < low_idx )
-			low_idx = idx;
+		if (usable_idx <= low_idx)
+		{
+			// back to where we started
+			low_idx = sample_idx;
+			continue;
+		}
 
-		const NTimecode value{ m_ViewTimecode->GetUtcTimecode( idx ) };
+		const NTimecode value{ m_ViewTimecode->GetUtcTimecode(usable_idx) };
 		if( target < value )
-			high_idx = idx - 1;
+			high_idx = usable_idx - 1;
 		else
-			low_idx = idx;
+			low_idx = usable_idx;
 	} while( low_idx < high_idx );
 
+	while (!m_ViewTimecode->HasTimeCode(low_idx))
+		low_idx -= 1;
 
 	if( tracker.IsNearest( low_idx, view_map->m_NumLinesOrOne, m_ViewTimecode ) )
 		return low_idx;
