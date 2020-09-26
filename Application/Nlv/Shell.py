@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -25,59 +25,145 @@ import win32con
 import winnt
 
 # Application imports
-from .Global import G_Global
 from Nlv.Version import NLV_VERSION
 
 
 
-## G_Shell #################################################
+## G_AppData ###############################################
 
-class G_Shell:
+class G_AppData:
 
     #-------------------------------------------------------
 
     # overall document version; change this when non-backwards
     # compatible changes are made to the document structure or
     # application
-    _PublicVersion = 3
+    PublicVersion = 3
 
-    _VersionData = {
+    VersionData = {
         # document-public-version : document-internal-version, icon-file
         1 : [4, "if_puzzle_yellow_10505.ico"],
         2 : [5, "if_puzzle_yellow_10505.ico"],
-        3 : [6, "if_puzzle_red_10504.ico"]
+        3 : [6, "if_puzzle_red_10504.ico", "if_gear_red_10439.ico"]
     }
 
 
     #-------------------------------------------------------
     @staticmethod
     def GetPackageDir():
-        return G_Global.GetInstallDir()
+        return Path( __file__ ).parent
 
 
     @classmethod
     def GetDocumentVersion(cls):
-        return cls._VersionData[cls._PublicVersion][0]
+        return cls.VersionData[cls.PublicVersion][0]
 
 
     @classmethod
-    def GetIconPath(cls):
-        filename = cls._VersionData[cls._PublicVersion][1]
+    def GetIconPathFor(cls, idx):
+        filename = cls.VersionData[cls.PublicVersion][idx + 1]
         return cls.GetPackageDir() / filename
 
 
     @classmethod
-    def GetScriptPath(cls):
-        return cls.GetPackageDir().parent.parent.parent / "Scripts" / "nlvw.exe"
+    def GetScriptPathFor(cls, name):
+        return cls.GetPackageDir().parent.parent.parent / "Scripts" / name
 
+
+
+## G_AppTraits #############################################
+
+class G_AppTraits(G_AppData):
 
     #-------------------------------------------------------
     @classmethod
-    def Extension(cls):
-        if cls._PublicVersion == 1:
+    def GetDescription(cls):
+        return "Log View"
+
+
+    @classmethod
+    def GetOpenArg(cls):
+        return "--session"
+
+
+    @classmethod
+    def GetLinkName(cls):
+        return "NLV.{}.{}.lnk".format(cls.PublicVersion, NLV_VERSION)
+
+
+    @classmethod
+    def GetProgId(cls):
+        return "NLV.Session.{}".format(cls.GetDocumentVersion())
+
+
+    @classmethod
+    def GetIconPath(cls):
+        return cls.GetIconPathFor(0)
+
+
+    @classmethod
+    def GetScriptPath(cls):
+        return cls.GetScriptPathFor("nlvw.exe")
+
+
+
+## G_LaunchTraits ##########################################
+
+class G_LaunchTraits(G_AppData):
+
+    #-------------------------------------------------------
+    @classmethod
+    def GetDescription(cls):
+        return "Log Launch"
+
+
+    @classmethod
+    def GetOpenArg(cls):
+        return "--launch"
+
+
+    @classmethod
+    def GetLinkName(cls):
+        return "NLV.Launch.lnk"
+
+
+    @classmethod
+    def GetProgId(cls):
+        return "NLV.Launch"
+
+
+    @classmethod
+    def GetIconPath(cls):
+        return cls.GetIconPathFor(1)
+
+
+    @classmethod
+    def GetScriptPath(cls):
+        return cls.GetScriptPathFor("launchw.exe")
+
+
+
+## G_Shell #################################################
+
+class G_Shell:
+    #-------------------------------------------------------
+    def GetAppIconPath():
+        return G_AppTraits.GetIconPath()
+
+    def GetLaunchIconPath():
+        return G_LaunchTraits.GetIconPath()
+
+    def GetDocumentVersion():
+        return G_AppData.GetDocumentVersion()
+
+
+    #-------------------------------------------------------
+    def Extension():
+        version = G_AppData.PublicVersion
+        if version == 1:
             return ".nlv"
         else:
-            return ".nlv{}".format(cls._PublicVersion)
+            return ".nlv{}".format(version)
 
 
     #-------------------------------------------------------
@@ -104,51 +190,55 @@ class G_Shell:
         return key
 
 
-    def _GetStrValue(self, key):
-        cur = ""
+    def _GetStrValue(self, key, value_name = None):
+        cur = None
         type = win32con.REG_SZ
 
         try:
-            (cur, type) = win32api.RegQueryValueEx(key, "")
+            (cur, type) = win32api.RegQueryValueEx(key, value_name)
         except:
             pass
 
         return (cur, type)
 
 
-    def _SetStrValue(self, key, value):
-        (cur, type) = self._GetStrValue(key)
+    def _SetStrValue(self, key, value, value_name = None):
+        (cur, type) = self._GetStrValue(key, value_name)
         if type != win32con.REG_SZ or value != cur:
             self._Changed = True
-            win32api.RegSetValue(key, None, win32con.REG_SZ, value)
+            win32api.RegSetValueEx(key, value_name, 0, win32con.REG_SZ, value)
 
 
     #-------------------------------------------------------
-    def _MakeProgId(self):
-        return "NLV.Session.{}".format(self.GetDocumentVersion())
-
-
-    def _SetupProgId(self):
-        prog_key = self._GetKey(self._HKEY_CLASSES_ROOT, self._MakeProgId())
-        self._SetStrValue(prog_key, "Log View")
+    def _SetupProgId(self, traits):
+        prog_key = self._GetKey(self._HKEY_CLASSES_ROOT, traits.GetProgId())
+        self._SetStrValue(prog_key, traits.GetDescription())
 
         icon_key = self._GetKey(prog_key, "DefaultIcon")
-        self._SetStrValue(icon_key, str(self.GetIconPath()))
+        self._SetStrValue(icon_key, str(traits.GetIconPath()))
 
-        script_path = self.GetScriptPath()
+        script_path = traits.GetScriptPath()
+        open_arg = traits.GetOpenArg()
         if script_path.exists():
             open_key = self._GetKey(prog_key, r"shell\open\command")
-            self._SetStrValue(open_key, '"{}" --session "%1"'.format(str(script_path)))
+            self._SetStrValue(open_key, '"{}" {} "%1"'.format(str(script_path), open_arg))
 
 
     #-------------------------------------------------------
-    def _SetupFileType(self):
+    def _SetupFileOpen(self, traits):
         type_key = self._GetKey(self._HKEY_CLASSES_ROOT, __class__.Extension())
-        self._SetStrValue(type_key, self._MakeProgId())
+        self._SetStrValue(type_key, traits.GetProgId())
         
 
     #-------------------------------------------------------
-    def _SetupStartMenu(self):
+    def _SetupFileOpenWith(self, extension, traits):
+        # https://docs.microsoft.com/en-us/windows/win32/shell/how-to-include-an-application-on-the-open-with-dialog-box
+        open_key = self._GetKey(self._HKEY_CLASSES_ROOT, extension + r"\OpenWithProgids")
+        self._SetStrValue(open_key, "", traits.GetProgId())
+
+
+    #-------------------------------------------------------
+    def _SetupStartMenu(self, traits):
         # https://docs.microsoft.com/en-gb/windows/desktop/shell/links
         # http://timgolden.me.uk/python/win32_how_do_i/create-a-shortcut.html
 
@@ -159,22 +249,50 @@ class G_Shell:
             shell.IID_IShellLink
         )
 
-        shortcut.SetPath(str(self.GetScriptPath()))
-        shortcut.SetDescription("LogView")
-        shortcut.SetIconLocation(str(self.GetIconPath()), 0)
+        shortcut.SetPath(str(traits.GetScriptPath()))
+        shortcut.SetDescription(traits.GetDescription())
+        shortcut.SetIconLocation(str(traits.GetIconPath()), 0)
 
         menu_dir = shell.SHGetFolderPath (0, shellcon.CSIDL_STARTMENU, 0, 0)
         persist_file = shortcut.QueryInterface(pythoncom.IID_IPersistFile)
-        persist_file.Save(os.path.join(menu_dir, "Programs", "NLV.{}.{}.lnk".format(self._PublicVersion, NLV_VERSION)), 0)
+        persist_file.Save(os.path.join(menu_dir, "Programs", traits.GetLinkName()), 0)
 
 
     #-------------------------------------------------------
-    def SetupIntegration(self):
+    def GetInstalledAppPath(self):
+        traits = G_AppTraits
+        open_key = self._GetKey(self._HKEY_CLASSES_ROOT, traits.GetProgId() + r"\shell\open\command")
+        (value, type) = self._GetStrValue(open_key)
+
+        if type == win32con.REG_SZ and value is not None:
+            split = value.split(" ")
+            if len(split) > 0:
+                return split[0].strip('"')
+
+        return None
+
+
+    #-------------------------------------------------------
+    def SetupAppIntegration(self):
         # see https://docs.microsoft.com/en-us/windows/desktop/shell/intro
 
-        self._SetupProgId()
-        self._SetupFileType()
-        self._SetupStartMenu()
+        traits = G_AppTraits
+        self._SetupProgId(traits)
+        self._SetupFileOpen(traits)
+        self._SetupStartMenu(traits)
+
+        if self._Changed:
+            shell.SHChangeNotify(shellcon.SHCNE_ASSOCCHANGED, shellcon.SHCNF_IDLIST, None, None)
+
+
+    #-------------------------------------------------------
+    def SetupLaunchIntegration(self, extensions):
+        traits = G_LaunchTraits
+        self._SetupProgId(traits)
+        self._SetupStartMenu(traits)
+
+        for extension in extensions:
+            self._SetupFileOpenWith("." + extension, traits)
 
         if self._Changed:
             shell.SHChangeNotify(shellcon.SHCNE_ASSOCCHANGED, shellcon.SHCNF_IDLIST, None, None)

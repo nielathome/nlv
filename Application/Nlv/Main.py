@@ -22,21 +22,27 @@ import http.server
 import json
 import logging
 from pathlib import Path
-from queue import Queue
 import socketserver 
 import sys
 import tempfile
 import threading
+from weakref import ref as MakeWeakRef
 
 # the only *reliable* way for Nlog to find and link against the sqlite3.dll
 # is to import the Python module first; in particular, this works around the fact
 # that the DLL path varies depending on whether NLV is running from a venv or not
 import sqlite3
  
+# pywin32 imports
+import pywintypes
+import win32file
+import win32pipe
+import winerror
 
 # wxWidgets imports
 import wx
 import wx.lib.agw.aui as aui
+import wx.lib.newevent as newevent
 
 # Application imports
 from Nlv.Global import G_ChannelLogFilter
@@ -46,11 +52,9 @@ import Nlv.Session
 import Nlv.Logfile
 import Nlv.View
 import Nlv.EventView
-from Nlv.Extension import LoadExtensions
 from Nlv.Project import G_Project
 from Nlv.Shell import G_Shell
 from Nlv.Version import NLV_VERSION
-
 
 # Enable/disable profiling (VisualStudio tools not working ...)
 _G_WantProfiling = False
@@ -62,7 +66,20 @@ if _G_WantProfiling:
 
 
 
+## COMMAND LINE ############################################
+
+_Parser = argparse.ArgumentParser( prog = "nlv", description = "NLV" )
+_Parser.add_argument( "-i", "--integration", action = "store_true", help = "integrate NLV into the shell" )
+_Parser.add_argument( "-l", "--log", action = "append", help = "add a logfile to the session; log specified as 'path@schema'" )
+_Parser.add_argument( "-n", "--new", type = str, default = None, help = "create new session document" )
+_Parser.add_argument( "-r", "--recent", action = "store_true", help = "open most recently accessed session" )
+_Parser.add_argument( "-s", "--session", type = str, default = None, help = "open session document" )
+
+
+
 ## HttpRequestHandler ######################################
+
+HttpActionEvent, EVT_HTTP_ACTION = newevent.NewEvent()
 
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
@@ -79,8 +96,8 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     #-------------------------------------------------------
     @classmethod
-    def RegisterCallback(cls, callabck):
-        cls._Callback = callabck
+    def RegisterCallback(cls, callback):
+        cls._Callback = callback
 
 
     #-------------------------------------------------------
@@ -138,6 +155,81 @@ def RunHttpServer(name = "localhost", port = 8000):
 
 
 
+## CommandServer ###########################################
+
+IpcCommandEvent, EVT_IPC_COMMAND = newevent.NewEvent()
+
+class CommandServer:
+
+    #-------------------------------------------------------
+    def __init__(self, handler):
+        self._Handler = MakeWeakRef(handler)
+
+
+    #-------------------------------------------------------
+    @staticmethod
+    def LogError(werr):
+        logging.error("Command: Pipe error: func:'{}' code:'{}' error:'{}'".format(werr.funcname, werr.winerror, werr.strerror))
+
+
+    #-------------------------------------------------------
+    def Setup(self):
+        try:
+            self._Pipe = win32pipe.CreateNamedPipe(
+                r"\\.\pipe\nlv-cmd", # pipeName
+                win32pipe.PIPE_ACCESS_INBOUND, # openMode
+                win32pipe.PIPE_TYPE_MESSAGE | win32pipe.PIPE_READMODE_MESSAGE, # pipeMode
+                1, # nMaxInstances
+                4096, # nOutBufferSize
+                4096, # nInBufferSize
+                0, # nDefaultTimeOut
+                None # sa
+           )
+
+            return True
+
+        except pywintypes.error as werr:
+            self.LogError(werr)
+
+        except Exception as ex:
+            logging.error("Command: Pipe creation error")
+
+        return False
+
+
+    #-------------------------------------------------------
+    def Transact(self):
+        try:
+            win32pipe.ConnectNamedPipe(self._Pipe)
+            hr, encoded_cmds = win32file.ReadFile(self._Pipe, 1024)
+            win32pipe.DisconnectNamedPipe(self._Pipe)
+
+            handler = self._Handler()
+            if handler is None:
+                return False
+            elif hr == 0:
+                cmds = json.loads(encoded_cmds.decode(encoding = "utf-8", errors = "replace"))
+                handler.QueueEvent(IpcCommandEvent(cmds = cmds))
+
+            return True
+
+        except pywintypes.error as werr:
+            self.LogError(werr)
+
+        except Exception as ex:
+            logging.error("Command: Pipe connection error")
+
+        return False
+
+
+def RunCommandServer(handler):
+    server = CommandServer(handler)
+    if server.Setup():
+        while server.Transact():
+            pass
+
+
+
 ## G_ExceptionDialog #######################################
 
 class G_ExceptionDialog(wx.Dialog):
@@ -163,7 +255,6 @@ class G_ExceptionDialog(wx.Dialog):
         sizer.Add(self._Message, proportion = 1, flag = wx.BOTTOM | wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, border = 5)
 
         self.SetSizer(sizer)
-#        sizer.Fit(self)
 
 
     #-------------------------------------------------------
@@ -296,7 +387,7 @@ class G_LogViewFrame(wx.Frame):
         self.SetMinSize((640,480))
         self.Centre(wx.BOTH)
 
-        icon_path = G_Shell.GetIconPath()
+        icon_path = G_Shell.GetAppIconPath()
         if icon_path.exists():
             self.SetIcons(wx.IconBundle(str(icon_path)))
 
@@ -379,21 +470,35 @@ class G_LogViewFrame(wx.Frame):
 
         # open session document
         global _Args
-        self._Project.OpenSession(_Args)
+        self._Project.OpenSession(_Args, True)
 
         # layout and display
         self._AuiManager.Update()
 
-        # HTTP callback processors; used to move requests from HTTP clients
+        # launch command handler
+        cmdd = threading.Thread(target = RunCommandServer, args = (self,))
+        cmdd.daemon = True
+        cmdd.start()
+        self.Bind(EVT_IPC_COMMAND, self.OnIpcCommand)
+
+        # HTTP callback processor; used to move requests from HTTP clients
         # from the HTTP thread to the UI thread
-        self._HttpActions = Queue()
-        HttpRequestHandler.RegisterCallback(self.OnHttpAction)
-        self.Bind(wx.EVT_IDLE, self.OnIdle)
+        class HttpCallback:
+            def __init__(self, handler):
+                self._Handler = MakeWeakRef(handler)
+
+            def __call__(self, node_id, method, args):
+                handler = self._Handler()
+                if handler is not None:
+                    handler.QueueEvent(HttpActionEvent(node_id = node_id, method = method, args = args))
+
+        HttpRequestHandler.RegisterCallback(HttpCallback(self))
 
         # local HTTPD
         httpd = threading.Thread(target = RunHttpServer)
         httpd.daemon = True
         httpd.start()
+        self.Bind(EVT_HTTP_ACTION, self.OnHttpAction)
 
 
     #-------------------------------------------------------
@@ -414,13 +519,15 @@ class G_LogViewFrame(wx.Frame):
 
 
     #-------------------------------------------------------
-    def OnHttpAction(self, node_id, method, args):
-        self._HttpActions.put((node_id, method, args))
+    def OnHttpAction(self, event):
+        self.GetProject().OnHttpAction(event.node_id, event.method, event.args)
 
-    def OnIdle(self, event):
-        if not self._HttpActions.empty():
-            node_id, method, args = self._HttpActions.get()
-            self.GetProject().OnHttpAction(node_id, method, args)
+
+    #-------------------------------------------------------
+    def OnIpcCommand(self, event):
+        logging.info("Running launch request")
+        args = _Parser.parse_args(event.cmds)
+        self._Project.OpenSession(args, False)
 
 
     #-------------------------------------------------------
@@ -463,15 +570,33 @@ class G_LogViewApp(wx.App):
 
             return False
 
-        # setup application configuration
-        path = Path(wx.StandardPaths.Get().GetUserDataDir())
-        path.mkdir(exist_ok = True)
-        config = wx.FileConfig(localFilename = str(path / "nlv.ini"))
-        config.Write("/NLV/DataDir", str(path))
-        wx.ConfigBase.Set(config)
+        user_dir = self.SetupApplicationConfiguration()
+        self.SetupLogging(user_dir)
+        self.SetupMetaData(user_dir)
+        self.SetupExtensions()
 
-        # setup logging
-        logfile = open(str(path / "nlv.log"), "a")
+        # startup the GUI window
+        frame = G_LogViewFrame(None, appname)
+
+        with G_PerfTimerScope("G_LogViewFrame.Show"):
+            frame.Show()
+
+        return True
+
+
+    #-------------------------------------------------------
+    def SetupApplicationConfiguration(self):
+        user_dir = Path(wx.StandardPaths.Get().GetUserDataDir())
+        user_dir.mkdir(exist_ok = True)
+        config = wx.FileConfig(localFilename = str(user_dir / "nlv.ini"))
+        config.Write("/NLV/DataDir", str(user_dir))
+        wx.ConfigBase.Set(config)
+        return user_dir
+
+
+    #-------------------------------------------------------
+    def SetupLogging(self, user_dir):
+        logfile = open(str(user_dir / "nlv.log"), "a")
 
         logger = logging.getLogger()
         logger.setLevel(logging.DEBUG)
@@ -486,28 +611,43 @@ class G_LogViewApp(wx.App):
         # the text window display for logging is setup once the frame is created
         # see G_ConsoleLog
 
+
+    #-------------------------------------------------------
+    def SetupMetaData(self, user_dir):
+        import Nlog
+        style_format_base = Nlog.EnumStyle.UserFormatBase
+
+        from Nlv.Logmeta import InitMetaStore
+        InitMetaStore(user_dir, style_format_base)
+
+
+    #-------------------------------------------------------
+    def SetupExtensions(self):
+        from Nlv.Logmeta import GetMetaStore
+        from Nlv.Theme import GetThemeStore
+
+        # Interface between NLV plugins (extensions) and the application
+        class Context:
+            def __init__(self, info):
+                self._Info = info
+
+            def RegisterLogSchemata(self, install_dir):
+                GetMetaStore().RegisterLogSchemata(install_dir)
+
+            def RegisterThemeDirectory(self, install_dir):
+                GetThemeStore().RegisterDirectory(install_dir)
+
+            def RegisterFileConverter(self, extension, converter):
+                pass
+
+            def RegisterDirectorySearch(self, searcher):
+                pass
+
+
         # load site specific extensions
+        from Nlv.Extension import LoadExtensions
         with G_PerfTimerScope("LoadExtensions"):
-            LoadExtensions()
-
-        # startup the GUI window
-        frame = G_LogViewFrame(None, appname)
-
-        with G_PerfTimerScope("G_LogViewFrame.Show"):
-            frame.Show()
-
-        return True
-
-
-
-## COMMAND LINE ############################################
-
-_Parser = argparse.ArgumentParser( prog = "nlv", description = "NLV" )
-_Parser.add_argument( "-i", "--integration", action = "store_true", help = "integrate NLV into the shell" )
-_Parser.add_argument( "-l", "--log", action = "append", help = "add a logfile to the session; log specified as 'path@schema'" )
-_Parser.add_argument( "-r", "--recent", action = "store_true", help = "open most recently accessed session" )
-_Parser.add_argument( "-s", "--session", type = str, default = None, help = "open session document" )
-_Args = _Parser.parse_args()
+            LoadExtensions(Context)
 
 
 
@@ -515,9 +655,11 @@ _Args = _Parser.parse_args()
 
 # create and run the application
 
+_Args = _Parser.parse_args()
+
 def main():
     if _Args.integration:
-        G_Shell().SetupIntegration()
+        G_Shell().SetupAppIntegration()
     else:
         with tempfile.TemporaryDirectory(prefix = "NLV.") as tmp_dir:
             G_Global.TempDir = Path(tmp_dir)

@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2018. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -21,12 +21,12 @@ from pathlib import Path
 import re
 import xml.etree.ElementTree as et
 
-# wxWidgets imports
-import wx
 
-# Application imports
-import Nlog
-from .Project import G_Global
+
+## PRIVATE #################################################
+
+_MetaStore = None
+_StyleFormatBase = None
 
 
 
@@ -42,6 +42,9 @@ class G_Builder:
 
 
     #-------------------------------------------------------
+    def GetName(self):
+        return self._Name
+
     def GetLogTheme(self):
         return self._LogTheme
 
@@ -137,7 +140,7 @@ class G_FieldSchemata(G_FieldList):
         if self._FormatterGuid is None:
             return G_Formatter()
         else:
-            return GetFormatter(self._FormatterGuid)
+            return _MetaStore.GetFormatter(self._FormatterGuid)
 
 
     #-------------------------------------------------------
@@ -293,6 +296,7 @@ class G_LogSchema(G_FieldSchemata):
         """Fetch the field ID of any 'emitter' field; -1 if none found"""
         return self._EmitterId
 
+
     #-------------------------------------------------------
     def GetUserDescription(self):
         """Fetch a human readable description of the log Schema"""
@@ -386,7 +390,7 @@ class G_StyleSet:
     #-------------------------------------------------------
     def __init__(self, element):
         
-        g = G_NumGenerator(Nlog.EnumStyle.UserFormatBase)
+        g = G_NumGenerator(_StyleFormatBase)
 
         self._Styles = dict(
             [(s.get("name"), G_Style(g, s)) for s in element.iterfind("style")]
@@ -422,7 +426,7 @@ class G_Formatter(list):
         if element is None:
             return
 
-        styleset = self._StyleSet = GetStyleSet(element.find("styleset").text)
+        styleset = self._StyleSet = _MetaStore.GetStyleSet(element.find("styleset").text)
         for f in element.iterfind("format"):
             self.append(G_Format(f, styleset))
 
@@ -443,7 +447,7 @@ class G_XmlStore:
     """
 
     #-------------------------------------------------------
-    def __init__(self, store_name, factory):
+    def __init__(self, store_name, factory, config_dir = None):
         # cached list of objects corresponding to XML elements
         self._Objects = dict()
 
@@ -455,7 +459,9 @@ class G_XmlStore:
         self._Factory = factory
 
         # XML tree for the collected data
-        self._XmlTree = None
+        self._XmlTree = et.Element("root")
+        if config_dir is not None:
+            self.AppendDir(config_dir)
 
 
     #-------------------------------------------------------
@@ -466,7 +472,7 @@ class G_XmlStore:
         level XML elements into the store.
         """
 
-        store = self._GetStore()
+        store = self._XmlTree
         store_name = self._StoreName
         file_glob = store_name + "*.xml"
 
@@ -479,36 +485,15 @@ class G_XmlStore:
         """
         Add an XML element from some other XML file to this store
         """
-        self._MakeStore()
         store = self._XmlTree
         store_name = self._StoreName
         store.extend(element.findall(store_name))
 
 
     #-------------------------------------------------------
-    def _MakeStore(self):
-        if self._XmlTree is None:
-            self._XmlTree = et.Element("root")
-            return True
-        else:
-            return False
-
-    def _GetStore(self):
-        """ Fetch the initialised store """
-
-        # If required, initialise the store by scanning XML files in the default
-        # data directory; can't be done earlier, as the wx.ConfigBase lookup
-        # requires wx.App to exist
-        if self._MakeStore():
-            self.AppendDir(Path(G_Global.GetConfigDir()))
-
-        return self._XmlTree
-
-
-    #-------------------------------------------------------
     def GetElementByGuid(self, guid):
         xpath = "./{}[@guid='{}']".format(self._StoreName, guid)
-        return self._GetStore().find(xpath)
+        return self._XmlTree.find(xpath)
  
 
    #-------------------------------------------------------
@@ -533,56 +518,60 @@ class G_XmlStore:
             return element.get("name")
 
         return [(e.get("name"), e.get("guid"))
-             for e in sorted(self._GetStore().iterfind(self._StoreName), key = Key)]
+             for e in sorted(self._XmlTree.iterfind(self._StoreName), key = Key)]
 
 
 
-## PRIVATE ##################################################
+## G_MetaStore ##############################################
 
-_XmlDb = {
-    "schema": G_XmlStore("schema", G_LogSchema),
-    "styleset": G_XmlStore("styleset", G_StyleSet),
-    "formatter": G_XmlStore("formatter", G_Formatter)
-}
+class G_MetaStore:
+    """
+    A group of named G_XmlStores
+    """
 
+    #-------------------------------------------------------
+    def __init__(self, config_dir):
+        self._XmlDb = {
+            "schema": G_XmlStore("schema", G_LogSchema, config_dir),
+            "styleset": G_XmlStore("styleset", G_StyleSet, config_dir),
+            "formatter": G_XmlStore("formatter", G_Formatter, config_dir)
+        }
+
+
+    #-------------------------------------------------------
+    def GetFormatter(self, guid):
+        return self._XmlDb["formatter"].GetObjectByGuid(guid)
+
+
+    def GetStyleSet(self, guid):
+        return self._XmlDb["styleset"].GetObjectByGuid(guid)
+
+
+    #-------------------------------------------------------
+    def RegisterLogSchemata(self, directory):
+        for store in self._XmlDb.values():
+            store.AppendDir(directory)
+
+
+    def GetLogSchemataNames(self):
+        return self._XmlDb["schema"].GetNameGuidList()
+
+
+    def GetLogSchema(self, guid):
+        """Fetch a G_LogSchema object describing the schema"""
+        return self._XmlDb["schema"].GetObjectByGuid(guid)
+    
 
 
 ## MODULE ##################################################
 
-def RegisterLogSchemata(directory):
-    global _XmlDb
-    for store in _XmlDb.values():
-        store.AppendDir(directory)
+def InitMetaStore(config_dir, style_format_base):
+    global _MetaStore
+    _MetaStore = G_MetaStore(config_dir)
+
+    global _StyleFormatBase
+    _StyleFormatBase = style_format_base
 
 
-def GetLogSchemataNames():
-
-    global _XmlDb
-    return _XmlDb["schema"].GetNameGuidList()
-
-
-def GetLogSchema(guid):
-    """Fetch a G_LogSchema object describing the schema"""
-
-    global _XmlDb
-    return _XmlDb["schema"].GetObjectByGuid(guid)
-    
-
-def GetFormatterNames():
-
-    global _XmlDb
-    return _XmlDb["formatter"].GetNameGuidList()
-
-def GetFormatter(guid):
-    global _XmlDb
-    return _XmlDb["formatter"].GetObjectByGuid(guid)
-
-
-def GetStyleSetNames():
-
-    global _XmlDb
-    return _XmlDb["styleset"].GetNameGuidList()
-
-def GetStyleSet(guid):
-    global _XmlDb
-    return _XmlDb["styleset"].GetObjectByGuid(guid)
+def GetMetaStore():
+    return _MetaStore

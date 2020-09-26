@@ -29,11 +29,10 @@ import wx
 from .DataExplorer import G_DataExplorer
 from .DataExplorer import G_DataExplorerChildNode
 from .Document import D_Document
-from .Extension import GetExtensionNames
 from .Global import G_Const
 from .Global import G_FrozenWindow
 from .Global import G_Global
-from .Logmeta import GetLogSchema, GetLogSchemataNames
+from .Logmeta import GetMetaStore
 from .Project import G_TabContainerNode
 from .Project import G_TabContainedNode
 from .Project import G_NodeFactory
@@ -182,9 +181,9 @@ class G_SessionManager:
 
 
     #-------------------------------------------------------
-    def SessionNew(self):
-        self.SetSessionFilename()
-        self.GetRootNode().LoadNode(self.SessionPathToName())
+    def SessionNew(self, doc_path = None):
+        self.SetSessionFilename(doc_path)
+        self.GetRootNode().LoadNode(self.SessionPathToName(doc_path))
         self.GetSessionNode().Select()
 
 
@@ -233,7 +232,6 @@ class G_SessionManager:
         if touch:
             self._ListTouch(self._CurrentPath)
 
-
         self.GetRootNode().SaveNode(self._CurrentPath)
 
 
@@ -243,68 +241,94 @@ class G_SessionManager:
 
 
     #-------------------------------------------------------
-    def SessionSetup(self, root_node, program_args):
+    def MakeNameGuidDicts(self, pair_list):
+        guid_by_name = dict(pair_list)
+        name_by_guid = dict([(guid, name) for (name, guid) in pair_list])
+        return guid_by_name, name_by_guid
+
+
+    def HandleCmdlineLog(self, desc):
+        base_path = Path.cwd()
+        schemata = GetMetaStore().GetLogSchemataNames()
+        schema_guids_by_name, schema_names_by_guid = self.MakeNameGuidDicts(schemata)
+        schemata_names = ", ".join(["{} ({})".format(name, guid) for name, guid in schemata])
+
+        try:
+            elems = desc.count('@')
+            builder_name = None
+            if elems == 1:
+                (path, schema_name_or_guid) = desc.split('@')
+            elif elems == 2:
+                (path, schema_name_or_guid, builder_name_or_guid) = desc.split('@')
+            else:
+                logging.error("Unrecognised logfile descriptor: '{}'".format(desc))
+
+        except ValueError:
+            logging.error("No schema in log descriptor '{}'; expected 'path@schema@builder' where valid schema names are: '{}'".format(desc, schemata_names))
+
+        if schema_name_or_guid in schema_guids_by_name:
+            schema_guid = schema_guids_by_name[schema_name_or_guid]
+        elif schema_name_or_guid in schema_names_by_guid:
+            schema_guid = schema_name_or_guid
+        else:
+            logging.error("Unrecognised schema in '{}'; valid schemata are: '{}'".format(desc, schemata_names))
+            return
+
+        builders = GetMetaStore().GetLogSchema(schema_guid).GetBuildersNameGuidList()
+        builder_guids_by_name, builder_names_by_guid = self.MakeNameGuidDicts(builders)
+
+        builder_guid = None
+        if builder_name_or_guid is not None:
+            if len(builders) == 0:
+                logging.error("Builder name included in logfile descriptor '{}', but schema defined no builders".format(builder_name_or_guid))
+                return
+
+            if builder_name_or_guid in builder_guids_by_name:
+                builder_guid = builder_guids_by_name[builder_name_or_guid]
+            elif builder_name_or_guid in builder_names_by_guid:
+                builder_guid = builder_name_or_guid
+            else:
+                builder_names = ", ".join(["{} ({})".format(name, guid) for name, guid in builders])
+                logging.error("Unrecognised builder in '{}'; valid builders are: '{}'".format(desc, builder_names))
+                return
+
+        p = Path(path)
+        if p.is_absolute():
+            p = G_Global.RelPath(p, base_path).as_posix()
+
+        self.GetSessionNode().AppendLog(str(p), schema_guid, builder_guid)
+
+
+    def SessionSetup(self, program_args, root_node_or_none):
         """Initialise the session manager; makes it operational"""
 
-        self._WRootNode = MakeWeakRef(root_node)
-        self._CurrentPath = None
+        if root_node_or_none is None:
+            self.SessionReap()
+        else:
+            self._WRootNode = MakeWeakRef(root_node_or_none)
+            self._CurrentPath = None
 
         with G_FrozenWindow(self.GetFrame()):
-            path = program_args.session
-            if path is not None:
-                self.SessionOpen(path)
+            path_to_open = program_args.session
+            path_to_create = program_args.new
+
+            if path_to_create is not None:
+                self.SessionNew(path_to_create)
+            elif path_to_open is not None:
+                self.SessionOpen(path_to_open)
             elif program_args.recent:
                 self.SessionOpen(0)
             else:
                 self.SessionNew()
 
             logfile_descs = program_args.log
-            if logfile_descs is None:
-                return
+            if logfile_descs is not None:
+                for desc in logfile_descs:
+                    self.HandleCmdlineLog(desc)
 
-            base_path = Path.cwd()
-            schemata = dict(GetLogSchemataNames())
+            if path_to_create is not None:
+                self.SessionSave()
 
-            for desc in logfile_descs:
-                try:
-                    elems = desc.count('@')
-                    builder_name = None
-                    if elems == 2:
-                        (path, schema_name) = desc.split('@')
-                    elif elems == 3:
-                        (path, schema_name, builder_name) = desc.split('@')
-                    else:
-                        logging.error("Unrecognised logfile descriptor: '{}'".format(desc))
-
-                    if schema_name not in schemata:
-                        schemata_names = "".join(schemata.keys())
-                        logging.error("Unrecognised schema in '{}'; valid schemata are: '{}'".format(desc, schemata_names))
-                        return
-
-                    schema_guid = schemata[schema_name]
-                    builders = dict(GetLogSchema(schema_guid).GetBuildersNameGuidList())
-
-                    builder_guid = None
-                    if builder_name is not None:
-                        if len(builders) == 0:
-                            logging.error("Builder name included in logfile descriptor '{}', but schema defined no builders".format(builder_name))
-                            return
-
-                        if builder_name in builders:
-                            builder_guid = builders[builder_name]
-                        else:
-                            builder_names = "".join(builders.keys())
-                            logging.error("Unrecognised builder in '{}'; valid builders are: '{}'".format(desc, builder_names))
-                            return
-
-                    p = Path(path)
-                    if p.is_absolute():
-                        p = G_Global.RelPath(p, base_path).as_posix()
-
-                    self.GetSessionNode().AppendLog(str(p), builder_guid)
-
-                except ValueError:
-                    logging.error("No schema in log descriptor '{}'; expected 'path@schema@builder' where valid schema names are: '{}'".format(desc, schemata_names))
 
 
     #-------------------------------------------------------
@@ -506,7 +530,7 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
 
         # add log schema label, chooser and description
         window = parent.GetWindow()
-        me._SchemataNames = GetLogSchemataNames()
+        me._SchemataNames = GetMetaStore().GetLogSchemataNames()
         names = [name[0] for name in me._SchemataNames]
         me._ChoiceLogSchema = wx.Choice(window, size = (-1, G_Const.ComboRowHeight), choices = names)
         me.BuildLabelledRow(parent, "Log file schema:", me._ChoiceLogSchema)
@@ -560,7 +584,7 @@ class G_OpenLogNode(G_SessionChildNode, G_TabContainedNode):
         return self._Field.SchemaGuid.Value
 
     def GetLogSchema(self):
-        return GetLogSchema(self.GetLogSchemaGuid())
+        return GetMetaStore().GetLogSchema(self.GetLogSchemaGuid())
 
 
     #-------------------------------------------------------

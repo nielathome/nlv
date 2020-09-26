@@ -777,12 +777,12 @@ class G_DeletableTreeNode(G_TreeNode):
 
 
     #-------------------------------------------------------
-    def _DeleteNode(self):
+    def _DeleteNode(self, delete_temps = True):
         # ensure GUI stays clean
         self.GetParentNode().Select()
 
         # perform orderly closedown of resources
-        self.Close(True)
+        self.Close(delete_temps)
 
         # remove tree item from tree
         tritem = self.GetTrItem()
@@ -800,7 +800,7 @@ class G_DeletableTreeNode(G_TreeNode):
         node._DeleteNode()
 
     def OnCmdDelete(self, event = None):
-        self._DeleteNode()
+        self._DeleteNode(event is not None)
 
 
 
@@ -1557,11 +1557,12 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         Nlog.Setup(_LogForwarder, PerfTimerFactory)
 
         # create a "public" list of the notfication channels for use by receivers
+        from .Logmeta import GetMetaStore
+        meta_store = GetMetaStore()
+
         root = et.Element("root")
-        from .Logmeta import GetLogSchemataNames
-        from .Logmeta import GetLogSchema
-        for (schema_name, schema_guid) in GetLogSchemataNames():
-            channel_guid = GetLogSchema(schema_guid).GetChannelGuid()
+        for (schema_name, schema_guid) in meta_store.GetLogSchemataNames():
+            channel_guid = meta_store.GetLogSchema(schema_guid).GetChannelGuid()
             if channel_guid is not None:
                 et.SubElement(root, "channel", name = schema_name).text = channel_guid
         et.ElementTree(root).write(str(Path(G_Global.GetConfigDir()) / "Channels.xml"))
@@ -1786,9 +1787,12 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
 
     #-------------------------------------------------------
-    def OpenSession(self, program_args):
+    def OpenSession(self, program_args, is_first):
         from .Session import GetSessionManager
-        GetSessionManager().SessionSetup(self.GetRootNode(), program_args)
+        node_or_none = None
+        if is_first:
+            node_or_none = self.GetRootNode()
+        GetSessionManager().SessionSetup(program_args, node_or_none)
 
 
     #-------------------------------------------------------
