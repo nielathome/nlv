@@ -290,7 +290,7 @@ function getfile()
 function runbat()
 {
   path=$1
-  `cygpath -u $COMSPEC` /C `cygpath -w $path`
+  `cygpath -u $COMSPEC` /C `cygpath -w $path` $2 $3 $4
 
   cd $prjdir
 }
@@ -600,7 +600,7 @@ fi
 for plugin in ../*/build-nlv.bat; do
   dir_name=`dirname ${plugin}`
   plugin_name=`basename ${dir_name}`
-  msg_header "Build plugin: " $plugin_name  
+  msg_header "Build plugin: ${plugin_name}"  
   runbat $plugin 2>&1 | tee "${logdir}/Plugin-${plugin_name}.log"
 done
 
@@ -611,9 +611,9 @@ done
 ###############################################################################
 
 if [ -n "$cfg_install" ]; then
-  msg_header "Install NLV " $ver  
+  msg_header "Install NLV ${ver}"  
   pushd $instdir > /dev/null
-  runbat install.bat 2>&1 | tee "${logdir}/install.log"
+  runbat install.bat $cfg_demo_install 2>&1 | tee "${logdir}/install.log"
   popd > /dev/null
 fi
 
