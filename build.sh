@@ -28,6 +28,8 @@ help()
   echo "--clean-pyenv - when cleaning, also remove Python virtual environments"
   echo "--force - force BOOST/TBB (re-)build"
   echo "--help | -h - display help"
+  echo "--install | -i - install the build"
+  echo "--install-demo | -d - install the build with the standard demo"
   echo "--release | -r - increment release number"
   echo "--skip-phoenix - do not clean/build wxPython or wxWidgets"
   echo "--verbose | -v - increase detail in output"
@@ -35,6 +37,8 @@ help()
 
 cfg_clean=""
 cfg_clean_pyenv=""
+cfg_install=""
+cfg_demo_install=""
 cfg_force=""
 cfg_release=""
 cfg_verbose=""
@@ -60,6 +64,15 @@ for arg in $*; do
     "--help"|"-h"|"/?")
       help
       exit 0
+      ;;
+
+    "--install"|"-i")
+      cfg_install=1
+      ;;
+
+    "--install-demo"|"-d")
+      cfg_install=1
+      cfg_demo_install="--withdemo"
       ;;
 
     "--skip-phoenix")
@@ -553,7 +566,7 @@ fi
 
 
 ###############################################################################
-# Finish
+# Finish NLV build
 ###############################################################################
 
 # close the .props file now
@@ -576,5 +589,38 @@ elif [ ! -f "$projfile" ]; then
     | sed -e "s@__TESTDIR__@$wtestdir@" > $projfile 
 
 fi
+
+
+
+###############################################################################
+# Build any co-resident plugins
+###############################################################################
+
+
+for plugin in ../*/build-nlv.bat; do
+  dir_name=`dirname ${plugin}`
+  plugin_name=`basename ${dir_name}`
+  msg_header "Build plugin: " $plugin_name  
+  runbat $plugin 2>&1 | tee "${logdir}/Plugin-${plugin_name}.log"
+done
+
+
+
+###############################################################################
+# If requested, install the build
+###############################################################################
+
+if [ -n "$cfg_install" ]; then
+  msg_header "Install NLV " $ver  
+  pushd $instdir > /dev/null
+  runbat install.bat 2>&1 | tee "${logdir}/install.log"
+  popd > /dev/null
+fi
+
+
+
+###############################################################################
+# All done
+###############################################################################
 
 msg_line "Build finished"
