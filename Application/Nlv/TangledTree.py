@@ -399,7 +399,8 @@ class G_Node(Data):
         graph = dict(
             x = self.X,
             y = self.Y,
-            bundle_height = self.BundleHeight
+            bundle_height = self.BundleHeight,
+            title = self.Data.Name
         )
 
         graph.update(self.Data.Properties)
