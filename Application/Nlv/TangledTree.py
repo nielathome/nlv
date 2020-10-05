@@ -310,15 +310,15 @@ class G_LayoutConfig:
     #-------------------------------------------------------
     def __init__(self):
         self.Border = 30
-        self.NodeSpacing = 22
+        self.NodeSpacing = 24
         self.NodeWidth = 150
         self.BundleWidth = 14
-        self.OutboundBundleSpacing = 4
+        self.OutboundBundleSpacing = 6
         self.BallRadius = 4
         self.LinkRadius = 16
-        self.MinLevelOffset = 3 * self.LinkRadius
+        self.MinLevelOffset = 4 * self.LinkRadius
         self.TextOffsetX = 2
-        self.TextOffsetY = 4
+        self.TextOffsetY = 6
 
     #-------------------------------------------------------
     def Extract(self, max_x, max_y):
