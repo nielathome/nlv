@@ -71,7 +71,10 @@ class D_Entity(Data):
 
     #-------------------------------------------------------
     def HasParents(self):
-        return len(self.ParentEntities) != 0
+        return self.ParentEntities
+
+    def IsConnected(self):
+        return self.ParentEntities or self.ChildEntities
 
     def CreateBundles(self, network):
         if self.HasParents():
@@ -84,17 +87,10 @@ class D_Entity(Data):
 
     #-------------------------------------------------------
     def AssignNodeLevel(self):
-        level = None
         if self.ParentBundle is not None:
-            if self.ParentBundle.Level is not None:
-                level = self.ParentBundle.Level + 1
+            self.Level = self.ParentBundle.Level + 1
         else:
-            levels = [bundle.Level for bundle in self.ChildBundles]
-            if levels:
-                level = min(levels)
-
-        if level is not None:
-            self.Level = level
+            self.Level = min([bundle.Level for bundle in self.ChildBundles])
 
 
 
@@ -140,8 +136,7 @@ class D_Bundle(Data):
 
     #-------------------------------------------------------
     def SetLevel(self, min_generation):
-        if self.Generation is not None:
-            self.Level = self.Generation - min_generation
+        self.Level = self.Generation - min_generation
     
 
     #-------------------------------------------------------
@@ -232,6 +227,11 @@ class D_NetworkBuilder:
 
     #-------------------------------------------------------
     def MakeNetwork(self):
+        # loose disconnected entities
+        for entity in self.Entities.copy().values():
+            if not entity.IsConnected():
+                self.Entities.pop(entity.Id)
+
         self.CreateBundles()
         self.CalcBundleLevels()
         self.AssignNodeLevels()
@@ -273,17 +273,24 @@ class D_Network(D_NetworkBuilder):
     #-------------------------------------------------------
     def CalcBundleLevels(self):
         bundles = self.Bundles.values()
-        if len(bundles) == 0:
+        if not bundles:
             return
 
-        # assign bundles generations - for disjoint networks, only
-        # the first one is handled
+        # look at connected bundles first; they're likely to
+        # be the most interesting
         for bundle in bundles:
-            if not bundle.HasParents() and bundle.HasChildren():
+            if bundle.Generation is None and not bundle.HasParents() and bundle.HasChildren():
                 bundle.AssignGeneration(0)
-                break
 
-        min_generation = min([bundle.Generation for bundle in bundles if bundle.Generation is not None])
+        discovered_generations = [bundle.Generation for bundle in bundles if bundle.Generation is not None]
+        discovered_generations.append(0)
+        min_generation = min(discovered_generations)
+
+        # now add disconnected bundles - at the left of the display
+        for bundle in bundles:
+            if bundle.Generation is None:
+                bundle.AssignGeneration(min_generation)
+
         for bundle in bundles:
             bundle.SetLevel(min_generation)
 
@@ -296,10 +303,10 @@ class D_Network(D_NetworkBuilder):
 
     #-------------------------------------------------------
     def GetNumLevels(self):
-        return len(set([bundle.Level for bundle in self.Bundles.values() if bundle.Level is not None]))
+        return len(set([bundle.Level for bundle in self.Bundles.values()]))
 
     def GetEntities(self):
-        return [entity for entity in self.Entities.values() if entity.Level is not None]
+        return self.Entities.values()
 
 
 
