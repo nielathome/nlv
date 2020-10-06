@@ -1136,6 +1136,9 @@ class G_Projector:
 
 ## G_Analyser ##############################################
 
+class Nlv:
+    pass
+
 class G_Analyser:
     """
     Analyse a logfile; combines event recognition, projection
@@ -1154,7 +1157,7 @@ class G_Analyser:
 
     #-------------------------------------------------------
     def SetEntryPoints(self, meta_only, log_schema, log_file, log_node):
-        script_globals = dict()
+        self._Projector = G_Projector(meta_only, log_node, self._Results)
 
         event_id = self._Results.EventId
         if meta_only:
@@ -1162,14 +1165,24 @@ class G_Analyser:
         else:
             self._Recogniser = G_Recogniser(event_id, self._Results.AnalysisDbInfo, log_schema, log_file)
         
-        script_globals.update(Recognise = self._Recogniser.Recognise)
+        nlv = Nlv()
+        nlv.Recognise = self._Recogniser.Recognise
+        nlv.Project = self._Projector.Project
+        nlv.Nodes = self._Projector.Nodes
+        nlv.Links = self._Projector.Links
+        nlv.Network = self._Projector.Network
+        nlv.MakeDisplaySchema = self.MakeDisplaySchema
+        nlv.SessionDir = log_node.MakeSessionDir()
 
-        self._Projector = G_Projector(meta_only, log_node, self._Results)
-        script_globals.update(Project = self._Projector.Project)
-        script_globals.update(Nodes = self._Projector.Nodes)
-        script_globals.update(Links = self._Projector.Links)
-        script_globals.update(Network = self._Projector.Network)
-        script_globals.update(MakeDisplaySchema = self.MakeDisplaySchema)
+        script_globals = dict(
+            Recognise = nlv.Recognise,
+            Project = nlv.Project,
+            Nodes = nlv.Nodes,
+            Links = nlv.Links,
+            Network = nlv.Network,
+            MakeDisplaySchema = nlv.MakeDisplaySchema,
+            Nlv = nlv
+        )
 
         return script_globals
 

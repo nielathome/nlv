@@ -56,7 +56,7 @@ class D_Entity(Data):
         self.ChildEntities = []
         self.ParentBundle = None
         self.ChildBundles = []
-        self.Level = -1
+        self.Level = None
 
 
     #-------------------------------------------------------
@@ -71,7 +71,10 @@ class D_Entity(Data):
 
     #-------------------------------------------------------
     def HasParents(self):
-        return len(self.ParentEntities) != 0
+        return self.ParentEntities
+
+    def IsConnected(self):
+        return self.ParentEntities or self.ChildEntities
 
     def CreateBundles(self, network):
         if self.HasParents():
@@ -83,9 +86,11 @@ class D_Entity(Data):
 
 
     #-------------------------------------------------------
-    def AssignNodeLevel(self, level):
-        if level > self.Level:
-            self.Level = level
+    def AssignNodeLevel(self):
+        if self.ParentBundle is not None:
+            self.Level = self.ParentBundle.Level + 1
+        else:
+            self.Level = min([bundle.Level for bundle in self.ChildBundles])
 
 
 
@@ -97,6 +102,7 @@ class D_Bundle(Data):
     #-------------------------------------------------------
     def __init__(self, id, name, parents):
         self.Generation = None
+        self.Level = None
         self.Id = id
         self.Name = name
         self.ParentEntities = sorted(parents)
@@ -112,7 +118,7 @@ class D_Bundle(Data):
     #-------------------------------------------------------
     def SetHierarchy(self):
         "Form a traversable hierarchy of bundles"
-        parent_bundles = self.ParentBundles = [parent.ParentBundle for parent in self.ParentEntities if parent.ParentBundle is not None]
+        parent_bundles = self.ParentBundles = set([parent.ParentBundle for parent in self.ParentEntities if parent.ParentBundle is not None])
         for bundle in parent_bundles:
             bundle.ChildBundles.append(self)
 
@@ -127,53 +133,64 @@ class D_Bundle(Data):
     def HasParents(self):
         return len(self.ParentBundles) != 0
 
-    def IsRootBundle(self):
-        # if we have a generation number, then we've already been assigned
-        # to another (disjoint) network of bundles - and so, cannot be a new
-        # root
-        return not self.HasParents() and self.HasChildren() and not self.HasGeneration()
-
 
     #-------------------------------------------------------
-    def HasGeneration(self):
-        return self.Generation is not None
+    def SetLevel(self, min_generation):
+        self.Level = self.Generation - min_generation
+    
 
-    def SetGeneration(self, generation):
-        # Note - only works for networks where all parent bundles
-        # belong to the same generation
-        if self.HasGeneration():
-            return False
-        else:
+    #-------------------------------------------------------
+    def AssignAncestorGeneration(self, generation, discovered):
+        if self.Generation is None or generation < self.Generation:
             self.Generation = generation
-            return True
+            discovered.add(self)
+            self.AssignAncestorsGeneration(generation, discovered)
 
 
-    #-------------------------------------------------------
-    def AssignAncestorGeneration(self, generation):
+    def AssignAncestorsGeneration(self, generation, discovered):
+        if generation is None:
+            generation = self.Generation
+
         for parent in self.ParentBundles:
-            parent.AssignGeneration(generation - 1)
+            parent.AssignAncestorGeneration(generation - 1, discovered)
 
-    def AssignDescendentGeneration(self, generation):
+        return discovered
+
+
+    def AssignDescendentGeneration(self, generation, discovered):
+        if self.Generation is None or generation > self.Generation:
+            self.Generation = generation
+            discovered.add(self)
+            self.AssignDescendentsGeneration(generation, discovered)
+
+    def AssignDescendentsGeneration(self, generation, discovered):
+        if generation is None:
+            generation = self.Generation
+
         for child in self.ChildBundles:
-            child.AssignGeneration(generation + 1)
+            child.AssignDescendentGeneration(generation + 1, discovered)
+
+        return discovered
+
 
     def AssignGeneration(self, generation):
-        if self.SetGeneration(generation):
-            self.AssignAncestorGeneration(generation)
-            self.AssignDescendentGeneration(generation)
+        self.Generation = generation
+        ancestors = self.AssignAncestorsGeneration(generation, set())
+        descendents = self.AssignDescendentsGeneration(generation, set())
 
-    def AssignDefaultGeneration(self):
-        self.SetGeneration(0)
+        while len(ancestors) != 0 or len(descendents) != 0:
+            next_ancestors = set()
+            next_descendents = set()
 
+            for ancestor in ancestors:
+                ancestor.AssignDescendentsGeneration(None, next_descendents)
 
-    #-------------------------------------------------------
-    def AssignNodeLevels(self, level_offset):
-        level = self.Generation + level_offset
-        for parent in self.ParentEntities:
-            parent.AssignNodeLevel(level)
+            for descendent in descendents:
+                descendent.AssignAncestorsGeneration(None, next_ancestors)
 
-        for child in self.ChildEntities:
-            child.AssignNodeLevel(level + 1)
+            ancestors = next_ancestors
+            descendents = next_descendents
+
 
 
 
@@ -210,7 +227,13 @@ class D_NetworkBuilder:
 
     #-------------------------------------------------------
     def MakeNetwork(self):
+        # loose disconnected entities
+        for entity in self.Entities.copy().values():
+            if not entity.IsConnected():
+                self.Entities.pop(entity.Id)
+
         self.CreateBundles()
+        self.CalcBundleLevels()
         self.AssignNodeLevels()
         return self
 
@@ -227,11 +250,11 @@ class D_Network(D_NetworkBuilder):
 
     #-------------------------------------------------------
     def GetBundle(self, parents):
-        id = "-".join([str(parent.Id) for parent in parents])
+        id = "-".join(sorted([str(parent.Id) for parent in parents]))
         got = self.Bundles.get(id)
 
         if got is None:
-            name = "-".join([parent.Name for parent in parents])
+            name = "-".join(sorted([parent.Name for parent in parents]))
             got = D_Bundle(id, name, parents)
             self.Bundles[id] = got
         
@@ -248,44 +271,42 @@ class D_Network(D_NetworkBuilder):
 
 
     #-------------------------------------------------------
-    def AssignNodeLevels(self):
-        # assign bundles generations first
-        for bundle in self.Bundles.values():
-            if bundle.IsRootBundle():
+    def CalcBundleLevels(self):
+        bundles = self.Bundles.values()
+        if not bundles:
+            return
+
+        # look at connected bundles first; they're likely to
+        # be the most interesting
+        for bundle in bundles:
+            if bundle.Generation is None and not bundle.HasParents() and bundle.HasChildren():
                 bundle.AssignGeneration(0)
 
-        # assign default generation for any bundles not covered
-        for bundle in self.Bundles.values():
-            bundle.AssignDefaultGeneration()
+        discovered_generations = [bundle.Generation for bundle in bundles if bundle.Generation is not None]
+        discovered_generations.append(0)
+        min_generation = min(discovered_generations)
 
-        # then build bundle generations into a "list"
-        generations = dict()
-        for bundle in self.Bundles.values():
-            generation = bundle.Generation
-            if generation in generations:
-                generations[generation].append(bundle)
-            else:
-                generations[generation] = [bundle]
+        # now add disconnected bundles - at the left of the display
+        for bundle in bundles:
+            if bundle.Generation is None:
+                bundle.AssignGeneration(min_generation)
 
-        # translate that to node levels
-        indices = [key for key in generations.keys()]
-        self.NumLevels = len(indices)
-        if self.NumLevels > 0:
-            indices.sort()
-            level_offset = - indices[0]
+        for bundle in bundles:
+            bundle.SetLevel(min_generation)
 
-            for index in indices:
-                bundles = generations[index]
-                for bundle in bundles:
-                    bundle.AssignNodeLevels(level_offset)
+
+    #-------------------------------------------------------
+    def AssignNodeLevels(self):
+        for entity in self.Entities.values():
+            entity.AssignNodeLevel()
 
 
     #-------------------------------------------------------
     def GetNumLevels(self):
-        return self.NumLevels
+        return len(set([bundle.Level for bundle in self.Bundles.values()]))
 
     def GetEntities(self):
-        return [entity for entity in self.Entities.values() if entity.Level >= 0]
+        return self.Entities.values()
 
 
 
@@ -296,15 +317,15 @@ class G_LayoutConfig:
     #-------------------------------------------------------
     def __init__(self):
         self.Border = 30
-        self.NodeSpacing = 22
+        self.NodeSpacing = 24
         self.NodeWidth = 150
         self.BundleWidth = 14
-        self.OutboundBundleSpacing = 4
+        self.OutboundBundleSpacing = 6
         self.BallRadius = 4
         self.LinkRadius = 16
-        self.MinLevelOffset = 3 * self.LinkRadius
+        self.MinLevelOffset = 4 * self.LinkRadius
         self.TextOffsetX = 2
-        self.TextOffsetY = 4
+        self.TextOffsetY = 6
 
     #-------------------------------------------------------
     def Extract(self, max_x, max_y):
@@ -369,7 +390,8 @@ class G_Node(Data):
 
     #-------------------------------------------------------
     def MakeBundles(self, store):
-        return set([G_Bundle(bundle, store) for bundle in self.Data.ChildBundles])
+        my_level = self.Data.Level
+        return set([G_Bundle(bundle, store) for bundle in self.Data.ChildBundles if bundle.Level == my_level])
 
 
     #-------------------------------------------------------
@@ -399,7 +421,8 @@ class G_Node(Data):
         graph = dict(
             x = self.X,
             y = self.Y,
-            bundle_height = self.BundleHeight
+            bundle_height = self.BundleHeight,
+            title = self.Data.Name
         )
 
         graph.update(self.Data.Properties)
@@ -493,9 +516,11 @@ class Level:
     "Graphical layout for a vertical group of entities"
 
     #-------------------------------------------------------
-    def __init__(self):
+    def __init__(self, level):
+        self.Level = level
         self.Nodes = []
         self.Bundles = []
+        self.IndexLimitNode = None
 
 
     #-------------------------------------------------------
@@ -506,24 +531,52 @@ class Level:
     #-------------------------------------------------------
     def MakeBundles(self, store):
         bundles = set()
+
         for node in self.Nodes:
             bundles.update(node.MakeBundles(store))
 
         self.Bundles = sorted([bundle for bundle in bundles])
 
-        # remake nodes in bundle order
-        remainder = set(self.Nodes)
-        nodes = set()
-        self.Nodes = []
-        for bundle in self.Bundles:
-            parents = [store.GetNode(parent) for parent in  bundle.Data.ParentEntities]
-            for parent in parents:
-                remainder.discard(parent)
-                if parent not in nodes:
-                    nodes.add(parent)
-                    self.Nodes.append(parent)
 
+    #-------------------------------------------------------
+    def OrderNodes(self, store):
+        my_level = self.Level
+        remainder = set(self.Nodes)
+        assigned_nodes = set()
+        ordered_nodes = []
+
+        def AddNode(node):
+            remainder.discard(node)
+            if node not in assigned_nodes:
+                assigned_nodes.add(node)
+                ordered_nodes.append(node)
+
+        # put nodes with non-local children first
+        non_local_nodes = dict()
+        for node in self.Nodes:
+            child_bundles = node.Data.ChildBundles
+            if len(child_bundles) != 0:
+                max_child_level = max([bundle.Level for bundle in child_bundles])
+                if max_child_level != my_level:
+                    non_local_nodes.setdefault(max_child_level, []).append(node)
+
+        for key in sorted(non_local_nodes.keys(), reverse = True):
+            for node in sorted(non_local_nodes[key]):
+                AddNode(node)
+
+        num_nonlocal_nodes = len(ordered_nodes)
+                    
+        # and the rest in bundle order (keeps a bundle's parents together)
+        for bundle in self.Bundles:
+            parents = [store.GetNode(parent) for parent in bundle.Data.ParentEntities if parent.Level == my_level]
+            for parent in parents:
+                AddNode(parent)
+
+        self.Nodes = ordered_nodes
         self.Nodes.extend(sorted([node for node in remainder]))
+
+        if num_nonlocal_nodes != 0:
+            self.IndexLimitNode = min(num_nonlocal_nodes, len(self.Nodes) - 1)
 
 
     #-------------------------------------------------------
@@ -541,7 +594,12 @@ class Level:
 
 
     #-------------------------------------------------------
-    def Adjust(self, delta, config):
+    def Adjust(self, limit, delta, config):
+        if limit is not None:
+            clip = self.Nodes[0].Y + delta - limit
+            if clip < 0:
+                delta -= clip
+
         for node in self.Nodes:
             node.Adjust(delta)
 
@@ -549,7 +607,11 @@ class Level:
         for bundle in self.Bundles:
             delta = bundle.Adjust(delta, config)
 
-        return delta
+        limit = None
+        if self.IndexLimitNode is not None:
+            limit = self.Nodes[self.IndexLimitNode].Y + config.NodeSpacing
+
+        return limit, delta
 
 
     #-------------------------------------------------------
@@ -568,22 +630,22 @@ class Layout:
     #-------------------------------------------------------
     def __init__(self, network):
         store = G_LayoutStore(network)
-        levels = self.Levels = [Level() for i in range(network.GetNumLevels() + 1)]
+        levels = self.Levels = [Level(i) for i in range(network.GetNumLevels() + 1)]
         for entity in network.GetEntities():
             levels[entity.Level].AddEntity(entity, store)
 
         for level in levels:
             level.MakeBundles(store)
+            level.OrderNodes(store)
 
         config = self.Config = G_LayoutConfig()
         pos = (config.Border, config.Border)
         for level in levels:
             pos = level.Layout(pos, config)
 
-
-        delta = 0
+        limit, delta = None, 0
         for level in levels:
-            delta = level.Adjust(delta, config)
+            limit, delta = level.Adjust(limit, delta, config)
 
 
     #-------------------------------------------------------
