@@ -601,7 +601,9 @@ for plugin in ../*/build-nlv.bat; do
   dir_name=`dirname ${plugin}`
   plugin_name=`basename ${dir_name}`
   msg_header "Build plugin: ${plugin_name}"  
-  runbat $plugin 2>&1 | tee "${logdir}/Plugin-${plugin_name}.log"
+  pushd $dir_name > /dev/null
+  runbat build-nlv.bat 2>&1 | tee "${logdir}/Plugin-${plugin_name}.log"
+  popd > /dev/null
 done
 
 
