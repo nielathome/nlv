@@ -85,6 +85,15 @@ echo . >> %MYTHTV_EGG_LINK%
 
 
 echo.
+echo ==== Copy Boost/TBB DLLs to debug environment
+set NLOG_DIR=%BLDDIR%\NlogDll\Bin
+xcopy /q /y %BOOST%\stage\x64\lib\*.dll %NLOG_DIR% 
+xcopy /q /y %TBB%\build\vs2013\x64\Debug\*.dll %NLOG_DIR% 
+xcopy /q /y %TBB%\build\vs2013\x64\Release\*.dll %NLOG_DIR% 
+
+
+
+echo.
 echo ===============================================================================
 echo NLV development environment installed to %VIRTUAL_ENV%
 echo Double-click the solution file; ensure the _Work\PyEnv\Dbg Python virtual
