@@ -190,10 +190,6 @@ mkdir -p "$blddir" "$pkgdir" "$instdir" "$logdir" "$stagedir" "$testdir"
 cp Scripts/install.bat "$instdir"
 echo "set VER=${ver}" > "$instdir/iver.bat" 
 
-# initialise debug time DLL path
-pathvar=$wrkdir/path.txt
-echo -n `cygpath -w -p "$PATH"` > $pathvar
-
 # initialise Windows environment
 envbat=$wrkdir/env.bat
 echo SET NLV=$ver > $envbat
@@ -404,7 +400,6 @@ if [ ! -d "$boost_dir" ]; then
 fi
 
 addenvpropspath BOOST "${boost_dir}"
-echo -n ";`cygpath -w ${boost_dir}/stage/x64/lib`" >> $pathvar 
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning BOOST ${boost_name}"
@@ -456,8 +451,6 @@ if [ ! -d "$tbb_dir" ]; then
 fi
 
 addenvpropspath TBB "${tbb_dir}"
-echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Debug`" >> $pathvar 
-echo -n ";`cygpath -w ${tbb_dir}/build/vs2013/x64/Release`" >> $pathvar 
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning TBB ${tbb_name}"
@@ -573,21 +566,8 @@ fi
 echo "  </PropertyGroup>" >> $envprops
 echo "</Project>" >> $envprops
 
-# as a convenience, customise the Visual Studio Python project file to allow
-# debugging to work
-projfile="Application/Nlv/Nlv.pyproj"
-tplfile="Application/Template/tpl-Nlv.pyproj"
-
 if [ -n "$cfg_clean" ]; then
   rm -rf "$blddir"
-  rm -f $projfile
-  
-elif [ ! -f "$projfile" ]; then 
-  wtestdir=`cygpath -a -m "$testdir"`
-  subst=`cat $pathvar | sed -e 's|\\\\|\\\\\\\\|'g`
-  sed -e "s@__ENVIRONMENT__@PATH=$subst@" < $tplfile \
-    | sed -e "s@__TESTDIR__@$wtestdir@" > $projfile 
-
 fi
 
 
@@ -601,7 +581,9 @@ for plugin in ../*/build-nlv.bat; do
   dir_name=`dirname ${plugin}`
   plugin_name=`basename ${dir_name}`
   msg_header "Build plugin: ${plugin_name}"  
-  runbat $plugin 2>&1 | tee "${logdir}/Plugin-${plugin_name}.log"
+  pushd $dir_name > /dev/null
+  runbat build-nlv.bat 2>&1 | tee "${logdir}/Plugin-${plugin_name}.log"
+  popd > /dev/null
 done
 
 
