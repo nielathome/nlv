@@ -257,6 +257,9 @@ class G_EnabledColourRow:
     #-------------------------------------------------------
     def Bind(self, onshow, description_text, visible, oncolour, colour_name, title_attr, normal_attr):
         label, desc = description_text
+        if desc is None:
+            desc = "The plugin creator has not provided a description for this field"
+
         self._Label = label
         checkbox = self._ShowColumnCheckBox
         checkbox.Unbind(wx.EVT_CHECKBOX)

@@ -684,7 +684,10 @@ class Tree:
 
 
     def AddRelationship(self, properties):
-        self.Builder.AddRelationship(properties["source"], properties["target"], properties["event_id"])
+        src = properties["source"]
+        tgt = properties["target"]
+        if src != tgt:
+            self.Builder.AddRelationship(src, tgt, properties["event_id"])
 
 
     #-------------------------------------------------------
