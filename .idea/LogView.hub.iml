@@ -6,12 +6,21 @@
       <sourceFolder url="file://$MODULE_DIR$/Plugin/NlvMythTV" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.idea" />
       <excludeFolder url="file://$MODULE_DIR$/.vs" />
+      <excludeFolder url="file://$MODULE_DIR$/Application/Model" />
+      <excludeFolder url="file://$MODULE_DIR$/Application/Template" />
+      <excludeFolder url="file://$MODULE_DIR$/Deps/Modules/GoogleTest" />
+      <excludeFolder url="file://$MODULE_DIR$/Deps/Modules/Json" />
+      <excludeFolder url="file://$MODULE_DIR$/Deps/Packages" />
       <excludeFolder url="file://$MODULE_DIR$/Extension" />
+      <excludeFolder url="file://$MODULE_DIR$/Log" />
+      <excludeFolder url="file://$MODULE_DIR$/Plugin/NlvMythTV.egg-info" />
+      <excludeFolder url="file://$MODULE_DIR$/Plugin/Template" />
+      <excludeFolder url="file://$MODULE_DIR$/Scripts" />
       <excludeFolder url="file://$MODULE_DIR$/Sphinx/_static" />
       <excludeFolder url="file://$MODULE_DIR$/Sphinx/_templates" />
       <excludeFolder url="file://$MODULE_DIR$/_Work" />
     </content>
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="Python 3.7 (Nlv)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

@@ -1,13 +1,13 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Nlv" type="PythonConfigurationType" factoryName="Python">
-    <module name="LogView.hub" />
+    <module name="LogView" />
     <option name="INTERPRETER_OPTIONS" value="" />
     <option name="PARENT_ENVS" value="true" />
     <envs>
       <env name="PYTHONUNBUFFERED" value="1" />
     </envs>
-    <option name="SDK_HOME" value="C:\Users\Niel\Work\Software\Projects\LogView.hub\_Work\PyEnv\Dbg\Scripts\python.exe" />
-    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Application/Nlv" />
+    <option name="SDK_HOME" value="$PROJECT_DIR$\_Work\PyEnv\Dbg\Scripts\python.exe" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/_Work/Test" />
     <option name="IS_MODULE_SDK" value="false" />
     <option name="ADD_CONTENT_ROOTS" value="false" />
     <option name="ADD_SOURCE_ROOTS" value="false" />
