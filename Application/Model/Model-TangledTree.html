@@ -19,8 +19,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <!-- Start model -->
 <script src="https://d3js.org/d3.v5.js"></script>
-<button onclick="Update1()">Data 1</button>
-<button onclick="Update2()">Data 2</button>
 <!-- End model -->
 
 
@@ -333,7 +331,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 <script>
-    function Update1() {
+    function Update() {
         const data = " \
         { \
             \"bundles\": [ \
@@ -659,6 +657,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         CreateChart(data, "{ \"show_link_labels\" : true }");
     }
 
-    Update1();
+    Update();
 
 </script>

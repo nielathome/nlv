@@ -49,12 +49,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <script>
     //----------------------------------------------------------
-    function OnClick(d) {
-        console.log("Column selected: " + d.category);
-    }
-
-
-    //----------------------------------------------------------
 
     // append the svg object to the body of the page
     var g_svg = d3.select("#graph")
@@ -197,7 +191,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         const arc_colour = d3.scaleOrdinal(d3.schemeDark2)
 
-        g_sunburst = g_svg.append("g")
+        g_sunburst = g_svg
+          .append("g")
             .attr("transform", "translate(" + window_width / 2 + ", " + window_height / 2 + ")");
 
         g_arc_paths = g_sunburst
@@ -263,7 +258,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .text(function (node) {
                 return node.data.name;
             });
-}
+    }
 
 
     //----------------------------------------------------------
