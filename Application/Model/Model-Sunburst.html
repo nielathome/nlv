@@ -1,4 +1,4 @@
-<!--
+﻿<!--
 Copyright (C) Niel Clausen 2020. All rights reserved.
 
 This program is free software: you can redistribute it and/or modify
@@ -62,27 +62,94 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         .attr("width", "100%")
         .attr("height", "100%");
 
+    var g_sunburst = null;
+    var g_arc_paths = null;
+    var g_arc_labels = null;
+    var g_parent = null;
+    var g_root_node = null;
+
 
     //----------------------------------------------------------
     var g_radius = 0;
 
-    function ArcVisible(display_node) {
-        return display_node.y1 <= 3 && display_node.y0 >= 1
-            && display_node.x1 > display_node.x0;
+    function ArcVisible(node) {
+        return node.y1 <= 3 && node.y0 >= 1
+            && node.x1 > node.x0;
     }
 
-    function LabelVisible(display_node) {
-        return display_node.y1 <= 3 && display_node.y0 >= 1
-            && (display_node.y1 - display_node.y0) * (display_node.x1 - display_node.x0) > 0.03;
+    function LabelVisible(node) {
+        return node.y1 <= 3 && node.y0 >= 1
+            && (node.y1 - node.y0) * (node.x1 - node.x0) > 0.03;
     }
 
-    function LabelTransform(display_node) {
-        const x = (display_node.x0 + display_node.x1) / 2 * 180 / Math.PI;
-        const y = (display_node.y0 + display_node.y1) / 2 * g_radius;
+    function LabelTransform(node) {
+        const x = (node.x0 + node.x1) / 2 * 180 / Math.PI;
+        const y = (node.y0 + node.y1) / 2 * g_radius;
 
         return "rotate(" + (x - 90) + ")"
             + "translate(" + y + ", 0)"
             + "rotate(" + (x < 180 ? 0 : 180) + ")";
+    }
+
+
+    //----------------------------------------------------------
+    function OnClick(next_node) {
+        g_parent.datum(next_node.parent || g_root_node);
+
+        g_root_node.each(function (node) {
+            node.target = {
+                x0: Math.max(0, Math.min(1, (node.x0 - next_node.x0) / (next_node.x1 - next_node.x0))) * 2 * Math.PI,
+                x1: Math.max(0, Math.min(1, (node.x1 - next_node.x0) / (next_node.x1 - next_node.x0))) * 2 * Math.PI,
+                y0: Math.max(0, node.y0 - next_node.depth),
+                y1: Math.max(0, node.y1 - next_node.depth)
+            };
+        });
+
+        const transition = g_sunburst
+          .transition()
+            .duration(750);
+
+        g_arc_paths
+          .transition(transition)
+            .tween("data", function (node) {
+                // interpolates radial co-ordinate to give "swirl" effect
+                const interpolator = d3.interpolate(node.current, node.target);
+                return function (eased_time) {
+                    node.current = interpolator(eased_time);
+                }
+            })
+          .filter(function (node) {
+                return + this.getAttribute("fill-opacity") || ArcVisible(node.target);
+           })
+            .attr("fill-opacity", function (node) {
+                return ArcVisible(node.target) ? (node.children ? 0.6 : 0.4) : 0;
+            })
+            .attrTween("d", function (node) {
+                return function (eased_time) {
+                    return d3.arc()
+                        .startAngle(node.current.x0)
+                        .endAngle(node.current.x1)
+                        .padAngle(Math.min((node.current.x1 - node.current.x0) / 2, 0.005))
+                        .padRadius(g_radius * 1.5)
+                        .innerRadius(node.current.y0 * g_radius)
+                        .outerRadius(Math.max(node.current.y0 * g_radius, node.current.y1 * g_radius - 1))
+                        ();
+                };
+            });
+
+        g_arc_labels.
+          filter(function (node) {
+                return +this.getAttribute("fill-opacity") || LabelVisible(node.target);
+          })
+          .transition(transition)
+            .attr("fill-opacity", function (node) {
+                return + LabelVisible(node.target);
+            })
+            .attrTween("transform", function (node) {
+                return function (eased_time) {
+                    return LabelTransform(node.current);
+                }
+            });
     }
 
 
@@ -94,8 +161,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_radius = (window_height - 2 * margin) / 6;
 
         const hierarchy = d3.hierarchy(data)
-            .sum(function (data_node) {
-                return data_node.value;
+            .sum(function (data) {
+                return data.value;
             })
             .sort(function(a, b) {
                 return b.value - a.value;
@@ -104,70 +171,73 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         const partition_layout = d3.partition()
             .size([2 * Math.PI, hierarchy.height + 1]);
 
-        const root_node = partition_layout(hierarchy);
+        g_root_node = partition_layout(hierarchy);
 
-        root_node.each(function (display_node) {
-            display_node.current = display_node;
+        g_root_node.each(function (node) {
+            node.current = node;
         });
 
         const arc_colour = d3.scaleOrdinal(d3.schemeDark2)
 
-        const sunburst = g_svg.append("g")
+        g_sunburst = g_svg.append("g")
             .attr("transform", "translate(" + window_width / 2 + ", " + window_height / 2 + ")");
 
-        const arc_paths = sunburst
+        g_arc_paths = g_sunburst
           .append("g")
           .selectAll("path")
-          .data(root_node.descendants().slice(1))
+          .data(g_root_node.descendants().slice(1))
           .join("path")
-            .attr("fill", function (display_node) {
-                while (display_node.depth > 1)
-                    display_node = display_node.parent;
-                return arc_colour(display_node.data.name);
+            .attr("fill", function (node) {
+                while (node.depth > 1)
+                    node = node.parent;
+                return arc_colour(node.data.name);
             })
-            .attr("fill-opacity", function (display_node) {
-                return ArcVisible(display_node.current) ? (display_node.children ? 0.6 : 0.4) : 0;
+            .attr("fill-opacity", function (node) {
+                return ArcVisible(node.current) ? (node.children ? 0.6 : 0.4) : 0;
             })
-            .attr("d", function (display_node) {
+            .attr("d", function (node) {
                 return d3.arc()
-                    .startAngle(display_node.current.x0)
-                    .endAngle(display_node.current.x1)
-                    .padAngle(Math.min((display_node.current.x1 - display_node.current.x0) / 2, 0.005))
+                    .startAngle(node.current.x0)
+                    .endAngle(node.current.x1)
+                    .padAngle(Math.min((node.current.x1 - node.current.x0) / 2, 0.005))
                     .padRadius(g_radius * 1.5)
-                    .innerRadius(display_node.current.y0 * g_radius)
-                    .outerRadius(Math.max(display_node.current.y0 * g_radius, display_node.y1 * g_radius - 1))
+                    .innerRadius(node.current.y0 * g_radius)
+                    .outerRadius(Math.max(node.current.y0 * g_radius, node.current.y1 * g_radius - 1))
                     ();
             });
 
-        arc_paths.filter(function (display_node) {
-            return display_node.children;
+        g_arc_paths.filter(function (node) {
+            return node.children;
         })
-            .style("cursor", "pointer");
+            .style("cursor", "pointer")
+            .on("click", OnClick);
 
-        const arc_labels = sunburst
+        g_arc_labels = g_sunburst
           .append("g")
             .attr("class", "label")
           .selectAll("text")
-          .data(root_node.descendants().slice(1))
+          .data(g_root_node.descendants().slice(1))
           .join("text")
             .attr("dy", "0.35em")
-            .attr("fill-opacity", function (display_node) {
-                return + LabelVisible(display_node.current);
+            .attr("fill-opacity", function (node) {
+                return + LabelVisible(node.current);
             })
-            .attr("transform", function (display_node) {
-                return LabelTransform(display_node.current);
+            .attr("transform", function (node) {
+                return LabelTransform(node.current);
             })
-            .text(function (display_node) {
-                return display_node.data.name;
+            .text(function (node) {
+                return node.data.name;
             });
 
-        const parent = sunburst
+        g_parent = g_sunburst
             .append("circle")
-            .datum(root_node)
+            .datum(g_root_node)
             .attr("r", g_radius)
             .attr("fill", "none")
-            .attr("pointer-events", "all");
-    }
+            .style("cursor", "pointer")
+            .attr("pointer-events", "all")
+            .on("click", OnClick);
+}
 
 
     //----------------------------------------------------------
