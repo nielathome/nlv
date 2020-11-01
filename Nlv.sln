@@ -41,7 +41,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Models", "Models", "{937885
 		Application\Model\Model-BarChart.html = Application\Model\Model-BarChart.html
 		Application\Model\Model-Network.html = Application\Model\Model-Network.html
 		Application\Model\Model-PieChart.html = Application\Model\Model-PieChart.html
+		Application\Model\Model-SunBurst.html = Application\Model\Model-SunBurst.html
 		Application\Model\Model-TangledTree.html = Application\Model\Model-TangledTree.html
+		Application\Model\Model-TreeMap.html = Application\Model\Model-TreeMap.html
 	EndProjectSection
 EndProject
 Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvLaunch", "Application\Nlv\NlvLaunch.pyproj", "{D863EBA4-7074-4957-92EA-FEAECA3441E5}"

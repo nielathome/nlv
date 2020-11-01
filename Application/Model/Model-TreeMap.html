@@ -39,6 +39,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         pointer-events: none;
         user-select: none;
     }
+
+    .leaf {
+        fill-opacity: 0.6;
+        stroke-width: 0.5;
+        stroke: grey;
+    }
 </style>
 
 
@@ -59,6 +65,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
+    var g_uid_count = 0;
+
+    function Uid(name) {
+        return "O-" + name + "-" + g_uid_count++;
+    }
+
     function DoCreateChart(data) {
         const min_window = 300, margin = 10;
         const window_width = Math.max(min_window, document.documentElement.clientWidth);
@@ -95,15 +107,28 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         leaves
           .append("rect")
+            .attr("class", "leaf")
+            .attr("id", function (node) {
+                return node.leafUid = Uid("leaf");
+            })
             .attr("fill", function (node) {
                 return element_colour(node.data.name);
             })
-            .attr("fill-opacity", 0.6)
             .attr("width", function (node) {
                 return node.x1 - node.x0;
             })
             .attr("height", function (node) {
                 return node.y1 - node.y0;
+            });
+
+        leaves
+          .append("clipPath")
+            .attr("id", function (node) {
+                return node.clipUid = Uid("clip");
+            })
+          .append("use")
+            .attr("xlink:href", function (node) {
+                return " #" + node.leafUid;
             });
 
         leaves
@@ -119,7 +144,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         leaves.append("text")
             .attr("class", "label")
-//            .attr("clip-path", d => d.clipUid)
+            .attr("clip-path", function (node) {
+                return "url(#" + node.clipUid + ")";
+            })
           .selectAll("tspan")
           .data(function (node) {
               return [node.data.name, number_formatter(node.value)];
