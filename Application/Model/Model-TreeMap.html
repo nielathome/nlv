@@ -86,11 +86,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
         const treemap_layout = d3.treemap()
             .size([window_width - 2 * margin, window_height - 2 * margin]);
-//            .padding(1);
 
         root_node = treemap_layout(hierarchy);
 
-        const element_colour = d3.scaleOrdinal(d3.schemeDark2)
+        const max_value = root_node.leaves().reduce(function (max, node) {
+            return Math.max(max, node.value);
+        }, 0);
+        const element_colour = d3.scaleSequential([0, max_value], d3.interpolateMagma);
         const number_formatter = d3.format(",d");
 
         g_treemap = g_svg
@@ -112,7 +114,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                 return node.leafUid = Uid("leaf");
             })
             .attr("fill", function (node) {
-                return element_colour(node.data.name);
+                return element_colour(node.value);
             })
             .attr("width", function (node) {
                 return node.x1 - node.x0;
