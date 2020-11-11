@@ -20,7 +20,7 @@ import re
 
 
 
-## Recognise ###################################################
+## RescheduleRecogniser ########################################
 
 class RescheduleRecogniser:
 
@@ -90,7 +90,7 @@ Recognise(
 
 
 
-## Recognise ###################################################
+## ExpireRecogniser ############################################
 
 class ExpireRecogniser:
 
@@ -143,7 +143,7 @@ Recognise(
 
 
 
-## Project #####################################################
+## RescheduleProjector #########################################
 
 def RescheduleProjector(connection, cursor, context):
     utc_datum = context.CalcUtcDatum(cursor, ["analysis.reschedule"])
@@ -217,7 +217,7 @@ Project(
 
 
 
-## Project #####################################################
+## SummaryProjector ############################################
 
 def SummaryProjector(connection, cursor, context):
     utc_datum = context.CalcUtcDatum(cursor, ["analysis.reschedule", "analysis.expire"])
@@ -230,6 +230,7 @@ def SummaryProjector(connection, cursor, context):
             start_text TEXT,
             start_offset_ns INT,
             duration_ns INT,
+            internal_ns INT,
             summary TEXT,
             start_line_no INT,
             finish_line_no INT,
@@ -243,6 +244,7 @@ def SummaryProjector(connection, cursor, context):
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
             duration_ns,
+            NULL,
             'P=[' || place || ']' AS summary,
             start_line_no,
             finish_line_no,
@@ -256,6 +258,7 @@ def SummaryProjector(connection, cursor, context):
             start_text,
             start_offset_ns + (start_utc - {utc_datum}) * 1000000000,
             duration_ns,
+            NULL,
             'expire' AS summary,
             start_line_no,
             finish_line_no,
@@ -310,6 +313,44 @@ def SummaryProjector(connection, cursor, context):
                 c2.execute("INSERT INTO hierarchy VALUES (?, ?)", (row[0], prev[0]))
                 break
 
+    # can use "update from" when Python updates to SQLite version 3.33
+    cursor.execute("""
+        SELECT
+            hierarchy.parent_event_id as event_id,
+            sum(projection.duration_ns) as child_duration_ns
+        FROM
+            hierarchy
+        JOIN
+            projection
+        ON
+            hierarchy.child_event_id = projection.event_id
+        GROUP BY
+            hierarchy.parent_event_id
+    """)
+ 
+    for row in cursor:
+        event_id = row[0]
+        child_duration_ns = row[1]
+        c2.execute("""
+            UPDATE
+                projection
+            SET
+                internal_ns = duration_ns - ?
+            WHERE
+                event_id = ?
+        """,
+        (child_duration_ns, event_id))
+ 
+    # set internal = duration where no child data is recorded
+    cursor.execute("""
+        UPDATE
+            projection
+        SET
+            internal_ns = duration_ns
+        WHERE
+            internal_ns ISNULL
+    """)
+
     c2.close()
 
 
@@ -318,14 +359,15 @@ projection = Project(
     SummaryProjector,
     MakeDisplaySchema()
         .AddNesting()
-        .AddStart("Start", "Date code at the beginning of the summarised event.", width = 100)
-        .AddDuration("Duration", "Duration of the summarised event.", scale = "s", width = 60)
+        .AddStart("Start", "Date code at the beginning of the summarised event.", width = 120)
+        .AddDuration("Duration", "Duration of the summarised event.", scale = "s", width = 80)
+        .AddDuration("Internal", "Duration of the summarised event excluding child events.", scale = "s", width = 80, initial_visibility = False)
         .AddField("Event Summary", "Brief description of the event.", "text", 150, "left", initial_colour = "ROYAL BLUE")
 )
 
 
 
-## Quantifier ##################################################
+## SummaryQuantifier ###########################################
 
 def SummaryQuantifier(connection, cursor):
     cursor.execute("DROP TABLE IF EXISTS main.projection")
@@ -372,3 +414,115 @@ metrics = projection.Quantify(
 
 metrics.Chart("By Count", True, Chart.Bar("Summary", "Count"))
 metrics.Chart("By Duration", True, Chart.Pie("Summary", "Duration (s)"))
+
+
+
+## HierarchyQuantifier #########################################
+
+def HierarchyQuantifier(connection, cursor):
+    cursor.execute("DROP TABLE IF EXISTS main.projection")
+    cursor.execute("""
+        CREATE TABLE projection
+        (
+            event_id INTEGER PRIMARY KEY ASC AUTOINCREMENT,
+            summary TEXT,
+            duration INT
+        )""")
+
+    cursor.execute("""
+        INSERT INTO projection
+        (
+            summary,
+            duration
+        )
+
+        WITH timing_data(event_id, summary_path, duration_ns, internal_ns) AS
+        (
+            SELECT
+                event_id,
+                summary,
+                duration_ns,
+                internal_ns
+            FROM
+                events.display
+            WHERE
+                event_id IN
+                (
+                    SELECT
+                        parent_event_id
+                    FROM
+                        events.hierarchy
+                )
+                    
+            -- recursive, "display" is a child; identifies nested
+            -- activities and builds up a path-like summary name
+            UNION
+            SELECT
+                display.event_id,
+                timing_data.summary_path || "/" || display.summary,
+                display.duration_ns,
+                display.internal_ns
+            FROM
+                timing_data
+            JOIN
+                events.hierarchy
+            ON
+                timing_data.event_id = hierarchy.parent_event_id
+            JOIN
+                events.display
+            ON
+                hierarchy.child_event_id = display.event_id
+            WHERE
+                display.duration_ns <> 0
+        ),
+ 
+        -- add hierarchy elements with meaningful internal time
+        internal_data(summary_path, duration_ns) AS
+        (
+            SELECT
+                summary_path || "/internal",
+                internal_ns
+            FROM
+                timing_data
+            WHERE
+                -- i.e. not a leaf
+                duration_ns <> internal_ns AND internal_ns <> 0           
+        ),
+ 
+        -- collect results of previous two "tables"
+        all_data(summary_path, duration_ns) AS
+        (
+            SELECT
+                summary_path,
+                duration_ns
+            FROM
+                timing_data
+ 
+            UNION
+            SELECT
+                summary_path,
+                duration_ns
+            FROM
+                internal_data
+        )
+ 
+    SELECT
+        summary_path,
+        sum(duration_ns) / 1000000000
+    FROM
+        all_data
+    GROUP BY
+        summary_path
+    HAVING
+        sum(duration_ns) / 1000000000 > 1  
+    """)
+
+
+metrics = projection.Quantify(
+    "Hierarchy",
+    HierarchyQuantifier,
+    MakeDisplaySchema()
+        .AddField("Summary", "Brief description of the event.", "text", 150, "left")
+        .AddField("Duration (s)", "The total duration for the event.", "int", 100, "left")
+)
+ 
