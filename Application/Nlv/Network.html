@@ -24,16 +24,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 <style>
-    html, body {
-        height: 100%;
-        margin: 0;
-    }
-
-    .full-height {
-        height: 99%;
-        overflow: hidden;
-    }
-
     .node-text {
         font-family: sans-serif;
         font-size: 8pt;
@@ -52,32 +42,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <div id="graph" class="full-height"></div>
 
 
+<!-- Common styles and JavaScript -->
+<link rel="stylesheet" href="Chart.css">
+<script src="Chart.js"></script>
+
+
 <script>
-    //----------------------------------------------------------
-    // here, node_id refers to the Python UI's node ID
-    var g_nodes_table_node_id = 0,
-        g_links_table_node_id = 0;
-
-    function SetNodeId(node_id) {
-    }
-
-    function SetTableNodeIds(nodes_table_node_id, links_table_node_id) {
-        g_nodes_table_node_id = nodes_table_node_id;
-        g_links_table_node_id = links_table_node_id;
-    }
-
-    function CallPython(target_node_id, method, args_object) {
-        args_json_text = JSON.stringify(args_object);
-        args_encoded_text = btoa(args_json_text);
-        cgi_text = "/" + target_node_id + "." + method + "?" + args_encoded_text;
-
-        d3.json(cgi_text, function (error, results_json) {
-            if (error)
-                throw error;
-        });
-    }
-
-
     //----------------------------------------------------------
     function OnNodeClick(node) {
         if (!node.dragged) {
@@ -184,7 +154,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_config = new g_configConstructor(data, g_svg);
     }
 
-    
+
     //----------------------------------------------------------
 
     //
@@ -379,7 +349,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     //  return -d3.event.deltaY * (d3.event.deltaMode === 1 ? 0.15 : d3.event.deltaMode ? 1 : 0.01);
                     return d3.event.deltaY < 0 ? 0.4 : -0.4;
                 })
-                .on("zoom", function() {
+                .on("zoom", function () {
                     g_curTransform = d3.event.transform;
                     Layout();
                 })
@@ -397,7 +367,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             .attr("class", "link-group")
             .call(g_config.UpdateLink)
             .call(g_config.StyleLink)
-            .on("click", OnLinkClick)
+            .on("click", OnLinkClick);
 
         g_joined_nodes = g_nodes_group.selectAll(".node-group")
           .data(data.nodes)

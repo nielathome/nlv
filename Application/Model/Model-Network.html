@@ -25,16 +25,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
 <style>
-    html, body {
-        height: 100%;
-        margin: 0;
-    }
-
-    .full-height {
-        height: 99%;
-        overflow: hidden;
-    }
-
     .node-text {
         font-family: sans-serif;
         font-size: 8pt;
@@ -51,6 +41,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 <!-- Create a div for the SVG graph -->
 <div id="graph" class="full-height"></div>
+
+
+<!-- Common styles and JavaScript -->
+<link rel="stylesheet" href="../Nlv/Chart.css">
+<script src="../Nlv/Chart.js"></script>
 
 
 <script>
@@ -158,7 +153,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
         g_config = new g_configConstructor(data, g_svg);
     }
 
-    
+
     //----------------------------------------------------------
 
     //
@@ -353,7 +348,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
                     //  return -d3.event.deltaY * (d3.event.deltaMode === 1 ? 0.15 : d3.event.deltaMode ? 1 : 0.01);
                     return d3.event.deltaY < 0 ? 0.4 : -0.4;
                 })
-                .on("zoom", function() {
+                .on("zoom", function () {
                     g_curTransform = d3.event.transform;
                     Layout();
                 })

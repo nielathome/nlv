@@ -17,6 +17,33 @@
 
 
 //----------------------------------------------------------
+var g_node_id = 0;
+
+function SetNodeId(node_id) {
+    g_node_id = node_id;
+}
+
+var g_nodes_table_node_id = 0,
+    g_links_table_node_id = 0;
+
+function SetTableNodeIds(nodes_table_node_id, links_table_node_id) {
+    g_nodes_table_node_id = nodes_table_node_id;
+    g_links_table_node_id = links_table_node_id;
+}
+
+function CallPython(target_node_id, method, args_object) {
+    args_json_text = JSON.stringify(args_object);
+    args_encoded_text = btoa(args_json_text);
+    cgi_text = "/" + target_node_id + "." + method + "?" + args_encoded_text;
+
+    d3.json(cgi_text, function (error, results_json) {
+        if (error)
+            throw error;
+    });
+}
+
+
+//----------------------------------------------------------
 function OnResize() {
     DoCreateChart(0);
 }
