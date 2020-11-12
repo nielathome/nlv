@@ -23,27 +23,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <script src="d3.v5.min.js"></script>
 
 <style>
-    html, body {
-        height: 100%;
-        margin: 0;
-    }
-
-    .full-height {
-        height: 99%;
-        overflow: hidden;
-    }
-
-    .tool-tip {
-        position: absolute;
-        padding: 8px;
-        background: rgba(0, 0, 0, 0.8);
-        color: bisque;
-        border-radius: 2px;
-        font-family: sans-serif;
-        font-size: x-small;
-        text-align: center;
-    }
-
     .x-label {
         font-family: sans-serif;
         text-anchor: end;
@@ -59,6 +38,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <!-- Create a div for the SVG graph -->
 <div id="graph" class="full-height"></div>
 
+
+<!-- Common styles and JavaScript -->
+<link rel="stylesheet" href="Chart.css">
+<script src="Chart.js"></script>
 
 
 <script>
@@ -89,13 +72,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
 
-    // retained data
+    // global data
     var g_data = null;
     var g_title_text = null, g_x_label_text = null, g_y_label_text = null;
 
     // append the svg object to the body of the page
     var g_svg = d3.select("#graph")
-        .append("svg")
+      .append("svg")
         .attr("width", "100%")
         .attr("height", "100%");
 
@@ -103,44 +86,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_x_axis = g_chart.append("g");
     var g_y_axis = g_chart.append("g");
 
-    var g_x_label = g_chart.append("text")
+    var g_x_label = g_chart
+      .append("text")
         .attr("class", "x-label");
 
     var g_y_label = g_chart.append("text")
         .attr("class", "y-label");
-
-
-    //----------------------------------------------------------
-    const g_short_transition = 200;
-    var g_tooltip = d3.select("#graph")
-      .append("div")
-        .attr('class', 'tool-tip')
-        .style("opacity", 0);
-
-    function OnTipShow(d) {
-        g_tooltip.transition(g_short_transition)
-            .style("opacity", 1);
-
-        d3.select(this).transition(g_short_transition)
-            .style("stroke", "black")
-            .style("opacity", 0.8);
-    }
-
-    function OnTipMove(d) {
-        g_tooltip
-            .html("<strong>" + d.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
-            .style("left", (d3.event.pageX + 15) + "px")
-            .style("top", (d3.event.pageY) + "px");
-    }
-
-    function OnTipHide(d) {
-        g_tooltip.transition(g_short_transition)
-            .style("opacity", "0");
-
-        d3.select(this).transition(g_short_transition)
-            .style("stroke", "none")
-            .style("opacity", 1);
-    }
 
 
     //----------------------------------------------------------
@@ -195,7 +146,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
-    function DrawChart(switch_time) {
+    function DoCreateChart(switch_time) {
+        if (g_data == null)
+            return;
+
         // set the dimensions and margins of the graph
         const min_window = 300, margin = 30, gap = 5, min_col_width = 20, max_col_width = 40;
         const window_width = Math.max(min_window, document.documentElement.clientWidth);
@@ -268,9 +222,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             function (update) {
                 return update;
             },
-            function(exit) {
+            function (exit) {
                 return exit
-                   .call(function(exit) {
+                   .call(function (exit) {
                        exit.transition(ref_transition)
                            .style("opacity", 0)
                            .attr("y", 2 * plot_bottom)
@@ -303,21 +257,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
+
+    //----------------------------------------------------------
+
+    SetupOnResize();
+    SetupTip(function (data) {
+        return "<strong>" + data.category + ":</strong> <span style='color:white'>" + data.value + "</span>";
+    });
+
     function CreateChart(title, x_label_text, y_label_text, data_json, switch_time) {
         g_data = JSON.parse(data_json);
         g_title_text = title;
         g_x_label_text = x_label_text;
         g_y_label_text = y_label_text;
-        DrawChart(switch_time);
+        DoCreateChart(switch_time);
     }
-
-
-    //----------------------------------------------------------
-    function OnResize() {
-        if (g_data !== null) {
-            DrawChart(0);
-        }
-    }
-
-    window.addEventListener("resize", OnResize);
 </script>

@@ -24,27 +24,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <!-- End model -->
 
 <style>
-    html, body {
-        height: 100%;
-        margin: 0;
-    }
-
-    .full-height {
-        height: 99%;
-        overflow: hidden;
-    }
-
-    .tool-tip {
-        position: absolute;
-        padding: 8px;
-        background: rgba(0, 0, 0, 0.8);
-        color: bisque;
-        border-radius: 2px;
-        font-family: sans-serif;
-        font-size: x-small;
-        text-align: center;
-    }
-
     .x-label {
         font-family: sans-serif;
         text-anchor: end;
@@ -61,6 +40,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 <div id="graph" class="full-height"></div>
 
 
+<!-- Common styles and JavaScript -->
+<link rel="stylesheet" href="../Nlv/Chart.css">
+<script src="../Nlv/Chart.js"></script>
+
 
 <script>
     //----------------------------------------------------------
@@ -71,13 +54,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
     //----------------------------------------------------------
 
-    // retained data
+    // global data
     var g_data = null;
     var g_title_text = null, g_x_label_text = null, g_y_label_text = null;
 
     // append the svg object to the body of the page
     var g_svg = d3.select("#graph")
-        .append("svg")
+      .append("svg")
         .attr("width", "100%")
         .attr("height", "100%");
 
@@ -85,44 +68,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     var g_x_axis = g_chart.append("g");
     var g_y_axis = g_chart.append("g");
 
-    var g_x_label = g_chart.append("text")
+    var g_x_label = g_chart
+      .append("text")
         .attr("class", "x-label");
 
     var g_y_label = g_chart.append("text")
         .attr("class", "y-label");
-
-
-    //----------------------------------------------------------
-    const g_short_transition = 200;
-    var g_tooltip = d3.select("#graph")
-      .append("div")
-        .attr('class', 'tool-tip')
-        .style("opacity", 0);
-
-    function OnTipShow(d) {
-        g_tooltip.transition(g_short_transition)
-            .style("opacity", 1);
-
-        d3.select(this).transition(g_short_transition)
-            .style("stroke", "black")
-            .style("opacity", 0.8);
-    }
-
-    function OnTipMove(d) {
-        g_tooltip
-            .html("<strong>" + d.category + ":</strong> <span style='color:white'>" + d.value + "</span>")
-            .style("left", (d3.event.pageX + 15) + "px")
-            .style("top", (d3.event.pageY) + "px");
-    }
-
-    function OnTipHide(d) {
-        g_tooltip.transition(g_short_transition)
-            .style("opacity", "0");
-
-        d3.select(this).transition(g_short_transition)
-            .style("stroke", "none")
-            .style("opacity", 1);
-    }
 
 
     //----------------------------------------------------------
@@ -177,7 +128,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 
     //----------------------------------------------------------
-    function DrawChart(switch_time) {
+    function DoCreateChart(switch_time) {
+        if (g_data == null)
+            return;
+
         // set the dimensions and margins of the graph
         const min_window = 300, margin = 30, gap = 5, min_col_width = 20, max_col_width = 40;
         const window_width = Math.max(min_window, document.documentElement.clientWidth);
@@ -250,9 +204,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             function (update) {
                 return update;
             },
-            function(exit) {
+            function (exit) {
                 return exit
-                   .call(function(exit) {
+                   .call(function (exit) {
                        exit.transition(ref_transition)
                            .style("opacity", 0)
                            .attr("y", 2 * plot_bottom)
@@ -285,26 +239,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
             });
     }
 
+
+    //----------------------------------------------------------
+
+    SetupOnResize();
+    SetupTip(function (data) {
+        return "<strong>" + data.category + ":</strong> <span style='color:white'>" + data.value + "</span>";
+    });
+
     function CreateChart(title, x_label_text, y_label_text, data_json, switch_time) {
         g_data = JSON.parse(data_json);
         g_title_text = title;
         g_x_label_text = x_label_text;
         g_y_label_text = y_label_text;
-        DrawChart(switch_time);
+        DoCreateChart(switch_time);
     }
+</script>
 
 
-    //----------------------------------------------------------
-    function OnResize() {
-        if (g_data !== null) {
-            DrawChart(0);
-        }
-    }
-
-    window.addEventListener("resize", OnResize);
-
-
-    //----------------------------------------------------------
+<script>
     const data1 = '[{"category":"P=[0.08]","value":185,"selected":false},{"category":"P=[0.09]","value":526,"selected":false},{"category":"P=[0.11]","value":5,"selected":false},{"category":"P=[0.12]","value":2,"selected":false},{"category":"P=[0.13]","value":1,"selected":false},{"category":"P=[0.14]","value":21,"selected":false},{"category":"P=[0.15]","value":829,"selected":false},{"category":"P=[0.16]","value":1151,"selected":false},{"category":"P=[0.17]","value":799,"selected":false},{"category":"P=[0.18]","value":267,"selected":false},{"category":"P=[0.19]","value":74,"selected":false},{"category":"P=[0.1]","value":26,"selected":false},{"category":"P=[0.21]","value":24,"selected":false},{"category":"P=[0.22]","value":21,"selected":false},{"category":"P=[0.23]","value":15,"selected":false},{"category":"P=[0.24]","value":16,"selected":false},{"category":"P=[0.25]","value":12,"selected":false},{"category":"P=[0.26]","value":6,"selected":false},{"category":"P=[0.27]","value":12,"selected":false},{"category":"P=[0.28]","value":4,"selected":false},{"category":"P=[0.29]","value":2,"selected":false},{"category":"P=[0.2]","value":30,"selected":false},{"category":"P=[0.31]","value":2,"selected":false},{"category":"P=[0.32]","value":4,"selected":false},{"category":"P=[0.33]","value":1,"selected":false},{"category":"P=[0.34]","value":6,"selected":false},{"category":"P=[0.35]","value":4,"selected":false},{"category":"P=[0.36]","value":2,"selected":false},{"category":"P=[0.37]","value":2,"selected":false},{"category":"P=[0.38]","value":2,"selected":false},{"category":"P=[0.39]","value":2,"selected":false},{"category":"P=[0.3]","value":4,"selected":false},{"category":"P=[0.42]","value":1,"selected":false},{"category":"P=[0.43]","value":2,"selected":false},{"category":"P=[0.45]","value":1,"selected":false},{"category":"P=[0.46]","value":2,"selected":false},{"category":"P=[0.48]","value":1,"selected":false},{"category":"P=[0.4]","value":1,"selected":false},{"category":"P=[0.51]","value":1,"selected":false},{"category":"P=[0.52]","value":1,"selected":false},{"category":"P=[0.54]","value":2,"selected":false},{"category":"P=[0.56]","value":3,"selected":false},{"category":"P=[0.57]","value":3,"selected":false},{"category":"P=[0.59]","value":1,"selected":false},{"category":"P=[0.61]","value":1,"selected":false},{"category":"P=[0.65]","value":2,"selected":false},{"category":"P=[0.68]","value":1,"selected":false},{"category":"P=[0.71]","value":1,"selected":false},{"category":"P=[1.16]","value":1,"selected":false},{"category":"P=[1.55]","value":1,"selected":false},{"category":"expire","value":1050,"selected":false}]';
     const data2 = '[{"category":"P=[0.08]","value":185,"selected":false},{"category":"P=[0.09]","value":526,"selected":false},{"category":"P=[0.14]","value":21,"selected":false},{"category":"P=[0.15]","value":829,"selected":false},{"category":"P=[0.16]","value":1151,"selected":false},{"category":"P=[0.17]","value":799,"selected":false},{"category":"P=[0.18]","value":267,"selected":false},{"category":"P=[0.19]","value":74,"selected":false},{"category":"P=[0.1]","value":26,"selected":false},{"category":"P=[0.21]","value":24,"selected":false},{"category":"P=[0.22]","value":21,"selected":false},{"category":"P=[0.23]","value":15,"selected":false},{"category":"P=[0.24]","value":16,"selected":false},{"category":"P=[0.25]","value":12,"selected":false},{"category":"P=[0.26]","value":6,"selected":false},{"category":"P=[0.27]","value":12,"selected":false},{"category":"P=[0.2]","value":30,"selected":false},{"category":"P=[0.34]","value":6,"selected":false}]';
 

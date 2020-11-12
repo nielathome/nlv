@@ -58,6 +58,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="BarChart.html" />
+    <Content Include="Chart.css" />
+    <Content Include="Chart.js" />
     <Content Include="Network.html" />
     <Content Include="PieChart.html" />
     <Content Include="style.css" />
