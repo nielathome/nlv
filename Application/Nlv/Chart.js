@@ -56,32 +56,27 @@ function SetupOnResize(){
 //----------------------------------------------------------
 const g_tip_transition_time = 200;
 var g_tip_html_func = null;
-
-var g_tooltip = d3.select("#graph")
-  .append("div")
-    .attr('class', 'tool-tip')
-    .style("opacity", 0);
+var g_tip = null;
 
 function OnTipShow(data) {
-    g_tooltip
+    g_tip
       .transition(g_tip_transition_time)
         .style("opacity", 1);
 
     d3.select(this)
       .transition(g_tip_transition_time)
-        .style("stroke", "black")
         .style("opacity", 0.8);
 }
 
 function OnTipMove(data) {
-    g_tooltip
+    g_tip
         .html(g_tip_html_func(data))
         .style("left", (d3.event.pageX + 15) + "px")
         .style("top", (d3.event.pageY) + "px");
 }
 
 function OnTipHide(data) {
-    g_tooltip
+    g_tip
       .transition(g_tip_transition_time)
         .style("opacity", "0");
 
@@ -92,5 +87,10 @@ function OnTipHide(data) {
 }
 
 function SetupTip(tip_html_func) {
+    g_tip = d3.select("#graph")
+        .append("div")
+        .attr('class', 'tool-tip')
+        .style("opacity", 0);
+
     g_tip_html_func = tip_html_func;
 }
