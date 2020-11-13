@@ -34,7 +34,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     <!-- Markers (margin icon) -->
 
     <item field_id="DF9575F1-F170-43EC-97C7-54241902E009">TOMATO</item>
-    <item field_id="A44E341B-385F-481F-B478-93B65404D9EC">Left Rectangle</item>
+    <item field_id="A44E341B-385F-481F-B478-93B65404D9EC">Minus (-)</item>
     
     <item field_id="F3CEC7A7-D3F0-44BA-8D4B-3229EEF53D32">ORCHID</item>
     <item field_id="45B00DD6-4876-4A9E-BAF6-916BB35E69C2">Left Rectangle</item>
@@ -43,7 +43,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
     <item field_id="9AACBC89-0192-4BB8-84F9-F120FA2FE1ED">Left Rectangle</item>
     
     <item field_id="18F9A63D-AF17-4AA9-8045-26A8D90024EC">STEEL BLUE</item>
-    <item field_id="5A0E35C8-A509-460C-8D13-04B6EE1FA4AD">Small Rectangle</item>
+    <item field_id="5A0E35C8-A509-460C-8D13-04B6EE1FA4AD">Bookmark</item>
 
     <!-- Trackers (margin icon) -->
 
