@@ -367,9 +367,9 @@ projection = Project(
 
 
 
-## SummaryQuantifier ###########################################
+## BreakdownQuantifier #########################################
 
-def SummaryQuantifier(connection, cursor):
+def BreakdownQuantifier(connection, cursor):
     cursor.execute("DROP TABLE IF EXISTS main.projection")
     cursor.execute("""
         CREATE TABLE projection
@@ -401,9 +401,9 @@ def SummaryQuantifier(connection, cursor):
         """)
 
 
-metrics = projection.Quantify(
+breakdown = projection.Quantify(
     "Breakdown",
-    SummaryQuantifier,
+    BreakdownQuantifier,
     MakeDisplaySchema()
         .AddField("Summary", "Brief description of the event.", "text", 150, "left")
         .AddField("Count", "The number of events.", "int", 80, "left")
@@ -412,8 +412,8 @@ metrics = projection.Quantify(
 )
 
 
-metrics.Chart("By Count", True, Chart.Bar("Summary", "Count"))
-metrics.Chart("By Duration", True, Chart.Pie("Summary", "Duration (s)"))
+breakdown.Chart("By Count", True, Chart.Bar("Summary", "Count"))
+breakdown.Chart("By Duration", True, Chart.Pie("Summary", "Duration (s)"))
 
 
 
@@ -518,11 +518,12 @@ def HierarchyQuantifier(connection, cursor):
     """)
 
 
-metrics = projection.Quantify(
+hierarchy = projection.Quantify(
     "Hierarchy",
     HierarchyQuantifier,
     MakeDisplaySchema()
         .AddField("Summary", "Brief description of the event.", "text", 150, "left")
         .AddField("Duration (s)", "The total duration for the event.", "int", 100, "left")
 )
- 
+
+hierarchy.Chart("TreeMap", True, Chart.TreeMap("Summary", "Duration"))

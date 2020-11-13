@@ -99,7 +99,7 @@ class Bar:
         for row in cursor:
             event_id = row[2]
             selected = event_id in selection
-            data.append(dict(zip(["category", "value", "selected", "event_id"], [row[0], row[1], selected, event_id])))
+            data.append(dict(category = row[0], value = row[1], selected = selected, event_id = event_id))
 
         # chart transition time in msec
         switch_time = 1000
@@ -177,11 +177,11 @@ class Pie:
             else:
                 value = row[1]
                 accum += value
-                data.append(dict(zip(["category", "value", "selected", "event_id"], [row[0], value, selected, event_id])))
+                data.append(dict(category = row[0], value = value, selected = selected, event_id = event_id))
 
         other = sum - accum
         if other > 0:            
-            data.append(dict(zip(["category", "value", "selected", "event_id"], ["Other", other, other_selected, -1])))
+            data.append(dict(category = "Other", value = other, selected = selected, event_id = -1))
 
         # chart transition time in msec
         switch_time = 1000
@@ -377,3 +377,69 @@ class TangledTree(NetworkCore):
     #-----------------------------------------------------------
     def Realise(self, name, connection, cursor, context):
         self.CreateChart(connection, cursor, context)
+
+
+
+## TreeMap #####################################################
+
+class TreeMap:
+
+    #-----------------------------------------------------------
+    def __init__(self, path_field, value_field):
+        self._PathField = path_field
+        self._ValueField = value_field
+
+
+    #-----------------------------------------------------------
+    def DefineParameters(self, connection, cursor, context):
+        pass
+
+
+    #-----------------------------------------------------------
+    @classmethod
+    def Setup(cls, context):
+        context.LoadPage("TreeMap.html")
+
+
+    #-----------------------------------------------------------
+    def Realise(self, name, connection, cursor, context):
+        cursor.execute("""
+            SELECT
+                {path},
+                {value},
+                event_id
+            FROM
+                display
+            """.format(path = ReduceFieldName(self._PathField), value = ReduceFieldName(self._ValueField)))
+
+        selection = context.GetSelection()
+
+        root = dict(name = "Map", children = [], selected = False, event_id = 0)
+        hierarchy = dict()
+        hierarchy["R"] = root
+
+        for row in cursor:
+            path = row[0]
+            name = path.split("/")[-1]
+
+            event_id = row[2]
+            selected = event_id in selection
+
+            node = dict(name = name, children = [], value = row[1], selected = selected, event_id = event_id)
+
+            hierarchy["R/" + path] = node
+
+        for key_path in hierarchy.keys():
+            dirs = key_path.split("/")[0:-1]
+            if dirs:
+                parent_path = "/".join(dirs)
+                node = hierarchy[key_path]
+                hierarchy[parent_path]["children"].append(node)
+
+        # chart transition time in msec
+        switch_time = 1000
+        if len(selection) != 0:
+            switch_time = 250
+
+        data_json = json.dumps(root)
+        context.CallJavaScript("CreateChart", data_json, switch_time)
