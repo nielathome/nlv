@@ -21,14 +21,12 @@ html, body {
 }
 
 .full-height {
-    height: 99%;
+    height: 100%;
     overflow: hidden;
 }
 
 .tool-tip {
     position: absolute;
-    left: 0px;
-    top: 0px;
     padding: 8px;
     background: rgba(0, 0, 0, 0.8);
     color: bisque;
@@ -36,4 +34,5 @@ html, body {
     font-family: sans-serif;
     font-size: small;
     text-align: center;
+    pointer-events: none;
 }
