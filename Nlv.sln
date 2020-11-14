@@ -38,7 +38,6 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sphinx", "Sphinx", "{6CFDE1
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Models", "Models", "{9378850E-74FB-4FEE-A64D-1168094AF060}"
 	ProjectSection(SolutionItems) = preProject
-		Application\Model\Model-BarChart.html = Application\Model\Model-BarChart.html
 		Application\Model\Model-Network.html = Application\Model\Model-Network.html
 		Application\Model\Model-PieChart.html = Application\Model\Model-PieChart.html
 		Application\Model\Model-SunBurst.html = Application\Model\Model-SunBurst.html
