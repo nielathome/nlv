@@ -81,7 +81,6 @@ function OnTipHide(data) {
 
     d3.select(this)
       .transition(g_tip_transition_time)
-        .style("stroke", "none")
         .style("opacity", 1);
 }
 

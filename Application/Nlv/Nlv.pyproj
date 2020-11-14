@@ -59,12 +59,23 @@
   <ItemGroup>
     <Content Include="Web\Charts\Bar\Bar.css" />
     <Content Include="Web\Charts\Bar\Bar.html" />
-    <Content Include="Chart.css" />
-    <Content Include="Chart.js" />
+    <Content Include="Web\Charts\Chart.css" />
+    <Content Include="Web\Charts\Chart.js" />
+    <Content Include="Web\Charts\Network\Network.css" />
     <Content Include="Web\Charts\Network\Network.html" />
+    <Content Include="Web\Charts\Network\Network.js" />
+    <Content Include="Web\Charts\Pie\Pie.css" />
+    <Content Include="Web\Charts\Pie\Pie.js" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.css" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.js" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.js" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.css" />
     <Content Include="Web\Charts\_Models\M-Network.html" />
     <Content Include="Web\Charts\Pie\Pie.html" />
-    <Content Include="style.css" />
+    <Content Include="Web\Charts\_Models\M-SunBurst.js" />
+    <Content Include="Web\Charts\_Models\M-TangledTree.js" />
+    <Content Include="Web\Charts\_Models\M-TreeMap.js" />
+    <Content Include="Web\ExplorerStyle.css" />
     <Content Include="Web\Charts\TangledTree\TangledTree.html" />
     <Content Include="theme.event.default.xml" />
     <Content Include="theme.log.default.xml" />
