@@ -123,7 +123,7 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         cgi_list = path.split('?')
 
         if len(cgi_list) == 1 or self._Callback is None:
-            for dir in (install_dir, G_Global.TempDir):
+            for dir in (G_Global.TempDir, install_dir / "Web" / "Charts", install_dir / "Web" ):
                 candidate = dir / path
                 if candidate.exists():
                     return str(candidate)

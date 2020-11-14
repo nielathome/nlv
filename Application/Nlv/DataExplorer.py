@@ -126,7 +126,7 @@ class G_DataExplorerPageBuilder:
         self.AddHeaderText("""
             <!DOCTYPE html>
             <head>
-                <link rel="stylesheet" type="text/css" href="http:style.css">
+                <link rel="stylesheet" type="text/css" href="http:ExplorerStyle.css">
 
             <!-- Load d3.js -->
             <script src="polyfill.8.1.3.js"></script>
