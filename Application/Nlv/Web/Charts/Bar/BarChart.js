@@ -213,7 +213,7 @@ function DoCreateChart(switch_time) {
 
 SetupOnResize();
 SetupTip(function (data) {
-    return "<strong>" + data.category + ":</strong> <span style='color:white'>" + data.value + "</span>";
+    return "<strong>" + data.category + "</strong> <span style='color:white'>" + data.value + "</span>";
 });
 
 function CreateChart(title, x_label_text, y_label_text, data_json, switch_time) {
