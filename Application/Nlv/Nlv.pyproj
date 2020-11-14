@@ -57,7 +57,8 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Web\BarChart.html" />
+    <Content Include="Web\Charts\Bar\BarChart.css" />
+    <Content Include="Web\Charts\Bar\BarChart.html" />
     <Content Include="Chart.css" />
     <Content Include="Chart.js" />
     <Content Include="Network.html" />
@@ -68,7 +69,9 @@
     <Content Include="theme.log.default.xml" />
     <Content Include="theme.view.default.xml" />
     <Content Include="TreeMap.html" />
+    <Content Include="Web\Charts\Bar\BarChart.js" />
     <Content Include="Web\Charts\_Models\M-BarChart.html" />
+    <Content Include="Web\Charts\_Models\M-BarChart.js" />
     <Content Include="_defaults.xml" />
     <Content Include="theme.global.default.xml" />
     <Content Include="_field_names.xml" />

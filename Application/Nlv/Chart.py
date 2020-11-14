@@ -79,7 +79,7 @@ class Bar:
     #-----------------------------------------------------------
     @classmethod
     def Setup(cls, context):
-        context.LoadPage("BarChart.html")
+        context.LoadPage("/Web/Charts/Bar/BarChart.html")
 
 
     #-----------------------------------------------------------
@@ -435,6 +435,7 @@ class TreeMap:
                 parent_path = "/".join(dirs)
                 node = hierarchy[key_path]
                 hierarchy[parent_path]["children"].append(node)
+                hierarchy[parent_path]["value"] = 0
 
         # chart transition time in msec
         switch_time = 1000

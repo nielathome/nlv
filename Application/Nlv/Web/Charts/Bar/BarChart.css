@@ -15,25 +15,12 @@
  * along with this program. If not, see <https://www.gnu.org/licenses/>.
  */
 
-html, body {
-    height: 100%;
-    margin: 0;
-}
-
-.full-height {
-    height: 99%;
-    overflow: hidden;
-}
-
-.tool-tip {
-    position: absolute;
-    left: 0px;
-    top: 0px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.8);
-    color: bisque;
-    border-radius: 2px;
+.x-label {
     font-family: sans-serif;
-    font-size: x-small;
-    text-align: center;
+    text-anchor: end;
+}
+
+.y-label {
+    font-family: sans-serif;
+    text-anchor: end;
 }
