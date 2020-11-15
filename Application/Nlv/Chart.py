@@ -79,7 +79,7 @@ class Bar:
     #-----------------------------------------------------------
     @classmethod
     def Setup(cls, context):
-        context.LoadPage("BarChart.html")
+        context.LoadPage("/Charts/Bar/Bar.html")
 
 
     #-----------------------------------------------------------
@@ -131,7 +131,7 @@ class Pie:
     #-----------------------------------------------------------
     @classmethod
     def Setup(cls, context):
-        context.LoadPage("PieChart.html")
+        context.LoadPage("/Charts/Pie/Pie.html")
 
 
     #-----------------------------------------------------------
@@ -309,7 +309,7 @@ class Network(NetworkCore):
 
     #-----------------------------------------------------------
     def __init__(self, setup_script = None):
-        super().__init__("Network.html", setup_script)
+        super().__init__("/Charts/Network/Network.html", setup_script)
 
 
     #-----------------------------------------------------------
@@ -358,7 +358,7 @@ class TangledTree(NetworkCore):
 
     #-----------------------------------------------------------
     def __init__(self, entity_name_field, setup_script = None):
-        super().__init__("TangledTree.html", setup_script)
+        super().__init__("/Charts/TangledTree/TangledTree.html", setup_script)
         self._EntityNameField = entity_name_field
 
 
@@ -398,7 +398,7 @@ class TreeMap:
     #-----------------------------------------------------------
     @classmethod
     def Setup(cls, context):
-        context.LoadPage("TreeMap.html")
+        context.LoadPage("/Charts/TreeMap/TreeMap.html")
 
 
     #-----------------------------------------------------------
@@ -435,6 +435,7 @@ class TreeMap:
                 parent_path = "/".join(dirs)
                 node = hierarchy[key_path]
                 hierarchy[parent_path]["children"].append(node)
+                hierarchy[parent_path]["value"] = 0
 
         # chart transition time in msec
         switch_time = 1000

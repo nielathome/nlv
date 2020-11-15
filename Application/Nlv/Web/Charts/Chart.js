@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2017-2018 Niel Clausen. All rights reserved.
+// Copyright (C) 2019-2020 Niel Clausen. All rights reserved.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 //
-
 
 //----------------------------------------------------------
 var g_node_id = 0;
@@ -45,6 +44,7 @@ function CallPython(target_node_id, method, args_object) {
 
 //----------------------------------------------------------
 function OnResize() {
+    ResetTip();
     DoCreateChart(0);
 }
 
@@ -59,38 +59,85 @@ var g_tip_html_func = null;
 var g_tip = null;
 
 function OnTipShow(data) {
+    const ref_transition = d3.transition("tip-show")
+        .duration(g_tip_transition_time);
+
     g_tip
-      .transition(g_tip_transition_time)
+      .transition(ref_transition)
         .style("opacity", 1);
 
     d3.select(this)
-      .transition(g_tip_transition_time)
+      .transition(ref_transition)
         .style("opacity", 0.8);
 }
 
 function OnTipMove(data) {
     g_tip
-        .html(g_tip_html_func(data))
-        .style("left", (d3.event.pageX + 15) + "px")
-        .style("top", (d3.event.pageY) + "px");
+        .html(g_tip_html_func(data));
+
+    const window_pos = document.documentElement.getBoundingClientRect();
+    const item_pos = this.getBoundingClientRect();
+    const tip_pos = g_tip.node().getBoundingClientRect();
+
+    var tip_left = item_pos.left + (item_pos.width - tip_pos.width) / 2;
+    const tip_x_overflow = (tip_left + tip_pos.width) - window_pos.right;
+    if (tip_x_overflow > 0) {
+        tip_left -= tip_x_overflow;
+    }
+    else if (tip_left < 0) {
+        tip_left = 0;
+    }
+
+    var tip_top = item_pos.top + (item_pos.height - tip_pos.height) / 2;
+    const tip_y_overflow = (tip_top + tip_pos.height) - window_pos.bottom;
+    if (tip_y_overflow > 0) {
+        tip_top -= tip_y_overflow;
+    }
+    else if (tip_top < 0) {
+        tip_top = 0;
+    }
+
+    const ref_transition = d3.transition("tip-move")
+        .duration(g_tip_transition_time)
+        .ease(d3.easeLinear);
+
+    g_tip
+      .transition(ref_transition)
+        .style("left", tip_left + "px")
+        .style("top", tip_top + "px");
+
+    //b2 = g_tip.node()
+    //a = 5
 }
 
 function OnTipHide(data) {
+    const ref_transition = d3.transition("tip-show")
+        .duration(g_tip_transition_time);
+
     g_tip
-      .transition(g_tip_transition_time)
+      .transition(ref_transition)
         .style("opacity", "0");
 
     d3.select(this)
-      .transition(g_tip_transition_time)
-        .style("stroke", "none")
+      .transition(ref_transition)
         .style("opacity", 1);
+}
+
+function ResetTip() {
+    if (g_tip !== null) {
+        g_tip
+            .style("opacity", 0)
+            .style("left", "0px")
+            .style("top", "0px");
+    }
 }
 
 function SetupTip(tip_html_func) {
     g_tip = d3.select("#graph")
-        .append("div")
-        .attr('class', 'tool-tip')
-        .style("opacity", 0);
+      .append("div")
+        .attr('class', 'tool-tip');
+
+    ResetTip();
 
     g_tip_html_func = tip_html_func;
 }

@@ -1,0 +1,52 @@
+﻿<!--
+Copyright (C) Niel Clausen 2020. All rights reserved.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+-->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Network</title>
+    <script src="https://d3js.org/d3.v5.js"></script>
+</head>
+
+<body>
+    <div style="position: absolute;">
+        <button onclick="Update1()">Data 1</button>
+        <button onclick="Update2()">Data 2</button>
+    </div>
+
+    <link rel="stylesheet" href="../Chart.css">
+    <link rel="stylesheet" href="../Network/Network.css">
+
+    <div id="graph" class="full-height"></div>
+
+    <script src="../Chart.js"></script>
+    <script src="../Network/Network.js"></script>
+
+    <script>
+        //----------------------------------------------------------
+        function OnNodeClick(node_data) {
+            console.log("Node selected: " + node_data.event_id);
+        }
+
+        function OnLinkClick(link) {
+            console.log("Link selected: " + link.event_id);
+        }
+    </script>
+
+    <script src="M-Network.js"></script>
+</body>
+</html>

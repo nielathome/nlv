@@ -57,17 +57,40 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="BarChart.html" />
-    <Content Include="Chart.css" />
-    <Content Include="Chart.js" />
-    <Content Include="Network.html" />
-    <Content Include="PieChart.html" />
-    <Content Include="style.css" />
-    <Content Include="TangledTree.html" />
+    <Content Include="Web\Charts\Bar\Bar.css" />
+    <Content Include="Web\Charts\Bar\Bar.html" />
+    <Content Include="Web\Charts\Chart.css" />
+    <Content Include="Web\Charts\Chart.js" />
+    <Content Include="Web\Charts\Network\Network.css" />
+    <Content Include="Web\Charts\Network\Network.html" />
+    <Content Include="Web\Charts\Network\Network.js" />
+    <Content Include="Web\Charts\Pie\Pie.css" />
+    <Content Include="Web\Charts\Pie\Pie.js" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.css" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.js" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.js" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.css" />
+    <Content Include="Web\Charts\_Models\M-Network.html" />
+    <Content Include="Web\Charts\Pie\Pie.html" />
+    <Content Include="Web\Charts\_Models\M-SunBurst.js" />
+    <Content Include="Web\Charts\_Models\M-TangledTree.js" />
+    <Content Include="Web\Charts\_Models\M-TreeMap.js" />
+    <Content Include="Web\empty.json" />
+    <Content Include="Web\ExplorerStyle.css" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.html" />
     <Content Include="theme.event.default.xml" />
     <Content Include="theme.log.default.xml" />
     <Content Include="theme.view.default.xml" />
-    <Content Include="TreeMap.html" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.html" />
+    <Content Include="Web\Charts\Bar\Bar.js" />
+    <Content Include="Web\Charts\_Models\M-Bar.html" />
+    <Content Include="Web\Charts\_Models\M-Bar.js" />
+    <Content Include="Web\Charts\_Models\M-Network.js" />
+    <Content Include="Web\Charts\_Models\M-Pie.html" />
+    <Content Include="Web\Charts\_Models\M-Pie.js" />
+    <Content Include="Web\Charts\_Models\M-SunBurst.html" />
+    <Content Include="Web\Charts\_Models\M-TangledTree.html" />
+    <Content Include="Web\Charts\_Models\M-TreeMap.html" />
     <Content Include="_defaults.xml" />
     <Content Include="theme.global.default.xml" />
     <Content Include="_field_names.xml" />
@@ -91,6 +114,17 @@
       </PathEnvironmentVariable>
       <Architecture>Amd64</Architecture>
     </Interpreter>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Web\" />
+    <Folder Include="Web\Charts\" />
+    <Folder Include="Web\Charts\Bar\" />
+    <Folder Include="Web\Charts\Network\" />
+    <Folder Include="Web\Charts\TreeMap\" />
+    <Folder Include="Web\Charts\SunBurst\" />
+    <Folder Include="Web\Charts\TangledTree\" />
+    <Folder Include="Web\Charts\Pie\" />
+    <Folder Include="Web\Charts\_Models\" />
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

@@ -184,6 +184,7 @@ instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
 stagedir="$wrkdir/Stage"
 testdir="$wrkdir/Test"
+rm -rf "$stagedir"
 mkdir -p "$blddir" "$pkgdir" "$instdir" "$logdir" "$stagedir" "$testdir"
 
 # initialise installer directory
