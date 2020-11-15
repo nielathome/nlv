@@ -62,6 +62,9 @@ pip install --upgrade --find-links=. %TARGET%
 for %%f in (plugin-*.bat) do (
   call %%~nf
 )
+
+rem Temporary (~Q1'21)- until MS fix this: https://tinyurl.com/y3dm3h86
+pip install numpy==1.19.3
  
 rem Shell integration
 nlvc -i

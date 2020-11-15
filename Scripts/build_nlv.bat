@@ -48,8 +48,8 @@ echo ==== NLV
 set PYBLD=%BLDDIR%\Python\
 set PYNLV=%PYBLD%\Nlv
 
-rem Setup staging area for build; contains NLV *and* built documentation
-xcopy /q /y %ROOT_DIR%\Application\Nlv\*.* %STAGEDIR%\Nlv >NUL
+rem Setup staging area for build; now contains NLV *and* built documentation
+xcopy /q /y /s %ROOT_DIR%\Application\Nlv\*.* %STAGEDIR%\Nlv >NUL
 cd %STAGEDIR%
 
 rem Build the distributable wheel
@@ -59,7 +59,7 @@ python nlv-setup.py %PIP_ARGS% ^
   bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
 
 rem Copy the program icon(s) to the install directory
-xcopy /q /y Nlv\*.ico %INSTDIR% >NUL
+xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL
 
 
 

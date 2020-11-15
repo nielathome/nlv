@@ -139,17 +139,20 @@ if __name__ == '__main__':
 
         package_data={
             "Nlv": [
-                '*.xml',
-                '*.ico',
-                '*.html',
-                '*.js',
-                '*.css',
-                '*.json',
-                 "Sphinx/doctrees/*",
-                 "Sphinx/html/[!_]*",
-                 "Sphinx/html/_sources/*",
-                 "Sphinx/html/_static/*",
-                 "Sphinx/html/_images/*"
+                "*.xml",
+                "Sphinx/doctrees/*",
+                "Sphinx/html/[!_]*",
+                "Sphinx/html/_sources/*",
+                "Sphinx/html/_static/*",
+                "Sphinx/html/_images/*",
+                "Ico/*.ico",
+                "Web/*",
+                "Web/Charts/*",
+                "Web/Charts/Bar/*",
+                "Web/Charts/Network/*",
+                "Web/Charts/Pie/*",
+                "Web/Charts/TangledTree/*",
+                "Web/Charts/TreeMap/*"                 
              ]
         },
 

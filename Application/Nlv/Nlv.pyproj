@@ -75,6 +75,7 @@
     <Content Include="Web\Charts\_Models\M-SunBurst.js" />
     <Content Include="Web\Charts\_Models\M-TangledTree.js" />
     <Content Include="Web\Charts\_Models\M-TreeMap.js" />
+    <Content Include="Web\empty.json" />
     <Content Include="Web\ExplorerStyle.css" />
     <Content Include="Web\Charts\TangledTree\TangledTree.html" />
     <Content Include="theme.event.default.xml" />

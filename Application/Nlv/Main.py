@@ -118,12 +118,14 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
     #-------------------------------------------------------
     def translate_path(self, path):
-        install_dir = G_Global.GetInstallDir()
+        web_dir = G_Global.GetInstallDir() / "Web"
+        chart_dir = web_dir / "Charts"
+
         path = path.lstrip("/")
         cgi_list = path.split('?')
 
         if len(cgi_list) == 1 or self._Callback is None:
-            for dir in (G_Global.TempDir, install_dir / "Web" / "Charts", install_dir / "Web" ):
+            for dir in (G_Global.TempDir, chart_dir, web_dir ):
                 candidate = dir / path
                 if candidate.exists():
                     return str(candidate)
@@ -134,7 +136,7 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
             args_json = base64.standard_b64decode(args_encoded_text)
             args = json.loads(args_json)
             self._Callback(int(node_id), method, args)
-            return install_dir / "empty.json"
+            return web_dir / "empty.json"
 
         # error, not found
         return ""
