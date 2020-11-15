@@ -105,9 +105,6 @@ function OnTipMove(data) {
       .transition(ref_transition)
         .style("left", tip_left + "px")
         .style("top", tip_top + "px");
-
-    //b2 = g_tip.node()
-    //a = 5
 }
 
 function OnTipHide(data) {

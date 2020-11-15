@@ -23,7 +23,6 @@
 }
 
 .leaf {
-    fill-opacity: 0.6;
     stroke-width: 0.5;
-    stroke: grey;
+    stroke: white;
 }
