@@ -156,13 +156,16 @@ function DoCreateChart(switch_time) {
         .attr("x", plot_right)
         .attr("y", plot_bottom + x_axis_height + gap + x_label_height);
 
-    g_chart.selectAll(".column")
+    g_chart
+      .selectAll(".column")
       .data(g_data, function (d) {
           return d.category;
       })
       .join(
         function (enter) {
-            return enter.append("rect")
+            return enter
+              .append("rect")
+                .attr("class", "column")
                 .style("opacity", 0)
                 .attr("x", function (d) {
                     return x_scale(d.category);
@@ -176,7 +179,8 @@ function DoCreateChart(switch_time) {
         function (exit) {
             return exit
                .call(function (exit) {
-                   exit.transition(ref_transition)
+                   exit
+                     .transition(ref_transition)
                        .style("opacity", 0)
                        .attr("y", 2 * plot_bottom)
                        .on('end', function () {
@@ -189,7 +193,6 @@ function DoCreateChart(switch_time) {
         .on("mouseover", OnTipShow)
         .on("mousemove", OnTipMove)
         .on("mouseleave", OnTipHide)
-        .attr("class", "column")
         .attr("transform", "translate(" + plot_left + ", " + margin + ")")
       .transition(ref_transition)
         .style("opacity", 1)

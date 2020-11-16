@@ -244,9 +244,9 @@ function DoCreateChart(data) {
             function (enter) {
                 return enter
                   .append("g")
+                    .attr("class", "bundle-group")
                     .call(g_config.EnterBundle)
             })
-        .attr("class", "bundle-group")
         .call(g_config.UpdateBundle)
         .call(g_config.StyleBundle);
 
@@ -256,10 +256,10 @@ function DoCreateChart(data) {
             function (enter) {
                 return enter
                   .append("g")
+                    .attr("class", "node-group")
                     .call(g_config.EnterNode)
             }
         )
-        .attr("class", "node-group")
         .call(g_config.UpdateNode)
         .call(g_config.StyleNode)
         .on("click", OnNodeClick);

@@ -322,30 +322,32 @@ function DoCreateChart(data) {
             })
         );
 
-    g_joined_links = g_links_group.selectAll(".link-group")
+    g_joined_links = g_links_group
+      .selectAll(".link-group")
       .data(data.links)
       .join(
         function (enter) {
             return enter
               .append("g")
+                .attr("class", "link-group")
                 .call(g_config.EnterLink)
         }
       )
-        .attr("class", "link-group")
         .call(g_config.UpdateLink)
         .call(g_config.StyleLink)
         .on("click", OnLinkClick);
 
-    g_joined_nodes = g_nodes_group.selectAll(".node-group")
+    g_joined_nodes = g_nodes_group
+      .selectAll(".node-group")
       .data(data.nodes)
       .join(
         function (enter) {
             return enter
               .append("g")
+                .attr("class", "node-group")
                 .call(g_config.EnterNode)
         }
       )
-        .attr("class", "node-group")
         .call(g_config.UpdateNode)
         .call(g_config.StyleNode)
         .on("click", OnNodeClick)

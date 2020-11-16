@@ -86,7 +86,9 @@ function DoCreateChart(switch_time) {
       })
       .join(
         function (enter) {
-            return enter.append("path")
+            return enter
+              .append("path")
+                .attr("class", "slice")
                 .style("opacity", 0);
         },
         function (update) {
@@ -95,7 +97,8 @@ function DoCreateChart(switch_time) {
         function (exit) {
             return exit
                 .call(function (exit) {
-                   exit.transition(ref_transition)
+                    exit
+                      .transition(ref_transition)
                        .style("opacity", 0)
                        .on('end', function () {
                            d3.select(this).remove();
@@ -107,7 +110,6 @@ function DoCreateChart(switch_time) {
         .on("mouseover", OnTipShow)
         .on("mousemove", OnTipMove)
         .on("mouseleave", OnTipHide)
-        .attr("class", "slice")
       .transition(ref_transition)
         .style("opacity", 1)
         .attr('d', slice_generator)
@@ -127,7 +129,9 @@ function DoCreateChart(switch_time) {
       })
       .join(
         function (enter) {
-            return enter.append("polyline")
+            return enter
+              .append("polyline")
+                .attr("class", "line")
                 .style("opacity", 0);
         },
         function (update) {
@@ -136,7 +140,8 @@ function DoCreateChart(switch_time) {
         function (exit) {
             return exit
                 .call(function (exit) {
-                   exit.transition(ref_transition)
+                    exit
+                      .transition(ref_transition)
                        .style("opacity", 0)
                        .on('end', function () {
                            d3.select(this).remove();
@@ -144,7 +149,6 @@ function DoCreateChart(switch_time) {
                })
         }
       )
-        .attr("class", "line")
       .transition(ref_transition)
         .style("opacity", 1)
         .attr('points', function (d) {
@@ -165,7 +169,9 @@ function DoCreateChart(switch_time) {
       })
       .join(
         function (enter) {
-            return enter.append("text")
+            return enter
+              .append("text")
+                .attr("class", "label")
                 .style("opacity", 0);
         },
         function (update) {
@@ -174,7 +180,8 @@ function DoCreateChart(switch_time) {
         function (exit) {
             return exit
                .call(function (exit) {
-                   return exit.transition(ref_transition)
+                   return exit
+                     .transition(ref_transition)
                        .style("opacity", 0)
                        .on('end', function () {
                            d3.select(this).remove();
@@ -182,7 +189,6 @@ function DoCreateChart(switch_time) {
                })
         }
       )
-        .attr("class", "label")
         .text(function (d) {
             return d.data.category;
         })
