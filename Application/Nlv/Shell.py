@@ -62,7 +62,7 @@ class G_AppData:
     @classmethod
     def GetIconPathFor(cls, idx):
         filename = cls.VersionData[cls.PublicVersion][idx + 1]
-        return cls.GetPackageDir() / filename
+        return cls.GetPackageDir() / "Ico" / filename
 
 
     @classmethod

@@ -87,7 +87,7 @@ echo . >> %MYTHTV_EGG_LINK%
 echo.
 echo ==== Copy Boost/TBB DLLs to debug environment
 set NLOG_DIR=%BLDDIR%\NlogDll\Bin
-xcopy /q /y %BOOST%\stage\x64\lib\*.dll %NLOG_DIR% >NUL 
+xcopy /q /y /i %BOOST%\stage\x64\lib\*.dll %NLOG_DIR% >NUL 
 xcopy /q /y %TBB%\build\vs2013\x64\Debug\*.dll %NLOG_DIR% >NUL 
 xcopy /q /y %TBB%\build\vs2013\x64\Release\*.dll %NLOG_DIR% >NUL 
 
