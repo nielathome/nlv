@@ -1694,7 +1694,7 @@ class G_CoreViewCtrl(wx.SplitterWindow, G_DisplayControl):
         if pane_sizer.IsEmpty():
             for chart_info in chart_list:
                 chart_view_ctrl = self.MakeHtmlChartCtrl(pane, context, chart_info)
-                pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
+                pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND)
 
             pane_sizer.ShowItems(False)
 
