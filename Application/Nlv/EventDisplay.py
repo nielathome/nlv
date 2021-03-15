@@ -1305,9 +1305,10 @@ class G_HtmlHostCtrl(wx.Panel):
 
         self.InitCharting()
 
-        self._Figure = wx.html2.WebView.New(self)
+        self._Figure = wx.html2.WebView.New(self, backend = wx.html2.WebViewBackendIE)
         self._Figure.EnableHistory(False)
         self._Figure.EnableContextMenu(False)
+        self._FigureLoaded = False
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
         self.SetupHtml()
