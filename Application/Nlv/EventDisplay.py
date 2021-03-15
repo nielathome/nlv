@@ -1342,6 +1342,7 @@ class G_HtmlHostCtrl(wx.Panel):
     #-------------------------------------------------------
     def OnPageLoaded(self, event):
         if not "about:" in event.URL:
+            self._FigureLoaded = True
             self.RunDomUpdateQueue()
 
 
@@ -1424,6 +1425,9 @@ class G_HtmlHostCtrl(wx.Panel):
             return
 
         self.RegisterConsole(doc)
+
+        if not self._FigureLoaded:
+            return
 
         for dom_update in self._DomUpdateQueue:
             dom_update.Update(doc)
