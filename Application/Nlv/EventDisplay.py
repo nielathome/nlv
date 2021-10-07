@@ -1313,10 +1313,15 @@ class G_HtmlHostCtrl(wx.Panel):
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
         self.SetupHtml()
 
+        self._Message = wx.StaticText(self)
+
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
         vsizer.Add(self._Figure, proportion = 1, flag = wx.EXPAND)
+        vsizer.Add(self._Message, proportion = 1, flag = wx.EXPAND)
+
         self.SetSizer(vsizer)
+        self.ShowMessage()
 
 
     def SetupHtml(self):
@@ -1337,6 +1342,20 @@ class G_HtmlHostCtrl(wx.Panel):
                 self._Host.CallJavaScript(method, *args)
 
         self._ChartInfo.Builder.Setup(Context(self))
+
+
+    #-------------------------------------------------------
+    def ShowMessage(self, message = "No data available"):
+        sizer = self.GetSizer()
+        if message is not None:
+            self._Message.SetLabel(message)
+            sizer_item = sizer.GetItem(self._Message)
+        else:
+            sizer_item = sizer.GetItem(self._Figure)
+
+        sizer.ShowItems(False)
+        sizer_item.Show(True)
+        sizer.Layout()
 
 
     #-------------------------------------------------------
@@ -1525,7 +1544,8 @@ class G_HtmlHostCtrl(wx.Panel):
             with G_ScriptGuard("Realise", error_reporter), db_info.ConnectionManager() as connection:
                 cursor = self.MakeDbCursor(connection)
                 context = Context(self, data_changed, selection_changed, changed_parameter_name)
-                self._ChartInfo.Realise(connection, cursor, context)
+                message = self._ChartInfo.Realise(connection, cursor, context)
+                self.ShowMessage(message)
 
 
             

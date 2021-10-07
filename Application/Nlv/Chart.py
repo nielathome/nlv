@@ -206,9 +206,10 @@ def _EscapeJsonField(field):
 class NetworkCore:
 
     #-----------------------------------------------------------
-    def __init__(self, html_page, setup_script = None):
+    def __init__(self, html_page, setup_script = None, max_size = None):
         self.HtmlPage = html_page
         self._SetupScript = setup_script
+        self._MaxSize = max_size
 
 
     #-----------------------------------------------------------
@@ -282,6 +283,8 @@ class NetworkCore:
             """)
 
         nodes = [dict(zip(node_fields, [_EscapeJsonField(field) for field in row])) for row in cursor]
+        if self._MaxSize is not None and len(nodes) > self._MaxSize:
+            return "Network chart not available - too many nodes found"
 
         link_fields = SqlColumnNames(cursor, "display", "links")
         cursor.execute("""
@@ -295,6 +298,8 @@ class NetworkCore:
             """)
 
         links = [dict(zip(link_fields, [_EscapeJsonField(field) for field in row])) for row in cursor]
+        if self._MaxSize is not None and len(links) > self._MaxSize:
+            return "Network chart not available - too many links found"
 
         data_json = self.NetworkToJson(nodes, links)
         context.CallJavaScript("CreateChart", data_json, self.MakeOptions(context))
@@ -308,8 +313,8 @@ class NetworkCore:
 class Network(NetworkCore):
 
     #-----------------------------------------------------------
-    def __init__(self, setup_script = None):
-        super().__init__("/Charts/Network/Network.html", setup_script)
+    def __init__(self, setup_script = None, max_size = 500):
+        super().__init__("/Charts/Network/Network.html", setup_script, max_size)
 
 
     #-----------------------------------------------------------
@@ -336,6 +341,7 @@ class Network(NetworkCore):
     def Realise(self, name, connection, cursor, context):
         structural_param_change = False
         display_param_change = False
+        ret = None
 
         changed_parameter = context.ChangedParameterName()
         if changed_parameter is not None:
@@ -345,10 +351,12 @@ class Network(NetworkCore):
                 display_param_change = True
 
         if context.DataChanged() or structural_param_change:
-            self.CreateChart(connection, cursor, context)
+            ret = self.CreateChart(connection, cursor, context)
 
         elif context.SelectionChanged() or display_param_change:
             self.SetSelection(connection, cursor, context)
+
+        return ret
 
 
 
@@ -357,8 +365,8 @@ class Network(NetworkCore):
 class TangledTree(NetworkCore):
 
     #-----------------------------------------------------------
-    def __init__(self, entity_name_field, setup_script = None):
-        super().__init__("/Charts/TangledTree/TangledTree.html", setup_script)
+    def __init__(self, entity_name_field, setup_script = None, max_size = 1500):
+        super().__init__("/Charts/TangledTree/TangledTree.html", setup_script, max_size)
         self._EntityNameField = entity_name_field
 
 
@@ -376,7 +384,7 @@ class TangledTree(NetworkCore):
 
     #-----------------------------------------------------------
     def Realise(self, name, connection, cursor, context):
-        self.CreateChart(connection, cursor, context)
+        return self.CreateChart(connection, cursor, context)
 
 
 
