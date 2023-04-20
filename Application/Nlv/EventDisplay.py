@@ -1305,17 +1305,23 @@ class G_HtmlHostCtrl(wx.Panel):
 
         self.InitCharting()
 
-        self._Figure = wx.html2.WebView.New(self)
+        self._Figure = wx.html2.WebView.New(self, backend = wx.html2.WebViewBackendIE)
         self._Figure.EnableHistory(False)
         self._Figure.EnableContextMenu(False)
+        self._FigureLoaded = False
 
         self.Bind(wx.html2.EVT_WEBVIEW_LOADED, self.OnPageLoaded)
         self.SetupHtml()
 
+        self._Message = wx.StaticText(self)
+
         # layout
         vsizer = wx.BoxSizer(wx.VERTICAL)
         vsizer.Add(self._Figure, proportion = 1, flag = wx.EXPAND)
+        vsizer.Add(self._Message, proportion = 1, flag = wx.EXPAND)
+
         self.SetSizer(vsizer)
+        self.ShowMessage()
 
 
     def SetupHtml(self):
@@ -1339,8 +1345,23 @@ class G_HtmlHostCtrl(wx.Panel):
 
 
     #-------------------------------------------------------
+    def ShowMessage(self, message = "No data available"):
+        sizer = self.GetSizer()
+        if message is not None:
+            self._Message.SetLabel(message)
+            sizer_item = sizer.GetItem(self._Message)
+        else:
+            sizer_item = sizer.GetItem(self._Figure)
+
+        sizer.ShowItems(False)
+        sizer_item.Show(True)
+        sizer.Layout()
+
+
+    #-------------------------------------------------------
     def OnPageLoaded(self, event):
         if not "about:" in event.URL:
+            self._FigureLoaded = True
             self.RunDomUpdateQueue()
 
 
@@ -1423,6 +1444,9 @@ class G_HtmlHostCtrl(wx.Panel):
             return
 
         self.RegisterConsole(doc)
+
+        if not self._FigureLoaded:
+            return
 
         for dom_update in self._DomUpdateQueue:
             dom_update.Update(doc)
@@ -1520,7 +1544,8 @@ class G_HtmlHostCtrl(wx.Panel):
             with G_ScriptGuard("Realise", error_reporter), db_info.ConnectionManager() as connection:
                 cursor = self.MakeDbCursor(connection)
                 context = Context(self, data_changed, selection_changed, changed_parameter_name)
-                self._ChartInfo.Realise(connection, cursor, context)
+                message = self._ChartInfo.Realise(connection, cursor, context)
+                self.ShowMessage(message)
 
 
             
@@ -1694,7 +1719,7 @@ class G_CoreViewCtrl(wx.SplitterWindow, G_DisplayControl):
         if pane_sizer.IsEmpty():
             for chart_info in chart_list:
                 chart_view_ctrl = self.MakeHtmlChartCtrl(pane, context, chart_info)
-                pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND | wx.ALIGN_CENTER | wx.ALIGN_CENTER_VERTICAL)
+                pane_sizer.Add(chart_view_ctrl, proportion = 1, flag = wx.EXPAND)
 
             pane_sizer.ShowItems(False)
 

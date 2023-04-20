@@ -885,7 +885,7 @@ class G_NetworkChartInfo:
         self.Builder.DefineParameters(connection, cursor, context)
 
     def Realise(self, connection, cursor, context):
-        self.Builder.Realise(self.Name, connection, cursor, context)
+        return self.Builder.Realise(self.Name, connection, cursor, context)
 
 
 

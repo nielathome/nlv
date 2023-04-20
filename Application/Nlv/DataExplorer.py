@@ -267,7 +267,7 @@ class G_DataExplorer:
         parent = frame.GetDataExplorerPanel()
 
         # create web control
-        self._WebView = wx.html2.WebView.New(parent)
+        self._WebView = wx.html2.WebView.New(parent, backend = wx.html2.WebViewBackendIE)
         self._WebView.EnableHistory(True)
         self._WebView.EnableContextMenu(False)
 

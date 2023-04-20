@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2021. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -21,9 +21,13 @@ call _Work\env.bat
 echo.
 echo ==== BOOST Release %BOOST%
 
+rem ensure the "right" Python is the first on PATH; there may be a better way
+rem to get Boost to find it ...
+PATH=%PYTHON_DIR%;%PATH%
+
 cd %BOOST%
 if not exist b2.exe (
-  call bootstrap.bat vc14
+  call bootstrap.bat vc14 --with-python=%PYTHON%
 )
 
 set OPT=%B2_ARGS% -j 4 --toolset=msvc-14.0 --stagedir=./stage/x64 address-model=64 --build-dir=bld threading=multi runtime-link=shared --with-python

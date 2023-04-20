@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) Niel Clausen 2018-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2021. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -182,6 +182,7 @@ blddir="$wrkdir/Bld"
 pkgdir="$prjdir/Deps/Packages"
 instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
+logpfx=`date +%d-%b-%Y-%H-%M-%S`
 stagedir="$wrkdir/Stage"
 testdir="$wrkdir/Test"
 rm -rf "$stagedir"
@@ -321,6 +322,7 @@ if [ "$?" == 0 ]; then
 
   echo "SET PYVER=$pyver" >> $envbat
   addenvpath PYTHON "$python"
+  addenvpath PYTHON_DIR "$python_dir"
   addpropspath PYTHON "$python_dir"
 else
   fail "Unable to locate Python $pyver" "$loc"
@@ -388,8 +390,8 @@ boost_file="${boost_name}.tar.bz2"
 boost_url="https://dl.bintray.com/boostorg/release/1.${boost_ver}.0/source/${boost_file}"
 boost_path="$pkgdir/${boost_file}"
 boost_dir="$pkgdir/${boost_name}"
-boost_build="${logdir}/${boost_name}.build.log"
-boost_clean="${logdir}/${boost_name}.clean.log"
+boost_build="${logdir}/${logpfx}.${boost_name}.build.log"
+boost_clean="${logdir}/${logpfx}.${boost_name}.clean.log"
 
 if [ ! -d "$boost_dir" ]; then
 
@@ -423,8 +425,8 @@ tbb_file="${tbb_name}.tar.gz"
 tbb_url="https://github.com/intel/tbb/archive/${tbb_file}"
 tbb_path="$pkgdir/${tbb_file}"
 tbb_dir="$pkgdir/tbb-${tbb_name}"
-tbb_build="${logdir}/${tbb_name}.build.log"
-tbb_clean="${logdir}/${tbb_name}.clean.log"
+tbb_build="${logdir}/${logpfx}.${tbb_name}.build.log"
+tbb_clean="${logdir}/${logpfx}.${tbb_name}.clean.log"
 
 if [ ! -d "$tbb_dir" ]; then
 
@@ -495,11 +497,11 @@ if [ -z "$cfg_skip_phoenix" ]; then
 
   if [ -n "$cfg_clean" ]; then
     msg_header "Cleaning Phoenix"
-    runbat Scripts/clean_phoenix.bat 2>&1 | tee "${logdir}/phoenix.clean.log"
+    runbat Scripts/clean_phoenix.bat 2>&1 | tee "${logdir}/${logpfx}.phoenix.clean.log"
   
   else
     msg_header "Building Phoenix"
-    time runbat Scripts/build_phoenix.bat 2>&1 | tee "${logdir}/phoenix.build.log"
+    time runbat Scripts/build_phoenix.bat 2>&1 | tee "${logdir}/${logpfx}.phoenix.build.log"
   fi
 
 fi
@@ -531,11 +533,11 @@ fi
 
 if [ -z "$cfg_clean" ]; then
   msg_header "Building NLV Release"
-  time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/nlv.build.log"
+  time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/${logpfx}.nlv.build.log"
 fi
 
-vsnlv_build="${logdir}/vsnlv.build.log"
-vsnlv_clean="${logdir}/vsnlv.clean.log"
+vsnlv_build="${logdir}/${logpfx}.vsnlv.build.log"
+vsnlv_clean="${logdir}/${logpfx}.vsnlv.clean.log"
 
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning vsNLV"
@@ -554,7 +556,7 @@ fi
 
 if [ -z "$cfg_clean" ]; then
   msg_header "Setup VisualStudio debug environment"
-  runbat Scripts/dbg_setup.bat 2>&1 | tee "${logdir}/debug_setup.log"
+  runbat Scripts/dbg_setup.bat 2>&1 | tee "${logdir}/${logpfx}.debug_setup.log"
 fi
 
 
@@ -577,15 +579,17 @@ fi
 # Build any co-resident plugins
 ###############################################################################
 
-
-for plugin in ../*/build-nlv.bat; do
-  dir_name=`dirname ${plugin}`
-  plugin_name=`basename ${dir_name}`
-  msg_header "Build plugin: ${plugin_name}"  
-  pushd $dir_name > /dev/null
-  runbat build-nlv.bat 2>&1 | tee "${logdir}/Plugin-${plugin_name}.log"
-  popd > /dev/null
-done
+plugins=`ls -1 ../*/build-nlv.bat 2>/dev/null`
+if [ -n "$plugins" ]; then
+  for plugin in ../*/build-nlv.bat; do
+    dir_name=`dirname ${plugin}`
+    plugin_name=`basename ${dir_name}`
+    msg_header "Build plugin: ${plugin_name}"  
+    pushd "$dir_name" > /dev/null
+    runbat build-nlv.bat 2>&1 | tee "${logdir}/${logpfx}.Plugin-${plugin_name}.log"
+    popd > /dev/null
+  done
+fi
 
 
 
@@ -596,7 +600,7 @@ done
 if [ -n "$cfg_install" ]; then
   msg_header "Install NLV ${ver}"  
   pushd $instdir > /dev/null
-  runbat install.bat $cfg_demo_install 2>&1 | tee "${logdir}/install.log"
+  runbat install.bat $cfg_demo_install 2>&1 | tee "${logdir}/${logpfx}.install.log"
   popd > /dev/null
 fi
 
