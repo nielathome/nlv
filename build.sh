@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Copyright (C) Niel Clausen 2018-2021. All rights reserved.
+# Copyright (C) Niel Clausen 2018-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -125,7 +125,7 @@ fi
 function addenvpath()
 {
   name=$1
-  winpath=`cygpath -a -w "$2"`
+  winpath=$(cygpath -a -w "$2")
   echo "SET $name=$winpath" >> $envbat
 }
 
@@ -133,7 +133,7 @@ function addenvpath()
 function addpropspath()
 {
   name=$1
-  winpath=`cygpath -a -w "$2"`
+  winpath=$(cygpath -a -w "$2")
   echo "    <$name>$winpath</$name>" >> $envprops
 }
 
@@ -141,7 +141,7 @@ function addpropspath()
 function addenvpropspath()
 {
   name=$1
-  winpath=`cygpath -a -w "$2"`
+  winpath=$(cygpath -a -w "$2")
   echo "SET $name=$winpath" >> $envbat
   echo "    <$name>$winpath</$name>" >> $envprops
 }
@@ -150,12 +150,12 @@ function msg_header()
 {
   echo
   echo "==============================================================================="
-  echo "==== [`date +%H:%M:%S`] $1"
+  echo "==== [$(date +%H:%M:%S)] $1"
 }
 
 function msg_line()
 {
-  echo "==== [`date +%H:%M:%S`] $1"
+  echo "==== [$(date +%H:%M:%S)] $1"
 }
 
 msg_header "Initialising NLV Build Directory"
@@ -163,26 +163,26 @@ msg_header "Initialising NLV Build Directory"
 # figure out a PEP440 compliant version number
 if [ -n "$cfg_release" ]; then
   echo -n "0" > bld.txt
-  tmp=`cat ver.txt`
+  tmp=$(cat ver.txt)
   echo -n $(($tmp + 1)) > ver.txt
 else
-  tmp=`cat bld.txt`
+  tmp=$(cat bld.txt)
   echo -n $(($tmp + 1)) > bld.txt
 fi
-ver="`cat ver.txt`.`cat bld.txt`"
+ver="$(cat ver.txt).$(cat bld.txt)"
 
 
 # make the application version available to the Python code
 sed -e "s/__DEV__/$ver/" < Application/Template/tpl-Version.py > Application/Nlv/Version.py
 
 # directory structure
-prjdir=`pwd`
+prjdir=$(pwd)
 wrkdir="$prjdir/_Work"
 blddir="$wrkdir/Bld"
 pkgdir="$prjdir/Deps/Packages"
 instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
-logpfx=`date +%d-%b-%Y-%H-%M-%S`
+logpfx=$(date +%d-%b-%Y-%H-%M-%S)
 stagedir="$wrkdir/Stage"
 testdir="$wrkdir/Test"
 rm -rf "$stagedir"
@@ -215,7 +215,7 @@ if [ -n "$https_proxy" ]; then
 fi
 
 if [ -n "$REQUESTS_CA_BUNDLE" ]; then
-  echo "set REQUESTS_CA_BUNDLE=`cygpath -w "$REQUESTS_CA_BUNDLE"`" >> $envbat
+  echo "set REQUESTS_CA_BUNDLE=$(cygpath -w "$REQUESTS_CA_BUNDLE")" >> $envbat
 fi
 
 # initialise VisualStudio environment
@@ -262,7 +262,7 @@ function getfile()
 {
   url=$1
   dest=$2
-  file=`basename $dest`  
+  file=$(basename $dest)  
 
   if [ ! -f "$dest" ]; then
   
@@ -288,7 +288,7 @@ function getfile()
 function runbat()
 {
   path=$1
-  `cygpath -u $COMSPEC` /C `cygpath -w $path` $2 $3 $4
+  $(cygpath -u $COMSPEC) /C $(cygpath -w $path) $2 $3 $4
 
   cd $prjdir
 }
@@ -306,7 +306,7 @@ nuget=$wrkdir/$nuget_file
 getfile $nuget_url $nuget   
 chmod +x $nuget           
 
-echo "SET NUGET=`cygpath -w $nuget`" >> $envbat
+echo "SET NUGET=$(cygpath -w $nuget)" >> $envbat
 
 
 
@@ -315,10 +315,10 @@ echo "SET NUGET=`cygpath -w $nuget`" >> $envbat
 ###############################################################################
 
 pyver=37
-loc=`which -a python | fgrep $pyver`
-python=`findf "$loc"`
+loc=$(which -a python | fgrep $pyver)
+python=$(findf "$loc")
 if [ "$?" == 0 ]; then
-  python_dir=`dirname "$python"`
+  python_dir=$(dirname "$python")
 
   echo "SET PYVER=$pyver" >> $envbat
   addenvpath PYTHON "$python"
@@ -349,7 +349,7 @@ fi
 
 
 ###############################################################################
-# Python Virtual Environments
+# Python Virtual Environments (build)
 ###############################################################################
 
 pyenvbld="$wrkdir/PyEnv/Bld"
@@ -358,23 +358,16 @@ addenvpath PYENVBLD "$pyenvbld"
 pyenvdbg="$wrkdir/PyEnv/Dbg"
 addenvpath PYENVDBG "$pyenvdbg"
 
-if [ -n "$cfg_clean_pyenv" ]; then
-
-  msg_line "Remove Python virtual environments"
-  rm -rf "$pyenvbld"
-  rm -rf "$pyenvdbg"
-    
-else
-
+if [ -z "$cfg_clean_pyenv" ]; then
   if [ ! -d "$pyenvbld" ]; then
   
     msg_line "Creating Python virtual environment directory for build"
-    "$python" -m venv `cygpath -w $pyenvbld`
+    "$python" -m venv $(cygpath -w $pyenvbld)
   fi
   
   if [ ! -d "$pyenvdbg" ]; then
     msg_line "Creating Python virtual environment directory for debugging"
-    "$python" -m venv `cygpath -w $pyenvdbg`
+    "$python" -m venv $(cygpath -w $pyenvdbg)
   fi
 fi
 
@@ -501,7 +494,7 @@ if [ -z "$cfg_skip_phoenix" ]; then
   
   else
     msg_header "Building Phoenix"
-    time runbat Scripts/build_phoenix.bat 2>&1 | tee "${logdir}/${logpfx}.phoenix.build.log"
+    time runbat Scripts/build_phoenix.bat ${logpfx} 2>&1 | tee "${logdir}/${logpfx}.phoenix.build.log"
   fi
 
 fi
@@ -513,7 +506,7 @@ fi
 ###############################################################################
 
 # create the Python setup files
-wxpythonver=`grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }'`
+wxpythonver=$(grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }')
 sed -e "s/__VER__/$ver/" -e "s/__WXPYTHONVER__/$wxpythonver/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
 sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py
 
@@ -579,16 +572,20 @@ fi
 # Build any co-resident plugins
 ###############################################################################
 
-plugins=`ls -1 ../*/build-nlv.bat 2>/dev/null`
-if [ -n "$plugins" ]; then
-  for plugin in ../*/build-nlv.bat; do
-    dir_name=`dirname ${plugin}`
-    plugin_name=`basename ${dir_name}`
-    msg_header "Build plugin: ${plugin_name}"  
-    pushd "$dir_name" > /dev/null
-    runbat build-nlv.bat 2>&1 | tee "${logdir}/${logpfx}.Plugin-${plugin_name}.log"
-    popd > /dev/null
-  done
+if [ -z "$cfg_clean" ]; then
+  plugins=$(ls -1 ../*/build-nlv.bat 2>/dev/null)
+  if [ -n "$plugins" ]; then
+    thisdir=$(pwd)
+    thisdir=$(cygpath -a -w "$thisdir")
+    for plugin in ../*/build-nlv.bat; do
+      dir_name=$(dirname ${plugin})
+      plugin_name=$(basename ${dir_name})
+      msg_header "Build plugin: ${plugin_name}"  
+      pushd "$dir_name" > /dev/null
+      runbat build-nlv.bat $thisdir 2>&1 | tee "${logdir}/${logpfx}.Plugin-${plugin_name}.log"
+      popd > /dev/null
+    done
+  fi
 fi
 
 
@@ -607,7 +604,20 @@ fi
 
 
 ###############################################################################
+# Python Virtual Environments (clean)
+###############################################################################
+
+if [ -n "$cfg_clean_pyenv" ]; then
+
+  msg_line "Remove Python virtual environments"
+  rm -rf "$pyenvbld"
+  rm -rf "$pyenvdbg"
+fi
+
+
+
+###############################################################################
 # All done
 ###############################################################################
 
-msg_line "Build finished"
+msg_line "Finished"

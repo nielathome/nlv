@@ -32,7 +32,7 @@ echo ==== Check/update Python Virtual Environment
 
 call %PYENVDBG%\Scripts\Activate.bat
 python -m pip install %PIP_ARGS% --upgrade pip 
-python -m pip %PIP_ARGS% install --upgrade pip pywin32 six pillow comtypes setuptools
+python -m pip %PIP_ARGS% install --upgrade pip pywin32 six pillow comtypes setuptools attrdict3 numpy
 
 
 
