@@ -24,7 +24,7 @@ if "%SPHINXBUILD%" == "" (
 	set SPHINXBUILD=sphinx-build
 )
 set SOURCEDIR=.
-set BUILDDIR=..\_Work\Stage\Nlv\Sphinx
+set BUILDDIR=%2
 set SPHINXPROJ=NLV
 
 if "%1" == "" goto help

@@ -7,9 +7,7 @@
 _Work/
 
 # Templated files
-nlv-setup.py
 Version.py
-nlv.mythtv-setup.py
 
 # User-specific files
 *.suo

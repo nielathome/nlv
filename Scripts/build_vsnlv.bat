@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2023. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -35,7 +35,7 @@ if not exist %NUGET% (
   goto FINISH 
 )
 
-cd %ROOT_DIR%\Extension\NlvVsExtension
+cd %ROOT_DIR%\NlvVsExtension
 
 %NUGET% restore packages.config
 

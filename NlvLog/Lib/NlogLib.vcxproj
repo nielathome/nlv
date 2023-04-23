@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="14.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -10,36 +10,21 @@
       <Platform>x64</Platform>
     </ProjectConfiguration>
   </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="$(GTEST)\googletest\src\gtest-all.cc">
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(GTEST)\googletest\include;$(GTEST)\googletest;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(GTEST)\googletest\include;$(GTEST)\googletest;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-    </ClCompile>
-    <ClCompile Include="$(GTEST)\googletest\src\gtest_main.cc" />
-    <ClCompile Include="Src\FieldValueTests.cpp" />
-    <ClCompile Include="Src\ParserTests.cpp" />
-    <ClCompile Include="Src\TimecodeTests.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\Lib\NlogLib.vcxproj">
-      <Project>{59ff8de3-28bd-43ab-9a38-3b4c01ded1b4}</Project>
-    </ProjectReference>
-  </ItemGroup>
   <PropertyGroup Label="Globals">
-    <ProjectGuid>{58360E66-6F3A-4DF5-B0EE-C6B00254271F}</ProjectGuid>
+    <ProjectGuid>{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>NlogTests</RootNamespace>
+    <RootNamespace>NlogLib</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
-    <ConfigurationType>Application</ConfigurationType>
+    <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <PlatformToolset>v140</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
@@ -59,49 +44,77 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <LinkIncremental>true</LinkIncremental>
-    <OutDir>..\..\_Work\Bld\NlogTests\Bin\$(Configuration)\</OutDir>
-    <IntDir>..\..\_Work\Bld\NlogTests\Obj\$(Configuration)\</IntDir>
+    <OutDir>..\..\_Work\Bld\NlvLog\Lib\Bin\$(Configuration)\</OutDir>
+    <IntDir>..\..\_Work\Bld\NlvLog\Lib\Obj\$(Configuration)\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <LinkIncremental>false</LinkIncremental>
-    <OutDir>..\..\_Work\Bld\NlogTests\Bin\$(Configuration)\</OutDir>
-    <IntDir>..\..\_Work\Bld\NlogTests\Obj\$(Configuration)\</IntDir>
+    <OutDir>..\..\_Work\Bld\NlvLog\Lib\Bin\$(Configuration)\</OutDir>
+    <IntDir>..\..\_Work\Bld\NlvLog\Lib\Obj\$(Configuration)\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\Lib\Hdr;$(GTEST)\googletest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;$(SQLITE)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <SubSystem>Windows</SubSystem>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <PrecompiledHeader>
-      </PrecompiledHeader>
+      <PrecompiledHeader>Use</PrecompiledHeader>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\Lib\Hdr;$(GTEST)\googletest\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>Hdr;Src;$(BOOST);$(TBB)\include;$(SQLITE)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="Hdr\Cache.h" />
+    <ClInclude Include="Hdr\Field.h" />
+    <ClInclude Include="Hdr\FileMap.h" />
+    <ClInclude Include="Hdr\LogAccessor.h" />
+    <ClInclude Include="Hdr\Nfilesystem.h" />
+    <ClInclude Include="Hdr\Nline.h" />
+    <ClInclude Include="Hdr\Nmisc.h" />
+    <ClInclude Include="Hdr\Match.h" />
+    <ClInclude Include="Hdr\Ntime.h" />
+    <ClInclude Include="Hdr\Ntrace.h" />
+    <ClInclude Include="Hdr\Parser.h" />
+    <ClInclude Include="Src\FieldAccessor.h" />
+    <ClInclude Include="Src\MapLogIndexAccessor.h" />
+    <ClInclude Include="Src\MapLogIndexWriter.h" />
+    <ClInclude Include="Src\StdAfx.h" />
+    <ClInclude Include="Src\TargetVer.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Src\FileMap.cpp" />
+    <ClCompile Include="Src\LogAccessor.cpp" />
+    <ClCompile Include="Src\MapLogAccessor.cpp" />
+    <ClCompile Include="Src\MapLogIndexAccessor.cpp" />
+    <ClCompile Include="Src\MapLogIndexWriter.cpp" />
+    <ClCompile Include="Src\Misc.cpp" />
+    <ClCompile Include="Src\Parser.cpp" />
+    <ClCompile Include="Src\Select.cpp" />
+    <ClCompile Include="Src\SqlLogAccessor.cpp" />
+    <ClCompile Include="Src\StdAfx.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+    <ClCompile Include="Src\Trace.cpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

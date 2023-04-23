@@ -6,7 +6,7 @@
     <ProjectGuid>5272b2ab-2437-43f5-a93c-c1190a6dfbf0</ProjectGuid>
     <ProjectHome>.</ProjectHome>
     <StartupFile>Main.py</StartupFile>
-    <WorkingDirectory>..\..\_Work\Test</WorkingDirectory>
+    <WorkingDirectory>..\_Work\Test</WorkingDirectory>
     <OutputPath>.</OutputPath>
     <Name>Nlv</Name>
     <RootNamespace>Nlv</RootNamespace>
@@ -103,7 +103,7 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <Interpreter Include="..\..\_Work\PyEnv\Dbg\">
+    <Interpreter Include="..\_Work\PyEnv\Dbg\">
       <Id>{2255ebd9-4fe6-405c-ac64-063adf3f719e}</Id>
       <Version>3.5</Version>
       <Description>Dbg (Python 3.7 x64)</Description>

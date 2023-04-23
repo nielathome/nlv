@@ -45,15 +45,15 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <OutDir>..\..\_Work\Bld\NlogDll\Bin\</OutDir>
-    <IntDir>..\..\_Work\Bld\NlogDll\Obj\$(Configuration)\</IntDir>
+    <OutDir>..\..\_Work\Bld\NlvLog\Dll\Bin\</OutDir>
+    <IntDir>..\..\_Work\Bld\NlvLog\\Obj\$(Configuration)\</IntDir>
     <TargetExt>.pyd</TargetExt>
     <TargetName>Nlog</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <OutDir>..\..\_Work\Bld\NlogDll\Bin\</OutDir>
-    <IntDir>..\..\_Work\Bld\NlogDll\Obj\$(Configuration)\</IntDir>
+    <OutDir>..\..\_Work\Bld\NlvLog\Dll\Bin\</OutDir>
+    <IntDir>..\..\_Work\Bld\NlvLog\\Obj\$(Configuration)\</IntDir>
     <TargetExt>.pyd</TargetExt>
     <TargetName>Nlog</TargetName>
   </PropertyGroup>
