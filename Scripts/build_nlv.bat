@@ -31,6 +31,9 @@ call "%VS2015ENV%" x64
 rem Build NLV within the defined Python build virtual environment
 call %PYENVBLD%\Scripts\Activate.bat
 
+rem Ensure required tools are present and up to date
+pip install %PIP_ARGS% --upgrade build
+
 
 
 echo.
@@ -45,18 +48,17 @@ call make html
 echo.
 echo ==== NLV
 
-set PYBLD=%BLDDIR%\Python\
-set PYNLV=%PYBLD%\Nlv
+set PYNLV=%PYBLDDIR%\Nlv
 
 rem Setup staging area for build; now contains NLV *and* built documentation
 xcopy /q /y /s %ROOT_DIR%\Application\Nlv\*.* %STAGEDIR%\Nlv >NUL
 cd %STAGEDIR%
 
 rem Build the distributable wheel
-python nlv-setup.py %PIP_ARGS% ^
-  build --build-base=%PYNLV% --parallel 4 ^
-  egg_info --egg-base %PYNLV% ^
-  bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
+rem python nlv-setup.py %PIP_ARGS% ^
+rem   build --build-base=%PYNLV% --parallel 4 ^
+rem   egg_info --egg-base %PYNLV% ^
+rem   bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
 
 rem Copy the program icon(s) to the install directory
 xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL
@@ -64,16 +66,14 @@ xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL
 
 
 echo.
-echo ==== MythTV
+echo ==== NlvMythTV (plugin)
 
-set PYMYTHTV=%PYBLD%\MythTV
-cd %ROOT_DIR%\Plugin
-
-rem Build the distributable wheel
-python nlv.mythtv-setup.py %PIP_ARGS% ^
-  build --build-base=%PYMYTHTV% ^
-  egg_info --egg-base %PYMYTHTV% ^
-  bdist_wheel --bdist-dir=%PYMYTHTV%\bdist.win-amd64 --dist-dir=%INSTDIR%
+echo on
+rem The new Python build system ignores most options (e.g. --build-base, --egg-base etc)
+rem so copy everything to the build directory
+xcopy /q /y /s %ROOT_DIR%\Plugin\NlvMythTV\*.* %MYTHTVBLDDIR% >NUL
+cd %MYTHTVBLDDIR%
+python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %INSTDIR%
 
 rem Deactivate the Python virtual environment
 call %PYENVBLD%\Scripts\Deactivate.bat

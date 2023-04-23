@@ -101,12 +101,14 @@ b2_args="-d0"
 msbuild_args="/clp:verbosity=quiet"
 msbuild_target="/target:Build"
 pip_args="--quiet"
+pybld_args="-C--quiet"
 wget_args="--no-verbose"
 
 if [ -n "$cfg_verbose" ]; then
   b2_args=""
   msbuild_args=""
   pip_args=""
+  pybld_args=""
   wget_args=""
 fi
 
@@ -126,7 +128,7 @@ function addenvpath()
 {
   name=$1
   winpath=$(cygpath -a -w "$2")
-  echo "SET $name=$winpath" >> $envbat
+  echo "SET $name=$winpath" >> "$envbat"
 }
 
 # add path variable to VisualStudio environment
@@ -134,7 +136,7 @@ function addpropspath()
 {
   name=$1
   winpath=$(cygpath -a -w "$2")
-  echo "    <$name>$winpath</$name>" >> $envprops
+  echo "    <$name>$winpath</$name>" >> "$envprops"
 }
 
 # add path variable to Windows and VisualStudio environments
@@ -143,7 +145,7 @@ function addenvpropspath()
   name=$1
   winpath=$(cygpath -a -w "$2")
   echo "SET $name=$winpath" >> $envbat
-  echo "    <$name>$winpath</$name>" >> $envprops
+  echo "    <$name>$winpath</$name>" >> "$envprops"
 }
 
 function msg_header()
@@ -179,14 +181,16 @@ sed -e "s/__DEV__/$ver/" < Application/Template/tpl-Version.py > Application/Nlv
 prjdir=$(pwd)
 wrkdir="$prjdir/_Work"
 blddir="$wrkdir/Bld"
+pyblddir="$blddir/Python"
+mythtvblddir="$pyblddir/NlvMythTV"
 pkgdir="$prjdir/Deps/Packages"
 instdir="$wrkdir/Installers/$ver"
 logdir="$wrkdir/Logs"
 logpfx=$(date +%d-%b-%Y-%H-%M-%S)
 stagedir="$wrkdir/Stage"
 testdir="$wrkdir/Test"
-rm -rf "$stagedir"
-mkdir -p "$blddir" "$pkgdir" "$instdir" "$logdir" "$stagedir" "$testdir"
+rm -rf "$pyblddir"
+mkdir -p "$blddir" "$pkgdir" "$instdir" "$logdir" "$stagedir" "$mythtvblddir" "$testdir"
 
 # initialise installer directory
 cp Scripts/install.bat "$instdir"
@@ -194,35 +198,43 @@ echo "set VER=${ver}" > "$instdir/iver.bat"
 
 # initialise Windows environment
 envbat=$wrkdir/env.bat
-echo SET NLV=$ver > $envbat
-echo "SET B2_ARGS=$b2_args" >> $envbat
-echo "SET MSBUILD_ARGS=$msbuild_args" >> $envbat
-echo "SET MSBUILD_TARGET=$msbuild_target" >> $envbat
-echo "SET PIP_ARGS=$pip_args" >> $envbat
+{
+  echo SET NLV=$ver
+  echo "SET B2_ARGS=$b2_args"
+  echo "SET MSBUILD_ARGS=$msbuild_args"
+  echo "SET MSBUILD_TARGET=$msbuild_target"
+  echo "SET PIP_ARGS=$pip_args"
+  ECHO "SET PYBLD_ARGS=$pybld_args"
+} > "$envbat"
+
 addenvpath ROOT_DIR "."
 addenvpath CYGWIN_BASE "/"
 addenvpath BLDDIR "$blddir"
 addenvpath INSTDIR "$instdir"
 addenvpath LOGDIR "$logdir"
 addenvpath STAGEDIR "$stagedir"
+addenvpath MYTHTVBLDDIR "$mythtvblddir"
+addenvpath PYBLDDIR "$blddir/Python"
 
 if [ -n "$http_proxy" ]; then
-  echo "set HTTP_PROXY=$http_proxy" >> $envbat
+  echo "set HTTP_PROXY=$http_proxy" >> "$envbat"
 fi
 
 if [ -n "$https_proxy" ]; then
-  echo "set HTTPS_PROXY=$https_proxy" >> $envbat
+  echo "set HTTPS_PROXY=$https_proxy" >> "$envbat"
 fi
 
 if [ -n "$REQUESTS_CA_BUNDLE" ]; then
-  echo "set REQUESTS_CA_BUNDLE=$(cygpath -w "$REQUESTS_CA_BUNDLE")" >> $envbat
+  echo "set REQUESTS_CA_BUNDLE=$(cygpath -w "$REQUESTS_CA_BUNDLE")" >> "$envbat"
 fi
 
 # initialise VisualStudio environment
 envprops=$wrkdir/env.props
-echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>" > $envprops
-echo "<Project xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">" >> $envprops
-echo "  <PropertyGroup>" >> $envprops
+{
+  echo "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
+  echo "<Project xmlns=\"http://schemas.microsoft.com/developer/msbuild/2003\">"
+  echo "  <PropertyGroup>"
+} > $envprops
 
 addenvpropspath GTEST "Deps/Modules/GoogleTest"
 addenvpropspath JSON "Deps/Modules/Json"
@@ -306,7 +318,7 @@ nuget=$wrkdir/$nuget_file
 getfile $nuget_url $nuget   
 chmod +x $nuget           
 
-echo "SET NUGET=$(cygpath -w $nuget)" >> $envbat
+echo "SET NUGET=$(cygpath -w $nuget)" >> "$envbat"
 
 
 
@@ -315,12 +327,13 @@ echo "SET NUGET=$(cygpath -w $nuget)" >> $envbat
 ###############################################################################
 
 pyver=37
+pyvertxt=3.7
 loc=$(which -a python | fgrep $pyver)
 python=$(findf "$loc")
 if [ "$?" == 0 ]; then
   python_dir=$(dirname "$python")
 
-  echo "SET PYVER=$pyver" >> $envbat
+  echo "SET PYVER=$pyver" >> "$envbat"
   addenvpath PYTHON "$python"
   addenvpath PYTHON_DIR "$python_dir"
   addpropspath PYTHON "$python_dir"
@@ -388,10 +401,10 @@ boost_clean="${logdir}/${logpfx}.${boost_name}.clean.log"
 
 if [ ! -d "$boost_dir" ]; then
 
-  getfile $boost_url $boost_path   
+  getfile $boost_url "$boost_path"
 
   msg_line "Unpacking archive: $boost_file ..."
-  tar xfj $boost_path -C $pkgdir
+  tar xfj "$boost_path" -C $pkgdir
 
 fi
 
@@ -505,11 +518,6 @@ fi
 # NLV
 ###############################################################################
 
-# create the Python setup files
-wxpythonver=$(grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }')
-sed -e "s/__VER__/$ver/" -e "s/__WXPYTHONVER__/$wxpythonver/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
-sed -e "s/__VER__/$ver/" < Plugin/Template/tpl-nlv.mythtv-setup.py > Plugin/nlv.mythtv-setup.py
-
 sqlite_lib=$wrkdir/sqlite3.lib
 addenvpath SQLITE_LIB_DIR "$wrkdir"
 
@@ -525,19 +533,24 @@ else
 fi
 
 if [ -z "$cfg_clean" ]; then
+  # create the Python setup files
+  wxpythonver=$(grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }')
+  sed -e "s/__VER__/$ver/" -e "s/__WXPYTHONVER__/$wxpythonver/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
+
+  sed -e "s/__VER__/$ver/" -e "s/__PYVER__/$pyvertxt/" < Plugin/template-pyproject.toml > "$mythtvblddir/pyproject.toml"
+
   msg_header "Building NLV Release"
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/${logpfx}.nlv.build.log"
 fi
 
-vsnlv_build="${logdir}/${logpfx}.vsnlv.build.log"
-vsnlv_clean="${logdir}/${logpfx}.vsnlv.clean.log"
-
 if [ -n "$cfg_clean" ]; then
   msg_header "Cleaning vsNLV"
+  vsnlv_clean="${logdir}/${logpfx}.vsnlv.clean.log"
   runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_clean}"
 
 else
   msg_header "Building vsNLV"
+  vsnlv_build="${logdir}/${logpfx}.vsnlv.build.log"
   time runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_build}"
 fi
 

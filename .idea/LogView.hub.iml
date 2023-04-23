@@ -15,7 +15,6 @@
       <excludeFolder url="file://$MODULE_DIR$/Log" />
       <excludeFolder url="file://$MODULE_DIR$/Plugin/NlvMythTV.egg-info" />
       <excludeFolder url="file://$MODULE_DIR$/Plugin/Template" />
-      <excludeFolder url="file://$MODULE_DIR$/Scripts" />
       <excludeFolder url="file://$MODULE_DIR$/Sphinx/_static" />
       <excludeFolder url="file://$MODULE_DIR$/Sphinx/_templates" />
       <excludeFolder url="file://$MODULE_DIR$/_Work" />

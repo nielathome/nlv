@@ -1,0 +1,76 @@
+#
+# Copyright (C) Niel Clausen 2023. All rights reserved.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+#
+
+
+#-------------------------------------------------------------------
+[build-system]
+
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+#-------------------------------------------------------------------
+[project]
+
+name = "NlvMythTV"
+description = "MythTV extension for NLV"
+version = "__VER__"
+license = {text = "GPL V3.0"}
+requires-python = "==__PYVER__"
+
+dependencies = [
+    "Nlv == __VER__"
+]
+
+authors = [
+  {name = "Niel Clausen"}
+]
+
+keywords = [
+    "GUI",
+    "NLV"
+]
+
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Programming Language :: Python :: __PYVER__",
+    "Topic :: Software Development :: User Interfaces"
+]
+
+
+#-------------------------------------------------------------------
+[project.entry-points."nlv.extensions"]
+
+MythTV = "NlvMythTV.Main:MakeExtension"
+
+
+#-------------------------------------------------------------------
+[project.urls]
+
+repository  = "https://github.com/nielathome/nlv"
+
+
+#-------------------------------------------------------------------
+[tool.setuptools.package-data]
+
+NlvMythTV = ["*.xml", "*.js"]
+
+
