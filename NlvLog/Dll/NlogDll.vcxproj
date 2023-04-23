@@ -48,14 +48,14 @@
     <OutDir>..\..\_Work\Bld\NlvLog\Dll\Bin\</OutDir>
     <IntDir>..\..\_Work\Bld\NlvLog\\Obj\$(Configuration)\</IntDir>
     <TargetExt>.pyd</TargetExt>
-    <TargetName>Nlog</TargetName>
+    <TargetName>NlvLog</TargetName>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <OutDir>..\..\_Work\Bld\NlvLog\Dll\Bin\</OutDir>
     <IntDir>..\..\_Work\Bld\NlvLog\\Obj\$(Configuration)\</IntDir>
     <TargetExt>.pyd</TargetExt>
-    <TargetName>Nlog</TargetName>
+    <TargetName>NlvLog</TargetName>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>

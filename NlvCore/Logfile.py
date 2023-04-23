@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ from .Theme import G_ThemeGalleryNode
 from .Theme import GetThemeGallery
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 ## G_LogChildNode ##########################################
@@ -64,7 +64,7 @@ class G_LogChildNode(G_SessionChildNode):
 
     #-------------------------------------------------------
     def GetLogfile(self):
-        """Fetch the Nlog logfile object associated with the logfile node"""
+        """Fetch the NlvLog logfile object associated with the logfile node"""
         return self.GetLogNode().GetLogfile()
 
 
@@ -645,7 +645,7 @@ class G_MarkerNode(G_LogChildNode, G_ThemeNode, G_MatchNode, G_MarkerFormatNode,
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_ListContainedNode.__init__(self, factory, wproject, witem)
         G_MatchNode.__init__(self, G_Const.LogThemeCls, "Marker")
-        G_MarkerFormatNode.__init__(self, Nlog.EnumMarker.StandardBase)
+        G_MarkerFormatNode.__init__(self, NlvLog.EnumMarker.StandardBase)
         G_MarkerStyleNode.__init__(self)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainLogfile)
 
@@ -731,7 +731,7 @@ class G_TrackerNode(G_LogChildNode, G_ThemeNode, G_MarkerFormatNode, G_ColourNod
     #-------------------------------------------------------
     def __init__(self, factory, wproject, witem, name, **kwargs):
         G_ListContainedNode.__init__(self, factory, wproject, witem)
-        G_MarkerFormatNode.__init__(self, Nlog.EnumMarker.TrackerBase)
+        G_MarkerFormatNode.__init__(self, NlvLog.EnumMarker.TrackerBase)
         G_TrackerStyleNode.__init__(self)
         G_ThemeNode.__init__(self, G_ThemeNode.DomainLogfile)
 
@@ -851,14 +851,14 @@ class G_LogInfoNode(G_LogChildNode, G_TabContainedNode):
         # persist new timezone offset to document
         idx = self._Field.LogTimezoneIdx.Value = self._TimezoneCtl.GetSelection()
 
-        # tell Nlog
+        # tell NlvLog
         self.SetTimezone(idx)
 
         # update screen
         self.GetLogNode().RefreshViews()
 
     def SetTimezone(self, idx = None):
-        """Write the logfile's timezone offset to Nlog"""
+        """Write the logfile's timezone offset to NlvLog"""
         if idx is None:
             idx = self._Field.LogTimezoneIdx.Value
         tz_offset = 3600 * self._Timezones[idx][1]
@@ -1027,7 +1027,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
 
         # open the logfile
         self._FullPath = fullpath = Path().cwd().joinpath(self._Field.RelativeLogfilePath.Value)
-        self._N_Logfile = Nlog.MakeLogfile(str(fullpath), self.GetLogSchema(), G_Global.PulseProgressMeter)
+        self._N_Logfile = NlvLog.MakeLogfile(str(fullpath), self.GetLogSchema(), G_Global.PulseProgressMeter)
 
         if self._N_Logfile is None:
             raise RuntimeError("Unable to index logfile {}".format(self._FullPath))
@@ -1079,7 +1079,7 @@ class G_LogNode(G_SessionChildNode, G_HideableTreeNode, G_TabContainerNode):
         """Release all resources owned by the logfile"""
 
         if self._N_Logfile is not None:
-            # force release references to Nlog objects
+            # force release references to NlvLog objects
             self._N_Logfile = None
 
         super().DoClose(delete)

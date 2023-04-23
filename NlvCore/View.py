@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -52,7 +52,7 @@ from .Theme import G_ThemeOverridesNode
 from .Theme import G_ThemeGalleryNode
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 
@@ -72,7 +72,7 @@ class G_StcView(wx.stc.StyledTextCtrl, G_DisplayControl):
 class G_ViewControl(G_PanelDisplayControl):
 
     #-------------------------------------------------------
-    _StyleIdxBase = Nlog.EnumStyle.AnnotationBase
+    _StyleIdxBase = NlvLog.EnumStyle.AnnotationBase
 
     _Descs = [
         # name, pen_style, scintilla style number, text colour, background
@@ -248,7 +248,7 @@ class G_ViewChildNode(G_DisplayChildNode):
 
     #-------------------------------------------------------
     def GetView(self):
-        """Fetch the Nlog view object associated with the view node"""
+        """Fetch the NlvLog view object associated with the view node"""
         return self.GetViewNode().GetView()
 
 
@@ -668,19 +668,19 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_ColourNode, G_TabContain
     """Define the view's general display"""
 
     _Type = [
-        ["None", Nlog.EnumMarginType.Empty],
-        ["Line Numbers", Nlog.EnumMarginType.LineNumber],
-        ["Time Offset", Nlog.EnumMarginType.Offset]
+        ["None", NlvLog.EnumMarginType.Empty],
+        ["Line Numbers", NlvLog.EnumMarginType.LineNumber],
+        ["Time Offset", NlvLog.EnumMarginType.Offset]
     ]
 
     _Precision = [
-        ["sec.msec.nsec", Nlog.EnumMarginPrecision.MsecDotNsec],
-        ["sec.usec", Nlog.EnumMarginPrecision.Usec],
-        ["sec.msec", Nlog.EnumMarginPrecision.Msec],
-        ["sec", Nlog.EnumMarginPrecision.Sec],
-		["min:sec", Nlog.EnumMarginPrecision.MinSec],
-		["hour:min:sec", Nlog.EnumMarginPrecision.HourMinSec],
-		["day:hour:min:sec", Nlog.EnumMarginPrecision.DayHourMinSec]
+        ["sec.msec.nsec", NlvLog.EnumMarginPrecision.MsecDotNsec],
+        ["sec.usec", NlvLog.EnumMarginPrecision.Usec],
+        ["sec.msec", NlvLog.EnumMarginPrecision.Msec],
+        ["sec", NlvLog.EnumMarginPrecision.Sec],
+		["min:sec", NlvLog.EnumMarginPrecision.MinSec],
+		["hour:min:sec", NlvLog.EnumMarginPrecision.HourMinSec],
+		["day:hour:min:sec", NlvLog.EnumMarginPrecision.DayHourMinSec]
     ]
 
 
@@ -721,7 +721,7 @@ class G_ViewOptionsNode(G_ViewChildNode, G_ThemeNode, G_ColourNode, G_TabContain
 
     #-------------------------------------------------------
     def EnablePrecisionCtl(self):
-        self._MarginPrecisionCtl.Enable(self.GetMarginType() == Nlog.EnumMarginType.Offset)
+        self._MarginPrecisionCtl.Enable(self.GetMarginType() == NlvLog.EnumMarginType.Offset)
 
     def Activate(self):
         self.ActivateCommon()
@@ -916,7 +916,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self._Field.Add(0, "FirstVisibleLine", replace_existing = False)
         self._Field.Add(0, "CursorLine", replace_existing = False)
 
-        # make a Scintilla editor and a Nlog logfile view
+        # make a Scintilla editor and a NlvLog logfile view
         aui_notebook = self.GetAuiNotebook()
         view_control = self._ViewControl = G_ViewControl(aui_notebook)
         editor = view_control.GetEditor()
@@ -960,7 +960,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         # setup Scintilla editor margins
         editor.SetMarginType(0, wx.stc.STC_MARGIN_RTEXT)
 
-        marker_mask = (2 ** Nlog.EnumMarker.TrackerBase) - 1
+        marker_mask = (2 ** NlvLog.EnumMarker.TrackerBase) - 1
         editor.SetMarginBackground(1, wx.Colour(0xf0f0f0))
         editor.SetMarginType(1, wx.stc.STC_MARGIN_COLOUR)
         editor.SetMarginWidth(1, 14)
@@ -974,7 +974,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
 
         # history line marker
         from .StyleNode import G_ColourTraits
-        history_marker = Nlog.EnumMarker.History
+        history_marker = NlvLog.EnumMarker.History
         editor.MarkerDefine(history_marker, wx.stc.STC_MARK_BACKGROUND)
         editor.MarkerSetBackground(history_marker, G_ColourTraits.GetColour("MEDIUM SLATE BLUE"))
         editor.MarkerSetAlpha(history_marker, 50)
@@ -997,7 +997,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             editor.StyleSetForeground(style_no, anno_traits.GetForegroundColourByIndex(anno_idx))
             editor.StyleSetBackground(style_no, anno_traits.GetBackgroundColourByIndex(anno_idx))
 
-        # editor must be set to read-only; switches off behaviour that Nlog
+        # editor must be set to read-only; switches off behaviour that NlvLog
         # does not implement
         editor.SetReadOnly( True );
 
@@ -1050,7 +1050,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             editor.SetDocPointer( 0 )
             editor.ReleaseDocument(self._S_Document)
 
-            # force release references to Nlog objects
+            # force release references to NlvLog objects
             self._S_Document = None
             self._N_View = None
 
@@ -1286,7 +1286,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
             elif modifiers == wx.MOD_CONTROL:
                 handled = True
                 timecode = self.GetNearestUtcTimecode(cur_line_no)
-                Nlog.SetGlobalTracker(tracker_idx, timecode)
+                NlvLog.SetGlobalTracker(tracker_idx, timecode)
                 self.RefreshTrackers(False, True, self)
                 self.UpdateTrackers(False, tracker_idx, [timecode])
 
@@ -1314,7 +1314,7 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         self.GetEditor().Refresh()
 
     def UpdateFieldColour(self, field_id, colour):
-        style_no = field_id + Nlog.EnumStyle.FieldBase
+        style_no = field_id + NlvLog.EnumStyle.FieldBase
         self.GetEditor().StyleSetForeground(style_no, colour)
 
 
@@ -1375,40 +1375,40 @@ class G_ViewNode(G_DisplayNode, G_HideableTreeNode, G_TabContainerNode):
         editor = self.GetEditor()
         width = 0
         
-        if type == Nlog.EnumMarginType.LineNumber:
+        if type == NlvLog.EnumMarginType.LineNumber:
             digits = 1 + int(log10(editor.GetNumberOfLines()))
             width = editor.TextWidth(wx.stc.STC_STYLE_LINENUMBER, "_" + "9" * digits)
 
-        elif type == Nlog.EnumMarginType.Offset:
+        elif type == NlvLog.EnumMarginType.Offset:
             begin_timecode = self.GetNearestUtcTimecode(0)
             end_timecode = self.GetNearestUtcTimecode(editor.GetNumberOfLines() - 1)
             duration = end_timecode.Subtract(begin_timecode) / 1000000000
 
-            if precision == Nlog.EnumMarginPrecision.MinSec:
+            if precision == NlvLog.EnumMarginPrecision.MinSec:
                 duration /= 60
-            elif precision == Nlog.EnumMarginPrecision.HourMinSec:
+            elif precision == NlvLog.EnumMarginPrecision.HourMinSec:
                 duration /= (60 * 60)
-            elif precision == Nlog.EnumMarginPrecision.DayHourMinSec:
+            elif precision == NlvLog.EnumMarginPrecision.DayHourMinSec:
                 duration /= (24 * 60 * 60)
 
             digits = 1 + int(log10(duration))
 
-            if precision == Nlog.EnumMarginPrecision.MsecDotNsec:
+            if precision == NlvLog.EnumMarginPrecision.MsecDotNsec:
                 digits += 10
-            elif precision == Nlog.EnumMarginPrecision.Usec:
+            elif precision == NlvLog.EnumMarginPrecision.Usec:
                 digits += 6
-            elif precision == Nlog.EnumMarginPrecision.Msec:
+            elif precision == NlvLog.EnumMarginPrecision.Msec:
                 digits += 3
-            elif precision == Nlog.EnumMarginPrecision.MinSec:
+            elif precision == NlvLog.EnumMarginPrecision.MinSec:
                 digits += 3
-            elif precision == Nlog.EnumMarginPrecision.HourMinSec:
+            elif precision == NlvLog.EnumMarginPrecision.HourMinSec:
                 digits += 6
-            elif precision == Nlog.EnumMarginPrecision.DayHourMinSec:
+            elif precision == NlvLog.EnumMarginPrecision.DayHourMinSec:
                 digits += 9
 
             width = editor.TextWidth(wx.stc.STC_STYLE_LINENUMBER, "__" + "9" * digits)
 
-        if type != Nlog.EnumMarginType.Empty:
+        if type != NlvLog.EnumMarginType.Empty:
             self._N_View.SetupMarginText(type, precision)
 
         editor.SetMarginWidth(0, width)

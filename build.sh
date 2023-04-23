@@ -175,7 +175,7 @@ ver="$(cat ver.txt).$(cat bld.txt)"
 
 
 # make the application version available to the Python code
-sed -e "s/__DEV__/${ver}/" < Template/Version.py > NlvCore/Version.py
+sed -e "s/__DEV__/${ver}/" < Template/NlvCore-Version.py > NlvCore/Version.py
 
 # directory structure
 prjdir=$(pwd)
@@ -553,9 +553,17 @@ fi
 if [ -z "${cfg_clean}" ]; then
   # create the Python setup files
   wxpythonver=$(grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }')
-  sed -e "s/__VER__/${ver}/" -e "s/__WXPYTHONVER__/${wxpythonver}/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
 
-  sed -e "s/__VER__/${ver}/" -e "s/__PYVER__/${pyvertxt}/" < Template/mythtv-pyproject.toml > "${mythtv_blddir}/pyproject.toml"
+  sed \
+    -e "s/__VER__/${ver}/" \
+    -e "s/__WXPYTHONVER__/${wxpythonver}/" \
+    -e "s/__PYVER__/${pyvertxt}/" \
+  < Template/NlvCore-setup.py > "${nlvcore_blddir}/setup.py"
+
+  sed \
+    -e "s/__VER__/${ver}/" \
+    -e "s/__PYVER__/${pyvertxt}/" \
+  < Template/MythTV-pyproject.toml > "${mythtv_blddir}/pyproject.toml"
 
   msg_header "Building NLV Release"
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/${logpfx}.nlv.build.log"

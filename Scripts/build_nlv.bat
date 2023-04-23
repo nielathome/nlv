@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2023. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -49,15 +49,11 @@ echo.
 echo ==== NLV
 
 
-rem Setup staging area for build; now contains NLV *and* built documentation
+rem Setup staging area for build; now contains NLV *and* built documentation.
+rem Use setyup.py - as the new .toml seems to lack the power of the older approach.
 xcopy /q /y /s /i %ROOT_DIR%\NlvCore %NLVCORE_BLDDIR%\NlvCore >NUL
 cd %NLVCORE_BLDDIR%
-
-rem Build the distributable wheel
-rem python nlv-setup.py %PIP_ARGS% ^
-rem   build --build-base=%PYNLV% --parallel 4 ^
-rem   egg_info --egg-base %PYNLV% ^
-rem   bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
+python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %INSTDIR%
 
 rem Copy the program icon(s) to the install directory
 xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL

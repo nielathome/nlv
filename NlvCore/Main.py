@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -28,7 +28,7 @@ import tempfile
 import threading
 from weakref import ref as MakeWeakRef
 
-# the only *reliable* way for Nlog to find and link against the sqlite3.dll
+# the only *reliable* way for NlvLog to find and link against the sqlite3.dll
 # is to import the Python module first; in particular, this works around the fact
 # that the DLL path varies depending on whether NLV is running from a venv or not
 import sqlite3
@@ -616,8 +616,8 @@ class G_LogViewApp(wx.App):
 
     #-------------------------------------------------------
     def SetupMetaData(self, user_dir):
-        import Nlog
-        style_format_base = Nlog.EnumStyle.UserFormatBase
+        import NlvLog
+        style_format_base = NlvLog.EnumStyle.UserFormatBase
 
         from NlvCore.Logmeta import InitMetaStore
         InitMetaStore(user_dir, style_format_base)

@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ from .Project import G_Project
 import wx
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 ## Locals ##################################################
@@ -213,13 +213,13 @@ class G_Recogniser:
             case = "i"
 
         selector_id = match.GetSelectorId()
-        if selector_id == Nlog.EnumSelector.Literal:
+        if selector_id == NlvLog.EnumSelector.Literal:
             return 'log ~= "{}"{}'.format(match.MatchText, case)
 
-        elif selector_id == Nlog.EnumSelector.RegularExpression:
+        elif selector_id == NlvLog.EnumSelector.RegularExpression:
             return 'log ~= /{}/{}'.format(match.MatchText, case)
 
-        elif selector_id == Nlog.EnumSelector.LogviewFilter:
+        elif selector_id == NlvLog.EnumSelector.LogviewFilter:
             return match.MatchText
 
         else:
@@ -587,7 +587,7 @@ class G_ProjectionFieldSchema:
         self.InitialColour = initial_colour
         self.ExplorerFormatter = explorer_formatter
 
-        # Nlog indexer info
+        # NlvLog indexer info
         self.Separator = ","
         self.SeparatorCount = 1
         self.MinWidth = 0

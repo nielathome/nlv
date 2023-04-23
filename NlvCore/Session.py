@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -43,7 +43,7 @@ from .Theme import G_ThemeGalleryNode
 from .Theme import GetThemeGallery
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 ## G_SessionManager ########################################
@@ -890,13 +890,13 @@ class G_SessionTrackerOptionsNode(G_SessionChildNode, G_TabContainedNode):
 
 
     def PostInitLoad(self):
-        # apply any persisted tracker data into Nlog; themes are setup now
+        # apply any persisted tracker data into NlvLog; themes are setup now
         timecodes = []
 
         for i in range(G_Const.NumGlobalTrackers):
             tracker = self._GlobalTrackerTimecodes[i]
             if tracker.InUse.Value:
-                timecodes.append(Nlog.Timecode(tracker.UtcDatum.Value, tracker.OffsetNs.Value))
+                timecodes.append(NlvLog.Timecode(tracker.UtcDatum.Value, tracker.OffsetNs.Value))
 
         self.SetTrackers(False, 0, timecodes)
 
@@ -1030,7 +1030,7 @@ class G_SessionTrackerOptionsNode(G_SessionChildNode, G_TabContainedNode):
 
         if update_global_idx >= 0:
             for (idx, timecode) in enumerate(timecodes):
-                Nlog.SetGlobalTracker(update_global_idx + idx, timecode)
+                NlvLog.SetGlobalTracker(update_global_idx + idx, timecode)
                 self._Trackers[1+update_global_idx+idx].Timecode = timecode
 
         self.UpdateTrackerPanel()

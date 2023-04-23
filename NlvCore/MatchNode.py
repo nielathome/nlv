@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2019. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ from .Global import G_Global
 from .Project import G_WindowInfo
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 
@@ -58,10 +58,10 @@ class G_MatchItem(D_Document.D_Value):
 
     #-------------------------------------------------------
     _MetaData = [
-        G_MatchItemMetaData("Literal", "lit", True, True, Nlog.EnumSelector.Literal),
-        G_MatchItemMetaData("Regular Expression", "re", True, True, Nlog.EnumSelector.RegularExpression),
-        G_MatchItemMetaData("LogView Filter", "LVF", False, False, Nlog.EnumSelector.LogviewFilter),
-        G_MatchItemMetaData("LogView Analyser", "LVA", False, False, Nlog.EnumSelector.LogviewFilter)
+        G_MatchItemMetaData("Literal", "lit", True, True, NlvLog.EnumSelector.Literal),
+        G_MatchItemMetaData("Regular Expression", "re", True, True, NlvLog.EnumSelector.RegularExpression),
+        G_MatchItemMetaData("LogView Filter", "LVF", False, False, NlvLog.EnumSelector.LogviewFilter),
+        G_MatchItemMetaData("LogView Analyser", "LVA", False, False, NlvLog.EnumSelector.LogviewFilter)
     ]
 
 

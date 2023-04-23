@@ -34,28 +34,28 @@ from setuptools import setup, find_packages, Extension
 #---------------------------------------------------------------------------
 
 CLASSIFIERS = """\
-Development Status :: 3 - Alpha
+Development Status :: 4 - Beta
 Environment :: Win32 (MS Windows)
 Intended Audience :: Developers
 License :: OSI Approved
 Operating System :: Microsoft :: Windows :: Windows 10
-Programming Language :: Python :: 3.5
+Programming Language :: Python :: __PYVER__
 Topic :: Software Development :: User Interfaces
 """
 
 #---------------------------------------------------------------------------
 
 def GetDir(var):
-  try:  
+  try:
     dir = os.environ[var]
     if Path(dir).is_dir():
       return dir
 
     print("Unable to locate dependency: {0}".format(dir))
-      
-  except KeyError: 
+
+  except KeyError:
     print("Unable to locate environment variable: {0}".format(var))
-    
+
   exit()
 
 
@@ -67,9 +67,9 @@ if __name__ == '__main__':
     # Ensure all build dependencies are present
 
     root_dir = GetDir("ROOT_DIR")
-    nlv_source = glob(root_dir + "/Log/Dll/Src/*cpp")
-    nlv_source.extend(glob(root_dir + "/Log/Lib/Src/*cpp"))
-    
+    nlv_source = glob(root_dir + "/NlvLog/Dll/Src/*cpp")
+    nlv_source.extend(glob(root_dir + "/NlvLog/Lib/Src/*cpp"))
+
     phoenix_dir = GetDir("PHOENIX")
     boost_dir = GetDir("BOOST")
     json_dir = GetDir("JSON")
@@ -85,21 +85,21 @@ if __name__ == '__main__':
     #-----------------------------------------------------------------------
     # Define the extension
 
-    nlog_extension = Extension(
-        name = "Nlog",
+    nlvlog_extension = Extension(
+        name = "NlvLog",
 
         sources = nlv_source,
-    
+
         include_dirs = [
-            root_dir + "/Log/Dll/Hdr",
-            root_dir + "/Log/Lib/Hdr",
+            root_dir + "/NlvLog/Dll/Hdr",
+            root_dir + "/NlvLog/Lib/Hdr",
             wx_dir + "/src/stc",
             boost_dir,
             json_dir + "/single_include",
             tbb_dir + "/include",
             sql_dir
         ],
-    
+
         define_macros = [
             ("_USRDLL", "1"),
             ("UNICODE", None),
@@ -119,13 +119,7 @@ if __name__ == '__main__':
         ],
 
         extra_compile_args = [
-            "/MD", # should not be needed ... used to override /MT added by Python
-            "/Zi"  # debug symbols are useful, even for release builds
-        ],
-
-        extra_link_args = [
-            "/DEBUG", # ensure debug symbols available to a debugger
-            "/OPT:REF,ICF" # fix up mess created by /DEBUG
+            "/MD" # should not be needed ... used to override /MT added by Python
         ]
     )
 
@@ -134,11 +128,11 @@ if __name__ == '__main__':
         #-------------------------------------------------------------------
         # Files
 
-        name = "Nlv",
+        name = "NlvCore",
         packages = find_packages(),
 
         package_data={
-            "Nlv": [
+            "NlvCore": [
                 "*.xml",
                 "Sphinx/doctrees/*",
                 "Sphinx/html/[!_]*",
@@ -152,7 +146,7 @@ if __name__ == '__main__':
                 "Web/Charts/Network/*",
                 "Web/Charts/Pie/*",
                 "Web/Charts/TangledTree/*",
-                "Web/Charts/TreeMap/*"                 
+                "Web/Charts/TreeMap/*"
              ]
         },
 
@@ -170,17 +164,17 @@ if __name__ == '__main__':
 
         entry_points={
             'console_scripts': [
-                'nlvc=Nlv.Main:main',
-                'launchc=Nlv.Launch:main'
+                'nlvc=NlvCore.Main:main',
+                'launchc=NlvCore.Launch:main'
             ],
             'gui_scripts': [
-                'nlvw=Nlv.Main:main',
-                'launchw=Nlv.Launch:main'
+                'nlvw=NlvCore.Main:main',
+                'launchw=NlvCore.Launch:main'
             ]
-            
+
         },
-        
-        ext_modules = [ nlog_extension ],
+
+        ext_modules = [ nlvlog_extension ],
 
 
         #-------------------------------------------------------------------
@@ -190,14 +184,11 @@ if __name__ == '__main__':
         license = "GPL V3.0",
         platforms = "WIN64",
         classifiers = [c for c in CLASSIFIERS.split("\n") if c],
-        keywords = "GUI,nlv",
+        keywords = "GUI,NLV",
 
         description = "Log file viewing and analysis",
-        long_description = "TBD",
 
         author = "Niel Clausen",
-        author_email = "Niel Clausen <niel@home>",
 
-        url = "http://tbd/",
-        download_url = "http://tbd/"
+        url = "https://github.com/nielathome/nlv"
     )

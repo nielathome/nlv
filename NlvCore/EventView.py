@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ from .Theme import G_ThemeGalleryNode
 from .Theme import GetThemeSupportFile
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 

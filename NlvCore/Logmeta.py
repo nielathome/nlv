@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -119,7 +119,7 @@ class G_FieldList(list):
 
 class G_FieldSchemata(G_FieldList):
     """
-    A list of G_FieldSchema-like objects; with an Nlog compatible interface.
+    A list of G_FieldSchema-like objects; with an NlvLog compatible interface.
     """
 
     #-------------------------------------------------------

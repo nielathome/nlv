@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2017-2020. All rights reserved.
+# Copyright (C) Niel Clausen 2017-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ import wx.lib.agw.customtreectrl as ctt
 import wx.lib.agw.hyperlink as hl
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 # Application imports
 from .Global import G_Const
@@ -46,7 +46,7 @@ from .Shell import G_Shell
 
 #-----------------------------------------------------------
 class LogForwarder:
-    """Forward log/trace messages from Nlog to the Python log system"""
+    """Forward log/trace messages from NlvLog to the Python log system"""
 
     def debug(self, message):
         logging.debug(message)
@@ -1552,9 +1552,9 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         def PerfTimerFactory(description, item_count):
             return G_PerfTimer(description, item_count)
 
-        # feed Nlog logging back to the application
+        # feed NlvLog logging back to the application
         _LogForwarder = LogForwarder()
-        Nlog.Setup(_LogForwarder, PerfTimerFactory)
+        NlvLog.Setup(_LogForwarder, PerfTimerFactory)
 
         # create a "public" list of the notfication channels for use by receivers
         from .Logmeta import GetMetaStore
@@ -1871,7 +1871,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
 
         root = self.GetRootNode()
         root.Close()
-        Nlog.Setup(None, None)
+        NlvLog.Setup(None, None)
 
         # kill any notification channels
         for channel in self._Channels.values():

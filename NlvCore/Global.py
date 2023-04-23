@@ -1,5 +1,5 @@
 #
-# Copyright (C) Niel Clausen 2019. All rights reserved.
+# Copyright (C) Niel Clausen 2019-2023. All rights reserved.
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ import traceback
 import wx
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 
@@ -145,7 +145,7 @@ class G_PerfTimer:
         self._Description = description
         self._Arguments = []
         self._ItemCount = item_count
-        self._Timer = Nlog.PerfTimer()
+        self._Timer = NlvLog.PerfTimer()
         self._Parent = __class__._Last
         self._Children = []
         self._Closed = False

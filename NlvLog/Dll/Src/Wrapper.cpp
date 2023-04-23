@@ -1,5 +1,5 @@
 //
-// Copyright (C) 2017-2020 Niel Clausen. All rights reserved.
+// Copyright (C) 2017-2023 Niel Clausen. All rights reserved.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
@@ -304,7 +304,7 @@ namespace boost
 // build the Python module interfaces
 // References:
 //  https://wiki.python.org/moin/boost.python/PointersAndSmartPointers
-BOOST_PYTHON_MODULE( Nlog )
+BOOST_PYTHON_MODULE( NlvLog )
 {
 	class_<std::vector<int> >( "ivec" )
 		.def( "__iter__", iterator<std::vector<int>>() )

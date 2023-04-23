@@ -49,7 +49,7 @@ import wx
 import wx.html2
 
 # Content provider interface
-import Nlog
+import NlvLog
 
 
 
@@ -480,8 +480,8 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
             finish_offset = self.GetFieldValue(item_key, table_schema.ColFinishOffset)
 
         utc_datum = self._N_Logfile.GetTimecodeBase().GetUtcDatum()
-        return (Nlog.Timecode(utc_datum, start_offset),
-            Nlog.Timecode(utc_datum, finish_offset)
+        return (NlvLog.Timecode(utc_datum, start_offset),
+            NlvLog.Timecode(utc_datum, finish_offset)
         )
 
 
@@ -683,7 +683,7 @@ class G_TableDataModel(wx.dataview.DataViewModel, G_DataExplorerProvider):
         num_fields = self.GetColumnCount()
         db_path = db_info.Path
         if Path(db_path).exists() and num_fields != 0:
-            self._N_Logfile = Nlog.MakeLogfile(db_path, table_schema, G_Global.PulseProgressMeter)
+            self._N_Logfile = NlvLog.MakeLogfile(db_path, table_schema, G_Global.PulseProgressMeter)
 
         # robustness, for broken logfiles ...
         if self._N_Logfile is not None:
