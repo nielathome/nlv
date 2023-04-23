@@ -12,7 +12,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogLib", "NlvLog\Lib\NlogL
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogTests", "NlvLog\Tests\NlogTests.vcxproj", "{58360E66-6F3A-4DF5-B0EE-C6B00254271F}"
 EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvMythTV", "Plugin\NlvMythTV\NlvMythTV.pyproj", "{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvMythTV", "NlvMythTV\NlvMythTV.pyproj", "{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{2A5E6D2B-7364-4F8B-A93C-DB0962B7ECB8}"
 EndProject

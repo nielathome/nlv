@@ -37,7 +37,7 @@ from .Global import G_Const
 from .Global import G_FrozenWindow
 from .Global import G_Global
 from .Global import G_PerfTimer
-from Nlv.Channel import Channel
+from NlvCore.Channel import Channel
 from .Shell import G_Shell
 
 
@@ -1696,7 +1696,7 @@ class G_Project(wx.SplitterWindow, G_ContainerMenu):
         # allow documentation to live in a couple of "well known" places
         file_path = G_Global.GetInstallDir().joinpath("Sphinx", "html")
         if not file_path.exists():
-            file_path = G_Global.GetInstallDir().parent.parent.joinpath("_Work", "Stage", "Nlv", "Sphinx", "html")
+            file_path = G_Global.GetInstallDir().parent.joinpath("_Work", "Bld", "Python", "NlvCore", "NlvCore", "Sphinx", "html")
         if not file_path.exists():
             file_path = Path("missing_doc")
 

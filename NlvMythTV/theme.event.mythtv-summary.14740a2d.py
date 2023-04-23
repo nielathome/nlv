@@ -15,7 +15,7 @@
 # along with this program. If not, see <https://www.gnu.org/licenses/>.
 #
 
-import Nlv.Chart as Chart
+import NlvCore.Chart as Chart
 import re
 
 

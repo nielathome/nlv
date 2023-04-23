@@ -15,6 +15,7 @@
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
     <CommandLineArguments>-r</CommandLineArguments>
+    <SearchPath>..\_Work\Bld\NlvLog\Dll\Bin</SearchPath>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
     <DebugSymbols>true</DebugSymbols>
@@ -96,13 +97,6 @@
     <Content Include="_field_names.xml" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Log\Dll\NlogDll.vcxproj">
-      <Name>NlogDll</Name>
-      <Project>{0c6fb63f-bcc2-4bf4-b484-9727584ee8ef}</Project>
-      <Private>True</Private>
-    </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
     <Interpreter Include="..\_Work\PyEnv\Dbg\">
       <Id>{2255ebd9-4fe6-405c-ac64-063adf3f719e}</Id>
       <Version>3.5</Version>
@@ -125,6 +119,13 @@
     <Folder Include="Web\Charts\TangledTree\" />
     <Folder Include="Web\Charts\Pie\" />
     <Folder Include="Web\Charts\_Models\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NlvLog\Dll\NlogDll.vcxproj">
+      <Name>NlogDll</Name>
+      <Project>{0c6fb63f-bcc2-4bf4-b484-9727584ee8ef}</Project>
+      <Private>True</Private>
+    </ProjectReference>
   </ItemGroup>
   <PropertyGroup>
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>

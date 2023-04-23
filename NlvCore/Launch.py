@@ -30,8 +30,8 @@ import win32file
 import wx
 
 # Application imports
-from Nlv.Logmeta import GetMetaStore
-from Nlv.Shell import G_Shell
+from NlvCore.Logmeta import GetMetaStore
+from NlvCore.Shell import G_Shell
 
 
 
@@ -515,13 +515,13 @@ class G_LaunchApp(wx.App):
 
     #-------------------------------------------------------
     def SetupMetaData(self, user_dir):
-        from Nlv.Logmeta import InitMetaStore
+        from NlvCore.Logmeta import InitMetaStore
         InitMetaStore(user_dir, 0)
 
 
     #-------------------------------------------------------
     def SetupExtensions(self):
-        from Nlv.Logmeta import GetMetaStore
+        from NlvCore.Logmeta import GetMetaStore
 
         # Interface between NLV plugins (extensions) and the application
         class Context:
@@ -544,7 +544,7 @@ class G_LaunchApp(wx.App):
 
 
         # load site specific extensions
-        from Nlv.Extension import LoadExtensions
+        from NlvCore.Extension import LoadExtensions
         return LoadExtensions(Context)
 
 

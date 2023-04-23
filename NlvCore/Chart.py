@@ -19,7 +19,7 @@
 import json
 
 # Application imports
-from Nlv.TangledTree import Tree
+from NlvCore.TangledTree import Tree
 
 
 def SqlColumnNames(cursor, table_name, database = None):

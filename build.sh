@@ -175,7 +175,7 @@ ver="$(cat ver.txt).$(cat bld.txt)"
 
 
 # make the application version available to the Python code
-sed -e "s/__DEV__/${ver}/" < Application/Template/tpl-Version.py > Application/Nlv/Version.py
+sed -e "s/__DEV__/${ver}/" < Template/Version.py > NlvCore/Version.py
 
 # directory structure
 prjdir=$(pwd)
@@ -555,7 +555,7 @@ if [ -z "${cfg_clean}" ]; then
   wxpythonver=$(grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }')
   sed -e "s/__VER__/${ver}/" -e "s/__WXPYTHONVER__/${wxpythonver}/" < Application/Template/tpl-nlv-setup.py > "$stagedir/nlv-setup.py"
 
-  sed -e "s/__VER__/${ver}/" -e "s/__PYVER__/${pyvertxt}/" < Plugin/template-pyproject.toml > "${mythtv_blddir}/pyproject.toml"
+  sed -e "s/__VER__/${ver}/" -e "s/__PYVER__/${pyvertxt}/" < Template/mythtv-pyproject.toml > "${mythtv_blddir}/pyproject.toml"
 
   msg_header "Building NLV Release"
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/${logpfx}.nlv.build.log"

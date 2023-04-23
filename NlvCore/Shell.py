@@ -25,7 +25,7 @@ import win32con
 import winnt
 
 # Application imports
-from Nlv.Version import NLV_VERSION
+from NlvCore.Version import NLV_VERSION
 
 
 

@@ -41,7 +41,7 @@ echo ==== Sphinx
 
 rem Build the documentation
 cd %ROOT_DIR%\Sphinx
-call make html
+call make html %NLVCORE_BLDDIR%\NlvCore\Sphinx
 
 
 
@@ -50,8 +50,8 @@ echo ==== NLV
 
 
 rem Setup staging area for build; now contains NLV *and* built documentation
-xcopy /q /y /s %ROOT_DIR%\Application\Nlv\*.* %STAGEDIR%\Nlv >NUL
-cd %STAGEDIR%
+xcopy /q /y /s /i %ROOT_DIR%\NlvCore %NLVCORE_BLDDIR%\NlvCore >NUL
+cd %NLVCORE_BLDDIR%
 
 rem Build the distributable wheel
 rem python nlv-setup.py %PIP_ARGS% ^
@@ -65,11 +65,11 @@ xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL
 
 
 echo.
-echo ==== NlvMythTV (plugin)
+echo ==== NlvMythTV
 
 rem The new Python build system ignores most options (e.g. --build-base, --egg-base etc)
 rem so copy everything to the build directory and process there
-xcopy /q /y /s %ROOT_DIR%\Plugin\NlvMythTV %MYTHTV_BLDDIR% >NUL
+xcopy /q /y /s /i %ROOT_DIR%\NlvMythTV %MYTHTV_BLDDIR%\NlvMythTV >NUL
 cd %MYTHTV_BLDDIR%
 python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %INSTDIR%
 

@@ -45,16 +45,16 @@ import wx.lib.agw.aui as aui
 import wx.lib.newevent as newevent
 
 # Application imports
-from Nlv.Global import G_ChannelLogFilter
-from Nlv.Global import G_Global
-from Nlv.Global import G_PerfTimerScope
-import Nlv.Session
-import Nlv.Logfile
-import Nlv.View
-import Nlv.EventView
-from Nlv.Project import G_Project
-from Nlv.Shell import G_Shell
-from Nlv.Version import NLV_VERSION
+from NlvCore.Global import G_ChannelLogFilter
+from NlvCore.Global import G_Global
+from NlvCore.Global import G_PerfTimerScope
+import NlvCore.Session
+import NlvCore.Logfile
+import NlvCore.View
+import NlvCore.EventView
+from NlvCore.Project import G_Project
+from NlvCore.Shell import G_Shell
+from NlvCore.Version import NLV_VERSION
 
 # Enable/disable profiling (VisualStudio tools not working ...)
 _G_WantProfiling = False
@@ -619,14 +619,14 @@ class G_LogViewApp(wx.App):
         import Nlog
         style_format_base = Nlog.EnumStyle.UserFormatBase
 
-        from Nlv.Logmeta import InitMetaStore
+        from NlvCore.Logmeta import InitMetaStore
         InitMetaStore(user_dir, style_format_base)
 
 
     #-------------------------------------------------------
     def SetupExtensions(self):
-        from Nlv.Logmeta import GetMetaStore
-        from Nlv.Theme import GetThemeStore
+        from NlvCore.Logmeta import GetMetaStore
+        from NlvCore.Theme import GetThemeStore
 
         # Interface between NLV plugins (extensions) and the application
         class Context:
@@ -647,7 +647,7 @@ class G_LogViewApp(wx.App):
 
 
         # load site specific extensions
-        from Nlv.Extension import LoadExtensions
+        from NlvCore.Extension import LoadExtensions
         with G_PerfTimerScope("LoadExtensions"):
             LoadExtensions(Context)
 
