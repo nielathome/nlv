@@ -48,7 +48,6 @@ call make html
 echo.
 echo ==== NLV
 
-set PYNLV=%PYBLDDIR%\Nlv
 
 rem Setup staging area for build; now contains NLV *and* built documentation
 xcopy /q /y /s %ROOT_DIR%\Application\Nlv\*.* %STAGEDIR%\Nlv >NUL
@@ -68,11 +67,10 @@ xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL
 echo.
 echo ==== NlvMythTV (plugin)
 
-echo on
 rem The new Python build system ignores most options (e.g. --build-base, --egg-base etc)
-rem so copy everything to the build directory
-xcopy /q /y /s %ROOT_DIR%\Plugin\NlvMythTV\*.* %MYTHTVBLDDIR% >NUL
-cd %MYTHTVBLDDIR%
+rem so copy everything to the build directory and process there
+xcopy /q /y /s %ROOT_DIR%\Plugin\NlvMythTV %MYTHTV_BLDDIR% >NUL
+cd %MYTHTV_BLDDIR%
 python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %INSTDIR%
 
 rem Deactivate the Python virtual environment
