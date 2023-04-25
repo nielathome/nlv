@@ -1,0 +1,16 @@
+Metadata-Version: 2.1
+Name: NlvCore
+Version: 523.15
+Summary: Log file viewing and analysis
+Home-page: https://github.com/nielathome/nlv
+Author: Niel Clausen
+License: GPL V3.0
+Keywords: GUI,NLV
+Platform: WIN64
+Classifier: Development Status :: 4 - Beta
+Classifier: Environment :: Win32 (MS Windows)
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved
+Classifier: Operating System :: Microsoft :: Windows :: Windows 10
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Topic :: Software Development :: User Interfaces

@@ -1,0 +1,7 @@
+[console_scripts]
+launchc = NlvCore.Launch:main
+nlvc = NlvCore.Main:main
+
+[gui_scripts]
+launchw = NlvCore.Launch:main
+nlvw = NlvCore.Main:main

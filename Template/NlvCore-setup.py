@@ -116,10 +116,6 @@ if __name__ == '__main__':
 
         libraries = [
             "sqlite3"
-        ],
-
-        extra_compile_args = [
-            "/MD" # should not be needed ... used to override /MT added by Python
         ]
     )
 
@@ -157,7 +153,7 @@ if __name__ == '__main__':
 
         zip_safe = False,
         install_requires = [
-          'Nlv-wxPython==__WXPYTHONVER__',
+          'NlvWxPython==__WXPYTHONVER__',
           'comtypes',
           'pywin32'
         ],

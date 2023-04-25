@@ -44,7 +44,7 @@ if "%HAVE_EXTENSION%"=="no" (
 
 echo.
 echo ==== wxWidgets - build
-python build.py -j 4 --relwithdebug --release build
+python build.py -j 4 --release build
 
 
 echo.

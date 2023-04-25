@@ -552,7 +552,7 @@ fi
 
 if [ -z "${cfg_clean}" ]; then
   # create the Python setup files
-  wxpythonver=$(grep "^Version:" < Deps/Modules/Phoenix/Nlv_wxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }')
+  wxpythonver=$(grep "^Version:" < Deps/Modules/Phoenix/NlvWxPython.egg-info/PKG-INFO  | tr -d '\r\n' | awk '{ printf("%s", $2); }')
 
   sed \
     -e "s/__VER__/${ver}/" \
