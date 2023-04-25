@@ -142,7 +142,8 @@ if __name__ == '__main__':
                 "Web/Charts/Network/*",
                 "Web/Charts/Pie/*",
                 "Web/Charts/TangledTree/*",
-                "Web/Charts/TreeMap/*"
+                "Web/Charts/TreeMap/*",
+                "vsNLV/*"
              ]
         },
 

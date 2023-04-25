@@ -41,11 +41,12 @@ cd %ROOT_DIR%\NlvVsExtension
 
 msbuild vsNLV.csproj /maxcpucount %MSBUILD_ARGS% %MSBUILD_TARGET% /property:Configuration=Release
 
-rem copy results to install sub-directory
-if not exist %INSTDIR%\vsNLV (
-  mkdir %INSTDIR%\vsNlv
+rem copy results to NlvCore sub-directory
+set OUTDIR=%NLVCORE_BLDDIR%\NlvCore\vsNLV
+if not exist %OUTDIR% (
+  mkdir %OUTDIR%
 )
 
-xcopy /q /y %BLDDIR%\VsExtension\Bin\Release\*.vsix %INSTDIR%\vsNlv > NUL
+xcopy /q /y %BLDDIR%\VsExtension\Bin\Release\*.vsix %OUTDIR% > NUL
 
 :FINISH

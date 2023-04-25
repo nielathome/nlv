@@ -540,6 +540,17 @@ sqlite_lib=${wrkdir}/sqlite3.lib
 addenvpath SQLITE_LIB_DIR "${wrkdir}"
 
 if [ -n "${cfg_clean}" ]; then
+  msg_header "Cleaning vsNLV"
+  vsnlv_clean="${logdir}/${logpfx}.vsnlv.clean.log"
+  runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_clean}"
+
+else
+  msg_header "Building vsNLV"
+  vsnlv_build="${logdir}/${logpfx}.vsnlv.build.log"
+  time runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_build}"
+fi
+
+if [ -n "${cfg_clean}" ]; then
   msg_header "Clean Sqlite import library"
   rm -f "${sqlite_lib}"
 
@@ -567,17 +578,6 @@ if [ -z "${cfg_clean}" ]; then
 
   msg_header "Building NLV Release"
   time runbat Scripts/build_nlv.bat 2>&1 | tee "${logdir}/${logpfx}.nlv.build.log"
-fi
-
-if [ -n "${cfg_clean}" ]; then
-  msg_header "Cleaning vsNLV"
-  vsnlv_clean="${logdir}/${logpfx}.vsnlv.clean.log"
-  runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_clean}"
-
-else
-  msg_header "Building vsNLV"
-  vsnlv_build="${logdir}/${logpfx}.vsnlv.build.log"
-  time runbat Scripts/build_vsnlv.bat 2>&1 | tee "${vsnlv_build}"
 fi
 
 
