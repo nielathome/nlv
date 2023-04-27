@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2018-2020. All rights reserved.
+rem Copyright (C) Niel Clausen 2018-2023. All rights reserved.
 rem
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -21,30 +21,32 @@ rem
 rem A Python virtual environment is required
 rem
 
-set TARGET=Nlv
+set VER=__VER__
+set ISLOCAL=__ISLOCAL__
+
 if "%1"=="--withdemo" (
-  set TARGET=NlvMythTV
+  set WITHDEMO=NlvMythTV
   shift
 )
 
 if not "%VIRTUAL_ENV%"=="" goto :INSTALL
 
-call .\iver.bat
-set ENVDIR=%1
+set PYENV=%1
 if "%1"=="" (
-  set ENVDIR=C:\Nlv\%VER%
+  set PYENV=C:\Nlv\%VER%
 )
+
 
 echo ===============================================================================
-echo Installing NLV to %ENVDIR%
+echo Installing NLV to %PYENV%
 
-if not exist %ENVDIR% (
+if not exist %PYENV% (
   echo ===============================================================================
   echo Creating Python virtual environment
-  python -m venv %ENVDIR%
+  python -m venv %PYENV%
 )
 
-call %ENVDIR%\Scripts\Activate.bat
+call %PYENV%\Scripts\Activate.bat
 
 
 rem
@@ -52,21 +54,32 @@ rem Install
 rem
 :INSTALL
 
+
 echo.
 echo ===============================================================================
 echo ==== NLV
  
 python -m pip install --upgrade pip
-pip install --upgrade --find-links=. %TARGET%
- 
-for %%f in (plugin-*.bat) do (
-  call %%~nf
+
+pip install --upgrade %ISLOCAL% NlvCore==%VER%
+
+
+echo.
+echo ===============================================================================
+
+if not %WITHDEMO% == "" (
+	echo ==== %WITHDEMO%
+    pip install --upgrade --find-links=. %WITHDEMO%
 )
 
-rem Temporary (~Q1'21)- until MS fix this: https://tinyurl.com/y3dm3h86
-pip install numpy==1.19.3
- 
+for %%P in (__PLUGINS__) do (
+	echo ==== %%P
+    pip install --upgrade --find-links=. %%P
+)
+
+
 rem Shell integration
+xcopy /y /q %PYENV%\lib\site-packages\NlvCore\Ico\*.ico .
 nlvc -i
 launchc -i
 
@@ -74,10 +87,13 @@ launchc -i
 echo.
 echo ===============================================================================
 echo NLV installed to %VIRTUAL_ENV%\Scripts and to the Start Menu
+echo The VisualStudio extension (2015, 2017 and 2019) can be found at
+echo   %PYENV%\lib\site-packages\NlvCore\vsNLV
 
-if "%ENVDIR%"=="" goto :FINISH
-call %ENVDIR%\Scripts\Deactivate.bat
+if "%PYENV%"=="" goto :FINISH
+call %PYENV%\Scripts\Deactivate.bat
 
 :FINISH
-set TARGET=
-set ENVDIR=
+set WITHDEMO=
+set ISLOCAL=
+set PYENV=

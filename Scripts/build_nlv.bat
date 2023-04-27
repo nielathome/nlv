@@ -48,15 +48,12 @@ call make html %NLVCORE_BLDDIR%\NlvCore\Sphinx
 echo.
 echo ==== NLV
 
-
 rem Setup staging area for build; now contains NLV *and* built documentation.
 rem Use setyup.py - as the new .toml seems to lack the power of the older approach.
 xcopy /q /y /s /i %ROOT_DIR%\NlvCore %NLVCORE_BLDDIR%\NlvCore >NUL
 cd %NLVCORE_BLDDIR%
-python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %INSTDIR%
-
-rem Copy the program icon(s) to the install directory
-xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL
+python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %UPLOADDIR%
+xcopy /q /y %UPLOADDIR%\NlvCore*.whl %LOCAL_INSTDIR%
 
 
 
@@ -67,7 +64,8 @@ rem The new Python build system ignores most options (e.g. --build-base, --egg-b
 rem so copy everything to the build directory and process there
 xcopy /q /y /s /i %ROOT_DIR%\NlvMythTV %MYTHTV_BLDDIR%\NlvMythTV >NUL
 cd %MYTHTV_BLDDIR%
-python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %INSTDIR%
+python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %LOCAL_INSTDIR%
+xcopy /q /y %LOCAL_INSTDIR%\NlvMythTV*.whl %REMOTE_INSTDIR%
 
 rem Deactivate the Python virtual environment
 call %PYENVBLD%\Scripts\Deactivate.bat

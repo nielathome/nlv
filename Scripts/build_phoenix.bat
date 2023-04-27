@@ -52,5 +52,6 @@ echo ==== wxPython - package
 rem Can't see how to stop verbose printout; so always capture to log file
 python build.py bdist_wheel > %LOGDIR%\%1.phoenix.package.log
 
-rem Copy installer to install directory
-xcopy /q /y dist\*.* %INSTDIR% >NUL
+rem Copy installer to upload directory directory
+xcopy /q /y dist\NlvWxPython*.whl %UPLOADDIR% >NUL
+xcopy /q /y dist\NlvWxPython*.whl %LOCAL_INSTDIR% >NUL

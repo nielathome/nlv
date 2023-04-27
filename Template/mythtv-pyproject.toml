@@ -30,10 +30,10 @@ name = "NlvMythTV"
 description = "MythTV extension for NLV"
 version = "__VER__"
 license = {text = "GPL V3.0"}
-requires-python = "==__PYVER__"
+requires-python = "==__PYVER__.*"
 
 dependencies = [
-    "Nlv == __VER__"
+    "NlvCore == __VER__"
 ]
 
 authors = [

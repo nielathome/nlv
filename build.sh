@@ -27,11 +27,13 @@ help()
   echo "--clean - clean workspace of build results"
   echo "--clean-pyenv - when cleaning, also remove Python virtual environments"
   echo "--force - force BOOST/TBB (re-)build"
-  echo "--help | -h - display help"
   echo "--install | -i - install the build"
   echo "--install-demo | -d - install the build with the standard demo"
   echo "--release | -r - increment release number"
   echo "--skip-phoenix - do not clean/build wxPython or wxWidgets"
+  echo "--upload - upload core distribution to PyPI"
+
+  echo "--help | -h - display help"
   echo "--verbose | -v - increase detail in output"
 }
 
@@ -41,6 +43,7 @@ cfg_install=""
 cfg_demo_install=""
 cfg_force=""
 cfg_release=""
+cfg_upload=""
 cfg_verbose=""
 cfg_skip_phoenix=""
 for arg in $*; do
@@ -81,6 +84,11 @@ for arg in $*; do
       
     "--release"|"-r")
       cfg_release=1
+      ;;
+
+    "--upload")
+      cfg_release=1
+      cfg_upload=1
       ;;
 
     "--verbose"|"-v")
@@ -185,16 +193,14 @@ python_blddir=${blddir}/Python
 nlvcore_blddir=${blddir}/Python/NlvCore
 mythtv_blddir=${python_blddir}/NlvMythTV
 pkgdir=${prjdir}/Deps/Packages
-instdir=${wrkdir}/Installers/${ver}
+linstdir=${wrkdir}/Installers/Local/${ver}
+rinstdir=${wrkdir}/Installers/Remote/${ver}
+uploaddir=${wrkdir}/Upload/${ver}
 logdir=${wrkdir}/Logs
 logpfx=$(date +%d-%b-%Y-%H-%M-%S)
 testdir=${wrkdir}/Test
 rm -rf "${python_blddir}"
-mkdir -p "${blddir}" "${pkgdir}" "${instdir}" "${logdir}" "${nlvcore_blddir}" "${mythtv_blddir}" "${testdir}"
-
-# initialise installer directory
-cp Scripts/install.bat "${instdir}"
-echo "set VER=${ver}" > "${instdir}/iver.bat"
+mkdir -p "${blddir}" "${pkgdir}" "${linstdir}" "${rinstdir}" "${uploaddir}" "${logdir}" "${nlvcore_blddir}" "${mythtv_blddir}" "${testdir}"
 
 # initialise Windows environment
 envbat=${wrkdir}/env.bat
@@ -210,8 +216,11 @@ envbat=${wrkdir}/env.bat
 addenvpath ROOT_DIR "."
 addenvpath CYGWIN_BASE "/"
 addenvpath BLDDIR "${blddir}"
-addenvpath INSTDIR "${instdir}"
+addenvpath LOCAL_INSTDIR "${linstdir}"
+addenvpath REMOTE_INSTDIR "${rinstdir}"
+addenvpath UPLOADDIR "${uploaddir}"
 addenvpath LOGDIR "${logdir}"
+addenvpath PYTHON_BLDDIR "${python_blddir}"
 addenvpath NLVCORE_BLDDIR "${nlvcore_blddir}"
 addenvpath MYTHTV_BLDDIR "${mythtv_blddir}"
 
@@ -613,21 +622,46 @@ fi
 # Build any co-resident plugins
 ###############################################################################
 
+plugins=
 if [ -z "${cfg_clean}" ]; then
-  plugins=$(ls -1 ../*/build-nlv.bat 2>/dev/null)
-  if [ -n "${plugins}" ]; then
-    thisdir=$(pwd)
-    thisdir=$(cygpath -a -w "$thisdir")
-    for plugin in ../*/build-nlv.bat; do
-      dir_name=$(dirname "${plugin}")
-      plugin_name=$(basename "${dir_name}")
+  probe=$(ls -1 ../*/build_plugin.sh 2>/dev/null)
+  if [ -n "${probe}" ]; then
+    for plugin in ${probe}; do
+      plugin_dir=$(dirname "${plugin}")
+      plugin_name=$(basename "${plugin_dir}")
+      plugin_blddir=${python_blddir}/${plugin_name}
+      plugins="${plugins} ${plugin_name}"
+
+      mkdir -p "${plugin_blddir}"
+      sed \
+        -e "s/__VER__/${ver}/" \
+        -e "s/__PYVER__/${pyvertxt}/" \
+      < ${plugin_dir}/Template/pyproject.toml > "${plugin_blddir}/pyproject.toml"
+
       msg_header "Build plugin: ${plugin_name}"
-      pushd "${dir_name}" > /dev/null || fail "pushd failed" "${dir_name}"
-      runbat build-nlv.bat "$thisdir" 2>&1 | tee "${logdir}/${logpfx}.Plugin-${plugin_name}.log"
-      popd > /dev/null || fail "popd failed"
+      time runbat Scripts/build_plugin.bat \
+        "$(cygpath -a -w "${plugin_dir}")" \
+        "${plugin_name}" \
+        "$(cygpath -a -w "${plugin_blddir}")" 2>&1 \
+      | tee "${logdir}/${logpfx}.Plugin-${plugin_name}.build.log"
     done
   fi
 fi
+
+# now finalise installer directories
+plugins="$(cat ${linstdir}/../*.txt | tr -d '\n\r')"
+
+sed \
+  -e "s/__VER__/${ver}/" \
+  -e "s/__ISLOCAL__/--find-links=./" \
+  -e "s/__PLUGINS__/${plugins}/" \
+< Template/install.bat > "${linstdir}/install.bat"
+
+sed \
+  -e "s/__VER__/${ver}/" \
+  -e "s/__ISLOCAL__//" \
+  -e "s/__PLUGINS__/${plugins}/" \
+< Template/install.bat > "${rinstdir}/install.bat"
 
 
 
@@ -637,9 +671,20 @@ fi
 
 if [ -n "${cfg_install}" ]; then
   msg_header "Install NLV ${ver}"  
-  pushd "${instdir}" > /dev/null || fail "pushd failed" "${instdir}"
+  pushd "${linstdir}" > /dev/null || fail "pushd failed" "${linstdir}"
   runbat install.bat ${cfg_demo_install} 2>&1 | tee "${logdir}/${logpfx}.install.log"
   popd > /dev/null || fail "popd failed"
+fi
+
+
+
+###############################################################################
+# If requested, upload the core distributions
+###############################################################################
+
+if [ -n "${cfg_upload}" ]; then
+  msg_header "Upload ${ver}"
+  runbat Scripts/upload.bat 2>&1 | tee "${logdir}/${logpfx}.upload.log"
 fi
 
 
