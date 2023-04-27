@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2023. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -31,6 +31,9 @@ call "%VS2015ENV%" x64
 rem Build NLV within the defined Python build virtual environment
 call %PYENVBLD%\Scripts\Activate.bat
 
+rem Ensure required tools are present and up to date
+pip install %PIP_ARGS% --upgrade build
+
 
 
 echo.
@@ -38,42 +41,31 @@ echo ==== Sphinx
 
 rem Build the documentation
 cd %ROOT_DIR%\Sphinx
-call make html
+call make html %NLVCORE_BLDDIR%\NlvCore\Sphinx
 
 
 
 echo.
 echo ==== NLV
 
-set PYBLD=%BLDDIR%\Python\
-set PYNLV=%PYBLD%\Nlv
-
-rem Setup staging area for build; now contains NLV *and* built documentation
-xcopy /q /y /s %ROOT_DIR%\Application\Nlv\*.* %STAGEDIR%\Nlv >NUL
-cd %STAGEDIR%
-
-rem Build the distributable wheel
-python nlv-setup.py %PIP_ARGS% ^
-  build --build-base=%PYNLV% --parallel 4 ^
-  egg_info --egg-base %PYNLV% ^
-  bdist_wheel --bdist-dir=%PYNLV%\bdist.win-amd64 --dist-dir=%INSTDIR%
-
-rem Copy the program icon(s) to the install directory
-xcopy /q /y Nlv\Ico\*.ico %INSTDIR% >NUL
+rem Setup staging area for build; now contains NLV *and* built documentation.
+rem Use setyup.py - as the new .toml seems to lack the power of the older approach.
+xcopy /q /y /s /i %ROOT_DIR%\NlvCore %NLVCORE_BLDDIR%\NlvCore >NUL
+cd %NLVCORE_BLDDIR%
+python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %UPLOADDIR%
+xcopy /q /y %UPLOADDIR%\NlvCore*.whl %LOCAL_INSTDIR%
 
 
 
 echo.
-echo ==== MythTV
+echo ==== NlvMythTV
 
-set PYMYTHTV=%PYBLD%\MythTV
-cd %ROOT_DIR%\Plugin
-
-rem Build the distributable wheel
-python nlv.mythtv-setup.py %PIP_ARGS% ^
-  build --build-base=%PYMYTHTV% ^
-  egg_info --egg-base %PYMYTHTV% ^
-  bdist_wheel --bdist-dir=%PYMYTHTV%\bdist.win-amd64 --dist-dir=%INSTDIR%
+rem The new Python build system ignores most options (e.g. --build-base, --egg-base etc)
+rem so copy everything to the build directory and process there
+xcopy /q /y /s /i %ROOT_DIR%\NlvMythTV %MYTHTV_BLDDIR%\NlvMythTV >NUL
+cd %MYTHTV_BLDDIR%
+python -m build %PYBLD_ARGS% --no-isolation --wheel --outdir %LOCAL_INSTDIR%
+xcopy /q /y %LOCAL_INSTDIR%\NlvMythTV*.whl %REMOTE_INSTDIR%
 
 rem Deactivate the Python virtual environment
 call %PYENVBLD%\Scripts\Deactivate.bat

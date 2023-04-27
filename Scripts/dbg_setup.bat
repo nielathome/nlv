@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019-2020. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2023. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -32,7 +32,7 @@ echo ==== Check/update Python Virtual Environment
 
 call %PYENVDBG%\Scripts\Activate.bat
 python -m pip install %PIP_ARGS% --upgrade pip 
-python -m pip %PIP_ARGS% install --upgrade pip pywin32 six pillow comtypes setuptools
+python -m pip %PIP_ARGS% install --upgrade pip pywin32 six pillow comtypes setuptools attrdict3 numpy
 
 
 
@@ -48,35 +48,23 @@ echo.
 echo ==== Add NLV to debug environment
 
 set NLV_PTH=%SITEDIR%\nlv.pth
-set NLV_EGG_LINK=%SITEDIR%\nlv.egg-link
-set NLOG_EGG_LINK=%SITEDIR%\nlog.egg-link
-
-set NLV_DIR=%ROOT_DIR%\Application
-set NLOG_DIR=%BLDDIR%\NlogDll\Bin
 
 rem sys.path extension
 echo # NLV developer paths > %NLV_PTH%
-echo %NLV_DIR% >> %NLV_PTH%
-echo %NLOG_DIR% >> %NLV_PTH%
 
-rem Nlv Egg link
-echo %NLV_DIR% > %NLV_EGG_LINK%   
-echo . >> %NLV_EGG_LINK%
+set NLV_CORE_DIR=%ROOT_DIR%
+echo %NLV_CORE_DIR% >> %NLV_PTH%
 
-rem Nlog Egg link
-echo %NLOG_DIR% > %NLOG_EGG_LINK%   
-echo . >> %NLOG_EGG_LINK%
+set NLV_LOG_DIR=%BLDDIR%\NlvLog\Dll\Bin
+echo %NLV_LOG_DIR% >> %NLV_PTH%
 
 
 
 echo.
 echo ==== Add MythTV to debug environment
 
-set MYTHTV_DIR=%ROOT_DIR%\Plugin
+set MYTHTV_DIR=%ROOT_DIR%\NlvMythTV
 set MYTHTV_EGG_LINK=%SITEDIR%\NlvMythTV.egg-link
-
-rem sys.path extension
-echo %MYTHTV_DIR% >> %NLV_PTH%
 
 rem Nlv Egg link
 echo %MYTHTV_DIR% > %MYTHTV_EGG_LINK%   
@@ -86,10 +74,9 @@ echo . >> %MYTHTV_EGG_LINK%
 
 echo.
 echo ==== Copy Boost/TBB DLLs to debug environment
-set NLOG_DIR=%BLDDIR%\NlogDll\Bin
-xcopy /q /y /i %BOOST%\stage\x64\lib\*.dll %NLOG_DIR% >NUL 
-xcopy /q /y %TBB%\build\vs2013\x64\Debug\*.dll %NLOG_DIR% >NUL 
-xcopy /q /y %TBB%\build\vs2013\x64\Release\*.dll %NLOG_DIR% >NUL 
+xcopy /q /y /i %BOOST%\stage\x64\lib\*.dll %NLV_LOG_DIR% >NUL 
+xcopy /q /y %TBB%\build\vs2013\x64\Debug\*.dll %NLV_LOG_DIR% >NUL 
+xcopy /q /y %TBB%\build\vs2013\x64\Release\*.dll %NLV_LOG_DIR% >NUL 
 
 
 

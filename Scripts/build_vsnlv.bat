@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2023. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -35,17 +35,18 @@ if not exist %NUGET% (
   goto FINISH 
 )
 
-cd %ROOT_DIR%\Extension\NlvVsExtension
+cd %ROOT_DIR%\NlvVsExtension
 
 %NUGET% restore packages.config
 
 msbuild vsNLV.csproj /maxcpucount %MSBUILD_ARGS% %MSBUILD_TARGET% /property:Configuration=Release
 
-rem copy results to install sub-directory
-if not exist %INSTDIR%\vsNLV (
-  mkdir %INSTDIR%\vsNlv
+rem copy results to NlvCore sub-directory
+set OUTDIR=%NLVCORE_BLDDIR%\NlvCore\vsNLV
+if not exist %OUTDIR% (
+  mkdir %OUTDIR%
 )
 
-xcopy /q /y %BLDDIR%\VsExtension\Bin\Release\*.vsix %INSTDIR%\vsNlv > NUL
+xcopy /q /y %BLDDIR%\VsExtension\Bin\Release\*.vsix %OUTDIR% > NUL
 
 :FINISH

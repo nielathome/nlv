@@ -4,15 +4,15 @@ VisualStudioVersion = 15.0.28307.1169
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Application", "Application", "{E6FC98CA-2142-491A-8CE3-73056F7E4507}"
 EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "Nlv", "Application\Nlv\Nlv.pyproj", "{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvCore", "NlvCore\NlvCore.pyproj", "{5272B2AB-2437-43F5-A93C-C1190A6DFBF0}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogDll", "Log\Dll\NlogDll.vcxproj", "{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogDll", "NlvLog\Dll\NlogDll.vcxproj", "{0C6FB63F-BCC2-4BF4-B484-9727584EE8EF}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogLib", "Log\Lib\NlogLib.vcxproj", "{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogLib", "NlvLog\Lib\NlogLib.vcxproj", "{59FF8DE3-28BD-43AB-9A38-3B4C01DED1B4}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogTests", "Log\Tests\NlogTests.vcxproj", "{58360E66-6F3A-4DF5-B0EE-C6B00254271F}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NlogTests", "NlvLog\Tests\NlogTests.vcxproj", "{58360E66-6F3A-4DF5-B0EE-C6B00254271F}"
 EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvMythTV", "Plugin\NlvMythTV\NlvMythTV.pyproj", "{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvMythTV", "NlvMythTV\NlvMythTV.pyproj", "{A88329AC-1E38-42F1-9E1B-19D730BCAFDF}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Documentation", "Documentation", "{2A5E6D2B-7364-4F8B-A93C-DB0962B7ECB8}"
 EndProject
@@ -36,7 +36,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Sphinx", "Sphinx", "{6CFDE1
 		Sphinx\vsnlv.rst = Sphinx\vsnlv.rst
 	EndProjectSection
 EndProject
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvLaunch", "Application\Nlv\NlvLaunch.pyproj", "{D863EBA4-7074-4957-92EA-FEAECA3441E5}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "NlvLaunch", "NlvCore\NlvLaunch.pyproj", "{D863EBA4-7074-4957-92EA-FEAECA3441E5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

@@ -1,6 +1,6 @@
 @echo off
 rem
-rem Copyright (C) Niel Clausen 2019-2020. All rights reserved.
+rem Copyright (C) Niel Clausen 2019-2023. All rights reserved.
 rem 
 rem This program is free software: you can redistribute it and/or modify
 rem it under the terms of the GNU General Public License as published by
@@ -29,7 +29,7 @@ call %PYENVBLD%\Scripts\Activate.bat
 
 rem Ensure required tools are present and up to date
 python -m pip install %PIP_ARGS% --upgrade pip 
-pip install %PIP_ARGS% --upgrade pathlib2 setuptools wheel requests pytest six sphinx
+pip install %PIP_ARGS% --upgrade --requirement %PHOENIX%\requirements\devel.txt pathlib2
 
 cd %PHOENIX%
 
@@ -44,13 +44,14 @@ if "%HAVE_EXTENSION%"=="no" (
 
 echo.
 echo ==== wxWidgets - build
-python build.py -j 4 --relwithdebug --release build
+python build.py -j 4 --release build
 
 
 echo.
 echo ==== wxPython - package
 rem Can't see how to stop verbose printout; so always capture to log file
-python build.py bdist_wheel > %LOGDIR%\phoenix.package.log
+python build.py bdist_wheel > %LOGDIR%\%1.phoenix.package.log
 
-rem Copy installer to install directory
-xcopy /q /y dist\*.* %INSTDIR% >NUL
+rem Copy installer to upload directory directory
+xcopy /q /y dist\NlvWxPython*.whl %UPLOADDIR% >NUL
+xcopy /q /y dist\NlvWxPython*.whl %LOCAL_INSTDIR% >NUL

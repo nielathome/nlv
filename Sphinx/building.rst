@@ -24,8 +24,8 @@ Structure
 NLV is a Python program and relies on customised versions of wxPython & wxWidgets
 to provide all Windows UI capabilities. These are provided as Git submodules.
 
-NLV relies on Nlog, a C++ DLL, for all searching, mapping and indexing tasks. The
-Nlog DLL makes use of a number of Open Source packages.
+NLV relies on NlvLog, a C++ DLL, for all searching, mapping and indexing tasks. The
+NlvLog DLL makes use of a number of Open Source packages.
 
 Building requires downloading the dependencies, patching wxWidgets, and compiling
 & packaging the source. It is recommended the supplied build.sh script is

@@ -1,0 +1,142 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>5272b2ab-2437-43f5-a93c-c1190a6dfbf0</ProjectGuid>
+    <ProjectHome>.</ProjectHome>
+    <StartupFile>Main.py</StartupFile>
+    <WorkingDirectory>..\_Work\Test</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <Name>Nlv</Name>
+    <RootNamespace>Nlv</RootNamespace>
+    <InterpreterId>MSBuild|{2255ebd9-4fe6-405c-ac64-063adf3f719e}|$(MSBuildProjectFullPath)</InterpreterId>
+    <IsWindowsApplication>True</IsWindowsApplication>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+    <CommandLineArguments>-r</CommandLineArguments>
+    <SearchPath>..\_Work\Bld\NlvLog\Dll\Bin</SearchPath>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Chart.py" />
+    <Compile Include="DataExplorer.py" />
+    <Compile Include="EventDisplay.py" />
+    <Compile Include="EventProjector.py" />
+    <Compile Include="EventView.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Channel.py" />
+    <Compile Include="Document.py" />
+    <Compile Include="Extension.py" />
+    <Compile Include="Global.py" />
+    <Compile Include="Logfile.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="PythonEditor.py" />
+    <Compile Include="Session.py" />
+    <Compile Include="Logmeta.py" />
+    <Compile Include="MatchNode.py" />
+    <Compile Include="Main.py" />
+    <Compile Include="Project.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Shell.py" />
+    <Compile Include="StyleNode.py" />
+    <Compile Include="TangledTree.py" />
+    <Compile Include="Theme.py" />
+    <Compile Include="Version.py" />
+    <Compile Include="View.py">
+      <SubType>Code</SubType>
+    </Compile>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Web\Charts\Bar\Bar.css" />
+    <Content Include="Web\Charts\Bar\Bar.html" />
+    <Content Include="Web\Charts\Chart.css" />
+    <Content Include="Web\Charts\Chart.js" />
+    <Content Include="Web\Charts\Network\Network.css" />
+    <Content Include="Web\Charts\Network\Network.html" />
+    <Content Include="Web\Charts\Network\Network.js" />
+    <Content Include="Web\Charts\Pie\Pie.css" />
+    <Content Include="Web\Charts\Pie\Pie.js" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.css" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.js" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.js" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.css" />
+    <Content Include="Web\Charts\_Models\M-Network.html" />
+    <Content Include="Web\Charts\Pie\Pie.html" />
+    <Content Include="Web\Charts\_Models\M-SunBurst.js" />
+    <Content Include="Web\Charts\_Models\M-TangledTree.js" />
+    <Content Include="Web\Charts\_Models\M-TreeMap.js" />
+    <Content Include="Web\empty.json" />
+    <Content Include="Web\ExplorerStyle.css" />
+    <Content Include="Web\Charts\TangledTree\TangledTree.html" />
+    <Content Include="theme.event.default.xml" />
+    <Content Include="theme.log.default.xml" />
+    <Content Include="theme.view.default.xml" />
+    <Content Include="Web\Charts\TreeMap\TreeMap.html" />
+    <Content Include="Web\Charts\Bar\Bar.js" />
+    <Content Include="Web\Charts\_Models\M-Bar.html" />
+    <Content Include="Web\Charts\_Models\M-Bar.js" />
+    <Content Include="Web\Charts\_Models\M-Network.js" />
+    <Content Include="Web\Charts\_Models\M-Pie.html" />
+    <Content Include="Web\Charts\_Models\M-Pie.js" />
+    <Content Include="Web\Charts\_Models\M-SunBurst.html" />
+    <Content Include="Web\Charts\_Models\M-TangledTree.html" />
+    <Content Include="Web\Charts\_Models\M-TreeMap.html" />
+    <Content Include="_defaults.xml" />
+    <Content Include="theme.global.default.xml" />
+    <Content Include="_field_names.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Interpreter Include="..\_Work\PyEnv\Dbg\">
+      <Id>{2255ebd9-4fe6-405c-ac64-063adf3f719e}</Id>
+      <Version>3.5</Version>
+      <Description>Dbg (Python 3.7 x64)</Description>
+      <InterpreterPath>Scripts\python.exe</InterpreterPath>
+      <WindowsInterpreterPath>Scripts\pythonw.exe</WindowsInterpreterPath>
+      <LibraryPath>Lib\</LibraryPath>
+      <PathEnvironmentVariable>
+      </PathEnvironmentVariable>
+      <Architecture>Amd64</Architecture>
+    </Interpreter>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Web\" />
+    <Folder Include="Web\Charts\" />
+    <Folder Include="Web\Charts\Bar\" />
+    <Folder Include="Web\Charts\Network\" />
+    <Folder Include="Web\Charts\TreeMap\" />
+    <Folder Include="Web\Charts\SunBurst\" />
+    <Folder Include="Web\Charts\TangledTree\" />
+    <Folder Include="Web\Charts\Pie\" />
+    <Folder Include="Web\Charts\_Models\" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\NlvLog\Dll\NlogDll.vcxproj">
+      <Name>NlogDll</Name>
+      <Project>{0c6fb63f-bcc2-4bf4-b484-9727584ee8ef}</Project>
+      <Private>True</Private>
+    </ProjectReference>
+  </ItemGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <!-- Uncomment the CoreCompile target to enable the Build command in
+       Visual Studio and specify your pre- and post-build commands in
+       the BeforeBuild and AfterBuild targets below. -->
+  <!--<Target Name="CoreCompile" />-->
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
