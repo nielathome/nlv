@@ -648,18 +648,15 @@ if [ -z "${cfg_clean}" ]; then
   fi
 fi
 
-# now finalise installer directories
-plugins="$(cat ${linstdir}/../*.txt | tr -d '\n\r')"
-
 sed \
   -e "s/__VER__/${ver}/" \
-  -e "s/__ISLOCAL__/--find-links=./" \
+  -e "s/__PKGLOC__/--find-links=./" \
   -e "s/__PLUGINS__/${plugins}/" \
 < Template/install.bat > "${linstdir}/install.bat"
 
 sed \
   -e "s/__VER__/${ver}/" \
-  -e "s/__ISLOCAL__//" \
+  -e "s/__PKGLOC__//" \
   -e "s/__PLUGINS__/${plugins}/" \
 < Template/install.bat > "${rinstdir}/install.bat"
 

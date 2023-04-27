@@ -33,6 +33,10 @@ from setuptools import setup, find_packages, Extension
 
 #---------------------------------------------------------------------------
 
+LONG_DESCRIPTION = """\
+Log file viewing and analysis
+"""
+
 CLASSIFIERS = """\
 Development Status :: 4 - Beta
 Environment :: Win32 (MS Windows)
@@ -42,6 +46,7 @@ Operating System :: Microsoft :: Windows :: Windows 10
 Programming Language :: Python :: __PYVER__
 Topic :: Software Development :: User Interfaces
 """
+
 
 #---------------------------------------------------------------------------
 
@@ -156,7 +161,7 @@ if __name__ == '__main__':
         install_requires = [
           'NlvWxPython==__WXPYTHONVER__',
           'comtypes',
-          'pywin32'
+          'pywin32==300' # there's something broken with newer pywin32 and older Python; pin to 300 for the time being
         ],
 
         entry_points={
@@ -184,6 +189,7 @@ if __name__ == '__main__':
         keywords = "GUI,NLV",
 
         description = "Log file viewing and analysis",
+        long_description = LONG_DESCRIPTION,
 
         author = "Niel Clausen",
 

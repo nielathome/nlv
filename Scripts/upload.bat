@@ -16,9 +16,10 @@ rem You should have received a copy of the GNU General Public License
 rem along with this program. If not, see <https://www.gnu.org/licenses/>.
 rem
 
+set PYPI=PyPI
 if "%1" == "--debug" (
-    set DBG_TEXT=(debug)
-    set DBG_ARGS=--verboase --repository-url https://test.pypi.org/
+    set PYPI=TesrPyPI
+    set DBG_ARGS=--verbose --repository-url https://test.pypi.org/legacy/
 )
 
 call _Work\env.bat
@@ -32,5 +33,4 @@ rem Ensure required tools are present and up to date
 python -m pip install %PIP_ARGS% --upgrade twine
 
 rem Upload distribution
-cd %UPLOADDIR%
 python -m twine upload --username __token__ %DBG_ARGS% %UPLOADDIR%\*.whl

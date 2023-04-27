@@ -22,12 +22,18 @@ rem A Python virtual environment is required
 rem
 
 set VER=__VER__
-set ISLOCAL=__ISLOCAL__
+set PKGLOC=__PKGLOC__
 
 if "%1"=="--withdemo" (
   set WITHDEMO=NlvMythTV
   shift
 )
+
+if "%1"=="--testpi" (
+  set PKGLOC=-i https://test.pypi.org/simple/
+  shift
+)
+
 
 if not "%VIRTUAL_ENV%"=="" goto :INSTALL
 
@@ -61,13 +67,13 @@ echo ==== NLV
  
 python -m pip install --upgrade pip
 
-pip install --upgrade %ISLOCAL% NlvCore==%VER%
+pip install --upgrade %PKGLOC% NlvCore==%VER%
 
 
 echo.
 echo ===============================================================================
 
-if not %WITHDEMO% == "" (
+if not "%WITHDEMO%" == "" (
 	echo ==== %WITHDEMO%
     pip install --upgrade --find-links=. %WITHDEMO%
 )
