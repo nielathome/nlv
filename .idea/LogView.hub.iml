@@ -15,6 +15,7 @@
       <excludeFolder url="file://$MODULE_DIR$/Sphinx/_static" />
       <excludeFolder url="file://$MODULE_DIR$/Sphinx/_templates" />
       <excludeFolder url="file://$MODULE_DIR$/_Work" />
+      <excludeFolder url="file://$MODULE_DIR$/Deps/Modules/Phoenix" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.7 (Nlv Dbg)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
