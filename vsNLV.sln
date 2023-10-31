@@ -1,11 +1,16 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.28010.2046
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vsNLV", "NlvVsExtension\vsNLV.csproj", "{85E59767-76DA-4155-9D3F-DC6EBF36F7A8}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "vsNLV-to-Vs2019", "NlvVsExtension\Vs2019\vsNLV-to-Vs2019.csproj", "{85E59767-76DA-4155-9D3F-DC6EBF36F7A8}"
+EndProject
+Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "vsNLV-shared", "NlvVsExtension\vsNLV-shared.shproj", "{5CB7C0CE-2B2C-4A0E-81E5-2B96D366DDF9}"
 EndProject
 Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		NlvVsExtension\vsNLV-shared.projitems*{5cb7c0ce-2b2c-4a0e-81e5-2b96d366ddf9}*SharedItemsImports = 13
+		NlvVsExtension\vsNLV-shared.projitems*{85e59767-76da-4155-9d3f-dc6ebf36f7a8}*SharedItemsImports = 4
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
