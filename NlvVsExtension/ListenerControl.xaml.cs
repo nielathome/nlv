@@ -140,7 +140,7 @@ namespace NLV.VisualStudio
                 return;
 
             if(pane != null)
-                pane.OutputString(message + "\n");
+                pane.OutputStringThreadSafe(message + "\n");
         }
 
 

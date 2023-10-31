@@ -1,8 +1,8 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011" xmlns:d="http://schemas.microsoft.com/developer/vsx-schema-design/2011">
     <Metadata>
-        <Identity Id="vsNLV" Version="0.1.0.11" Language="en-US" Publisher="Niel Clausen" />
-        <DisplayName>NLV Listener for VisusalStudio</DisplayName>
+        <Identity Id="vsNLV.51bf49be-efd1-46fd-8128-5eb715c6c914" Version="1.0" Language="en-US" Publisher="Niel Clausen" />
+        <DisplayName>NLV Listener for VisualStudio</DisplayName>
         <Description xml:space="preserve">NLV Listener for VisualStudio. License: GPL V3.</Description>
         <License>LICENSE.txt</License>
     </Metadata>
